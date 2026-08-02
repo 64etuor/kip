@@ -1,0 +1,219 @@
+.playwright-cli/page-2026-07-30T10-27-26-116Z.yml
+  s_f2b3e4ecc5c8ee::t_89cf28a94bf33f 1-19
+.playwright-cli/page-2026-07-30T10-29-52-390Z.yml
+  s_bc6cc2e74c9087::t_d08b3abec6db5c 1-22
+.playwright-cli/page-2026-07-30T10-30-59-743Z.yml
+  s_f2b3e4ecc5c8ee::t_47639547e040f0 1-33
+.playwright-cli/page-2026-07-30T10-34-40-973Z.yml
+  s_f2b3e4ecc5c8ee::t_fd16536b07bd84 1-22
+.playwright-cli/page-2026-07-30T10-36-16-626Z.yml
+  s_f2b3e4ecc5c8ee::t_a251035e1cbbcc 1-22
+.playwright-cli/page-2026-07-30T10-41-26-043Z.yml
+  s_bc6cc2e74c9087::t_3de14c621c02f7 1-22
+.playwright-cli/page-2026-07-30T10-42-12-489Z.yml
+  s_bc6cc2e74c9087::t_c1a7e01c058051 1-22
+.playwright-cli/page-2026-07-30T10-45-35-951Z.yml
+  s_f2b3e4ecc5c8ee::t_8b85459b9b3389 1-22
+.playwright-cli/page-2026-07-30T10-46-29-479Z.yml
+  s_f2b3e4ecc5c8ee::t_502beb26a05364 1-22
+.playwright-cli/page-2026-07-30T10-47-17-808Z.yml
+  s_f2b3e4ecc5c8ee::t_7bd0c886492186 1-22
+.playwright-cli/page-2026-07-30T10-47-57-782Z.yml
+  s_f2b3e4ecc5c8ee::t_98f02cc4bb8ee9 1-22
+.playwright-cli/page-2026-07-30T11-48-34-869Z.yml
+  s_f2b3e4ecc5c8ee::t_25fe36d51cb4e6 1-23
+.playwright-cli/page-2026-07-30T11-51-25-964Z.yml
+  s_f2b3e4ecc5c8ee::t_9d300066fbb520 1-23
+.playwright-cli/page-2026-07-30T12-01-50-590Z.yml
+  s_f2b3e4ecc5c8ee::t_3a201426b70995 1-23
+.playwright-cli/page-2026-07-30T12-03-25-128Z.yml
+  s_f2b3e4ecc5c8ee::t_d7a5f567ffb956 1-23
+.playwright-cli/page-2026-07-30T12-04-17-428Z.yml
+  s_f2b3e4ecc5c8ee::t_54859b64ff079d 1-23
+.playwright-cli/page-2026-07-30T12-04-56-827Z.yml
+  s_f2b3e4ecc5c8ee::t_79e129e9859c0c 1-23
+.playwright-cli/page-2026-07-30T12-29-36-484Z.yml
+  s_f2b3e4ecc5c8ee::t_e9c00dfb1d885d 1-23
+.playwright-cli/page-2026-07-30T12-31-45-705Z.yml
+  s_f2b3e4ecc5c8ee::t_b422e43d7614ae 1-23
+.playwright-cli/page-2026-07-30T12-33-02-881Z.yml
+  s_f2b3e4ecc5c8ee::t_0c5cd5534544f9 1-23
+Makefile
+  s_bc6cc2e74c9087::t_dae4b2f61300e5 1-40
+README.md
+  s_bc6cc2e74c9087::t_9e4cb336a24ddd 1-174
+config/kip.example.toml
+  s_bc6cc2e74c9087::t_ba7114bd26db6a 1-122
+contracts/approved-assertion.schema.json
+  s_bc6cc2e74c9087::t_e28d6be44d3379 1-107
+contracts/artifact.schema.json
+  s_bc6cc2e74c9087::t_3efec4510555cd 1-106
+contracts/assertion-candidate.schema.json
+  s_bc6cc2e74c9087::t_ac51e9feec1a2a 1-93
+contracts/assertion-explanation.schema.json
+  s_bc6cc2e74c9087::t_0432e8c88b2acd 1-389
+contracts/capabilities.schema.json
+  s_bc6cc2e74c9087::t_5b33482f3472bf 1-62
+contracts/connector-event.schema.json
+  s_bc6cc2e74c9087::t_9be37167ddd478 1-57
+contracts/content-unit.schema.json
+  s_bc6cc2e74c9087::t_55c11b17615b8a 1-111
+contracts/context-bundle.schema.json
+  s_bc6cc2e74c9087::t_fcf1e9af87e446 1-179
+contracts/context-request.schema.json
+  s_bc6cc2e74c9087::t_2c03f849f14f67 1-55
+contracts/document-packet.schema.json
+  s_bc6cc2e74c9087::t_7c89b7686c6299 1-549
+contracts/envelope.schema.json
+  s_bc6cc2e74c9087::t_296a1e2cfeb5f5 1-96
+contracts/evidence-locator.schema.json
+  s_bc6cc2e74c9087::t_a0b61ebbbeb8dc 1-20
+contracts/evidence-read.schema.json
+  s_bc6cc2e74c9087::t_f2c043bec31a0d 1-158
+contracts/graph-neighbors-request.schema.json
+  s_bc6cc2e74c9087::t_fb0cb135a1e521 1-43
+contracts/graph-path-request.schema.json
+  s_bc6cc2e74c9087::t_f9dc7314d80a14 1-38
+contracts/ingest-result.schema.json
+  s_bc6cc2e74c9087::t_e5311d6233bde2 1-64
+contracts/openapi.json
+  s_bc6cc2e74c9087::t_ab22712b7d4b95 1-1804
+contracts/openapi.yaml
+  s_bc6cc2e74c9087::t_ef91cb1b90247a 1-1100
+contracts/search-hit.schema.json
+  s_bc6cc2e74c9087::t_d9adeb258af591 1-105
+contracts/search-request.schema.json
+  s_bc6cc2e74c9087::t_ad95f1b92743aa 1-48
+contracts/source-object.schema.json
+  s_bc6cc2e74c9087::t_ca5802d40b7da3 1-68
+contracts/source-revision.schema.json
+  s_bc6cc2e74c9087::t_d2d2ffc3202d7b 1-76
+contracts/status-report.schema.json
+  s_bc6cc2e74c9087::t_0c81a509102d1c 1-69
+contracts/sync-summary.schema.json
+  s_bc6cc2e74c9087::t_687bda7220273f 1-51
+contracts/vocabulary-item.schema.json
+  s_bc6cc2e74c9087::t_70ecf0dfca21ff 1-24
+contracts/xlsx-range-read.schema.json
+  s_bc6cc2e74c9087::t_bbd61ca6a11c14 1-56
+docs/IMPLEMENTATION_STATUS.md
+  s_bc6cc2e74c9087::t_e55fb271c562fe 1-36
+docs/OPERATIONS.md
+  s_bc6cc2e74c9087::t_7b1138e2e5f3d5 1-84
+docs/PRD.md
+  s_75817b400a5cec::t_7d57433e2d664c 1-849
+docs/PRODUCTION_CHECKLIST.md
+  s_bc6cc2e74c9087::t_969f46345f7f35 1-49
+docs/QUICKSTART.md
+  s_bc6cc2e74c9087::t_0853f1bcf3a196 1-62
+docs/RAG_EVALUATION.md
+  s_bc6cc2e74c9087::t_5741fb24f4a278 1-83
+docs/SECURITY.md
+  s_bc6cc2e74c9087::t_1ee0c26a1f8b1f 1-38
+docs/adr/ADR-005-local-first-hybrid-retrieval.md
+  s_bc6cc2e74c9087::t_02fa77033a991e 1-41
+docs/plans/2026-07-30-rag-quality-stack-design.md
+  s_bc6cc2e74c9087::t_4531ea113ec2ea 1-193
+docs/plans/2026-07-30-rag-quality-stack-implementation.md
+  s_bc6cc2e74c9087::t_24c9035e33a9df 1-492
+evaluation/README.md
+  s_bc6cc2e74c9087::t_883ed684f3489e 1-35
+evaluation/reports/evolution.jsonl
+  s_bc6cc2e74c9087::t_680ddba6477569 1-18
+evaluation/reports/public-government/eval_20260730T105915336204Z.json
+  s_bc6cc2e74c9087::t_a2d092ab4e77d7 1-3246
+evaluation/reports/public-government/eval_20260730T105915336204Z.md
+  s_bc6cc2e74c9087::t_f55ea18dfcf1a3 1-26
+evaluation/reports/public-government/eval_20260730T110400722276Z.json
+  s_bc6cc2e74c9087::t_dbe3c852b3ba42 1-3373
+evaluation/reports/public-government/eval_20260730T110400722276Z.md
+  s_bc6cc2e74c9087::t_094433e73fbaf0 1-26
+evaluation/reports/public-government/eval_20260730T110743478291Z.json
+  s_bc6cc2e74c9087::t_31550b1073a821 1-1674
+evaluation/reports/public-government/eval_20260730T110743478291Z.md
+  s_bc6cc2e74c9087::t_058b284a8555ab 1-24
+evaluation/reports/public-government/eval_20260730T111540556068Z.json
+  s_bc6cc2e74c9087::t_ef2457e8484d60 1-3351
+evaluation/reports/public-government/eval_20260730T111540556068Z.md
+  s_bc6cc2e74c9087::t_c71a1a3c79ea01 1-26
+evaluation/reports/public-government/eval_20260730T111926992603Z.json
+  s_bc6cc2e74c9087::t_47c582e41875d6 1-3352
+evaluation/reports/public-government/eval_20260730T111926992603Z.md
+  s_bc6cc2e74c9087::t_8aaa0333a3454e 1-27
+evaluation/reports/public-government/latest.json
+  s_bc6cc2e74c9087::t_61f4142c830ce3 1-3352
+evaluation/reports/public-government/latest.md
+  s_bc6cc2e74c9087::t_488db9454c7b8f 1-27
+evaluation/schemas/evaluation-report.schema.json
+  s_bc6cc2e74c9087::t_89a64a53837b43 1-128
+scripts/bootstrap-semantic.sh
+  s_bc6cc2e74c9087::t_20eae706a52912 1-26
+scripts/fetch_public_corpus.py
+  s_bc6cc2e74c9087::t_35ec979c07a3bb 1-184
+scripts/semantic-smoke.sh
+  s_bc6cc2e74c9087::t_164bc991c1093b 1-44
+src/kip/adapters/repository/memory.py
+  s_bc6cc2e74c9087::t_b69152b25390a3 1-712
+src/kip/adapters/repository/postgres.py
+  s_bc6cc2e74c9087::t_ebb1d1ae83e22f 1-1399
+src/kip/application/services.py
+  s_bc6cc2e74c9087::t_c20dc7312d31b9 1-936
+src/kip/cli.py
+  s_bc6cc2e74c9087::t_432e981dc8af2c 1-891
+src/kip/container.py
+  s_bc6cc2e74c9087::t_2249af22392350 1-87
+src/kip/domain/models.py
+  s_bc6cc2e74c9087::t_3ca1a76ebd640a 1-376
+src/kip/evaluation/reporting.py
+  s_bc6cc2e74c9087::t_6a4ea9138d301b 1-109
+src/kip/evaluation/runner.py
+  s_bc6cc2e74c9087::t_00b61c4b56b9f1 1-373
+src/kip/ports/embedding.py
+  s_bc6cc2e74c9087::t_bc53d625350a07 1-17
+src/kip/ports/repository.py
+  s_bc6cc2e74c9087::t_9718ffd6126d93 1-74
+src/kip/ports/reranker.py
+  s_bc6cc2e74c9087::t_d93f11b567c0ae 1-21
+tests/integration/test_postgres_repository.py
+  s_bc6cc2e74c9087::t_ba6b1a2574a393 1-140
+tests/test_cli_surface.py
+  s_bc6cc2e74c9087::t_51e5a4ac0b6e02 1-114
+tests/test_evaluation_contracts.py
+  s_bc6cc2e74c9087::t_c888baf68cb9eb 1-83
+tests/test_evaluation_runner.py
+  s_bc6cc2e74c9087::t_cba19dc1566ec7 1-149
+tests/test_hybrid_retrieval.py
+  s_bc6cc2e74c9087::t_59179c68328cea 1-217
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "95808190211336937f4e680d0f8a6da523eb7d91",
+  "prompts": {},
+  "sessions": {
+    "s_75817b400a5cec": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fa762-6c60-7240-9819-020a8c65c1a3",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_bc6cc2e74c9087": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fb25a-ab3e-73e0-aab0-2cee6db1e945",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_f2b3e4ecc5c8ee": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fb287-4720-7f71-8306-6cebda7451c0",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

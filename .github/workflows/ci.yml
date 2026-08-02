@@ -1,0 +1,38 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.2-pg18-trixie
+        env:
+          POSTGRES_DB: kip
+          POSTGRES_USER: kip_owner
+          POSTGRES_PASSWORD: test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kip_owner -d kip"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      KIP_DATABASE_URL: postgresql://kip_owner:test-password@127.0.0.1:5432/kip
+      KIP_WORKSPACE: default
+      KIP_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e '.[postgres,api,extractors,dev]'
+      - run: kip migrate
+      - run: pytest
+      - run: python scripts/generate_contracts.py --check
+      - run: python scripts/verify_project.py

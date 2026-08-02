@@ -1,0 +1,55 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "document_types": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Document Types",
+      "type": "array"
+    },
+    "include_candidate_assertions": {
+      "default": false,
+      "title": "Include Candidate Assertions",
+      "type": "boolean"
+    },
+    "limit": {
+      "default": 10,
+      "maximum": 100,
+      "minimum": 1,
+      "title": "Limit",
+      "type": "integer"
+    },
+    "max_chars": {
+      "default": 40000,
+      "maximum": 200000,
+      "minimum": 1000,
+      "title": "Max Chars",
+      "type": "integer"
+    },
+    "project_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Project Ids",
+      "type": "array"
+    },
+    "query": {
+      "minLength": 1,
+      "title": "Query",
+      "type": "string"
+    },
+    "source_kinds": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Source Kinds",
+      "type": "array"
+    }
+  },
+  "required": [
+    "query"
+  ],
+  "title": "ContextRequest",
+  "type": "object"
+}

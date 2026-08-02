@@ -1,0 +1,3 @@
+interface:
+  display_name: "KIP Knowledge Fabric"
+  short_description: "Search and verify internal evidence across files, Slack, and mail"

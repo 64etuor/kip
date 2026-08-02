@@ -1,0 +1,38 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "approved_only": {
+      "default": true,
+      "title": "Approved Only",
+      "type": "boolean"
+    },
+    "from_node_id": {
+      "title": "From Node Id",
+      "type": "string"
+    },
+    "max_depth": {
+      "default": 4,
+      "maximum": 8,
+      "minimum": 1,
+      "title": "Max Depth",
+      "type": "integer"
+    },
+    "predicates": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Predicates",
+      "type": "array"
+    },
+    "to_node_id": {
+      "title": "To Node Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "from_node_id",
+    "to_node_id"
+  ],
+  "title": "GraphPathRequest",
+  "type": "object"
+}

@@ -1,0 +1,85 @@
+{
+  "schema_version": "kip.public-corpus.v1",
+  "name": "Korean government policy pilot",
+  "description": "Public Nuri Type 1 Korean government documents for reproducible retrieval evaluation.",
+  "documents": [
+    {
+      "id": "MOHW-PRIORITY-PURCHASE-2025",
+      "title": "공공기관 중증장애인생산품 우선구매 2024년 실적 및 2025년 계획",
+      "agency": "보건복지부",
+      "published_at": "2025-04-28",
+      "filename": "mohw-priority-purchase-2025.pdf",
+      "url": "https://www.mohw.go.kr/boardDownload.es?bid=0027&list_no=1485549&seq=2",
+      "source_page": "https://www.mohw.go.kr/board.es?act=view&bid=0027&list_no=1485549&mid=a10503000000",
+      "license": "KOGL-Type-1-Attribution",
+      "license_url": "https://www.kogl.or.kr/info/licenseType1.do",
+      "sha256": "d432f12e2c31a964f698bf8add03a25e916999a68618a65f4de39116a24ffd34",
+      "attribution": "출처: 보건복지부, 공공누리 제1유형"
+    },
+    {
+      "id": "MOHW-INTEGRATED-CARE-2025",
+      "title": "의료·돌봄 통합지원 본사업 준비방안",
+      "agency": "보건복지부",
+      "published_at": "2025-02-24",
+      "filename": "mohw-integrated-care-2025.pdf",
+      "url": "https://www.mohw.go.kr/boardDownload.es?bid=0027&list_no=1484769&seq=2",
+      "source_page": "https://www.mohw.go.kr/board.es?act=view&bid=0027&list_no=1484769&mid=a10503010100",
+      "license": "KOGL-Type-1-Attribution",
+      "license_url": "https://www.kogl.or.kr/info/licenseType1.do",
+      "sha256": "530434679b57d72ebb5b4965c79503c1ddda825485cba976d012c0bfcbbd4b81",
+      "attribution": "출처: 보건복지부, 공공누리 제1유형"
+    },
+    {
+      "id": "MOHW-HEALTH-INSURANCE-2025",
+      "title": "필수·지역의료 강화를 위한 건강보험 투자 확대",
+      "agency": "보건복지부",
+      "published_at": "2025-03-27",
+      "filename": "mohw-health-insurance-2025.pdf",
+      "url": "https://www.mohw.go.kr/boardDownload.es?bid=0027&list_no=1485110&seq=2",
+      "source_page": "https://www.mohw.go.kr/board.es?act=view&bid=0027&list_no=1485110&mid=a10503000000",
+      "license": "KOGL-Type-1-Attribution",
+      "license_url": "https://www.kogl.or.kr/info/licenseType1.do",
+      "sha256": "1b4d812d3e65f4190caaf6853eac9f8d0d6188667fd1cf57d8df17f409de59be",
+      "attribution": "출처: 보건복지부, 공공누리 제1유형"
+    },
+    {
+      "id": "MOHW-KOREA-ZINC-VOTE-2025",
+      "title": "국민연금 고려아연 주주총회 의결권 행사 방향",
+      "agency": "보건복지부",
+      "published_at": "2025-03-27",
+      "filename": "mohw-korea-zinc-vote-2025.pdf",
+      "url": "https://www.mohw.go.kr/boardDownload.es?bid=0027&list_no=1485112&seq=2",
+      "source_page": "https://www.mohw.go.kr/board.es?act=view&bid=0027&list_no=1485112&mid=a10503010300",
+      "license": "KOGL-Type-1-Attribution",
+      "license_url": "https://www.kogl.or.kr/info/licenseType1.do",
+      "sha256": "7694411ea2ff325e8116abe30a3ba733d08242308aaedaa4368e37cde2ef97ee",
+      "attribution": "출처: 보건복지부, 공공누리 제1유형"
+    },
+    {
+      "id": "MOHW-ADOPTION-REFORM-2023",
+      "title": "입양에 대한 국가책임 강화",
+      "agency": "보건복지부",
+      "published_at": "2023-06-30",
+      "filename": "mohw-adoption-reform-2023.pdf",
+      "url": "https://www.mohw.go.kr/boardDownload.es?bid=0027&list_no=377003&seq=2",
+      "source_page": "https://www.mohw.go.kr/board.es?act=view&bid=0027&list_no=377003&mid=a10503000000",
+      "license": "KOGL-Type-1-Attribution",
+      "license_url": "https://www.kogl.or.kr/info/licenseType1.do",
+      "sha256": "04a753f628c3d36d3daf34d10b28f12aef1a8650496bb8eb1bab611cd084703f",
+      "attribution": "출처: 보건복지부, 공공누리 제1유형"
+    },
+    {
+      "id": "MOE-BUSINESS-PLAN-2025",
+      "title": "2025년 교육부 주요업무 추진계획",
+      "agency": "교육부",
+      "published_at": "2025-01-10",
+      "filename": "moe-business-plan-2025.pdf",
+      "url": "https://www.moe.go.kr/boardCnts/fileDown.do?fileSeq=4bd087b733426be7be33763cec754c2d&m=031102&s=moe",
+      "source_page": "https://www.moe.go.kr/boardCnts/viewRenew.do?boardID=72713&boardSeq=104862&lev=0&m=031102&opType=N&page=1&s=moe",
+      "license": "KOGL-Type-1-Attribution",
+      "license_url": "https://www.kogl.or.kr/info/licenseType1.do",
+      "sha256": "0b3dfbbc98583734892aa7dea656d5b975254f3eb8e573c561bc5cb19a991f6c",
+      "attribution": "출처: 교육부, 공공누리 제1유형"
+    }
+  ]
+}

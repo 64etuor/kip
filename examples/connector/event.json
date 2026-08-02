@@ -1,0 +1,14 @@
+{
+  "schema_version": "kip.connector-event.v1",
+  "event_id": "evt_example_001",
+  "connector_name": "custom-crm",
+  "operation": "upsert",
+  "external_id": "message-123",
+  "payload": {
+    "source_kind": "crm",
+    "subject": "A과제 협약 변경",
+    "text": "협약 변경 신청서를 제출했습니다.",
+    "message_id": "message-123"
+  },
+  "acl_scopes": ["workspace:default", "project:A"]
+}

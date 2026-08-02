@@ -1,0 +1,122 @@
+[app]
+environment = "development"
+workspace = "default"
+log_level = "INFO"
+
+[database]
+url_env = "KIP_DATABASE_URL"
+statement_timeout_ms = 15000
+pool_min = 1
+pool_max = 10
+
+[storage]
+cas_path = "./var/cas"
+snapshot_filesystem_sources = false
+snapshot_message_sources = true
+
+[api]
+host = "127.0.0.1"
+port = 8080
+require_api_key_outside_development = true
+max_request_bytes = 10485760
+
+[security]
+allow_remote_model_egress = false
+follow_symlinks = false
+max_file_bytes = 524288000
+max_zip_entries = 100000
+max_zip_uncompressed_bytes = 2147483648
+max_zip_ratio = 200
+
+[search]
+semantic_enabled = false
+default_mode = "reranked"
+lexical_limit_default = 10
+context_max_chars = 40000
+korean_ngram_min = 2
+korean_ngram_max = 4
+hybrid_candidate_limit = 40
+rerank_candidate_limit = 6
+rrf_rank_constant = 60
+
+[models.embedding]
+enabled = false
+base_url = "http://127.0.0.1:7997"
+model = "kip-qwen3-embedding-0.6b"
+revision = "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
+dimensions = 1024
+batch_size = 4
+timeout_seconds = 120
+query_instruction = "Retrieve relevant Korean evidence for this query: "
+space_name = "qwen3-embedding-0.6b-1024"
+
+[models.reranker]
+enabled = false
+base_url = "http://127.0.0.1:7997"
+model = "kip-bge-reranker-v2-m3"
+revision = "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
+timeout_seconds = 120
+
+[graph]
+backend = "postgres"
+max_depth_default = 4
+max_nodes_default = 500
+
+[parsers]
+parser_timeout_seconds = 120
+minimum_quality_score = 0.70
+shadow_parse_critical_documents = true
+
+[parsers.hwp]
+order = ["kordoc", "unhwp", "paired_pdf"]
+
+[parsers.hwp.kordoc]
+enabled = true
+argv = ["npx", "-y", "kordoc@4.2.7", "{input}", "--format", "json"]
+
+[parsers.hwp.unhwp]
+enabled = false
+argv = ["unhwp", "convert", "{input}", "-o", "{output_dir}", "--all"]
+
+[[sources.filesystem]]
+name = "sample"
+root = "./sample-data"
+enabled = true
+read_only = true
+settle_seconds = 2
+include_extensions = [".md", ".txt", ".pdf", ".xlsx", ".hwp", ".hwpx", ".docx", ".csv"]
+exclude_globs = ["**/.DS_Store", "**/~$*", "**/.~lock.*"]
+acl_scope = "workspace:default"
+
+[[sources.filesystem]]
+name = "public-government"
+root = "./var/public-corpus"
+enabled = false
+read_only = true
+settle_seconds = 2
+include_extensions = [".pdf"]
+exclude_globs = ["**/.DS_Store", "**/~$*", "**/.~lock.*"]
+acl_scope = "workspace:default"
+
+[sources.slack]
+enabled = false
+workspace_id = ""
+allowed_conversation_ids = []
+download_files = false
+token_env = "KIP_SLACK_BOT_TOKEN"
+
+[sources.apple_mail]
+enabled = false
+allowed_accounts = []
+allowed_mailboxes = ["INBOX", "Sent", "Archive"]
+excluded_mailboxes = ["Junk", "Trash"]
+lookback_days = 30
+
+[sources.imap]
+enabled = false
+host = ""
+port = 993
+username_env = "KIP_IMAP_USERNAME"
+password_env = "KIP_IMAP_PASSWORD"
+mailboxes = ["INBOX", "Sent", "Archive"]
+use_ssl = true

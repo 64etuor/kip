@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "kip": {
+      "command": "bash",
+      "args": ["scripts/mcp.sh"],
+      "env": {
+        "KIP_CONFIG": "config/kip.toml"
+      }
+    }
+  }
+}

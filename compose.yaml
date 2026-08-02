@@ -1,0 +1,101 @@
+name: kip
+
+services:
+  postgres:
+    image: ${KIP_POSTGRES_IMAGE:-pgvector/pgvector:0.8.2-pg18-trixie}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-kip}
+      POSTGRES_USER: ${POSTGRES_USER:-kip_owner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${KIP_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - kip_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kip_owner} -d ${POSTGRES_DB:-kip}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    shm_size: 1gb
+    security_opt:
+      - no-new-privileges:true
+
+  migrate:
+    profiles: ["app"]
+    build:
+      context: .
+      target: runtime
+    restart: "no"
+    env_file: .env
+    environment:
+      KIP_DATABASE_URL: postgresql://${POSTGRES_USER:-kip_owner}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kip}
+      KIP_CONFIG: /app/config/kip.container.toml
+    command: ["migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+
+  api:
+    profiles: ["app"]
+    build:
+      context: .
+      target: runtime
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      KIP_DATABASE_URL: postgresql://${POSTGRES_USER:-kip_owner}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kip}
+      KIP_CONFIG: /app/config/kip.container.toml
+      KIP_API_HOST: 0.0.0.0
+      KIP_CAS_PATH: /data/cas
+    command: ["api", "serve", "--host", "0.0.0.0", "--port", "8080"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${KIP_API_PORT:-8080}:8080"
+    volumes:
+      - kip_cas:/data/cas
+      - ${KIP_NAS_PATH:-./sample-data}:/sources/nas:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+
+  worker:
+    profiles: ["app"]
+    build:
+      context: .
+      target: runtime
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      KIP_DATABASE_URL: postgresql://${POSTGRES_USER:-kip_owner}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kip}
+      KIP_CONFIG: /app/config/kip.container.toml
+      KIP_CAS_PATH: /data/cas
+    command: ["worker", "run"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - kip_cas:/data/cas
+      - ${KIP_NAS_PATH:-./sample-data}:/sources/nas:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=1g,mode=1777
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  kip_pgdata:
+  kip_cas:

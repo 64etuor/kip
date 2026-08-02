@@ -1,0 +1,56 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "artifact_id": {
+      "title": "Artifact Id",
+      "type": "string"
+    },
+    "cell_range": {
+      "title": "Cell Range",
+      "type": "string"
+    },
+    "cells": {
+      "items": {
+        "items": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "title": "Cells",
+      "type": "array"
+    },
+    "current_source_sha256": {
+      "title": "Current Source Sha256",
+      "type": "string"
+    },
+    "indexed_source_sha256": {
+      "title": "Indexed Source Sha256",
+      "type": "string"
+    },
+    "sheet": {
+      "title": "Sheet",
+      "type": "string"
+    },
+    "source_changed_since_index": {
+      "title": "Source Changed Since Index",
+      "type": "boolean"
+    },
+    "source_uri": {
+      "title": "Source Uri",
+      "type": "string"
+    }
+  },
+  "required": [
+    "artifact_id",
+    "source_uri",
+    "sheet",
+    "cell_range",
+    "cells",
+    "indexed_source_sha256",
+    "current_source_sha256",
+    "source_changed_since_index"
+  ],
+  "title": "XlsxRangeRead",
+  "type": "object"
+}

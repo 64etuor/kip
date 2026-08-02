@@ -1,0 +1,43 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "approved_only": {
+      "default": true,
+      "title": "Approved Only",
+      "type": "boolean"
+    },
+    "direction": {
+      "default": "both",
+      "enum": [
+        "out",
+        "in",
+        "both"
+      ],
+      "title": "Direction",
+      "type": "string"
+    },
+    "limit": {
+      "default": 100,
+      "maximum": 1000,
+      "minimum": 1,
+      "title": "Limit",
+      "type": "integer"
+    },
+    "node_id": {
+      "title": "Node Id",
+      "type": "string"
+    },
+    "predicates": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Predicates",
+      "type": "array"
+    }
+  },
+  "required": [
+    "node_id"
+  ],
+  "title": "GraphNeighborsRequest",
+  "type": "object"
+}

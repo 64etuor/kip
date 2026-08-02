@@ -1,0 +1,549 @@
+{
+  "$defs": {
+    "Artifact": {
+      "additionalProperties": false,
+      "properties": {
+        "byte_size": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Byte Size"
+        },
+        "cas_uri": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cas Uri"
+        },
+        "extension": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Extension"
+        },
+        "file_name": {
+          "title": "File Name",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "media_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Media Type"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "representation_role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Representation Role"
+        },
+        "revision_id": {
+          "title": "Revision Id",
+          "type": "string"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "source_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Path"
+        }
+      },
+      "required": [
+        "id",
+        "revision_id",
+        "file_name",
+        "sha256"
+      ],
+      "title": "Artifact",
+      "type": "object"
+    },
+    "ContentUnit": {
+      "additionalProperties": false,
+      "properties": {
+        "acl_scopes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Acl Scopes",
+          "type": "array"
+        },
+        "artifact_id": {
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "body": {
+          "title": "Body",
+          "type": "string"
+        },
+        "body_normalized": {
+          "title": "Body Normalized",
+          "type": "string"
+        },
+        "document_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Document Id"
+        },
+        "extraction_id": {
+          "title": "Extraction Id",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "lexical_text": {
+          "title": "Lexical Text",
+          "type": "string"
+        },
+        "locator": {
+          "$ref": "#/$defs/EvidenceLocator"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "ordinal": {
+          "title": "Ordinal",
+          "type": "integer"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "unit_type": {
+          "title": "Unit Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "extraction_id",
+        "artifact_id",
+        "ordinal",
+        "unit_type",
+        "body",
+        "body_normalized",
+        "lexical_text",
+        "locator"
+      ],
+      "title": "ContentUnit",
+      "type": "object"
+    },
+    "EvidenceLocator": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "title": "EvidenceLocator",
+      "type": "object"
+    },
+    "ExtractionRun": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "output_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output Hash"
+        },
+        "parser_name": {
+          "title": "Parser Name",
+          "type": "string"
+        },
+        "parser_version": {
+          "title": "Parser Version",
+          "type": "string"
+        },
+        "quality_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quality Score"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "partial",
+            "failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "artifact_id",
+        "parser_name",
+        "parser_version",
+        "status"
+      ],
+      "title": "ExtractionRun",
+      "type": "object"
+    },
+    "LogicalDocument": {
+      "additionalProperties": false,
+      "properties": {
+        "document_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Document Type"
+        },
+        "family_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Family Key"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "lifecycle": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lifecycle"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "stable_key": {
+          "title": "Stable Key",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "stable_key",
+        "title"
+      ],
+      "title": "LogicalDocument",
+      "type": "object"
+    },
+    "SourceObject": {
+      "additionalProperties": false,
+      "properties": {
+        "acl_scopes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Acl Scopes",
+          "type": "array"
+        },
+        "canonical_uri": {
+          "title": "Canonical Uri",
+          "type": "string"
+        },
+        "container_external_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Container External Id"
+        },
+        "external_id": {
+          "title": "External Id",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "object_type": {
+          "title": "Object Type",
+          "type": "string"
+        },
+        "system_id": {
+          "title": "System Id",
+          "type": "string"
+        },
+        "system_kind": {
+          "title": "System Kind",
+          "type": "string"
+        },
+        "system_name": {
+          "title": "System Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "system_id",
+        "system_name",
+        "system_kind",
+        "external_id",
+        "object_type",
+        "canonical_uri"
+      ],
+      "title": "SourceObject",
+      "type": "object"
+    },
+    "SourceRevision": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "is_tombstone": {
+          "default": false,
+          "title": "Is Tombstone",
+          "type": "boolean"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "object_id": {
+          "title": "Object Id",
+          "type": "string"
+        },
+        "raw_object_uri": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Raw Object Uri"
+        },
+        "revision_key": {
+          "title": "Revision Key",
+          "type": "string"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Size Bytes"
+        },
+        "source_modified_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Modified At"
+        }
+      },
+      "required": [
+        "id",
+        "object_id",
+        "revision_key",
+        "sha256"
+      ],
+      "title": "SourceRevision",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifact": {
+      "$ref": "#/$defs/Artifact"
+    },
+    "extraction": {
+      "$ref": "#/$defs/ExtractionRun"
+    },
+    "logical_document": {
+      "$ref": "#/$defs/LogicalDocument"
+    },
+    "revision": {
+      "$ref": "#/$defs/SourceRevision"
+    },
+    "schema_version": {
+      "const": "kip.document-packet.v1",
+      "default": "kip.document-packet.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_object": {
+      "$ref": "#/$defs/SourceObject"
+    },
+    "units": {
+      "items": {
+        "$ref": "#/$defs/ContentUnit"
+      },
+      "title": "Units",
+      "type": "array"
+    },
+    "workspace_id": {
+      "title": "Workspace Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workspace_id",
+    "source_object",
+    "revision",
+    "logical_document",
+    "artifact",
+    "extraction",
+    "units"
+  ],
+  "title": "DocumentPacket",
+  "type": "object"
+}

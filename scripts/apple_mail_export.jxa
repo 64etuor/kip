@@ -1,0 +1,57 @@
+#!/usr/bin/osascript -l JavaScript
+/*
+  Read-only Apple Mail exporter. Output: JSONL on stdout.
+  Arguments:
+    1: JSON array of allowed account names
+    2: JSON array of allowed mailbox names
+    3: ISO timestamp lower bound
+    4: integer limit per mailbox
+*/
+ObjC.import('Foundation');
+
+function iso(dateValue) {
+  try { return new Date(dateValue).toISOString(); } catch (_) { return null; }
+}
+
+function run(argv) {
+  const allowedAccounts = argv[0] ? JSON.parse(argv[0]) : [];
+  const allowedMailboxes = argv[1] ? JSON.parse(argv[1]) : [];
+  const since = argv[2] ? new Date(argv[2]) : new Date(0);
+  const limit = argv[3] ? Number(argv[3]) : 500;
+  const Mail = Application('Mail');
+  const lines = [];
+
+  for (const account of Mail.accounts()) {
+    const accountName = account.name();
+    if (allowedAccounts.length && !allowedAccounts.includes(accountName)) continue;
+    for (const mailbox of account.mailboxes()) {
+      const mailboxName = mailbox.name();
+      if (allowedMailboxes.length && !allowedMailboxes.includes(mailboxName)) continue;
+      let emitted = 0;
+      const messages = mailbox.messages();
+      for (let i = messages.length - 1; i >= 0 && emitted < limit; i--) {
+        const msg = messages[i];
+        const received = msg.dateReceived();
+        if (received && new Date(received) < since) continue;
+        const record = {
+          source_type: 'apple_mail_message',
+          account: accountName,
+          mailbox: mailboxName,
+          mail_internal_id: String(msg.id()),
+          message_id: msg.messageId ? String(msg.messageId() || '') : '',
+          subject: String(msg.subject() || ''),
+          sender: String(msg.sender() || ''),
+          to_recipients: msg.toRecipients().map(r => String(r.address() || '')),
+          cc_recipients: msg.ccRecipients().map(r => String(r.address() || '')),
+          date_sent: iso(msg.dateSent()),
+          date_received: iso(received),
+          content: String(msg.content() || ''),
+          read_only: true
+        };
+        lines.push(JSON.stringify(record));
+        emitted += 1;
+      }
+    }
+  }
+  return lines.join('\n');
+}

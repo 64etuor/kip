@@ -1,0 +1,57 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "acl_scopes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Acl Scopes",
+      "type": "array"
+    },
+    "connector_name": {
+      "title": "Connector Name",
+      "type": "string"
+    },
+    "event_id": {
+      "title": "Event Id",
+      "type": "string"
+    },
+    "external_id": {
+      "title": "External Id",
+      "type": "string"
+    },
+    "occurred_at": {
+      "format": "date-time",
+      "title": "Occurred At",
+      "type": "string"
+    },
+    "operation": {
+      "enum": [
+        "upsert",
+        "delete",
+        "sync_complete"
+      ],
+      "title": "Operation",
+      "type": "string"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "kip.connector-event.v1",
+      "default": "kip.connector-event.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "event_id",
+    "connector_name",
+    "operation",
+    "external_id"
+  ],
+  "title": "ConnectorEvent",
+  "type": "object"
+}

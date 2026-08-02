@@ -1,0 +1,8 @@
+policy: kip-acl-policy
+version: 1.0.0
+rules:
+  - derived_visibility_must_not_exceed_evidence_visibility
+  - acl_filter_must_run_before_search
+  - acl_filter_must_run_before_graph_traversal
+  - inaccessible_path_existence_must_not_be_disclosed
+  - personal_and_company_mail_workspaces_must_not_auto_merge

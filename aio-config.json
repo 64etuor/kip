@@ -1,0 +1,62 @@
+{
+  "$schema": "./aio-config.schema.md",
+  "base_branch": "dev",
+  "worker_backend": "claude",
+  "lead_backend": "claude",
+  "default_assignees": [
+    "yanghapark"
+  ],
+  "title_prefix": {
+    "root": "Kip",
+    "scope_rules": {}
+  },
+  "labels": {
+    "user_based": {},
+    "path_based": {},
+    "special": []
+  },
+  "reviewers": {
+    "default": [],
+    "path_based": {}
+  },
+  "project_paths": {},
+  "test_commands": {},
+  "build_commands": {},
+  "lint_commands": {},
+  "release_notes": {
+    "format": "monolingual",
+    "languages": [
+      "en"
+    ],
+    "tag_pattern": "v*"
+  },
+  "wiki": {},
+  "hooks": {},
+  "qa": {
+    "version": 1,
+    "enabled": false,
+    "scenarios_dir": "tests/qa",
+    "browser": "chrome",
+    "docs_glob": [
+      "docs/**/*.md",
+      "README.md"
+    ],
+    "environments": [],
+    "artifacts": {
+      "store": "ghe-release-asset",
+      "retention": {
+        "passed": "7d",
+        "failed": "30d",
+        "flaky": "14d"
+      },
+      "video": "on-fail",
+      "trace": "on-retry"
+    },
+    "policy": {
+      "onFail": "warn",
+      "onFlaky": "retry-once",
+      "parallelism": 1,
+      "timeoutMinutes": 30
+    }
+  }
+}

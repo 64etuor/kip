@@ -1,0 +1,33 @@
+- generic [ref=f3e1]:
+  - main "KIP Knowledge Fabric 발표 자료" [ref=f3e2]:
+    - region [ref=f3e25]:
+      - generic [ref=f3e26]:
+        - generic [ref=f3e27]:
+          - generic [ref=f3e28]: 왜 필요한가
+          - generic [ref=f3e29]: "02"
+        - generic [ref=f3e30]:
+          - paragraph [ref=f3e31]: 업무 지식의 현실
+          - heading "자료는 많지만, 답을 믿기 어려운 이유" [level=2] [ref=f3e32]: 자료는 많지만,답을 믿기 어려운 이유
+          - generic [ref=f3e33]:
+            - article [ref=f3e34]:
+              - generic [ref=f3e35]: "01"
+              - generic [ref=f3e36]:
+                - heading "자료가 흩어져 있습니다" [level=3] [ref=f3e37]
+                - paragraph [ref=f3e38]: NAS의 한글·PDF·엑셀, Slack 대화, 메일 답장이 서로 다른 곳에 남습니다.
+            - article [ref=f3e39]:
+              - generic [ref=f3e40]: "02"
+              - generic [ref=f3e41]:
+                - heading "제목만으로는 부족합니다" [level=3] [ref=f3e42]
+                - paragraph [ref=f3e43]: 문서번호, 셀 안의 문구, 수정 전후 맥락은 파일명 검색만으로 찾기 어렵습니다.
+            - article [ref=f3e44]:
+              - generic [ref=f3e45]: "03"
+              - generic [ref=f3e46]:
+                - heading "결론에는 근거가 필요합니다" [level=3] [ref=f3e47]
+                - paragraph [ref=f3e48]: 중요한 답은 “어디에 적혀 있는가”와 최신 여부까지 함께 보여야 합니다.
+        - generic [ref=f3e49]:
+          - generic [ref=f3e50]: "근거: PRD 2장, 3장"
+          - generic [ref=f3e51]: 02 / 10
+  - generic "슬라이드 제어" [ref=f3e19]:
+    - button "이전 슬라이드" [ref=f3e20] [cursor=pointer]: ←
+    - button "다음 슬라이드" [active] [ref=f3e21] [cursor=pointer]: →
+  - paragraph [ref=f3e24]: "2번째 슬라이드: 자료는 많지만,답을 믿기 어려운 이유"

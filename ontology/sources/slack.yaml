@@ -1,0 +1,16 @@
+ontology: kip-source-slack
+version: 1.0.0
+source_object_types:
+  SlackMessage:
+    parent: Communication
+    canonical_identity: [workspace_id, conversation_id, ts]
+  SlackConversation:
+    parent: Conversation
+    canonical_identity: [workspace_id, conversation_id]
+locators:
+  slack_message:
+    required: [workspace_id, conversation_id, ts]
+deterministic_relations:
+  - authored_by
+  - reply_to
+  - attached_to

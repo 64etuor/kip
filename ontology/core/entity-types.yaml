@@ -1,0 +1,28 @@
+ontology: kip-core
+version: 1.0.0
+entity_types:
+  Person:
+    description: A human actor represented independently of source-specific identifiers.
+  Organization:
+    description: A company, institution, department, or team.
+  Project:
+    description: A bounded body of work such as a research project.
+  EvidenceObject:
+    abstract: true
+    description: A source-backed object that can support an assertion.
+  Document:
+    parent: EvidenceObject
+  Communication:
+    parent: EvidenceObject
+  Conversation:
+    parent: EvidenceObject
+  Requirement:
+    description: A condition, obligation, or submission requirement.
+  Decision:
+    description: An approved or recorded choice.
+  Task:
+    description: An action expected from a responsible actor.
+  Event:
+    description: A time-bounded occurrence.
+  Concept:
+    description: A reusable domain concept.

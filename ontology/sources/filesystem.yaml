@@ -1,0 +1,18 @@
+ontology: kip-source-filesystem
+version: 1.0.0
+source_object_types:
+  File:
+    canonical_identity: [source_system, relative_path]
+  Directory:
+    canonical_identity: [source_system, relative_path]
+locators:
+  pdf_page:
+    required: [page]
+  hwp_structure:
+    required: [section]
+  xlsx_sheet:
+    required: [sheet]
+  xlsx_range:
+    required: [sheet, range]
+  text_line_range:
+    required: [start_line, end_line]

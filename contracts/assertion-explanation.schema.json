@@ -1,0 +1,389 @@
+{
+  "$defs": {
+    "ApprovedAssertion": {
+      "additionalProperties": false,
+      "properties": {
+        "acl_scopes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Acl Scopes",
+          "type": "array"
+        },
+        "evidence_unit_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Unit Ids",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "object_entity_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Object Entity Id"
+        },
+        "object_value": {
+          "default": null,
+          "title": "Object Value"
+        },
+        "ontology_version": {
+          "title": "Ontology Version",
+          "type": "string"
+        },
+        "predicate": {
+          "title": "Predicate",
+          "type": "string"
+        },
+        "source_candidate_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Candidate Id"
+        },
+        "status": {
+          "default": "active",
+          "enum": [
+            "active",
+            "superseded",
+            "revoked"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "subject_id": {
+          "title": "Subject Id",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "id",
+        "subject_id",
+        "predicate",
+        "ontology_version"
+      ],
+      "title": "ApprovedAssertion",
+      "type": "object"
+    },
+    "AssertionCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "confidence": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "evidence": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "object_entity_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Object Entity Id"
+        },
+        "object_value": {
+          "default": null,
+          "title": "Object Value"
+        },
+        "ontology_version": {
+          "title": "Ontology Version",
+          "type": "string"
+        },
+        "origin": {
+          "title": "Origin",
+          "type": "string"
+        },
+        "predicate": {
+          "title": "Predicate",
+          "type": "string"
+        },
+        "review_note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Review Note"
+        },
+        "status": {
+          "default": "proposed",
+          "enum": [
+            "proposed",
+            "approved",
+            "rejected",
+            "superseded"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "subject_id": {
+          "title": "Subject Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "subject_id",
+        "predicate",
+        "origin",
+        "ontology_version"
+      ],
+      "title": "AssertionCandidate",
+      "type": "object"
+    },
+    "ContentUnit": {
+      "additionalProperties": false,
+      "properties": {
+        "acl_scopes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Acl Scopes",
+          "type": "array"
+        },
+        "artifact_id": {
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "body": {
+          "title": "Body",
+          "type": "string"
+        },
+        "body_normalized": {
+          "title": "Body Normalized",
+          "type": "string"
+        },
+        "document_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Document Id"
+        },
+        "extraction_id": {
+          "title": "Extraction Id",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "lexical_text": {
+          "title": "Lexical Text",
+          "type": "string"
+        },
+        "locator": {
+          "$ref": "#/$defs/EvidenceLocator"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "ordinal": {
+          "title": "Ordinal",
+          "type": "integer"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "unit_type": {
+          "title": "Unit Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "extraction_id",
+        "artifact_id",
+        "ordinal",
+        "unit_type",
+        "body",
+        "body_normalized",
+        "lexical_text",
+        "locator"
+      ],
+      "title": "ContentUnit",
+      "type": "object"
+    },
+    "EvidenceLocator": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "title": "EvidenceLocator",
+      "type": "object"
+    },
+    "EvidenceRead": {
+      "additionalProperties": false,
+      "properties": {
+        "current_source_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Source Sha256"
+        },
+        "indexed_source_sha256": {
+          "title": "Indexed Source Sha256",
+          "type": "string"
+        },
+        "source_changed_since_index": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Changed Since Index"
+        },
+        "source_uri": {
+          "title": "Source Uri",
+          "type": "string"
+        },
+        "unit": {
+          "$ref": "#/$defs/ContentUnit"
+        }
+      },
+      "required": [
+        "unit",
+        "source_uri",
+        "indexed_source_sha256"
+      ],
+      "title": "EvidenceRead",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "assertion": {
+      "$ref": "#/$defs/ApprovedAssertion"
+    },
+    "evidence": {
+      "items": {
+        "$ref": "#/$defs/EvidenceRead"
+      },
+      "title": "Evidence",
+      "type": "array"
+    },
+    "source_candidate": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AssertionCandidate"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "assertion"
+  ],
+  "title": "AssertionExplanation",
+  "type": "object"
+}

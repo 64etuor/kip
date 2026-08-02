@@ -1,0 +1,58 @@
+ontology: kip-core-predicates
+version: 1.0.0
+predicates:
+  authored_by:
+    domain: [EvidenceObject]
+    range: [Person]
+    extraction: deterministic_when_source_identified
+    review: not_required
+  belongs_to_project:
+    domain: [EvidenceObject, Decision, Requirement, Task]
+    range: [Project]
+    extraction: mixed
+    review: conditional
+  reply_to:
+    domain: [Communication]
+    range: [Communication]
+    extraction: deterministic_source_relation
+    review: not_required
+  responds_to:
+    domain: [Communication, Document]
+    range: [Communication, Document, Requirement]
+    extraction: semantic
+    review: required
+  amends:
+    domain: [Document, Communication]
+    range: [Document]
+    extraction: semantic
+    review: required
+  supersedes:
+    domain: [Document, Communication]
+    range: [Document]
+    extraction: semantic
+    review: required
+  approves:
+    domain: [Document, Communication, Person, Organization]
+    range: [Decision, Requirement, Task, Document]
+    extraction: semantic
+    review: required
+  evidences:
+    domain: [EvidenceObject]
+    range: [Requirement, Decision, Event, Concept]
+    extraction: semantic
+    review: required
+  records_decision:
+    domain: [Document, Communication]
+    range: [Decision]
+    extraction: semantic
+    review: required
+  responsible_for:
+    domain: [Person, Organization]
+    range: [Project, Task, Requirement]
+    extraction: semantic
+    review: conditional
+  attached_to:
+    domain: [EvidenceObject]
+    range: [Communication, Document]
+    extraction: deterministic_source_relation
+    review: not_required

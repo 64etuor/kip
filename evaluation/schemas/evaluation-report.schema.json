@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kip.local/schemas/evaluation-report.schema.json",
+  "title": "KIP Retrieval Evaluation Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run",
+    "fingerprints",
+    "variants",
+    "gates",
+    "decision"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "kip.evaluation-report.v1"
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "started_at", "completed_at"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "started_at": {"type": "string", "format": "date-time"},
+        "completed_at": {"type": "string", "format": "date-time"},
+        "workspace": {"type": "string"},
+        "dataset": {"type": "string"},
+        "warmup_passes": {"type": "integer", "minimum": 0},
+        "hardware": {"type": "object"}
+      }
+    },
+    "fingerprints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["corpus", "dataset", "configuration", "code"],
+      "properties": {
+        "corpus": {"type": "string", "minLength": 1},
+        "dataset": {"type": "string", "minLength": 1},
+        "configuration": {"type": "string", "minLength": 1},
+        "code": {"type": "string", "minLength": 1},
+        "models": {
+          "type": "object",
+          "additionalProperties": {"type": "string"}
+        }
+      }
+    },
+    "variants": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/variant"}
+    },
+    "gates": {
+      "type": "object"
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reasons"],
+      "properties": {
+        "status": {
+          "enum": ["baseline", "promote", "keep_disabled", "reject", "incomplete"]
+        },
+        "reasons": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_count",
+        "recall_at_k",
+        "mrr",
+        "ndcg_at_k",
+        "zero_result_rate",
+        "unauthorized_result_count",
+        "locator_accuracy",
+        "latest_version_accuracy",
+        "stale_warning_rate"
+      ],
+      "properties": {
+        "case_count": {"type": "integer", "minimum": 0},
+        "recall_at_k": {"type": "number", "minimum": 0, "maximum": 1},
+        "mrr": {"type": "number", "minimum": 0, "maximum": 1},
+        "ndcg_at_k": {"type": "number", "minimum": 0, "maximum": 1},
+        "zero_result_rate": {"type": "number", "minimum": 0, "maximum": 1},
+        "zero_result_recovery_rate": {"type": "number", "minimum": 0, "maximum": 1},
+        "unauthorized_result_count": {"type": "integer", "minimum": 0},
+        "locator_accuracy": {"type": "number", "minimum": 0, "maximum": 1},
+        "latest_version_accuracy": {"type": "number", "minimum": 0, "maximum": 1},
+        "stale_warning_rate": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "latency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["p50", "p95", "max"],
+      "properties": {
+        "p50": {"type": "number", "minimum": 0},
+        "p95": {"type": "number", "minimum": 0},
+        "max": {"type": "number", "minimum": 0}
+      }
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metrics", "latency_ms", "categories", "cases"],
+      "properties": {
+        "metrics": {"$ref": "#/$defs/metrics"},
+        "latency_ms": {"$ref": "#/$defs/latency"},
+        "categories": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/metrics"}
+        },
+        "cases": {
+          "type": "array",
+          "items": {"type": "object"}
+        },
+        "error": {"type": "string"}
+      }
+    }
+  }
+}

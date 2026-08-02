@@ -1,0 +1,19 @@
+ontology: kip-source-mail
+version: 1.0.0
+source_object_types:
+  EmailMessage:
+    parent: Communication
+    canonical_identity_preference:
+      - [account_id, message_id]
+      - [account_id, mailbox_id, uidvalidity, uid]
+  Mailbox:
+    parent: Conversation
+locators:
+  email_message:
+    required: [account_id, message_id]
+  email_mime_part:
+    required: [account_id, message_id, mime_part]
+deterministic_relations:
+  - authored_by
+  - reply_to
+  - attached_to

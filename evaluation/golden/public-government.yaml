@@ -1,0 +1,299 @@
+schema_version: kip.golden-dataset.v1
+name: public-government-ko-v1
+description: 30 reviewed Korean relevance questions plus one ACL-denial case per licensed document.
+corpus_fingerprint: sha256:68d47873a9c605021581b1522b6b6e0fd1e486cb6ee0cf82b4633e35a76fb6f8
+cases:
+  - id: GOV-PP-001
+    question: 2025년부터 공공기관이 지켜야 하는 중증장애인생산품 법정 의무구매 비율은?
+    category: exact_numeric
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_f6286f72ff69b81b7f879e4035b64bdd]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-PP-002
+    question: 2024년 1,024개 공공기관 중 의무구매 비율을 달성한 기관 수와 비중은?
+    category: exact_numeric
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_f6286f72ff69b81b7f879e4035b64bdd]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-PP-003
+    question: 전년보다 0.02%포인트 올라 2024년에 기록한 중증장애인생산품 전체 우선구매 실적 비율은?
+    category: semantic_paraphrase
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_f6286f72ff69b81b7f879e4035b64bdd]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-PP-004
+    question: 2025년 중증장애인 생산품 박람회는 언제 어디에서 열리는가?
+    category: exact_fact
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_f6286f72ff69b81b7f879e4035b64bdd]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-PP-005
+    question: 각 공공기관이 제출한 2025년 우선구매 계획의 총액과 구매 비율은?
+    category: semantic_paraphrase
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_f6286f72ff69b81b7f879e4035b64bdd]
+    forbidden_documents: []
+    recall_at: 10
+
+  - id: GOV-CARE-001
+    question: 돌봄통합지원법에 따른 의료·요양·돌봄 통합지원 본사업 시행일은?
+    category: exact_date
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_479b58f482b49d2bc7d157071accc34c]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-CARE-002
+    question: 2025년 1월부터 통합돌봄 시범사업을 확대 실시한 시군구는 몇 곳인가?
+    category: exact_numeric
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_479b58f482b49d2bc7d157071accc34c]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-CARE-003
+    question: 노인 외에 2025년 의료돌봄 통합지원 시범사업 대상에 새로 포함된 집단은?
+    category: semantic_paraphrase
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_479b58f482b49d2bc7d157071accc34c]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-CARE-004
+    question: 통합판정조사는 의료 필요도와 돌봄 필요도에 따라 서비스를 몇 개 영역으로 분류하는가?
+    category: exact_numeric
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_479b58f482b49d2bc7d157071accc34c]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-CARE-005
+    question: 살던 곳에서 계속 생활하도록 지원하는 통합돌봄의 신청부터 모니터링까지 절차는?
+    category: semantic_paraphrase
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_479b58f482b49d2bc7d157071accc34c]
+    forbidden_documents: []
+    recall_at: 10
+
+  - id: GOV-HI-001
+    question: 제2차 국민건강보험 종합계획의 2025년도 시행계획은 몇 개 세부 과제를 추진하는가?
+    category: exact_numeric
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_6e9065f41ec8032df5bf5803e8d8211a]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-HI-002
+    question: 저수가 구조 개선을 위해 2027년까지 인상하려는 수술·처치·마취 수가 규모는?
+    category: semantic_paraphrase
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_6e9065f41ec8032df5bf5803e8d8211a]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-HI-003
+    question: 지역 외과계 병원 응급복부수술 시범사업은 몇 개 수술에 몇 퍼센트 가산을 적용하는가?
+    category: exact_numeric
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_6e9065f41ec8032df5bf5803e8d8211a]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-HI-004
+    question: 지역거점 국립대병원 역량 강화를 위한 교원 인건비, 시설장비, 저리융자 지원액은 각각 얼마인가?
+    category: exact_numeric
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_6e9065f41ec8032df5bf5803e8d8211a]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-HI-005
+    question: 의료·돌봄 통합지원 시범사업의 시군구 확대 목표는 기존 몇 곳에서 몇 곳 이상인가?
+    category: semantic_paraphrase
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_6e9065f41ec8032df5bf5803e8d8211a]
+    forbidden_documents: []
+    recall_at: 10
+
+  - id: GOV-VOTE-001
+    question: 국민연금은 고려아연 이사 수를 최대 몇 명으로 제한하는 정관 변경안에 찬성했는가?
+    category: exact_numeric
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_6cfee518392af474da107b6918214410]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-VOTE-002
+    question: 이사 수 상한 안건이 가결될 경우 국민연금이 집중투표하기로 한 네 후보는 누구인가?
+    category: exact_entity
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_6cfee518392af474da107b6918214410]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-VOTE-003
+    question: 이사 수 상한 안건이 부결되면 신규 이사 12인 안과 17인 안에 각각 어떤 표를 행사하는가?
+    category: semantic_paraphrase
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_6cfee518392af474da107b6918214410]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-VOTE-004
+    question: 감시 의무를 소홀히 했다는 이유로 국민연금이 반대한 감사위원 관련 후보들은?
+    category: semantic_paraphrase
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_6cfee518392af474da107b6918214410]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-VOTE-005
+    question: 국민연금이 찬성한 이사회 안에서 미처분이익잉여금으로 전환되는 임의적립금 규모는?
+    category: exact_numeric
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_6cfee518392af474da107b6918214410]
+    forbidden_documents: []
+    recall_at: 10
+
+  - id: GOV-ADOPT-001
+    question: 입양체계 전면 개편을 위해 국회를 통과한 세 법안은?
+    category: exact_entity
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_edc362e3d349c3572ee4dbc591b11f64]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-ADOPT-002
+    question: 법 시행 후 아동을 입양대상으로 결정하고 입양 전까지 보호하는 주체는?
+    category: semantic_paraphrase
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_edc362e3d349c3572ee4dbc591b11f64]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-ADOPT-003
+    question: 입양대상아동과 예비양부모의 결연을 아동 최선의 이익에 따라 심의·결정하는 위원회는?
+    category: exact_entity
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_edc362e3d349c3572ee4dbc591b11f64]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-ADOPT-004
+    question: 입양허가 재판 중 조기 애착과 상호적응을 위해 새로 도입되는 법원의 제도는?
+    category: semantic_paraphrase
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_edc362e3d349c3572ee4dbc591b11f64]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-ADOPT-005
+    question: 기존 기관에 보관된 약 25만 건의 입양기록물은 어느 기관으로 이관되는가?
+    category: exact_fact
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_edc362e3d349c3572ee4dbc591b11f64]
+    forbidden_documents: []
+    recall_at: 10
+
+  - id: GOV-MOE-001
+    question: 2025년 늘봄학교는 전체 초등학교 1·2학년의 몇 퍼센트 이상 참여를 지원하는가?
+    category: exact_numeric
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_f8828d40c4bf7fc6acfe0855e37c9368]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-MOE-002
+    question: 2025년 전면 도입되는 고교학점제와 함께 고교 내신은 몇 등급제로 바뀌는가?
+    category: semantic_paraphrase
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_f8828d40c4bf7fc6acfe0855e37c9368]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-MOE-003
+    question: 국가장학금과 근로장학금 지원 대상은 각각 몇만 명에서 몇만 명으로 확대되는가?
+    category: exact_numeric
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_f8828d40c4bf7fc6acfe0855e37c9368]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-MOE-004
+    question: 대학이 지역 혁신의 엔진 역할을 하도록 라이즈 체계를 전면 시행하는 시도 수는?
+    category: semantic_paraphrase
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_f8828d40c4bf7fc6acfe0855e37c9368]
+    forbidden_documents: []
+    recall_at: 10
+  - id: GOV-MOE-005
+    question: 교육발전특구 56건은 몇 개 광역과 몇 개 기초지자체에 걸쳐 있는가?
+    category: exact_numeric
+    principal: principal_public
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_f8828d40c4bf7fc6acfe0855e37c9368]
+    forbidden_documents: []
+    recall_at: 10
+
+  - id: GOV-ACL-001
+    question: 중증장애인생산품 우선구매 의무 비율은?
+    category: access_denied
+    principal: principal_unscoped
+    acl_scopes: [public]
+    expected_documents: []
+    forbidden_documents: [ldoc_f6286f72ff69b81b7f879e4035b64bdd]
+    recall_at: 10
+  - id: GOV-ACL-002
+    question: 의료·요양·돌봄 통합지원 본사업 시행일은?
+    category: access_denied
+    principal: principal_unscoped
+    acl_scopes: [public]
+    expected_documents: []
+    forbidden_documents: [ldoc_479b58f482b49d2bc7d157071accc34c]
+    recall_at: 10
+  - id: GOV-ACL-003
+    question: 건강보험 2025년 시행계획 세부 과제 수는?
+    category: access_denied
+    principal: principal_unscoped
+    acl_scopes: [public]
+    expected_documents: []
+    forbidden_documents: [ldoc_6e9065f41ec8032df5bf5803e8d8211a]
+    recall_at: 10
+  - id: GOV-ACL-004
+    question: 고려아연 이사 수 상한 정관 안건의 국민연금 결정은?
+    category: access_denied
+    principal: principal_unscoped
+    acl_scopes: [public]
+    expected_documents: []
+    forbidden_documents: [ldoc_6cfee518392af474da107b6918214410]
+    recall_at: 10
+  - id: GOV-ACL-005
+    question: 입양기록물 이관 기관은?
+    category: access_denied
+    principal: principal_unscoped
+    acl_scopes: [public]
+    expected_documents: []
+    forbidden_documents: [ldoc_edc362e3d349c3572ee4dbc591b11f64]
+    recall_at: 10
+  - id: GOV-ACL-006
+    question: 2025년 늘봄학교 참여 지원 목표는?
+    category: access_denied
+    principal: principal_unscoped
+    acl_scopes: [public]
+    expected_documents: []
+    forbidden_documents: [ldoc_f8828d40c4bf7fc6acfe0855e37c9368]
+    recall_at: 10

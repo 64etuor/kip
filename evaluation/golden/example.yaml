@@ -1,0 +1,15 @@
+schema_version: kip.golden-dataset.v1
+name: example
+description: Minimal evaluator smoke dataset; replace expected IDs with reviewed corpus IDs.
+corpus_fingerprint: sha256:example
+cases:
+  - id: EX-001
+    question: 존재하지 않는 비공개 문서
+    category: access_denied
+    principal: principal_public
+    acl_scopes:
+      - workspace:default
+    expected_documents: []
+    forbidden_documents:
+      - ldoc_forbidden_example
+    recall_at: 10

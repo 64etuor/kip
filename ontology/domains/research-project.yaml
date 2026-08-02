@@ -1,0 +1,24 @@
+ontology: kip-domain-research-project
+version: 1.0.0
+entity_types:
+  ResearchProject:
+    parent: Project
+  Agreement:
+    parent: Document
+  OfficialLetter:
+    parent: Document
+  SettlementEvidence:
+    parent: EvidenceObject
+  ParticipationRateChange:
+    parent: Decision
+controlled_values:
+  document_type:
+    - business_plan
+    - agreement
+    - agreement_change
+    - official_letter_inbound
+    - official_letter_outbound
+    - settlement_report
+    - evidence
+    - meeting_minutes
+    - guideline

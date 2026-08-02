@@ -1,0 +1,35 @@
+-- Run as a PostgreSQL administrator after replacing all CHANGE_ME values.
+-- Local Compose uses kip_owner for convenience; production runtimes must not.
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='kip_agent') THEN
+    CREATE ROLE kip_agent LOGIN PASSWORD 'CHANGE_ME_AGENT';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='kip_worker') THEN
+    CREATE ROLE kip_worker LOGIN PASSWORD 'CHANGE_ME_WORKER';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='kip_reviewer') THEN
+    CREATE ROLE kip_reviewer LOGIN PASSWORD 'CHANGE_ME_REVIEWER';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='kip_backup') THEN
+    CREATE ROLE kip_backup LOGIN PASSWORD 'CHANGE_ME_BACKUP' BYPASSRLS;
+  END IF;
+END $$;
+
+GRANT CONNECT ON DATABASE kip TO kip_agent, kip_worker, kip_reviewer, kip_backup;
+GRANT USAGE ON SCHEMA kip, source, content, knowledge, search, jobs, audit TO kip_agent, kip_worker, kip_reviewer, kip_backup;
+
+GRANT SELECT ON ALL TABLES IN SCHEMA kip, source, content, knowledge, search TO kip_agent;
+GRANT SELECT, INSERT, UPDATE ON source.systems, source.containers, source.objects, source.revisions, source.sync_cursors TO kip_worker;
+GRANT SELECT, INSERT, UPDATE ON content.logical_documents, content.artifacts, content.document_artifacts, content.extractions, content.units TO kip_worker;
+GRANT SELECT, INSERT, UPDATE, DELETE ON search.lexical_units, search.aliases, search.embedding_spaces TO kip_worker;
+GRANT SELECT, INSERT, UPDATE ON jobs.queue, audit.events TO kip_worker;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA jobs, audit TO kip_worker;
+
+GRANT SELECT ON knowledge.assertion_candidates, knowledge.assertions, knowledge.assertion_evidence TO kip_reviewer;
+GRANT UPDATE ON knowledge.assertion_candidates TO kip_reviewer;
+GRANT INSERT, UPDATE ON knowledge.assertions, knowledge.assertion_evidence TO kip_reviewer;
+
+GRANT SELECT ON ALL TABLES IN SCHEMA kip, source, content, knowledge, search, jobs, audit TO kip_backup;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA source, content, knowledge, search GRANT SELECT ON TABLES TO kip_agent;

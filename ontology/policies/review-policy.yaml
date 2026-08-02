@@ -1,0 +1,21 @@
+policy: kip-review-policy
+version: 1.0.0
+human_review_required:
+  predicates:
+    - amends
+    - supersedes
+    - responds_to
+    - approves
+    - evidences
+    - records_decision
+  fact_fields:
+    - effective_date
+    - deadline
+    - amount
+    - rate
+    - approval_status
+auto_approval_allowed:
+  - identical_content_hash
+  - file_represents_same_logical_document
+  - slack_reply_to_from_thread_metadata
+  - email_reply_to_from_in_reply_to_header

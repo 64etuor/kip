@@ -1,0 +1,22 @@
+- generic [active] [ref=f5e1]:
+  - main "KIP Knowledge Fabric 발표 자료" [ref=f5e2]:
+    - group [ref=f5e3]:
+      - generic [ref=f5e4]:
+        - generic [ref=f5e5]:
+          - generic [ref=f5e6]: KIP / Knowledge Fabric
+          - generic [ref=f5e7]: "01"
+        - generic [ref=f5e8]:
+          - generic [ref=f5e9]: evidence-first
+          - paragraph [ref=f5e12]: 회사 지식을 다시 찾을 수 있게
+          - heading "자료를 모으는 일을 넘어, 근거까지 다시 읽는 지식 기반" [level=1] [ref=f5e13]:
+            - text: 자료를 모으는 일을 넘어,
+            - generic [ref=f5e14]: 근거까지 다시 읽는
+            - text: 지식 기반
+          - paragraph [ref=f5e15]: KIP는 NAS 문서, 메신저, 메일에 흩어진 업무 자료를 원본 그대로 보존하고, 질문에 맞는 근거 위치까지 찾아 주는 시스템입니다.
+        - generic [ref=f5e16]:
+          - generic [ref=f5e17]: KIP Knowledge Fabric · 발표용 개요
+          - generic [ref=f5e18]: ← → 또는 하단 버튼으로 이동
+  - generic "슬라이드 제어" [ref=f5e19]:
+    - button "이전 슬라이드" [disabled] [ref=f5e20]: ←
+    - button "다음 슬라이드" [ref=f5e21] [cursor=pointer]: →
+  - paragraph [ref=f5e24]: "1번째 슬라이드: 자료를 모으는 일을 넘어,근거까지 다시 읽는 지식 기반"

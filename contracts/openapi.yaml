@@ -1,0 +1,1100 @@
+openapi: 3.1.0
+info:
+  title: KIP Knowledge Fabric API
+  description: Optional REST edge adapter over the same application services used
+    by the CLI and MCP.
+  version: 3.1.0
+paths:
+  /healthz:
+    get:
+      summary: Healthz
+      operationId: healthz_healthz_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /v1/capabilities:
+    get:
+      summary: Capabilities
+      operationId: capabilities_v1_capabilities_get
+      parameters:
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/status:
+    get:
+      summary: Status
+      operationId: status_v1_status_get
+      parameters:
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/search:
+    post:
+      summary: Search
+      operationId: search_v1_search_post
+      parameters:
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/context:
+    post:
+      summary: Context Bundle
+      operationId: context_bundle_v1_context_post
+      parameters:
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContextRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/vocabulary:
+    get:
+      summary: Vocabulary
+      operationId: vocabulary_v1_vocabulary_get
+      parameters:
+      - name: prefix
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Prefix
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 20
+          title: Limit
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/units/{unit_id}:
+    get:
+      summary: Read Unit
+      operationId: read_unit_v1_units__unit_id__get
+      parameters:
+      - name: unit_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Unit Id
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/artifacts/{artifact_id}:
+    get:
+      summary: Get Artifact
+      operationId: get_artifact_v1_artifacts__artifact_id__get
+      parameters:
+      - name: artifact_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Artifact Id
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/documents/{document_id}:
+    get:
+      summary: Get Document
+      operationId: get_document_v1_documents__document_id__get
+      parameters:
+      - name: document_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Document Id
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/assertions/{assertion_id}:
+    get:
+      summary: Get Assertion
+      operationId: get_assertion_v1_assertions__assertion_id__get
+      parameters:
+      - name: assertion_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Assertion Id
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/assertions/{assertion_id}/explain:
+    get:
+      summary: Explain Assertion
+      operationId: explain_assertion_v1_assertions__assertion_id__explain_get
+      parameters:
+      - name: assertion_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Assertion Id
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/xlsx/{artifact_id}/range:
+    get:
+      summary: Xlsx Range
+      operationId: xlsx_range_v1_xlsx__artifact_id__range_get
+      parameters:
+      - name: artifact_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Artifact Id
+      - name: sheet
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Sheet
+      - name: cell_range
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Cell Range
+      - name: allow_stale
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Allow Stale
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/graph/neighbors:
+    post:
+      summary: Graph Neighbors
+      operationId: graph_neighbors_v1_graph_neighbors_post
+      parameters:
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GraphNeighborsRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/graph/path:
+    post:
+      summary: Graph Path
+      operationId: graph_path_v1_graph_path_post
+      parameters:
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GraphPathRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/sync/filesystem/{source_name}:
+    post:
+      summary: Sync Filesystem
+      operationId: sync_filesystem_v1_sync_filesystem__source_name__post
+      parameters:
+      - name: source_name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Source Name
+      - name: enqueue
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: true
+          title: Enqueue
+      - name: dry_run
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Dry Run
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      - name: x-kip-admin-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Admin-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/sync/{source_name}:
+    post:
+      summary: Enqueue Source Sync
+      operationId: enqueue_source_sync_v1_sync__source_name__post
+      parameters:
+      - name: source_name
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Source Name
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      - name: x-kip-admin-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Admin-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/jobs:
+    get:
+      summary: Jobs
+      operationId: jobs_v1_jobs_get
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 100
+          title: Limit
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      - name: x-kip-admin-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Admin-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/connectors/events:
+    post:
+      summary: Connector Event
+      operationId: connector_event_v1_connectors_events_post
+      parameters:
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      - name: x-kip-admin-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Admin-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConnectorEvent'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/review/candidates:
+    get:
+      summary: Candidates
+      operationId: candidates_v1_review_candidates_get
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          default: proposed
+          title: Status
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 100
+          title: Limit
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      - name: x-kip-admin-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Admin-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/review/candidates/{candidate_id}:
+    get:
+      summary: Candidate
+      operationId: candidate_v1_review_candidates__candidate_id__get
+      parameters:
+      - name: candidate_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Candidate Id
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      - name: x-kip-admin-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Admin-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/review/candidates/{candidate_id}/approve:
+    post:
+      summary: Approve
+      operationId: approve_v1_review_candidates__candidate_id__approve_post
+      parameters:
+      - name: candidate_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Candidate Id
+      - name: note
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Note
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      - name: x-kip-admin-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Admin-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/review/candidates/{candidate_id}/reject:
+    post:
+      summary: Reject
+      operationId: reject_v1_review_candidates__candidate_id__reject_post
+      parameters:
+      - name: candidate_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Candidate Id
+      - name: note
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Note
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      - name: x-kip-admin-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Admin-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    ConnectorEvent:
+      properties:
+        schema_version:
+          type: string
+          const: kip.connector-event.v1
+          title: Schema Version
+          default: kip.connector-event.v1
+        event_id:
+          type: string
+          title: Event Id
+        connector_name:
+          type: string
+          title: Connector Name
+        operation:
+          type: string
+          enum:
+          - upsert
+          - delete
+          - sync_complete
+          title: Operation
+        external_id:
+          type: string
+          title: External Id
+        occurred_at:
+          type: string
+          format: date-time
+          title: Occurred At
+        payload:
+          additionalProperties: true
+          type: object
+          title: Payload
+        acl_scopes:
+          items:
+            type: string
+          type: array
+          title: Acl Scopes
+      additionalProperties: false
+      type: object
+      required:
+      - event_id
+      - connector_name
+      - operation
+      - external_id
+      title: ConnectorEvent
+    ContextRequest:
+      properties:
+        query:
+          type: string
+          minLength: 1
+          title: Query
+        limit:
+          type: integer
+          maximum: 100.0
+          minimum: 1.0
+          title: Limit
+          default: 10
+        source_kinds:
+          items:
+            type: string
+          type: array
+          title: Source Kinds
+        document_types:
+          items:
+            type: string
+          type: array
+          title: Document Types
+        project_ids:
+          items:
+            type: string
+          type: array
+          title: Project Ids
+        include_candidate_assertions:
+          type: boolean
+          title: Include Candidate Assertions
+          default: false
+        max_chars:
+          type: integer
+          maximum: 200000.0
+          minimum: 1000.0
+          title: Max Chars
+          default: 40000
+      additionalProperties: false
+      type: object
+      required:
+      - query
+      title: ContextRequest
+    Envelope:
+      properties:
+        schema_version:
+          type: string
+          const: kip.envelope.v1
+          title: Schema Version
+          default: kip.envelope.v1
+        ok:
+          type: boolean
+          title: Ok
+        data:
+          title: Data
+        error:
+          anyOf:
+          - $ref: '#/components/schemas/ErrorInfo'
+          - type: 'null'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+      additionalProperties: false
+      type: object
+      required:
+      - ok
+      - meta
+      title: Envelope
+    EnvelopeMeta:
+      properties:
+        request_id:
+          type: string
+          title: Request Id
+        workspace:
+          type: string
+          title: Workspace
+        generated_at:
+          type: string
+          format: date-time
+          title: Generated At
+        warnings:
+          items:
+            type: string
+          type: array
+          title: Warnings
+      additionalProperties: false
+      type: object
+      required:
+      - request_id
+      - workspace
+      title: EnvelopeMeta
+    ErrorInfo:
+      properties:
+        code:
+          type: string
+          title: Code
+        message:
+          type: string
+          title: Message
+        details:
+          additionalProperties: true
+          type: object
+          title: Details
+      additionalProperties: false
+      type: object
+      required:
+      - code
+      - message
+      title: ErrorInfo
+    GraphNeighborsRequest:
+      properties:
+        node_id:
+          type: string
+          title: Node Id
+        predicates:
+          items:
+            type: string
+          type: array
+          title: Predicates
+        direction:
+          type: string
+          enum:
+          - out
+          - in
+          - both
+          title: Direction
+          default: both
+        limit:
+          type: integer
+          maximum: 1000.0
+          minimum: 1.0
+          title: Limit
+          default: 100
+        approved_only:
+          type: boolean
+          title: Approved Only
+          default: true
+      additionalProperties: false
+      type: object
+      required:
+      - node_id
+      title: GraphNeighborsRequest
+    GraphPathRequest:
+      properties:
+        from_node_id:
+          type: string
+          title: From Node Id
+        to_node_id:
+          type: string
+          title: To Node Id
+        predicates:
+          items:
+            type: string
+          type: array
+          title: Predicates
+        max_depth:
+          type: integer
+          maximum: 8.0
+          minimum: 1.0
+          title: Max Depth
+          default: 4
+        approved_only:
+          type: boolean
+          title: Approved Only
+          default: true
+      additionalProperties: false
+      type: object
+      required:
+      - from_node_id
+      - to_node_id
+      title: GraphPathRequest
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    SearchRequest:
+      properties:
+        query:
+          type: string
+          minLength: 1
+          title: Query
+        limit:
+          type: integer
+          maximum: 100.0
+          minimum: 1.0
+          title: Limit
+          default: 10
+        source_kinds:
+          items:
+            type: string
+          type: array
+          title: Source Kinds
+        document_types:
+          items:
+            type: string
+          type: array
+          title: Document Types
+        project_ids:
+          items:
+            type: string
+          type: array
+          title: Project Ids
+        include_candidate_assertions:
+          type: boolean
+          title: Include Candidate Assertions
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+      - query
+      title: SearchRequest
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError

@@ -1,0 +1,14 @@
+mapping: kip-property-graph
+version: 1.0.0
+node_id: canonical_entity_id
+edge_id: assertion_id
+edge_properties:
+  - status
+  - valid_from
+  - valid_to
+  - ontology_version
+  - confidence
+  - evidence_count
+notes:
+  - Neo4j internal IDs are never public IDs.
+  - Only approved assertions are projected by default.

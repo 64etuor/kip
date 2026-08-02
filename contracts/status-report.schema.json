@@ -1,0 +1,69 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "active_extractions": {
+      "title": "Active Extractions",
+      "type": "integer"
+    },
+    "approved_assertions": {
+      "title": "Approved Assertions",
+      "type": "integer"
+    },
+    "artifacts": {
+      "title": "Artifacts",
+      "type": "integer"
+    },
+    "assertion_candidates": {
+      "title": "Assertion Candidates",
+      "type": "integer"
+    },
+    "content_units": {
+      "title": "Content Units",
+      "type": "integer"
+    },
+    "failed_jobs": {
+      "title": "Failed Jobs",
+      "type": "integer"
+    },
+    "lexical_units": {
+      "title": "Lexical Units",
+      "type": "integer"
+    },
+    "queued_jobs": {
+      "title": "Queued Jobs",
+      "type": "integer"
+    },
+    "repository": {
+      "title": "Repository",
+      "type": "string"
+    },
+    "revisions": {
+      "title": "Revisions",
+      "type": "integer"
+    },
+    "source_objects": {
+      "title": "Source Objects",
+      "type": "integer"
+    },
+    "workspace": {
+      "title": "Workspace",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workspace",
+    "repository",
+    "source_objects",
+    "revisions",
+    "artifacts",
+    "active_extractions",
+    "content_units",
+    "lexical_units",
+    "assertion_candidates",
+    "approved_assertions",
+    "queued_jobs",
+    "failed_jobs"
+  ],
+  "title": "StatusReport",
+  "type": "object"
+}

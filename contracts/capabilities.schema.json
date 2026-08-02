@@ -1,0 +1,62 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "api": {
+      "title": "Api",
+      "type": "boolean"
+    },
+    "connectors": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Connectors",
+      "type": "object"
+    },
+    "graph_backend": {
+      "title": "Graph Backend",
+      "type": "string"
+    },
+    "lexical_search": {
+      "title": "Lexical Search",
+      "type": "boolean"
+    },
+    "mcp": {
+      "title": "Mcp",
+      "type": "boolean"
+    },
+    "parsers": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Parsers",
+      "type": "object"
+    },
+    "repository": {
+      "title": "Repository",
+      "type": "string"
+    },
+    "semantic_search": {
+      "title": "Semantic Search",
+      "type": "boolean"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "repository",
+    "lexical_search",
+    "semantic_search",
+    "graph_backend",
+    "api",
+    "mcp",
+    "parsers",
+    "connectors"
+  ],
+  "title": "Capabilities",
+  "type": "object"
+}

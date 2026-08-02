@@ -1,0 +1,24 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "corpus_frequency": {
+      "title": "Corpus Frequency",
+      "type": "integer"
+    },
+    "document_frequency": {
+      "title": "Document Frequency",
+      "type": "integer"
+    },
+    "term": {
+      "title": "Term",
+      "type": "string"
+    }
+  },
+  "required": [
+    "term",
+    "document_frequency",
+    "corpus_frequency"
+  ],
+  "title": "VocabularyItem",
+  "type": "object"
+}

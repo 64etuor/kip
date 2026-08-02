@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="KIP Knowledge Fabric 발표 자료" />
+    <link rel="icon" href="data:," />
+    <title>KIP Knowledge Fabric | 발표 자료</title>
+    <style>
+      :root {
+        --canvas: #f6f2ea;
+        --paper: #fffdf8;
+        --ink: #1f2933;
+        --muted: #65707a;
+        --line: #d8d0c3;
+        --accent: #294c60;
+        --accent-pale: #dde8e7;
+        --success: #476e55;
+        --warning: #9a6630;
+        --space-1: 8px;
+        --space-2: 16px;
+        --space-3: 24px;
+        --space-4: 32px;
+        --space-5: 40px;
+        --space-6: 48px;
+        --space-8: 64px;
+        --space-10: 80px;
+        --display: 68px;
+        --h1: 48px;
+        --h2: 30px;
+        --lead: 24px;
+        --body: 18px;
+        --caption: 13px;
+        --sans: Pretendard, SUIT, "Apple SD Gothic Neo", system-ui, sans-serif;
+        --serif: "Iowan Old Style", "Noto Serif KR", Georgia, serif;
+        --mono: ui-monospace, "SFMono-Regular", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html, body { margin: 0; min-height: 100%; background: var(--canvas); color: var(--ink); }
+      body { font-family: var(--sans); overflow: hidden; }
+      button { font: inherit; }
+      .deck { min-height: 100svh; position: relative; }
+      .deck::before {
+        background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+        background-size: 48px 48px;
+        content: "";
+        inset: 0;
+        opacity: .22;
+        pointer-events: none;
+        position: fixed;
+      }
+      .slide {
+        display: none;
+        min-height: 100svh;
+        padding: clamp(32px, 6vw, 80px);
+        position: relative;
+      }
+      .slide.active { display: grid; animation: appear .26s ease-out both; }
+      .slide-shell { width: min(1280px, 100%); margin: auto; min-height: calc(100svh - clamp(64px, 12vw, 160px)); display: grid; }
+      .slide-header { align-items: center; color: var(--muted); display: flex; font-family: var(--mono); font-size: var(--caption); font-weight: 600; justify-content: space-between; letter-spacing: .06em; text-transform: uppercase; }
+      .slide-number { color: var(--accent); }
+      .eyebrow { color: var(--accent); font-family: var(--mono); font-size: var(--caption); font-weight: 700; letter-spacing: .08em; margin: 0 0 var(--space-3); text-transform: uppercase; }
+      h1, h2, h3, p { margin: 0; }
+      h1 { font-size: clamp(40px, 5.1vw, var(--display)); letter-spacing: -.055em; line-height: 1.04; }
+      h2 { font-size: clamp(34px, 4vw, var(--h1)); letter-spacing: -.045em; line-height: 1.1; }
+      h3 { font-size: var(--h2); letter-spacing: -.03em; line-height: 1.16; }
+      .lead { color: var(--muted); font-size: clamp(18px, 2vw, var(--lead)); line-height: 1.55; }
+      .body { color: var(--muted); font-size: var(--body); line-height: 1.65; }
+      .serif { font-family: var(--serif); font-weight: 500; }
+      .accent { color: var(--accent); }
+      .footer { align-items: end; color: var(--muted); display: flex; font-size: var(--caption); justify-content: space-between; line-height: 1.45; }
+      .source { max-width: 70ch; }
+      .rule { background: var(--line); height: 1px; width: 100%; }
+      .tag { border: 1px solid var(--line); color: var(--accent); display: inline-flex; font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .05em; padding: 6px 10px; text-transform: uppercase; }
+      .card { background: var(--paper); border: 1px solid var(--line); padding: clamp(20px, 2.6vw, 36px); }
+      .card-label { color: var(--accent); font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .08em; margin-bottom: var(--space-2); text-transform: uppercase; }
+      .card p { margin-top: var(--space-2); }
+      .title-layout { align-content: space-between; grid-template-rows: auto 1fr auto; }
+      .title-copy { align-self: center; max-width: 900px; }
+      .title-copy .lead { margin-top: var(--space-5); max-width: 720px; }
+      .title-mark { align-items: center; display: flex; gap: var(--space-2); margin-bottom: var(--space-5); }
+      .mark { border: 2px solid var(--accent); display: grid; height: 34px; place-items: center; width: 34px; }
+      .mark::after { background: var(--accent); content: ""; height: 10px; width: 10px; }
+      .corner-note { align-self: end; border-left: 2px solid var(--accent); color: var(--muted); font-size: var(--body); line-height: 1.55; padding-left: var(--space-3); }
+      .problem-layout { grid-template-rows: auto 1fr auto; }
+      .problem-grid { align-content: center; display: grid; gap: var(--space-4); grid-template-columns: repeat(3, 1fr); }
+      .problem-card { min-height: 250px; display: flex; flex-direction: column; justify-content: space-between; }
+      .problem-card .count { color: var(--line); font-family: var(--serif); font-size: 72px; line-height: .8; }
+      .problem-card h3 { font-size: 26px; }
+      .problem-card p { margin-top: var(--space-2); }
+      .promise-layout { grid-template-rows: auto 1fr auto; }
+      .promise-grid { align-items: center; display: grid; gap: 0; grid-template-columns: repeat(3, 1fr); margin: auto 0; }
+      .promise-step { min-height: 280px; padding: var(--space-4); position: relative; }
+      .promise-step:not(:last-child)::after { background: var(--accent); content: ""; height: 1px; position: absolute; right: -18%; top: 50%; width: 36%; }
+      .promise-index { color: var(--accent); font-family: var(--mono); font-size: 14px; font-weight: 700; letter-spacing: .08em; }
+      .promise-step h3 { margin-top: var(--space-4); }
+      .promise-step p { margin-top: var(--space-2); max-width: 24ch; }
+      .source-layout { grid-template-rows: auto 1fr auto; }
+      .source-grid { align-content: center; display: grid; gap: var(--space-3); grid-template-columns: 1.2fr .8fr; }
+      .source-map { border-left: 1px solid var(--line); display: grid; gap: var(--space-2); grid-template-columns: repeat(2, 1fr); padding-left: var(--space-3); }
+      .source-item { border-top: 1px solid var(--line); padding-top: var(--space-2); }
+      .source-item h3 { font-size: 20px; }
+      .source-item p { font-size: 15px; margin-top: var(--space-1); }
+      .diagram { background: var(--accent-pale); border: 1px solid var(--line); min-height: 360px; padding: var(--space-4); position: relative; }
+      .document { background: var(--paper); border: 1px solid var(--line); padding: 18px; position: absolute; width: 42%; }
+      .document::before { background: var(--line); content: ""; display: block; height: 1px; margin-bottom: 12px; width: 100%; }
+      .document span { color: var(--muted); display: block; font-size: 13px; line-height: 1.5; }
+      .document.a { left: 8%; top: 16%; transform: rotate(-3deg); }
+      .document.b { right: 8%; top: 22%; transform: rotate(3deg); }
+      .document.c { bottom: 10%; left: 29%; }
+      .evidence-line { border-left: 2px solid var(--accent); bottom: 8%; left: 50%; position: absolute; top: 8%; }
+      .evidence-layout { grid-template-rows: auto 1fr auto; }
+      .evidence-grid { align-items: center; display: grid; gap: var(--space-6); grid-template-columns: .9fr 1.1fr; }
+      .quote { border-left: 3px solid var(--accent); font-family: var(--serif); font-size: clamp(28px, 3vw, 42px); line-height: 1.3; padding-left: var(--space-4); }
+      .evidence-list { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+      .evidence-list div { background: var(--paper); padding: var(--space-3); }
+      .evidence-list strong { display: block; font-size: 18px; }
+      .evidence-list span { color: var(--muted); display: block; font-size: 15px; margin-top: var(--space-1); }
+      .architecture-layout { grid-template-rows: auto 1fr auto; }
+      .architecture-grid { align-items: center; display: grid; gap: var(--space-5); grid-template-columns: 1fr 1.1fr; }
+      .ledger { border: 2px solid var(--accent); min-height: 305px; padding: var(--space-4); }
+      .ledger h3 { color: var(--accent); font-family: var(--serif); font-size: 38px; }
+      .ledger p { margin-top: var(--space-3); }
+      .projection-list { display: grid; gap: var(--space-2); }
+      .projection { align-items: center; border-bottom: 1px solid var(--line); display: flex; gap: var(--space-3); padding: var(--space-2) 0; }
+      .projection b { color: var(--accent); font-family: var(--mono); font-size: 13px; min-width: 96px; }
+      .decoupling-layout, .resilience-layout { grid-template-rows: auto 1fr auto; }
+      .decoupling-grid { align-items: stretch; display: grid; gap: var(--space-2); grid-template-columns: repeat(4, 1fr); margin-top: var(--space-5); }
+      .decoupling-card { min-height: 250px; padding: var(--space-3); position: relative; }
+      .decoupling-card:not(:last-child)::after { color: var(--accent); content: "→"; font-family: var(--serif); font-size: 28px; position: absolute; right: calc(var(--space-2) * -1 - 9px); top: calc(50% - 20px); z-index: 1; }
+      .decoupling-card h3 { font-size: 23px; line-height: 1.25; }
+      .decoupling-card .body { margin-top: var(--space-2); }
+      .resilience-grid { align-items: stretch; display: grid; gap: var(--space-4); grid-template-columns: 1.1fr .9fr; margin-top: var(--space-5); }
+      .resilience-ledger { background: var(--accent); color: var(--paper); min-height: 290px; padding: var(--space-4); }
+      .resilience-ledger h3 { font-family: var(--serif); font-size: 34px; }
+      .resilience-ledger p { color: #e9e2d3; margin-top: var(--space-3); }
+      .safeguards { border-top: 1px solid var(--line); display: grid; }
+      .safeguard { border-bottom: 1px solid var(--line); padding: var(--space-3) 0; }
+      .safeguard b { color: var(--accent); display: block; font-size: 18px; }
+      .safeguard span { color: var(--muted); display: block; font-size: 15px; margin-top: var(--space-1); }
+      .principle-layout { grid-template-rows: auto 1fr auto; }
+      .principle-grid { align-items: stretch; display: grid; gap: var(--space-3); grid-template-columns: repeat(2, 1fr); margin-top: var(--space-5); }
+      .principle-card { border-top: 4px solid var(--accent); min-height: 220px; }
+      .principle-card h3 { font-size: 28px; line-height: 1.25; }
+      .principle-card .body { margin-top: var(--space-3); }
+      .principle-index { color: var(--accent); font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .08em; margin-bottom: var(--space-4); }
+      .principle-card.warm { background: var(--accent-pale); }
+      .principle-card.dark { background: var(--accent); border-color: var(--accent); color: var(--paper); }
+      .principle-card.dark .principle-index, .principle-card.dark .body { color: #e9e2d3; }
+      .principle-card.dark h3 { color: var(--paper); }
+      .vector-layout, .embedding-layout, .chunking-layout, .activation-layout { grid-template-rows: auto 1fr auto; }
+      .vector-grid { align-items: center; display: grid; gap: var(--space-6); grid-template-columns: .9fr 1.1fr; }
+      .vector-equation { border-left: 3px solid var(--accent); padding-left: var(--space-4); }
+      .vector-equation .math { color: var(--accent); font-family: var(--serif); font-size: clamp(31px, 3.2vw, 48px); line-height: 1.25; }
+      .vector-equation .body { margin-top: var(--space-3); }
+      .vector-stage { background: #233039; border: 1px solid #233039; min-height: 380px; padding: var(--space-3); }
+      .vector-stage svg { display: block; height: 100%; min-height: 330px; width: 100%; }
+      .embedding-flow { align-items: stretch; display: grid; gap: var(--space-2); grid-template-columns: repeat(4, 1fr); margin-top: var(--space-5); }
+      .embedding-step { min-height: 260px; padding: var(--space-3); position: relative; }
+      .embedding-step:not(:last-child)::after { color: var(--accent); content: "→"; font-family: var(--serif); font-size: 28px; position: absolute; right: calc(var(--space-2) * -1 - 9px); top: calc(50% - 20px); z-index: 1; }
+      .embedding-step h3 { font-size: 25px; line-height: 1.25; }
+      .embedding-step .body { font-size: 16px; margin-top: var(--space-2); }
+      .chunking-grid { align-items: stretch; display: grid; gap: var(--space-4); grid-template-columns: 1.05fr .95fr; margin-top: var(--space-5); }
+      .chunk-document { background: var(--paper); border: 1px solid var(--line); padding: var(--space-3); }
+      .chunk-document > p { color: var(--accent); font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .06em; }
+      .chunk-block { border-left: 4px solid var(--accent); margin-top: var(--space-2); padding: 11px 14px; }
+      .chunk-block h3 { font-size: 18px; }
+      .chunk-block p { color: var(--muted); font-size: 14px; line-height: 1.5; margin-top: 4px; }
+      .chunk-block.table { background: var(--accent-pale); border-color: var(--success); }
+      .chunk-block.message { border-color: var(--warning); }
+      .chunk-rules { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+      .chunk-rules div { background: var(--paper); padding: var(--space-3); }
+      .chunk-rules b { color: var(--accent); display: block; font-size: 18px; }
+      .chunk-rules span { color: var(--muted); display: block; font-size: 15px; line-height: 1.5; margin-top: var(--space-1); }
+      .activation-grid { align-items: stretch; display: grid; gap: var(--space-3); grid-template-columns: repeat(3, 1fr); margin-top: var(--space-5); }
+      .activation-card { min-height: 260px; padding: var(--space-4); }
+      .activation-card h3 { font-size: 27px; }
+      .activation-card .body { margin-top: var(--space-3); }
+      .activation-card.shadow { background: var(--accent-pale); border-top: 4px solid var(--accent); }
+      .activation-card.current { border-top: 4px solid var(--warning); }
+      .sheet-layout { grid-template-rows: auto 1fr auto; }
+      .sheet-grid { align-items: center; display: grid; gap: var(--space-5); grid-template-columns: .9fr 1.1fr; }
+      .sheet-window { background: var(--paper); border: 1px solid var(--line); min-height: 330px; padding: var(--space-3); }
+      .sheet-bar { background: var(--accent-pale); height: 22px; margin-bottom: var(--space-2); width: 45%; }
+      .cells { display: grid; grid-template-columns: repeat(6, 1fr); }
+      .cell { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); min-height: 38px; padding: 8px; }
+      .cell.focus { background: var(--accent-pale); color: var(--accent); font-weight: 700; }
+      .sheet-copy { display: grid; gap: var(--space-3); }
+      .sheet-copy .card { padding: var(--space-3); }
+      .review-layout { grid-template-rows: auto 1fr auto; }
+      .review-grid { align-items: center; display: grid; gap: var(--space-4); grid-template-columns: repeat(3, 1fr); }
+      .review-card { min-height: 300px; }
+      .review-card .state { color: var(--success); font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: .06em; }
+      .review-card.warning .state { color: var(--warning); }
+      .interface-layout { grid-template-rows: auto 1fr auto; }
+      .interface-grid { align-items: center; display: grid; gap: var(--space-2); grid-template-columns: repeat(3, 1fr); }
+      .interface { border-top: 4px solid var(--accent); min-height: 270px; padding: var(--space-4); }
+      .interface h3 { font-size: 29px; }
+      .interface .mono { color: var(--muted); font-family: var(--mono); font-size: 13px; line-height: 1.7; margin-top: var(--space-4); }
+      .status-layout { grid-template-rows: auto 1fr auto; }
+      .status-grid { align-content: center; display: grid; gap: var(--space-3); grid-template-columns: repeat(2, 1fr); }
+      .status-card { min-height: 230px; }
+      .status-card ul { color: var(--muted); font-size: 16px; line-height: 1.7; margin: var(--space-3) 0 0; padding-left: 20px; }
+      .status-card.ready { border-top: 4px solid var(--success); }
+      .status-card.pilot { border-top: 4px solid var(--warning); }
+      .closing-layout { align-content: space-between; grid-template-rows: auto 1fr auto; }
+      .closing-copy { align-self: center; max-width: 900px; }
+      .closing-copy p { margin-top: var(--space-5); max-width: 680px; }
+      .closing-list { border-top: 1px solid var(--line); display: grid; gap: var(--space-3); grid-template-columns: repeat(3, 1fr); margin-top: var(--space-6); padding-top: var(--space-3); }
+      .closing-list div { color: var(--muted); font-size: 16px; }
+      .controls { align-items: center; bottom: 18px; display: flex; gap: var(--space-1); position: fixed; right: 22px; z-index: 5; }
+      .control { align-items: center; background: var(--paper); border: 1px solid var(--line); color: var(--ink); cursor: pointer; display: inline-flex; font-family: var(--mono); font-size: 16px; height: 44px; justify-content: center; width: 44px; }
+      .control:hover { background: var(--accent-pale); }
+      .control:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      .control:disabled { cursor: not-allowed; opacity: .4; }
+      .progress { background: var(--line); bottom: 0; height: 4px; left: 0; position: fixed; right: 0; z-index: 5; }
+      .progress > span { background: var(--accent); display: block; height: 100%; transition: width .26s ease-out; }
+      .sr-only { height: 1px; margin: -1px; overflow: hidden; position: absolute; width: 1px; clip: rect(0, 0, 0, 0); }
+      .mobile-break { display: none; }
+      .keep { white-space: nowrap; }
+      @keyframes appear { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+      @media (max-width: 780px) {
+        body { overflow: auto; }
+        .slide { min-height: 100svh; padding: 28px 22px 120px; }
+        .mobile-break { display: inline; }
+        h2 { font-size: clamp(30px, 8vw, 38px); }
+        .slide-shell { min-height: calc(100svh - 104px); }
+        .problem-grid, .promise-grid, .review-grid, .interface-grid, .decoupling-grid, .principle-grid, .embedding-flow, .activation-grid, .closing-list { grid-template-columns: 1fr; }
+        .source-grid, .evidence-grid, .architecture-grid, .resilience-grid, .vector-grid, .chunking-grid, .sheet-grid, .status-grid { grid-template-columns: 1fr; }
+        .promise-step { min-height: auto; padding: var(--space-3) 0; }
+        .promise-step:not(:last-child)::after { bottom: -10px; height: 20px; left: 8px; top: auto; width: 1px; }
+        .problem-card, .review-card, .interface, .status-card, .principle-card { min-height: auto; }
+        .source-map { border-left: 0; border-top: 1px solid var(--line); grid-template-columns: 1fr; padding-left: 0; padding-top: var(--space-3); }
+        .diagram { display: grid; gap: var(--space-2); min-height: auto; padding: var(--space-2); }
+        .document, .document.a, .document.b, .document.c { position: static; transform: none; width: 100%; }
+        .evidence-line { display: none; }
+        .document span, .source-item p { word-break: keep-all; }
+        .projection { align-items: flex-start; flex-direction: column; gap: var(--space-1); }
+        .projection b { min-width: 0; }
+        .projection span { word-break: keep-all; }
+        .principle-layout h2 { word-break: keep-all; }
+        .principle-layout .eyebrow { word-break: keep-all; }
+        .principle-card, .principle-card h3, .principle-card .body { word-break: keep-all; }
+        .embedding-step { min-height: auto; word-break: keep-all; }
+        .embedding-step:not(:last-child)::after { bottom: calc(var(--space-2) * -1 - 18px); left: calc(50% - 10px); right: auto; top: auto; transform: rotate(90deg); }
+        .vector-stage { min-height: 280px; padding: var(--space-1); }
+        .vector-stage svg { min-height: 240px; }
+        .chunk-document, .chunk-rules, .activation-card { word-break: keep-all; }
+        .decoupling-card { min-height: auto; }
+        .decoupling-card:not(:last-child)::after { bottom: calc(var(--space-2) * -1 - 18px); left: calc(50% - 10px); right: auto; top: auto; transform: rotate(90deg); }
+        .resilience-ledger { min-height: auto; }
+        .sheet-window { min-height: 0; padding: var(--space-2); }
+        .cells { grid-template-columns: repeat(3, 1fr); }
+        .cell { font-size: 14px; min-height: 44px; padding: 6px 4px; word-break: keep-all; }
+        .controls { bottom: auto; justify-self: end; margin-top: var(--space-3); position: static; }
+        .footer { gap: var(--space-2); flex-direction: column; align-items: start; }
+      }
+      @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+    </style>
+  </head>
+  <body>
+    <main class="deck" aria-label="KIP Knowledge Fabric 발표 자료">
+      <section class="slide active" data-slide aria-labelledby="slide-1-title">
+        <div class="slide-shell title-layout">
+          <header class="slide-header"><span>KIP / Knowledge Fabric</span><span class="slide-number">01</span></header>
+          <div class="title-copy">
+            <div class="title-mark"><span class="mark" aria-hidden="true"></span><span class="tag">evidence-first</span></div>
+            <p class="eyebrow">회사 지식을 다시 찾을 수 있게</p>
+            <h1 id="slide-1-title">자료를 모으는<span class="mobile-break"><br></span> 일을 넘어,<br><span class="serif accent">근거까지 <span class="keep">다시 읽는</span></span> 지식 기반</h1>
+            <p class="lead">KIP는 NAS 문서, 메신저, 메일에 흩어진 업무 자료를 원본 그대로 보존하고, 질문에 맞는 <span class="keep">근거 위치</span>까지 찾아 주는 시스템입니다.</p>
+          </div>
+          <footer class="footer"><span class="source">KIP Knowledge Fabric · 발표용 개요</span><span>← → 또는 하단 버튼으로 이동</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-2-title">
+        <div class="slide-shell problem-layout">
+          <header class="slide-header"><span>왜 필요한가</span><span class="slide-number">02</span></header>
+          <div>
+            <p class="eyebrow">업무 지식의 현실</p>
+            <h2 id="slide-2-title">자료는 많지만,<br>답을 믿기 어려운 이유</h2>
+            <div class="problem-grid">
+              <article class="card problem-card"><span class="count">01</span><div><h3>자료가 흩어져 있습니다</h3><p class="body">NAS의 한글·PDF·엑셀, Slack 대화, 메일 답장이 서로 다른 곳에 남습니다.</p></div></article>
+              <article class="card problem-card"><span class="count">02</span><div><h3>제목만으로는 부족합니다</h3><p class="body">문서번호, 셀 안의 문구, 수정 전후 맥락은 파일명 검색만으로 찾기 어렵습니다.</p></div></article>
+              <article class="card problem-card"><span class="count">03</span><div><h3>결론에는 근거가 필요합니다</h3><p class="body">중요한 답은 “어디에 적혀 있는가”와 최신 여부까지 함께 보여야 합니다.</p></div></article>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: PRD 2장, 3장</span><span>02 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-3-title">
+        <div class="slide-shell promise-layout">
+          <header class="slide-header"><span>핵심 약속</span><span class="slide-number">03</span></header>
+          <div>
+            <p class="eyebrow">Find · Verify · Connect</p>
+            <h2 id="slide-3-title">찾고, 확인하고, 연결합니다.</h2>
+            <p class="lead" style="margin-top: var(--space-3);">검색 결과를 곧바로 결론으로 쓰지 않습니다. 실제 자료를 다시 읽고, 필요한 관계만 근거와 함께 남깁니다.</p>
+            <div class="promise-grid">
+              <article class="promise-step"><p class="promise-index">01 / 찾기</p><h3>내용으로 후보를 찾습니다</h3><p class="body">파일명뿐 아니라 본문, 엑셀 셀, 메시지 문장으로 자료를 찾습니다.</p></article>
+              <article class="promise-step"><p class="promise-index">02 / 확인</p><h3>원본 위치를 다시 읽습니다</h3><p class="body">PDF 페이지, 한글 문서 위치, 엑셀 시트·셀 범위처럼 정확한 자리로 돌아갑니다.</p></article>
+              <article class="promise-step"><p class="promise-index">03 / 연결</p><h3>근거 있는 관계만 남깁니다</h3><p class="body">승인, 변경, 답장 같은 관계는 출처와 검토 상태를 함께 관리합니다.</p></article>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: PRD 3장, 8장, 11장</span><span>03 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-4-title">
+        <div class="slide-shell source-layout">
+          <header class="slide-header"><span>자료의 범위</span><span class="slide-number">04</span></header>
+          <div>
+            <p class="eyebrow">서로 다른 자료, 하나의 근거 흐름</p>
+            <h2 id="slide-4-title">문서·대화·메일을<br>같은 질문으로 읽습니다.</h2>
+            <div class="source-grid" style="margin-top: var(--space-5);">
+              <div class="diagram" aria-label="서로 다른 자료가 근거 흐름으로 정리되는 모습">
+                <div class="evidence-line" aria-hidden="true"></div>
+                <div class="document a"><strong>계약 변경 승인서</strong><span>HWP / PDF · 페이지 위치</span></div>
+                <div class="document b"><strong>참여율 정산표</strong><span>XLSX · 시트 / 셀 범위</span></div>
+                <div class="document c"><strong>변경 전 논의</strong><span>Slack / Mail · 대화 맥락</span></div>
+              </div>
+              <div class="source-map">
+                <article class="source-item"><h3>NAS 문서</h3><p class="body">HWP/HWPX, PDF, XLSX, DOCX, PPTX 등 실무 파일</p></article>
+                <article class="source-item"><h3>업무 대화</h3><p class="body">Slack 메시지·스레드·첨부파일과 수정 이력</p></article>
+                <article class="source-item"><h3>메일</h3><p class="body">본문, 첨부파일, 답장 관계와 메시지 식별자</p></article>
+                <article class="source-item"><h3>사람이 쓴 메모</h3><p class="body">Obsidian Markdown과 텍스트 자료</p></article>
+              </div>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: PRD 7장, CONNECTORS.md</span><span>04 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-5-title">
+        <div class="slide-shell evidence-layout">
+          <header class="slide-header"><span>신뢰의 기준</span><span class="slide-number">05</span></header>
+          <div class="evidence-grid">
+            <div><p class="eyebrow">Evidence-first</p><h2 id="slide-5-title" class="quote">“그럴듯한 요약”보다<br>“다시 확인할 수 있는 위치”를 먼저 제공합니다.</h2></div>
+            <div class="evidence-list">
+              <div><strong>원본은 바꾸지 않습니다</strong><span>색인 과정에서 파일과 메시지를 수정하지 않고, 읽기 전용으로 다룹니다.</span></div>
+              <div><strong>검색 결과는 출발점입니다</strong><span>스니펫을 보고 결론내리지 않고, 정확한 근거 단위를 다시 읽습니다.</span></div>
+              <div><strong>오래된 자료는 표시합니다</strong><span>색인 시점의 해시와 원본이 다르면 최신 여부를 확인하도록 알립니다.</span></div>
+              <div><strong>권한을 먼저 적용합니다</strong><span>볼 수 없는 자료는 검색·관계 탐색의 시작 단계에서 제외합니다.</span></div>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: AGENTS.md, PRD 6장·11장, SECURITY.md</span><span>05 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-6-title">
+        <div class="slide-shell architecture-layout">
+          <header class="slide-header"><span>구조의 원칙</span><span class="slide-number">06</span></header>
+          <div class="architecture-grid">
+            <div><p class="eyebrow">하나의 기준, 여러 보기 방식</p><h2 id="slide-6-title">중요한 기록은<br><span class="serif accent">한 곳에</span> 남깁니다.</h2><p class="lead" style="margin-top: var(--space-4);">원본 식별, 수정 이력, 접근 권한, 승인된 관계는 중앙 <span class="keep">데이터베이스</span>(PostgreSQL)에 보관합니다. 검색·요약·그래프는 필요할 때 다시 만들 수 있는 보기 방식입니다.</p></div>
+            <div class="ledger"><h3>기준 기록</h3><p class="body">원본, 버전, 권한, 승인 이력</p><div class="rule" style="margin: var(--space-4) 0;"></div><div class="projection-list"><div class="projection"><b>검색</b><span>빠르게 후보를 찾는 색인</span></div><div class="projection"><b>의미 검색</b><span>필요할 때만 켜는 유사도 검색</span></div><div class="projection"><b>관계 보기</b><span>승인된 관계를 따라 보는 그래프</span></div><div class="projection"><b>요약</b><span>다시 만들 수 있는 읽기 보조 자료</span></div></div></div>
+          </div>
+          <footer class="footer"><span class="source">근거: PRD 6장·12장, TRD 1장·10장</span><span>06 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-7-title">
+        <div class="slide-shell decoupling-layout">
+          <header class="slide-header"><span>분리해서 설계한 이유</span><span class="slide-number">07</span></header>
+          <div>
+            <p class="eyebrow">Decoupling · 서로 얽히지 않게 나누기</p>
+            <h2 id="slide-7-title">연결 방식은 바꿔도,<br>핵심 기준은 흔들리지 않게.</h2>
+            <p class="lead" style="margin-top: var(--space-3);">자료를 가져오는 곳과 사용하는 방법을 핵심 서비스에서 분리합니다. 그래서 Slack·메일·새 도구가 바뀌어도 권한, 근거, 검토 규칙을 <span class="keep">처음부터</span> 다시 만들 필요가 없습니다.</p>
+            <div class="decoupling-grid">
+              <article class="card decoupling-card"><p class="card-label">01 / 자료 연결부</p><h3>원본을 읽는<br>전용 창구</h3><p class="body">NAS, Slack, 메일이 각자의 방식으로 자료를 읽되, 원본을 수정하지 않습니다.</p></article>
+              <article class="card decoupling-card"><p class="card-label">02 / 공통 약속</p><h3>같은 형태로<br>전달</h3><p class="body">어디서 온 자료든 위치·권한·수정 이력을 포함한 같은 형식으로 바꿉니다.</p></article>
+              <article class="card decoupling-card"><p class="card-label">03 / 핵심 서비스</p><h3>기준을 한 번만<br>적용</h3><p class="body">검색, 원문 읽기, 검토는 한 서비스가 맡아 결과가 입구마다 달라지지 않습니다.</p></article>
+              <article class="card decoupling-card"><p class="card-label">04 / 사용 연결부</p><h3>필요한 화면과<br>도구로 전달</h3><p class="body">명령창, 업무 시스템, AI 도구는 같은 결과를 각자에게 맞는 방법으로 받습니다.</p></article>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: PRD 6장·12장, DATA_CONTRACTS.md, TRD 7장·31장</span><span>07 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-8-title">
+        <div class="slide-shell resilience-layout">
+          <header class="slide-header"><span>장애와 변화에 대비하는 구조</span><span class="slide-number">08</span></header>
+          <div>
+            <p class="eyebrow">기준 기록과 보조 자료를 분리</p>
+            <h2 id="slide-8-title">검색 기능이 멈춰도,<br>기준 기록은 잃지 않습니다.</h2>
+            <div class="resilience-grid">
+              <article class="resilience-ledger"><p class="card-label" style="color:#e9e2d3">바꿀 수 없는 기준</p><h3>원본 식별 · 버전 · 권한 · 승인 이력</h3><p class="body">이 기록은 중앙 데이터베이스에 <span class="keep">남습니다</span>. 검색 색인·유사도 검색·관계 그래프·요약은 이 기준을 바꾸지 못하며, 필요하면 다시 만들 수 있습니다.</p></article>
+              <div class="safeguards">
+                <div class="safeguard"><b>보조 기능은 독립적으로 다시 만듭니다</b><span>검색이나 그래프가 고장 나도 기준 기록은 유지되고, 해당 기능만 재구축합니다.</span></div>
+                <div class="safeguard"><b>새 추출 결과는 뒤에서 먼저 검사합니다</b><span>새 파서 결과가 실패하면 기존에 사용 중인 결과를 바꾸지 않습니다.</span></div>
+                <div class="safeguard"><b>평소 검색이 전체 재수집을 부르지 않습니다</b><span>질문에 답하는 일과 대규모 동기화·재구축 작업을 분리해 운영 부담을 낮춥니다.</span></div>
+              </div>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: AGENTS.md, PRD 6장·15장, TRD 10장·27장·33장</span><span>08 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-9-title">
+        <div class="slide-shell principle-layout">
+          <header class="slide-header"><span>권한은 나중에 거르는 장치가 아닙니다</span><span class="slide-number">09</span></header>
+          <div>
+            <p class="eyebrow">Source ACL propagation · 원본 권한을 끝까지</p>
+            <h2 id="slide-9-title">보면 안 되는 자료는<br>애초에 찾지 못하게 합니다.</h2>
+            <div class="principle-grid">
+              <article class="card principle-card dark"><p class="principle-index">먼저 거르기</p><h3>검색 전에<br>권한을 적용</h3><p class="body">결과를 만든 뒤 숨기는 방식이 아닙니다. 검색과 관계 탐색의 출발점에서 접근 범위를 제한합니다.</p></article>
+              <article class="card principle-card"><p class="principle-index">끝까지 유지</p><h3>요약과 관계에도<br>같은 경계</h3><p class="body">원본보다 더 넓은 범위로 파생 정보가 보이지 않도록, 모든 보기 방식에 원본 권한을 이어갑니다.</p></article>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: PRD P-09·9.15절, SECURITY.md, TRD 27장</span><span>09 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-10-title">
+        <div class="slide-shell principle-layout">
+          <header class="slide-header"><span>업무의 의미는 도구 밖에 둡니다</span><span class="slide-number">10</span></header>
+          <div>
+            <p class="eyebrow">Ontology is independent · 의미의 계약</p>
+            <h2 id="slide-10-title">“승인”의 뜻을<br>그래프 도구에 맡기지 않습니다.</h2>
+            <div class="principle-grid">
+              <article class="card principle-card warm"><p class="principle-index">업무 언어</p><h3>사람이 이해하는<br>관계의 정의</h3><p class="body">과제·기관·승인·변경 같은 말의 범위와 검토 규칙을 독립된 온톨로지 파일에 적습니다.</p></article>
+              <article class="card principle-card"><p class="principle-index">도구 교체 가능</p><h3>데이터베이스가 바뀌어도<br>뜻은 유지</h3><p class="body">특정 그래프의 라벨이나 내부 번호에 의미를 묶지 않아, 저장소를 바꿔도 같은 업무 언어를 사용합니다.</p></article>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: PRD P-05·9.11절, DATA_CONTRACTS.md, ontology/</span><span>10 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-11-title">
+        <div class="slide-shell principle-layout">
+          <header class="slide-header"><span>비용과 정확도를 함께 다룹니다</span><span class="slide-number">11</span></header>
+          <div>
+            <p class="eyebrow">Shallow first, deep on demand</p>
+            <h2 id="slide-11-title">모든 자료를 깊게 읽지 않고,<br>필요한 순간에만 원문으로 갑니다.</h2>
+            <div class="principle-grid">
+              <article class="card principle-card"><p class="principle-index">평소에는 가볍게</p><h3>전체 자료에서<br>후보를 빠르게 찾기</h3><p class="body">제목과 본문 단서로 넓게 찾습니다. 이 단계는 답을 확정하는 일이 아니라, 확인할 곳을 고르는 일입니다.</p></article>
+              <article class="card principle-card dark"><p class="principle-index">중요한 순간에는 깊게</p><h3>페이지·셀·메시지를<br>정확히 다시 읽기</h3><p class="body">금액, 날짜, 승인처럼 중요한 판단은 원본의 정확한 단위를 읽어 근거와 함께 돌려줍니다.</p></article>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: PRD P-07·8장·9.7절, TRD 20장</span><span>11 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-12-title">
+        <div class="slide-shell principle-layout">
+          <header class="slide-header"><span>자동화와 책임을 섞지 않습니다</span><span class="slide-number">12</span></header>
+          <div>
+            <p class="eyebrow">Candidate before assertion · 제안과 사실의 분리</p>
+            <h2 id="slide-12-title">자동으로 찾은 것은<br>검토할 후보일 뿐입니다.</h2>
+            <div class="principle-grid">
+              <article class="card principle-card warm"><p class="principle-index">기계의 역할</p><h3>놓치기 쉬운 관계를<br>먼저 제안</h3><p class="body">문서와 대화에서 “누가 무엇을 승인했는지” 같은 연결 가능성을 찾아 검토 대상으로 올립니다.</p></article>
+              <article class="card principle-card"><p class="principle-index">사람의 역할</p><h3>근거를 보고<br>승인·반려·수정</h3><p class="body">공식 기록이 되는 순간은 사람이 근거와 맥락을 확인해 판단했을 때입니다. 판단 이력도 함께 남깁니다.</p></article>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: PRD P-08·9.11절, DATA_CONTRACTS.md</span><span>12 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-13-title">
+        <div class="slide-shell principle-layout">
+          <header class="slide-header"><span>사용자에게 약속한 형식을 지킵니다</span><span class="slide-number">13</span></header>
+          <div>
+            <p class="eyebrow">Stable contracts · 바뀌어도 같은 약속</p>
+            <h2 id="slide-13-title">안쪽 도구는 바뀌어도,<br>밖으로 내보내는 약속은 지킵니다.</h2>
+            <div class="principle-grid">
+              <article class="card principle-card"><p class="principle-index">안정적인 식별자</p><h3>링크와 근거 위치를<br>계속 사용할 수 있게</h3><p class="body">내부 데이터베이스의 행 번호 대신, 바뀌지 않는 공개 ID와 버전이 있는 JSON 형식을 사용합니다.</p></article>
+              <article class="card principle-card dark"><p class="principle-index">같은 서비스</p><h3>명령창·API·AI 도구가<br>서로 다른 답을 내지 않게</h3><p class="body">모든 입구는 같은 검색·읽기·검토 서비스를 호출합니다. 화면마다 규칙을 따로 복사하지 않습니다.</p></article>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: PRD P-11·9.13절, DATA_CONTRACTS.md, TRD 29장·31장</span><span>13 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-14-title">
+        <div class="slide-shell principle-layout">
+          <header class="slide-header"><span>복잡함은 필요가 증명된 뒤에</span><span class="slide-number">14</span></header>
+          <div>
+            <p class="eyebrow">Progressive complexity · 검증 후 확장</p>
+            <h2 id="slide-14-title">처음부터 모든 기술을<br>운영하지 않습니다.</h2>
+            <div class="principle-grid">
+              <article class="card principle-card dark"><p class="principle-index">기본은 작게</p><h3>필수 기능은<br>중앙 저장소만으로</h3><p class="body">검색·권한·검토·감사는 PostgreSQL 중심 구조로 먼저 완성합니다.</p></article>
+              <article class="card principle-card"><p class="principle-index">확장은 근거가 있을 때</p><h3>벡터 검색과 그래프는<br>효과가 확인되면 추가</h3><p class="body">새 도구가 실제 검색 품질·사용률·운영 부담에서 이득을 보일 때만 보조 기능으로 켭니다.</p></article>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: PRD P-12·6.3절·12장, IMPLEMENTATION_STATUS.md</span><span>14 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-15-title">
+        <div class="slide-shell principle-layout">
+          <header class="slide-header"><span>특정 도구에 갇히지 않습니다</span><span class="slide-number">15</span></header>
+          <div>
+            <p class="eyebrow">Portability · 옮길 수 있는 기록</p>
+            <h2 id="slide-15-title">데이터를 옮길 수 있어야,<br>도구 선택도 자유로워집니다.</h2>
+            <div class="principle-grid">
+              <article class="card principle-card warm"><p class="principle-index">내보낼 수 있는 기준 기록</p><h3>표준 형식으로<br>보관하고 백업</h3><p class="body">원본 식별, 권한, 검토 이력을 정해진 JSON 묶음으로 내보내 다른 환경에서도 다시 읽을 수 있습니다.</p></article>
+              <article class="card principle-card"><p class="principle-index">교체는 비교하며</p><h3>새 연결부는 뒤에서<br>결과를 대조</h3><p class="body">파서나 연결 방식을 바꾸기 전, 같은 자료에서 결과를 비교해 품질이 나아졌는지 확인합니다.</p></article>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: PRD 9.16절·P-10, TRD 34장, OPERATIONS.md</span><span>15 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-16-title">
+        <div class="slide-shell principle-layout">
+          <header class="slide-header"><span>일상의 질문과 무거운 작업을 분리합니다</span><span class="slide-number">16</span></header>
+          <div>
+            <p class="eyebrow">운영 리듬의 분리</p>
+            <h2 id="slide-16-title">질문에 답하는 동안,<br>전체 재수집을 시작하지 않습니다.</h2>
+            <div class="principle-grid">
+              <article class="card principle-card"><p class="principle-index">일상 조회</p><h3>빠르게 찾고<br>정확히 읽기</h3><p class="body">검색·원문 읽기·설명은 지금 필요한 근거를 돌려주는 일입니다. 대규모 작업을 끼워 넣지 않습니다.</p></article>
+              <article class="card principle-card dark"><p class="principle-index">별도 운영 작업</p><h3>동기화·재구축·백업은<br>계획해서 실행</h3><p class="body">증분 수집, 색인 재구축, 백업·복구 훈련은 상태를 기록하고 확인 가능한 별도 작업으로 관리합니다.</p></article>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: AGENTS.md, PRD 9.13절·9.16절, TRD 30장·33장</span><span>16 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-17-title">
+        <div class="slide-shell sheet-layout">
+          <header class="slide-header"><span>엑셀을 다루는 방식</span><span class="slide-number">17</span></header>
+          <div class="sheet-grid">
+            <div><p class="eyebrow">얕게 찾고, 깊게 확인</p><h2 id="slide-17-title">엑셀의 숫자는<br>원본에서 계산합니다.</h2><p class="lead" style="margin-top: var(--space-4);">먼저 전체 파일에서 후보를 찾고, 합계·날짜·수식이 필요한 순간에는 원본 시트와 셀 범위를 다시 읽습니다.</p></div>
+            <div class="sheet-copy"><div class="sheet-window" aria-label="엑셀 원본 범위를 다시 읽는 예시"><div class="sheet-bar"></div><div class="cells"><span class="cell">A</span><span class="cell">B</span><span class="cell">C</span><span class="cell">D</span><span class="cell">E</span><span class="cell">F</span><span class="cell">장비명</span><span class="cell">수량</span><span class="cell focus">금액</span><span class="cell">세금</span><span class="cell">합계</span><span class="cell">비고</span><span class="cell">측정기</span><span class="cell">2</span><span class="cell focus">1,200,000</span><span class="cell">120,000</span><span class="cell">1,320,000</span><span class="cell">확인</span></div></div><article class="card"><p class="card-label">반환하는 근거</p><p class="body">파일명 · 시트명 · 사용한 셀 범위 · 계산 제외 규칙</p></article></div>
+          </div>
+          <footer class="footer"><span class="source">근거: PRD 8.3절·9.7절, TRD 20장</span><span>17 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-18-title">
+        <div class="slide-shell review-layout">
+          <header class="slide-header"><span>사실을 만드는 절차</span><span class="slide-number">18</span></header>
+          <div>
+            <p class="eyebrow">Candidate before fact</p>
+            <h2 id="slide-18-title">모델이 찾아낸 관계는<br>바로 공식 사실이 되지 않습니다.</h2>
+            <div class="review-grid" style="margin-top: var(--space-5);">
+              <article class="card review-card"><p class="state">01 / 제안</p><h3 style="margin-top: var(--space-4);">후보로 저장</h3><p class="body">사람·기관·과제의 연결이나 “승인했다” 같은 관계를 우선 후보로 표시합니다.</p></article>
+              <article class="card review-card warning"><p class="state">02 / 검토</p><h3 style="margin-top: var(--space-4);">근거를 보고 판단</h3><p class="body">검토자는 위치, 생성 방식, 관련 원본을 확인한 뒤 승인·반려·수정 승인을 선택합니다.</p></article>
+              <article class="card review-card"><p class="state">03 / 기록</p><h3 style="margin-top: var(--space-4);">승인 이력을 남김</h3><p class="body">누가 언제 판단했는지 남기고, 나중에 취소·대체가 필요해도 추적할 수 있습니다.</p></article>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: PRD 6장·9.11절·9.14절, DATA_CONTRACTS.md</span><span>18 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-19-title">
+        <div class="slide-shell interface-layout">
+          <header class="slide-header"><span>사용하는 길</span><span class="slide-number">19</span></header>
+          <div>
+            <p class="eyebrow">같은 서비스, 다른 입구</p>
+            <h2 id="slide-19-title">어떤 방식으로 접근해도<br>동일한 검색·권한·검토 기준을 사용합니다.</h2>
+            <div class="interface-grid" style="margin-top: var(--space-5);">
+              <article class="card interface"><p class="card-label">CLI · 명령창</p><h3>터미널에서</h3><p class="mono">kip search "협약 변경 승인"<br>kip read UNIT_ID<br>kip xlsx-read ARTIFACT_ID</p></article>
+              <article class="card interface"><p class="card-label">REST API · 시스템 연결</p><h3>업무 시스템에서</h3><p class="mono">/v1/search<br>/v1/read<br>/v1/connectors/events</p></article>
+              <article class="card interface"><p class="card-label">MCP · AI 도구 연결</p><h3>AI 도구에서</h3><p class="mono">AI가 KIP의 검색 기능을 부르는 길<br>터미널·업무 시스템과 같은 권한 기준<br>필요할 때만 추가하는 연결 방식</p></article>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: README.md, PRD 9.13절, TRD 29장·31장</span><span>19 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-20-title">
+        <div class="slide-shell vector-layout">
+          <header class="slide-header"><span>벡터 검색의 직관</span><span class="slide-number">20</span></header>
+          <div class="vector-grid">
+            <div>
+              <p class="eyebrow">Vector similarity · 뜻의 방향을 비교</p>
+              <h2 id="slide-20-title">문장을 숫자 좌표로 바꾸고,<br>가까운 방향을 찾습니다.</h2>
+              <div class="vector-equation" style="margin-top: var(--space-4);"><p class="math">cos(θ) = <span class="keep">q · d</span> / (‖q‖ ‖d‖)</p><p class="body">질문 벡터 <b>q</b>와 문서 벡터 <b>d</b>가 같은 <span class="keep">방향일수록</span> 값이 커집니다. 실제 임베딩은 2차원이 아니라 1,024개 좌표를 쓰지만, 원리는 이 그림과 같습니다.</p></div>
+            </div>
+            <div class="vector-stage" role="img" aria-label="질문 벡터와 의미가 가까운 문서 벡터, 멀리 있는 문서 벡터를 비교한 좌표 그림">
+              <svg viewBox="40 30 490 305" aria-hidden="true">
+                <defs><marker id="arrow" markerHeight="8" markerWidth="8" orient="auto" refX="7" refY="4"><path d="M0,0 L8,4 L0,8" fill="#7196ff" /></marker><marker id="arrow-muted" markerHeight="8" markerWidth="8" orient="auto" refX="7" refY="4"><path d="M0,0 L8,4 L0,8" fill="#95a3a8" /></marker></defs>
+                <g stroke="#4c5960" stroke-width="1" opacity=".6"><path d="M40 50H530M40 105H530M40 160H530M40 215H530M40 270H530M40 325H530"/><path d="M40 30V335M110 30V335M180 30V335M250 30V335M320 30V335M390 30V335M460 30V335M530 30V335"/></g>
+                <g stroke="#a5b0b4" stroke-width="2"><path d="M40 270H530"/><path d="M250 335V30"/></g>
+                <path d="M250 270 L430 175" fill="none" marker-end="url(#arrow)" stroke="#7196ff" stroke-width="6"/><path d="M250 270 L385 196" fill="none" marker-end="url(#arrow)" stroke="#6dd28a" stroke-width="6"/><path d="M250 270 L170 75" fill="none" marker-end="url(#arrow-muted)" stroke="#95a3a8" stroke-width="5"/>
+                <path d="M310 270 A60 60 0 0 0 303 243" fill="none" stroke="#d8d0c3" stroke-dasharray="6 6" stroke-width="3"/>
+                <g fill="#fffdf8" font-family="Arial, sans-serif" font-size="20" font-weight="700"><rect fill="#7196ff" height="38" rx="19" width="144" x="324" y="138"/><text x="341" y="163">q: 협약 변경</text><rect fill="#6dd28a" height="38" rx="19" width="120" x="353" y="188"/><text x="369" y="213">d₁: 승인</text><rect fill="#637178" height="38" rx="19" width="120" x="58" y="46"/><text x="75" y="71">d₂: 회식</text></g>
+                <text fill="#d8d0c3" font-family="Arial, sans-serif" font-size="18" x="293" y="252">θ 작음 · 유사</text>
+              </svg>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: TRD 23.2절·23.4절 · 그림은 1,024차원 임베딩을 2차원으로 단순화한 설명</span><span>20 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-21-title">
+        <div class="slide-shell embedding-layout">
+          <header class="slide-header"><span>임베딩이 만들어지는 과정</span><span class="slide-number">21</span></header>
+          <div>
+            <p class="eyebrow">Embedding projection · 원본을 <span class="keep">대체하지 않는</span> 검색 보조 자료</p>
+            <h2 id="slide-21-title">모델보다 먼저,<br>무엇을 넣고 어떻게 추적할지 정합니다.</h2>
+            <div class="embedding-flow">
+              <article class="card embedding-step"><p class="card-label">01 / 대상 선별</p><h3>의미가 있는<br>내용만</h3><p class="body">짧은 인사, 메일 서명, 반복 인용, 품질 낮은 OCR, 중복 본문은 제외합니다.</p></article>
+              <article class="card embedding-step"><p class="card-label">02 / 출처별 정리</p><h3>제목·소제목·본문을<br>함께 묶기</h3><p class="body">메일 인용문·Slack 대체 텍스트·표 구조를 자료 유형에 맞춰 정리하고, 최종 입력의 해시를 남깁니다.</p></article>
+              <article class="card embedding-step"><p class="card-label">03 / 좌표화</p><h3>문장을 1,024개<br>숫자로</h3><p class="body">현재 검증된 shadow 경로는 로컬 Qwen3 Embedding 0.6B를 사용합니다. 모델·버전·차원도 함께 기록합니다.</p></article>
+              <article class="card embedding-step"><p class="card-label">04 / 검색 보조</p><h3>권한 범위 안에서<br>가까운 후보 찾기</h3><p class="body">벡터에는 원본 단위, 접근 범위, 입력 해시가 연결됩니다. 원문 확인 없이 결과를 사실로 쓰지 않습니다.</p></article>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: TRD 23.2절·23.5절, IMPLEMENTATION_STATUS.md · 현재는 shadow 경로</span><span>21 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-22-title">
+        <div class="slide-shell chunking-layout">
+          <header class="slide-header"><span>어댑티브 청킹 설계 원칙</span><span class="slide-number">22</span></header>
+          <div>
+            <p class="eyebrow">Adaptive chunking · 고정 글자 수 대신 자료의 구조를 따르기</p>
+            <h2 id="slide-22-title">모든 문서를 똑같은 길이로<br>자르면 근거가 끊어집니다.</h2>
+            <div class="chunking-grid">
+              <article class="chunk-document"><p>같은 “변경 승인”이라도 자료마다 경계가 다릅니다</p><div class="chunk-block"><h3>PDF / HWP</h3><p>페이지·제목·문단 경계를 지키고, 페이지 위치를 함께 유지</p></div><div class="chunk-block table"><h3>XLSX</h3><p>헤더와 행 묶음을 함께 읽고, 필요한 수치는 원본 셀 범위로 재확인</p></div><div class="chunk-block message"><h3>Slack / 메일</h3><p>메시지·스레드·답장 관계를 보존하고, 반복 인용문은 제외</p></div></article>
+              <div class="chunk-rules"><div><b>의미가 한 덩어리인지 먼저 봅니다</b><span>제목 아래 문단, 표의 헤더와 행, 질문과 답장은 가능한 한 하나의 단위로 남깁니다.</span></div><div><b>길이는 그 다음에 조절합니다</b><span>너무 긴 단위만 안전한 경계에서 나누고, 앞뒤 문맥을 최소한으로 함께 둡니다.</span></div><div><b>각 조각은 원래 위치로 돌아가야 합니다</b><span>조각마다 문서·페이지·시트·메시지 위치를 유지해, 검색 결과에서 원본을 다시 읽을 수 있게 합니다.</span></div><div><b>현재 상태: 도입 전 평가 원칙</b><span>KIP는 source-aware 입력 정리를 구현했지만, 적응형 분할 규칙은 실제 말뭉치의 검색 품질·비용·근거 재현성 평가를 통과한 뒤 활성화합니다.</span></div></div>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: TRD 19장·20장·23.5절, PRD P-07 · 적응형 분할은 평가 후 도입할 설계 원칙</span><span>22 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-23-title">
+        <div class="slide-shell activation-layout">
+          <header class="slide-header"><span>벡터 검색을 켜는 기준</span><span class="slide-number">23</span></header>
+          <div>
+            <p class="eyebrow">Shadow first · 성능이 아니라 근거로 활성화</p>
+            <h2 id="slide-23-title">임베딩이 있다고 해서,<br>기본 검색을 바꾸지 않습니다.</h2>
+            <div class="activation-grid">
+              <article class="card activation-card"><p class="card-label">기준선</p><h3>기존 검색의<br>정답률을 먼저 측정</h3><p class="body">정확한 단어·문서번호에 강한 기본 검색의 golden query를 먼저 만들고, 실패 사례를 모읍니다.</p></article>
+              <article class="card activation-card shadow"><p class="card-label">그림자 실행</p><h3>권한·비용·속도까지<br>같이 비교</h3><p class="body">벡터·하이브리드·재정렬 결과를 Recall, MRR, ACL 누출, 지연 시간, 비용과 함께 비교합니다.</p></article>
+              <article class="card activation-card current"><p class="card-label">현재 공개 평가</p><h3>경로는 준비됐지만<br>기본은 비활성</h3><p class="body">pgvector·하이브리드 경로는 완성된 shadow 상태입니다. 공개 자료에서는 기본 검색보다 품질 개선이 없어 켜지 않았습니다.</p></article>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: TRD 23.1절·23.4절·23.7절, README.md, IMPLEMENTATION_STATUS.md</span><span>23 / 24</span></footer>
+        </div>
+      </section>
+
+      <section class="slide" data-slide aria-labelledby="slide-24-title">
+        <div class="slide-shell status-layout">
+          <header class="slide-header"><span>현재 범위와 다음 단계</span><span class="slide-number">24</span></header>
+          <div>
+            <p class="eyebrow">파일럿에 정직하게</p>
+            <h2 id="slide-24-title">준비된 기반 위에서,<br>실제 회사 자료로 검증을 시작합니다.</h2>
+            <div class="status-grid" style="margin-top: var(--space-5);">
+              <article class="card status-card ready"><p class="card-label">파일럿 준비</p><h3>이미 갖춘 기반</h3><ul><li>읽기 전용 파일 수집과 해시 기반 변경 추적</li><li>PDF·텍스트·엑셀의 얕은 검색과 원본 범위 읽기</li><li>CLI·REST의 공통 계약과 권한 규칙</li></ul></article>
+              <article class="card status-card pilot"><p class="card-label">현장 검증 필요</p><h3>도입 전 확인할 것</h3><ul><li>실제 HWP 자료에서 파서 품질 비교</li><li>Slack·메일 권한, 수정·삭제, 보존 정책</li><li>PostgreSQL 운영 권한과 백업·복구 훈련</li></ul></article>
+            </div>
+          </div>
+          <footer class="footer"><span class="source">근거: IMPLEMENTATION_STATUS.md, OPERATIONS.md</span><span>24 / 24</span></footer>
+        </div>
+      </section>
+    </main>
+    <div class="controls" aria-label="슬라이드 제어">
+      <button class="control" id="previous" type="button" aria-label="이전 슬라이드">←</button>
+      <button class="control" id="next" type="button" aria-label="다음 슬라이드">→</button>
+    </div>
+    <div class="progress" aria-hidden="true"><span id="progress-bar"></span></div>
+    <p class="sr-only" id="slide-announcer" aria-live="polite"></p>
+    <script>
+      const slides = Array.from(document.querySelectorAll('[data-slide]'));
+      const previous = document.querySelector('#previous');
+      const next = document.querySelector('#next');
+      const progress = document.querySelector('#progress-bar');
+      const announcer = document.querySelector('#slide-announcer');
+      const controls = document.querySelector('.controls');
+      let current = 0;
+
+      slides.forEach((slide, index) => {
+        slide.setAttribute('role', 'group');
+        slide.setAttribute('aria-roledescription', 'slide');
+      });
+
+      function showSlide(index) {
+        current = Math.max(0, Math.min(index, slides.length - 1));
+        slides.forEach((slide, slideIndex) => slide.classList.toggle('active', slideIndex === current));
+        slides[current].append(controls);
+        previous.disabled = current === 0;
+        next.disabled = current === slides.length - 1;
+        progress.style.width = `${((current + 1) / slides.length) * 100}%`;
+        const title = slides[current].querySelector('h1, h2').textContent.replace(/\s+/g, ' ').trim();
+        announcer.textContent = `${current + 1}번째 슬라이드: ${title}`;
+      }
+
+      previous.addEventListener('click', () => showSlide(current - 1));
+      next.addEventListener('click', () => showSlide(current + 1));
+      window.addEventListener('keydown', (event) => {
+        if (event.target.closest('button')) return;
+        if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') {
+          event.preventDefault(); showSlide(current + 1);
+        }
+        if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
+          event.preventDefault(); showSlide(current - 1);
+        }
+        if (event.key === 'Home') { event.preventDefault(); showSlide(0); }
+        if (event.key === 'End') { event.preventDefault(); showSlide(slides.length - 1); }
+      });
+      showSlide(0);
+    </script>
+  </body>
+</html>

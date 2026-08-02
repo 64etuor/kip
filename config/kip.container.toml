@@ -1,0 +1,90 @@
+[app]
+environment = "development"
+workspace = "default"
+log_level = "INFO"
+
+[database]
+url_env = "KIP_DATABASE_URL"
+statement_timeout_ms = 15000
+pool_min = 1
+pool_max = 10
+
+[storage]
+cas_path = "/data/cas"
+snapshot_filesystem_sources = false
+snapshot_message_sources = true
+
+[api]
+host = "0.0.0.0"
+port = 8080
+require_api_key_outside_development = true
+max_request_bytes = 10485760
+
+[security]
+allow_remote_model_egress = false
+follow_symlinks = false
+max_file_bytes = 524288000
+max_zip_entries = 100000
+max_zip_uncompressed_bytes = 2147483648
+max_zip_ratio = 200
+
+[search]
+semantic_enabled = false
+lexical_limit_default = 10
+context_max_chars = 40000
+korean_ngram_min = 2
+korean_ngram_max = 4
+
+[graph]
+backend = "postgres"
+max_depth_default = 4
+max_nodes_default = 500
+
+[parsers]
+parser_timeout_seconds = 120
+minimum_quality_score = 0.70
+shadow_parse_critical_documents = true
+
+[parsers.hwp]
+order = ["kordoc", "unhwp", "paired_pdf"]
+
+[parsers.hwp.kordoc]
+enabled = false
+argv = ["npx", "-y", "kordoc@4.2.7", "{input}", "--format", "json"]
+
+[parsers.hwp.unhwp]
+enabled = false
+argv = ["unhwp", "convert", "{input}", "-o", "{output_dir}", "--all"]
+
+[[sources.filesystem]]
+name = "company-nas"
+root = "/sources/nas"
+enabled = true
+read_only = true
+settle_seconds = 2
+include_extensions = [".md", ".txt", ".pdf", ".xlsx", ".hwp", ".hwpx", ".docx", ".csv"]
+exclude_globs = ["**/.DS_Store", "**/~$*", "**/.~lock.*"]
+acl_scope = "workspace:default"
+
+[sources.slack]
+enabled = false
+workspace_id = ""
+allowed_conversation_ids = []
+download_files = false
+token_env = "KIP_SLACK_BOT_TOKEN"
+
+[sources.apple_mail]
+enabled = false
+allowed_accounts = []
+allowed_mailboxes = ["INBOX", "Sent", "Archive"]
+excluded_mailboxes = ["Junk", "Trash"]
+lookback_days = 30
+
+[sources.imap]
+enabled = false
+host = ""
+port = 993
+username_env = "KIP_IMAP_USERNAME"
+password_env = "KIP_IMAP_PASSWORD"
+mailboxes = ["INBOX", "Sent", "Archive"]
+use_ssl = true

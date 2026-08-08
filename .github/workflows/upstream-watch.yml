@@ -13,7 +13,7 @@ jobs:
   detect:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Compare pinned parser and model revisions
         id: watch
         shell: bash

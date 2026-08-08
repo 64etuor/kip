@@ -12,8 +12,12 @@ from kip.domain.models import (
     AssertionCandidate,
     EmbeddingRecord,
     EmbeddingSpace,
+    GraphNeighborsRequest,
+    GraphPathRequest,
+    RequestContext,
     SearchRequest,
 )
+from kip.errors import NotFoundError
 from kip.ids import new_id, stable_id
 from kip.settings import Settings
 
@@ -67,6 +71,8 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
         assert summary.inserted == 1
         hits = container.service.search(context, SearchRequest(query="참여율 변경 승인", limit=10))
         assert hits
+        bulk_units = repository.get_content_units(context, [hit.unit_id for hit in hits])
+        assert [unit.id for unit in bulk_units] == [hit.unit_id for hit in hits]
         natural_hits = container.service.search(
             context,
             SearchRequest(
@@ -126,6 +132,33 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
         explanation = container.service.explain_assertion(context, assertion.id)
         assert explanation.assertion.id == assertion.id
         assert explanation.evidence[0].unit.id == hits[0].unit_id
+        edges = repository.graph_neighbors(
+            context,
+            GraphNeighborsRequest(node_id="doc_new", direction="out"),
+        )
+        assert [edge.assertion_id for edge in edges] == [assertion.id]
+        paths = repository.graph_path(
+            context,
+            GraphPathRequest(from_node_id="doc_new", to_node_id="doc_old"),
+        )
+        assert [path.assertion_ids for path in paths] == [[assertion.id]]
+
+        restricted_context = RequestContext(
+            workspace=workspace,
+            principal_id="principal_restricted",
+            acl_scopes=[],
+            request_id=new_id("req"),
+        )
+        with pytest.raises(NotFoundError):
+            repository.get_assertion(restricted_context, assertion.id)
+        assert repository.graph_neighbors(
+            restricted_context,
+            GraphNeighborsRequest(node_id="doc_new"),
+        ) == []
+        assert repository.graph_path(
+            restricted_context,
+            GraphPathRequest(from_node_id="doc_new", to_node_id="doc_old"),
+        ) == []
 
         status = repository.status(context)
         assert status.source_objects == 1

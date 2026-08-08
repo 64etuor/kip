@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from kip.application.analyzer import normalize_text
 from kip.domain.models import ContentUnit, EvidenceLocator, ExtractionRun
@@ -24,34 +25,37 @@ class PdfParser:
         units: list[ContentUnit] = []
         warnings: list[str] = []
         try:
-            document = fitz.open(path)
-            for index, page in enumerate(document):
-                text = page.get_text("text") or ""
-                normalized = normalize_text(text)
-                if len(normalized) < 20:
-                    warnings.append(f"page {index + 1}: low text; OCR may be required")
-                units.append(
-                    ContentUnit(
-                        id=stable_id("unit", extraction_id, str(index)),
-                        extraction_id=extraction_id,
-                        document_id=document_id,
-                        artifact_id=artifact_id,
-                        ordinal=index,
-                        unit_type="pdf_page",
-                        title=f"{path.name} - page {index + 1}",
-                        body=text,
-                        body_normalized=normalized,
-                        lexical_text=normalized,
-                        locator=EvidenceLocator(type="pdf_page", data={"page": index + 1}),
-                        acl_scopes=acl_scopes,
-                        metadata={"page": index + 1},
+            with fitz.open(path) as document:
+                for index, page in enumerate(document):
+                    text = page.get_text("text") or ""
+                    normalized = normalize_text(text)
+                    if len(normalized) < 20:
+                        warnings.append(f"page {index + 1}: low text; OCR may be required")
+                    units.append(
+                        ContentUnit(
+                            id=stable_id("unit", extraction_id, str(index)),
+                            extraction_id=extraction_id,
+                            document_id=document_id,
+                            artifact_id=artifact_id,
+                            ordinal=index,
+                            unit_type="pdf_page",
+                            title=f"{path.name} - page {index + 1}",
+                            body=text,
+                            body_normalized=normalized,
+                            lexical_text=normalized,
+                            locator=EvidenceLocator(type="pdf_page", data={"page": index + 1}),
+                            acl_scopes=acl_scopes,
+                            metadata={"page": index + 1},
+                        )
                     )
-                )
         except Exception as exc:
             raise ParserError(f"PDF parse failed: {path}: {exc}") from exc
         body = "\n".join(unit.body for unit in units)
-        status = "partial" if warnings else "succeeded"
-        quality = 0.6 if warnings and not body.strip() else 0.95
+        page_count = len(units)
+        low_text_page_count = len(warnings)
+        text_coverage = (page_count - low_text_page_count) / page_count if page_count else 0.0
+        status: Literal["succeeded", "partial"] = "partial" if warnings else "succeeded"
+        quality = round(0.95 * text_coverage, 4)
         extraction = ExtractionRun(
             id=extraction_id,
             artifact_id=artifact_id,
@@ -61,5 +65,10 @@ class PdfParser:
             quality_score=quality,
             output_hash=sha256_bytes(body.encode("utf-8")),
             warnings=warnings,
+            metadata={
+                "page_count": page_count,
+                "low_text_page_count": low_text_page_count,
+                "text_coverage": text_coverage,
+            },
         )
         return extraction, units

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from collections.abc import Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -844,36 +845,46 @@ class PostgresRepository:
             rows = cursor.fetchall()
         return [VocabularyItem(**dict(row)) for row in rows]
 
-    def get_content_unit(self, context: RequestContext, unit_id: str) -> ContentUnit:
+    def get_content_units(self, context: RequestContext, unit_ids: Sequence[str]) -> list[ContentUnit]:
+        if not unit_ids:
+            return []
         with self._connection(context) as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT u.*, l.lexemes
                 FROM content.units u
                 LEFT JOIN search.lexical_units l ON l.unit_id=u.id
-                WHERE u.workspace_id=%s AND u.id=%s
+                WHERE u.workspace_id=%s AND u.id = ANY(%s::text[])
                   AND (cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])
                 """,
-                (context.workspace, unit_id, context.acl_scopes),
+                (context.workspace, list(unit_ids), context.acl_scopes),
             )
-            row = cursor.fetchone()
-        if not row:
-            raise NotFoundError(f"content unit not found: {unit_id}")
-        return ContentUnit(
-            id=row["id"],
-            extraction_id=row["extraction_id"],
-            document_id=row["document_id"],
-            artifact_id=row["artifact_id"],
-            ordinal=row["ordinal"],
-            unit_type=row["unit_type"],
-            title=row["title"],
-            body=row["body"],
-            body_normalized=row["body_normalized"],
-            lexical_text=row["lexemes"] or row["body_normalized"],
-            locator=EvidenceLocator.model_validate(row["locator"]),
-            acl_scopes=list(row["acl_scopes"] or []),
-            metadata=row["metadata"] or {},
-        )
+            rows = cursor.fetchall()
+        by_id = {
+            row["id"]: ContentUnit(
+                id=row["id"],
+                extraction_id=row["extraction_id"],
+                document_id=row["document_id"],
+                artifact_id=row["artifact_id"],
+                ordinal=row["ordinal"],
+                unit_type=row["unit_type"],
+                title=row["title"],
+                body=row["body"],
+                body_normalized=row["body_normalized"],
+                lexical_text=row["lexemes"] or row["body_normalized"],
+                locator=EvidenceLocator.model_validate(row["locator"]),
+                acl_scopes=list(row["acl_scopes"] or []),
+                metadata=row["metadata"] or {},
+            )
+            for row in rows
+        }
+        missing = [unit_id for unit_id in unit_ids if unit_id not in by_id]
+        if missing:
+            raise NotFoundError(f"content unit not found: {missing[0]}")
+        return [by_id[unit_id] for unit_id in unit_ids]
+
+    def get_content_unit(self, context: RequestContext, unit_id: str) -> ContentUnit:
+        return self.get_content_units(context, [unit_id])[0]
 
     def get_artifact(self, context: RequestContext, artifact_id: str) -> ArtifactView:
         with self._connection(context) as connection, connection.cursor() as cursor:
@@ -1300,10 +1311,12 @@ class PostgresRepository:
                 FROM knowledge.assertions a
                 LEFT JOIN knowledge.assertion_evidence e
                     ON e.workspace_id=a.workspace_id AND e.assertion_id=a.id
-                WHERE a.workspace_id=%s AND a.id=%s
+                WHERE a.workspace_id=%s
+                  AND a.id=%s
+                  AND (cardinality(a.acl_scopes)=0 OR a.acl_scopes <@ %s::text[])
                 GROUP BY a.id
                 """,
-                (context.workspace, assertion_id),
+                (context.workspace, assertion_id, context.acl_scopes),
             )
             row = cursor.fetchone()
         if not row:

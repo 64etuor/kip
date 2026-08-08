@@ -131,6 +131,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /v1/answer:
+    post:
+      summary: Answer
+      operationId: answer_v1_answer_post
+      parameters:
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnswerRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v1/vocabulary:
     get:
       summary: Vocabulary
@@ -814,6 +846,48 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
 components:
   schemas:
+    AnswerRequest:
+      properties:
+        query:
+          type: string
+          minLength: 1
+          title: Query
+        limit:
+          type: integer
+          maximum: 100.0
+          minimum: 1.0
+          title: Limit
+          default: 10
+        source_kinds:
+          items:
+            type: string
+          type: array
+          title: Source Kinds
+        document_types:
+          items:
+            type: string
+          type: array
+          title: Document Types
+        project_ids:
+          items:
+            type: string
+          type: array
+          title: Project Ids
+        include_candidate_assertions:
+          type: boolean
+          title: Include Candidate Assertions
+          default: false
+        max_chars:
+          type: integer
+          maximum: 40000.0
+          minimum: 1000.0
+          title: Max Chars
+          default: 12000
+      additionalProperties: false
+      type: object
+      required:
+      - query
+      title: AnswerRequest
     ConnectorEvent:
       properties:
         schema_version:

@@ -37,6 +37,16 @@ Do not assume a parser, source connector, semantic index, or graph projection is
    ```
 6. State source locator and stale-source status with every material conclusion.
 
+For a direct question, prefer the evidence-bounded answer surface:
+
+```bash
+scripts/kip.sh answer "질문" --limit 5
+```
+
+`refused=true` is a valid safety result. For XLSX numeric questions, follow an
+`exact_xlsx_read_required` refusal with `xlsx-read` using the cited search
+locator; never turn shallow sheet text into a numeric answer.
+
 Read `references/retrieval.md` for ranking, weak-result, and citation rules. Read `references/evidence.md` for locator handling.
 
 ## Graph workflow

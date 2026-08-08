@@ -210,6 +210,35 @@ class ContextBundle(StrictModel):
     truncated: bool
 
 
+class AnswerRequest(ContextRequest):
+    max_chars: int = Field(default=12000, ge=1000, le=40000)
+
+
+class AnswerCitation(StrictModel):
+    unit_id: str
+    artifact_id: str
+    source_uri: str
+    locator: EvidenceLocator
+    indexed_source_sha256: str
+    current_source_sha256: str | None = None
+    source_changed_since_index: bool
+
+
+class AnswerResponse(StrictModel):
+    schema_version: Literal["kip.answer.v1"] = "kip.answer.v1"
+    query: str
+    answer: str
+    refused: bool
+    refusal_reason: Literal[
+        "no_admissible_evidence",
+        "no_fresh_evidence",
+        "exact_xlsx_read_required",
+        "insufficient_decision_evidence",
+    ] | None = None
+    citations: list[AnswerCitation] = Field(default_factory=list)
+    retrieval_mode: str = "extractive"
+
+
 class ArtifactView(StrictModel):
     artifact: Artifact
     document: LogicalDocument | None = None

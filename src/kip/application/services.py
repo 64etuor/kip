@@ -18,8 +18,11 @@ from kip.adapters.connectors.slack import SlackConnector
 from kip.adapters.parsers.registry import ParserRegistry
 from kip.adapters.parsers.xlsx import read_xlsx_range
 from kip.application.analyzer import KoreanNgramAnalyzer, normalize_text
+from kip.application.answers import assemble_answer
 from kip.application.retrieval import apply_rerank, reciprocal_rank_fusion
 from kip.domain.models import (
+    AnswerRequest,
+    AnswerResponse,
     Artifact,
     AssertionCandidate,
     AssertionExplanation,
@@ -52,6 +55,7 @@ from kip.errors import (
     ValidationError,
 )
 from kip.ids import new_id, sha256_bytes, stable_id
+from kip.ontology import OntologyCatalog
 from kip.ports.embedding import EmbeddingPort
 from kip.ports.repository import RepositoryPort
 from kip.ports.reranker import RerankerPort
@@ -92,6 +96,7 @@ def _representation_role(extension: str) -> str:
         ".hwpx": "editable_original",
         ".pdf": "searchable_representation",
         ".xlsx": "workbook",
+        ".xlsm": "workbook",
         ".xls": "workbook",
     }.get(extension.lower(), "primary")
 
@@ -114,6 +119,8 @@ class KnowledgeService:
         self.analyzer = analyzer
         self.embedding = embedding
         self.reranker = reranker
+        ontology_root = self.settings.project_root / "ontology"
+        self.ontology = OntologyCatalog.load(ontology_root) if ontology_root.is_dir() else None
         self.settings.cas_path.mkdir(parents=True, exist_ok=True)
 
     def request_context(
@@ -758,12 +765,19 @@ class KnowledgeService:
                 int(self.settings.get("search.rerank_candidate_limit", 20)),
             )
             rerank_hits = fused[:rerank_depth]
+            rerank_units = {
+                unit.id: unit
+                for unit in self.repository.get_content_units(
+                    context,
+                    [hit.unit_id for hit in rerank_hits],
+                )
+            }
             documents = [
                 "\n".join(
                     part
                     for part in (
                         hit.title,
-                        self.repository.get_content_unit(context, hit.unit_id).body,
+                        rerank_units[hit.unit_id].body,
                     )
                     if part
                 )
@@ -813,7 +827,7 @@ class KnowledgeService:
                     body=body,
                     current_source_sha256=current_hash,
                     source_changed_since_index=(
-                        current_hash is not None and current_hash != hit.source_sha256
+                        current_hash != hit.source_sha256
                     ),
                 )
             )
@@ -823,6 +837,22 @@ class KnowledgeService:
             items=items,
             total_chars=total_chars,
             truncated=truncated,
+        )
+
+    def answer(self, context: RequestContext, request: AnswerRequest) -> AnswerResponse:
+        hits = self.search(context, request)
+        evidence: list[EvidenceRead] = []
+        had_stale_evidence = False
+        for hit in hits:
+            item = self.read_unit(context, hit.unit_id)
+            if item.source_changed_since_index:
+                had_stale_evidence = True
+                continue
+            evidence.append(item)
+        return assemble_answer(
+            request,
+            evidence,
+            had_stale_evidence=had_stale_evidence,
         )
 
     def read_unit(self, context: RequestContext, unit_id: str) -> EvidenceRead:
@@ -837,7 +867,7 @@ class KnowledgeService:
             indexed_source_sha256=view.revision.sha256,
             current_source_sha256=current_hash,
             source_changed_since_index=(
-                current_hash is not None and current_hash != view.revision.sha256
+                current_hash != view.revision.sha256
             ),
         )
 
@@ -855,8 +885,8 @@ class KnowledgeService:
         if not path_value:
             raise ValidationError("artifact has no live source path")
         path = Path(path_value).resolve()
-        if path.suffix.lower() != ".xlsx":
-            raise ValidationError("artifact is not an XLSX workbook")
+        if path.suffix.lower() not in {".xlsx", ".xlsm"}:
+            raise ValidationError("artifact is not an XLSX/XLSM workbook")
         if not path.exists():
             raise NotFoundError(f"source workbook is unavailable: {path}")
         current_hash = _sha256_file(path)
@@ -912,6 +942,8 @@ class KnowledgeService:
         return sources
 
     def create_candidate(self, context: RequestContext, candidate: AssertionCandidate) -> AssertionCandidate:
+        if self.ontology is not None:
+            self.ontology.validate_candidate(candidate.predicate, candidate.ontology_version)
         return self.repository.save_candidate(context, candidate)
 
     def review_approve(self, context: RequestContext, candidate_id: str, note: str | None = None):

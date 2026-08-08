@@ -40,10 +40,16 @@ The default Compose profile is a local pilot profile. Before serving multiple us
 - Test restore into a new database and CAS path.
 - Monitor failed jobs, extraction failure rate, stale-source warnings, queue age, and search latency.
 - Pin production image digests and schedule upgrades.
+- Enable Dependabot and `upstream-watch`, create the `dependencies` and
+  `quality-candidate` labels, and route notifications to a named owner.
+- Require changelog/license review, shadow evaluation, rollback evidence, and
+  explicit activation for every parser, model, database, and runtime upgrade.
 - Rebuild lexical, vector, and graph projections independently.
 - Do not activate pgvector or Neo4j without the gates documented in PRD/TRD.
-- Require `projection verify --name semantic` parity and a passing
-  `evaluate compare` report before `projection activate`. Enabling semantic
-  search in configuration remains a separate reviewed change.
+- Require `projection verify --name semantic` parity and pass the full,
+  fingerprint-matched evaluation report to `projection activate --report ...
+  --candidate ...`. The command rejects non-promoted, stale-code, and
+  stale-configuration reports. Enabling semantic search in configuration
+  remains a separate reviewed change.
 - Keep the model sidecar on loopback with telemetry disabled and monitor its
   memory separately from Python RSS on Apple unified-memory systems.

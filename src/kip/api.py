@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 
 from kip.container import Container, build_container
 from kip.domain.models import (
+    AnswerRequest,
     ConnectorEvent,
     ContextRequest,
     Envelope,
@@ -129,6 +130,10 @@ def create_app(container: Container | None = None) -> FastAPI:
     @app.post("/v1/context", response_model=Envelope)
     async def context_bundle(payload: ContextRequest, context: RequestContext = Depends(authenticated_context)):
         return ok(selected.service.context_bundle(context, payload), context)
+
+    @app.post("/v1/answer", response_model=Envelope)
+    async def answer(payload: AnswerRequest, context: RequestContext = Depends(authenticated_context)):
+        return ok(selected.service.answer(context, payload), context)
 
     @app.get("/v1/vocabulary", response_model=Envelope)
     async def vocabulary(prefix: str, limit: int = 20, context: RequestContext = Depends(authenticated_context)):

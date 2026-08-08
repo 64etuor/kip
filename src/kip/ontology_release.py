@@ -1,0 +1,68 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Literal
+
+import yaml
+from pydantic import BaseModel, ConfigDict, Field
+
+from kip.errors import ValidationError
+from kip.ontology import validate_ontology
+
+
+class OntologyModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class EntityDefinition(OntologyModel):
+    parent: str | None = None
+    description: str | None = None
+    abstract: bool = False
+
+
+class PredicateDefinition(OntologyModel):
+    domain: frozenset[str]
+    range: frozenset[str]
+    inverse: str | None
+    risk: Literal["low", "medium", "high"]
+    extraction: str
+    review: Literal["not_required", "conditional", "required"]
+
+
+class EntityFile(OntologyModel):
+    ontology: str
+    version: str
+    entity_types: dict[str, EntityDefinition]
+    controlled_values: dict[str, tuple[str, ...]] = Field(default_factory=dict)
+
+
+class PredicateFile(OntologyModel):
+    ontology: str
+    version: str
+    predicates: dict[str, PredicateDefinition]
+
+
+class OntologyRelease(OntologyModel):
+    version: str
+    entities: dict[str, EntityDefinition]
+    predicates: dict[str, PredicateDefinition]
+
+    @classmethod
+    def load(cls, root: Path) -> OntologyRelease:
+        errors = validate_ontology(root)
+        if errors:
+            raise ValidationError("invalid ontology contract: " + "; ".join(errors))
+        core = EntityFile.model_validate(
+            yaml.safe_load((root / "core/entity-types.yaml").read_text(encoding="utf-8"))
+        )
+        domain = EntityFile.model_validate(
+            yaml.safe_load((root / "domains/research-project.yaml").read_text(encoding="utf-8"))
+        )
+        predicates = PredicateFile.model_validate(
+            yaml.safe_load((root / "core/predicates.yaml").read_text(encoding="utf-8"))
+        )
+        return cls(
+            version=f"core/{predicates.version}",
+            entities=core.entity_types | domain.entity_types,
+            predicates=predicates.predicates,
+        )

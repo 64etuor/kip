@@ -1,0 +1,20 @@
+{
+  "schema_version": "kip.model-smoke.v1",
+  "run_id": "hf-smoke-20260806",
+  "model": "jinaai/jina-reranker-v2-base-multilingual",
+  "revision": "9cfeff2df7d40d1b78e75e5e9cebec92a99813c9",
+  "backend": "huggingface",
+  "device": "mps",
+  "cache_state": "warm",
+  "model_load_seconds": 3.009,
+  "two_document_score_seconds": 1.834,
+  "score_order": [1, 0],
+  "service_smoke": {
+    "sync_inserted": 2,
+    "projection_indexed_units": 2,
+    "top_title": "approval.txt",
+    "result_count": 2,
+    "provider": "jinaai"
+  },
+  "decision": "candidate_only"
+}

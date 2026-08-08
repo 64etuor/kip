@@ -14,6 +14,7 @@ This directory contains reproducible retrieval-quality inputs and generated evid
 - `reports/public-government/<run-id>.json`: complete machine-readable run evidence.
 - `reports/public-government/<run-id>.md`: human-readable scorecard.
 - `reports/public-government/latest.json` and `latest.md`: atomic convenience copies.
+- `reports/jina-reranker-v2/`: pinned Jina Hugging Face trial report and gate decision.
 - `reports/evolution.jsonl`: append-only redacted comparison history.
 
 Reports must not contain source bodies, secrets, model credentials, or private filesystem paths.
@@ -22,6 +23,12 @@ The evaluator records document IDs, unit IDs, locators, hashes, metrics, and bou
 Semantic candidates remain shadow-only until the activation gates in
 `docs/plans/2026-07-30-rag-quality-stack-design.md` pass. An evaluator recommendation never
 changes active configuration automatically.
+
+`golden/private-starter.yaml` is a redacted acceptance template. It covers
+exact evidence, Korean paraphrase, XLSX original-range requirements, weak-query
+refusal, ACL denial, and missing/stale sources. A real deployment must replace
+or extend it with reviewed internal cases and must not commit sensitive source
+bodies or private paths.
 
 The checked-in public pilot contains 30 relevance cases and six ACL-denial
 cases. Run it only through `./scripts/kip`, which loads `.env`; invoking

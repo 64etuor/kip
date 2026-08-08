@@ -12,12 +12,17 @@ The baseline runtime is PostgreSQL 18 with PostgreSQL-native lexical search. `pg
 - `AGENTS.md` and `CLAUDE.md` are at the project root.
 - `CLAUDE.md` imports `AGENTS.md` with `@AGENTS.md`.
 - NAS and connector sources are read-only.
-- HWP parsing is brokered through replaceable subprocess adapters.
+- HWP/HWPX uses the measured native `hwp-hwpx-parser` adapter first, with replaceable command and paired-PDF fallbacks.
 - XLSX uses shallow-all / deep-candidate retrieval.
 - CLI, REST, and MCP use the same application layer.
 - Search, graph, and embeddings are replaceable projections.
 
 ## 2. Quick start - local development
+
+다른 조직이나 저장소에 적용할 때는 먼저
+[`docs/STARTER_KIT_GUIDE.md`](docs/STARTER_KIT_GUIDE.md)를 따른다. 이 문서는
+환경별 결정, AI 변경 계약, 실제 자료 인수 테스트, 자동 업데이트 알림과
+승격/rollback 기준을 한 경로로 묶는다.
 
 Prerequisites: Python 3.12+, Docker with Compose, and optionally Node.js 18+ for `kordoc`.
 
@@ -97,6 +102,8 @@ Set `KIP_WORKSPACE`, `KIP_PRINCIPAL_ID`, and `KIP_ACL_SCOPES` in the environment
 
 Edit `config/kip.toml` and `.env`.
 
+For an AI-operated real-corpus run, read [`docs/AI_OPERATOR_RUNBOOK.md`](docs/AI_OPERATOR_RUNBOOK.md) after the root agent files and contract documents.
+
 ### NAS
 
 Mount NAS paths read-only. For Docker app mode, set `KIP_NAS_PATH` and Compose mounts it at `/sources/nas:ro`.
@@ -105,8 +112,8 @@ Mount NAS paths read-only. For Docker app mode, set `KIP_NAS_PATH` and Compose m
 
 Reference parser order:
 
-1. configurable `kordoc` subprocess adapter;
-2. configurable `unhwp` subprocess adapter;
+1. native `hwp-hwpx-parser` adapter with bounded evidence units;
+2. configurable `kordoc`/`unhwp` subprocess broker;
 3. paired PDF fallback;
 4. manual review when all parsers fail.
 
@@ -138,11 +145,17 @@ This is an implementation-ready starter, not a claim that every production
 adapter is complete. The filesystem, text, PDF, XLSX shallow/deep path, memory
 repository, CLI/API contracts, PostgreSQL migrations, and pgvector shadow path
 are concrete; the local semantic path has been validated on the documented
-Apple Silicon pilot. Slack, Apple Mail, IMAP, HWP external parsers, MCP, and
-Neo4j remain reference adapters that require environment-specific validation
-before production use.
+Apple Silicon pilot but remains shadow-only for the private corpus. Slack,
+Apple Mail, IMAP, MCP, and Neo4j remain reference adapters that require
+environment-specific validation before production use. Existing unchanged
+revisions require an explicit re-extraction workflow when parser versions
+change.
 
 Run `./scripts/verify.sh` before modifying or deploying the project.
+
+Dependency PR과 parser/model upstream 알림은 후보 발견 기능이다. 어떤
+업데이트도 자동 활성화하지 않으며, shadow 평가와 사람의 승격 승인을
+거쳐야 한다.
 
 ## 8. Reproducible RAG scorecard
 
@@ -172,3 +185,6 @@ semantic variants did not improve quality. The implementation remains a
 complete shadow path for harder, explicitly allowlisted corpora. Exact results,
 latency, fingerprints, and improvement history are in
 `docs/RAG_EVALUATION.md` and `evaluation/reports/`.
+
+The loaded-corpus parser, retrieval, semantic, graph, and ontology audit is in
+[`docs/RAG_QUALITY_AUDIT_2026-08-06.md`](docs/RAG_QUALITY_AUDIT_2026-08-06.md).

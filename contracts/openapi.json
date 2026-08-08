@@ -1,6 +1,61 @@
 {
   "components": {
     "schemas": {
+      "AnswerRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "document_types": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Document Types",
+            "type": "array"
+          },
+          "include_candidate_assertions": {
+            "default": false,
+            "title": "Include Candidate Assertions",
+            "type": "boolean"
+          },
+          "limit": {
+            "default": 10,
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "max_chars": {
+            "default": 12000,
+            "maximum": 40000.0,
+            "minimum": 1000.0,
+            "title": "Max Chars",
+            "type": "integer"
+          },
+          "project_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Project Ids",
+            "type": "array"
+          },
+          "query": {
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          },
+          "source_kinds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Kinds",
+            "type": "array"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "AnswerRequest",
+        "type": "object"
+      },
       "ConnectorEvent": {
         "additionalProperties": false,
         "properties": {
@@ -410,6 +465,62 @@
           }
         },
         "summary": "Healthz"
+      }
+    },
+    "/v1/answer": {
+      "post": {
+        "operationId": "answer_v1_answer_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-kip-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer"
       }
     },
     "/v1/artifacts/{artifact_id}": {

@@ -1,0 +1,70 @@
+name: upstream-watch
+
+on:
+  schedule:
+    - cron: "0 20 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare pinned parser and model revisions
+        id: watch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          report="$(mktemp)"
+          trap 'rm -f "$report"' EXIT
+
+          current_kordoc="$(sed -nE 's/.*kordoc@([^" ]+).*/\1/p' config/kip.example.toml | head -1)"
+          latest_kordoc="$(curl --fail --silent --show-error --retry 3 https://registry.npmjs.org/kordoc/latest | jq -r '.version')"
+          if [[ -n "$current_kordoc" && "$current_kordoc" != "$latest_kordoc" ]]; then
+            printf -- "- \`kordoc\`: \`%s\` -> \`%s\`\n" "$current_kordoc" "$latest_kordoc" >> "$report"
+          fi
+
+          while IFS='|' read -r label repository pinned; do
+            latest="$(curl --fail --silent --show-error --retry 3 "https://huggingface.co/api/models/$repository" | jq -r '.sha')"
+            if [[ -n "$pinned" && "$pinned" != "$latest" ]]; then
+              printf -- "- \`%s\`: \`%s\` -> \`%s\`\n" "$label" "$pinned" "$latest" >> "$report"
+            fi
+          done < <(python - <<'PY'
+          pairs = (
+              ("Qwen/Qwen3-Embedding-0.6B", "KIP_EMBEDDING_REVISION"),
+              ("BAAI/bge-reranker-v2-m3", "KIP_RERANKER_REVISION"),
+          )
+          values = {}
+          with open(".env.example", encoding="utf-8") as stream:
+              for line in stream:
+                  key, separator, value = line.strip().partition("=")
+                  if separator:
+                      values[key] = value
+          for repository, key in pairs:
+              print(f"{repository}|{repository}|{values[key]}")
+          PY
+          )
+
+          marker="<!-- kip-upstream-watch -->"
+          if [[ ! -s "$report" ]]; then
+            gh issue list --state open --search "$marker in:body" --json number --jq ".[].number" |
+              while read -r number; do gh issue close "$number" --comment "All watched pins now match upstream."; done
+            exit 0
+          fi
+
+          body="$(printf '%s\n\n%s\n\n%s\n' "$marker" 'Upstream versions differ from the reviewed KIP pins:' "$(cat "$report")")"
+          body+=$'\nThis is a notification, not an activation request. Follow `docs/STARTER_KIT_GUIDE.md` and run a shadow quality experiment before changing a pin.'
+          existing="$(gh issue list --state open --search "$marker in:body" --json number --jq ".[0].number // empty")"
+          if [[ -n "$existing" ]]; then
+            gh issue edit "$existing" --body "$body"
+          else
+            gh label create dependencies --color 0366d6 --description "Dependency update" --force
+            gh label create quality-candidate --color fbca04 --description "Requires shadow quality evaluation" --force
+            gh issue create --title "Upstream parser or model update available" --label "dependencies,quality-candidate" --body "$body"
+          fi

@@ -20,7 +20,8 @@ dependencies = [
 [project.optional-dependencies]
 postgres = ["psycopg[binary]>=3.2,<4"]
 api = ["fastapi>=0.115,<1", "uvicorn[standard]>=0.34,<1"]
-extractors = ["openpyxl>=3.1,<4", "PyMuPDF>=1.25,<2"]
+extractors = ["openpyxl>=3.1,<4", "PyMuPDF>=1.25,<2", "hwp-hwpx-parser>=1,<2"]
+semantic = ["torch>=2.5,<3", "transformers>=4.57,<5", "einops>=0.8,<1"]
 mcp = ["mcp>=1.0,<2"]
 neo4j = ["neo4j>=5.26,<7"]
 dev = [
@@ -29,6 +30,7 @@ dev = [
   "jsonschema>=4.23,<5",
   "ruff>=0.9,<1",
   "mypy>=1.14,<2",
+  "types-PyYAML>=6.0,<7",
 ]
 all = [
   "psycopg[binary]>=3.2,<4",
@@ -36,6 +38,10 @@ all = [
   "uvicorn[standard]>=0.34,<1",
   "openpyxl>=3.1,<4",
   "PyMuPDF>=1.25,<2",
+  "hwp-hwpx-parser>=1,<2",
+  "torch>=2.5,<3",
+  "transformers>=4.57,<5",
+  "einops>=0.8,<1",
   "mcp>=1.0,<2",
   "neo4j>=5.26,<7",
 ]

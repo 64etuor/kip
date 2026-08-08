@@ -1,0 +1,33 @@
+schema_version: kip.quality-experiment.v1
+id: quality-audit-20260806-bge-reranker
+dataset: evaluation/golden/public-government.yaml
+baseline_variant: lexical
+candidate_variant: reranked
+components:
+  - kind: reranker
+    adapter: http
+    identifier: kip-bge-reranker-v2-m3
+    revision: 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
+    configuration:
+      top_n: 6
+fingerprints:
+  corpus: sha256:68d47873a9c605021581b1522b6b6e0fd1e486cb6ee0cf82b4633e35a76fb6f8
+  dataset: sha256:c61d3bb5c4b1306bf8ff1f69fc9bba54cc338c5136e7bcdc2b5c5aa5fbed2d08
+  configuration: sha256:a4897d46860430df697ff814c3889649ec0316fdb4deaaafc7480ef4fe616ae5
+  code: sha256:e60d2548e0273bf77afee50a1d2356d8867203b0d8d4ab65921f0589a8f18212
+policy:
+  minimum_recall_delta: 0.0
+  maximum_category_regression: 0.01
+  maximum_p95_latency_ms: 2000.0
+  minimum_required_metric: 1.0
+  required_categories:
+    - semantic_paraphrase
+    - exact_date
+    - exact_entity
+    - exact_fact
+    - exact_numeric
+    - access_denied
+  required_metrics:
+    - locator_accuracy
+    - latest_version_accuracy
+    - stale_warning_rate

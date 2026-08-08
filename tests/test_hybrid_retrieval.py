@@ -4,7 +4,9 @@ from pathlib import Path
 
 import pytest
 
+from kip.adapters.repository.memory import MemoryRepository
 from kip.application.retrieval import reciprocal_rank_fusion
+from kip.container import build_container
 from kip.domain.models import EvidenceLocator, SearchHit, SearchRequest
 from kip.errors import DependencyUnavailableError
 from kip.ports.reranker import RerankScore
@@ -62,6 +64,21 @@ class FixtureReranker:
             for index, document in enumerate(documents)
         ]
         return sorted(scores, key=lambda item: (-item.score, item.index))
+
+
+class CountingMemoryRepository(MemoryRepository):
+    def __init__(self) -> None:
+        super().__init__()
+        self.single_lookup_count = 0
+        self.bulk_lookup_count = 0
+
+    def get_content_unit(self, context, unit_id):
+        self.single_lookup_count += 1
+        return super().get_content_unit(context, unit_id)
+
+    def get_content_units(self, context, unit_ids):
+        self.bulk_lookup_count += 1
+        return super().get_content_units(context, unit_ids)
 
 
 def _hit(unit_id: str, score: float) -> SearchHit:
@@ -166,6 +183,31 @@ def test_explicit_hybrid_search_and_reranking_use_shadow_space(
     assert reranked[0].title.startswith("허가")
     assert reranked[0].metadata["rerank_rank"] == 1
     assert reranker.document_counts == [2]
+
+
+def test_reranking_fetches_candidate_units_in_one_repository_call(
+    test_container,
+    tmp_path: Path,
+) -> None:
+    source_root = tmp_path / "source"
+    (source_root / "승인.txt").write_text("참여율 변경을 승인한다.", encoding="utf-8")
+    (source_root / "허가.txt").write_text("계약 조건의 수정을 허가한다.", encoding="utf-8")
+    repository = CountingMemoryRepository()
+    container = build_container(test_container.settings, repository=repository)
+    context = container.service.request_context()
+    container.service.sync_filesystem(context, "fixture")
+    container.service.embedding = FixtureEmbedding()
+    container.service.reranker = FixtureReranker()
+    container.service.rebuild_semantic_projection(context)
+
+    container.service.search(
+        context,
+        SearchRequest(query="승인", limit=10),
+        mode="reranked",
+    )
+
+    assert repository.bulk_lookup_count == 1
+    assert repository.single_lookup_count == 0
 
 
 def test_optional_default_mode_falls_back_but_explicit_hybrid_fails(

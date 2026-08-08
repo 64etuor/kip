@@ -5,6 +5,7 @@ from typing import Any
 
 from kip.adapters.parsers.docx import DocxParser
 from kip.adapters.parsers.hwp_broker import CommandParserConfig, HwpParserBroker
+from kip.adapters.parsers.hwp_native import HwpNativeParser, HwpParserChain
 from kip.adapters.parsers.pdf import PdfParser
 from kip.adapters.parsers.plain import PlainTextParser
 from kip.adapters.parsers.xlsx import XlsxShallowParser
@@ -17,13 +18,20 @@ class ParserRegistry:
         self.parsers = parsers
 
     @classmethod
-    def from_settings(cls, settings: Settings) -> "ParserRegistry":
+    def from_settings(cls, settings: Settings) -> ParserRegistry:
         pdf = PdfParser()
         hwp_configs: list[CommandParserConfig] = []
+        native_parser: HwpNativeParser | None = None
         for name in settings.get("parsers.hwp.order", ["kordoc", "unhwp"]):
             if name == "paired_pdf":
                 continue
             config = settings.get(f"parsers.hwp.{name}", {}) or {}
+            if name == "hwp-hwpx-parser":
+                if bool(config.get("enabled", False)):
+                    native_parser = HwpNativeParser(
+                        max_chars_per_unit=int(config.get("max_chars_per_unit", 4000))
+                    )
+                continue
             hwp_configs.append(
                 CommandParserConfig(
                     name=name,
@@ -38,7 +46,10 @@ class ParserRegistry:
                 XlsxShallowParser(),
                 DocxParser(),
                 pdf,
-                HwpParserBroker(hwp_configs, paired_pdf_parser=pdf),
+                HwpParserChain(
+                    native_parser,
+                    HwpParserBroker(hwp_configs, paired_pdf_parser=pdf),
+                ),
             ]
         )
 

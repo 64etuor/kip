@@ -4,55 +4,77 @@ predicates:
   authored_by:
     domain: [EvidenceObject]
     range: [Person]
+    inverse: null
+    risk: low
     extraction: deterministic_when_source_identified
     review: not_required
   belongs_to_project:
     domain: [EvidenceObject, Decision, Requirement, Task]
     range: [Project]
+    inverse: null
+    risk: medium
     extraction: mixed
     review: conditional
   reply_to:
     domain: [Communication]
     range: [Communication]
+    inverse: null
+    risk: low
     extraction: deterministic_source_relation
     review: not_required
   responds_to:
     domain: [Communication, Document]
     range: [Communication, Document, Requirement]
+    inverse: null
+    risk: high
     extraction: semantic
     review: required
   amends:
     domain: [Document, Communication]
     range: [Document]
+    inverse: null
+    risk: high
     extraction: semantic
     review: required
   supersedes:
     domain: [Document, Communication]
     range: [Document]
+    inverse: null
+    risk: high
     extraction: semantic
     review: required
   approves:
     domain: [Document, Communication, Person, Organization]
     range: [Decision, Requirement, Task, Document]
+    inverse: null
+    risk: high
     extraction: semantic
     review: required
   evidences:
     domain: [EvidenceObject]
     range: [Requirement, Decision, Event, Concept]
+    inverse: null
+    risk: high
     extraction: semantic
     review: required
   records_decision:
     domain: [Document, Communication]
     range: [Decision]
+    inverse: null
+    risk: high
     extraction: semantic
     review: required
   responsible_for:
     domain: [Person, Organization]
     range: [Project, Task, Requirement]
+    inverse: null
+    risk: medium
     extraction: semantic
     review: conditional
   attached_to:
     domain: [EvidenceObject]
     range: [Communication, Document]
+    inverse: null
+    risk: low
     extraction: deterministic_source_relation
     review: not_required

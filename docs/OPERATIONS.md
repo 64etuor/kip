@@ -82,3 +82,11 @@ to `evaluate run` only for a deliberate cold-start measurement.
 3. Keep the previous active extraction until the new extraction passes.
 4. Activate atomically.
 5. Preserve parser name, version, run ID, warnings, and output hash.
+
+## Dependency and model update watch
+
+Dependabot proposes Python, GitHub Actions, and Docker updates weekly. The
+scheduled `upstream-watch` workflow reports newer `kordoc` and Hugging Face
+model revisions in one GitHub issue. Both are discovery surfaces only: follow
+`STARTER_KIT_GUIDE.md` and the quality experiment workflow before changing a
+production pin or activating a projection.

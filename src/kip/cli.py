@@ -8,6 +8,7 @@ import typer
 
 from kip.container import Container, build_container
 from kip.domain.models import (
+    AnswerRequest,
     AssertionCandidate,
     ContextRequest,
     Envelope,
@@ -20,8 +21,20 @@ from kip.domain.models import (
 )
 from kip.errors import AuthorizationError, ConflictError, KipError, NotFoundError, ValidationError
 from kip.evaluation.reporting import append_evolution_record, write_report
-from kip.evaluation.runner import compare_variants, load_dataset, run_evaluation
+from kip.evaluation.runner import (
+    compare_variants,
+    load_dataset,
+    run_evaluation,
+    validate_activation_report,
+)
 from kip.ids import new_id
+from kip.ontology import OntologyCatalog, validate_ontology
+from kip.ontology_migration import (
+    diff_ontologies,
+    load_migration,
+    validate_migration_coverage,
+)
+from kip.quality import load_experiment, load_quality_report, recommend
 from kip.settings import Settings
 
 app = typer.Typer(no_args_is_help=True, add_completion=False, help="KIP knowledge fabric CLI")
@@ -36,6 +49,8 @@ get_app = typer.Typer(no_args_is_help=True, help="Get canonical objects")
 projection_app = typer.Typer(no_args_is_help=True, help="Inspect and rebuild disposable projections")
 export_app = typer.Typer(no_args_is_help=True, help="Export portable canonical bundles")
 evaluate_app = typer.Typer(no_args_is_help=True, help="Measure retrieval quality")
+quality_app = typer.Typer(no_args_is_help=True, help="Evaluate version-pinned candidates")
+ontology_app = typer.Typer(no_args_is_help=True, help="Validate and migrate ontology releases")
 
 app.add_typer(sync_app, name="sync")
 app.add_typer(xlsx_app, name="xlsx")
@@ -48,6 +63,8 @@ app.add_typer(get_app, name="get")
 app.add_typer(projection_app, name="projection")
 app.add_typer(export_app, name="export")
 app.add_typer(evaluate_app, name="evaluate")
+app.add_typer(quality_app, name="quality")
+app.add_typer(ontology_app, name="ontology")
 
 
 class Runtime:
@@ -71,7 +88,10 @@ def root(
     ),
 ) -> None:
     settings = Settings.load(config)
-    container = build_container(settings)
+    container = build_container(
+        settings,
+        load_models=ctx.invoked_subcommand not in {"quality", "ontology"},
+    )
     selected_scopes = list(acl_scope or [])
     if acl_scopes:
         selected_scopes.extend(item.strip() for item in acl_scopes.split(",") if item.strip())
@@ -369,6 +389,26 @@ def context_command(
             source_kinds=_split_values(source_kind),
         )
         return runtime.container.service.context_bundle(runtime.context, request)
+    _run(ctx, action)
+
+
+@app.command()
+def answer(
+    ctx: typer.Context,
+    query: str | None = typer.Argument(None),
+    query_option: str | None = typer.Option(None, "--query"),
+    limit: int = typer.Option(5, min=1, max=20),
+    max_chars: int = typer.Option(12000, min=1000, max=40000),
+) -> None:
+    def action(runtime: Runtime):
+        selected_query = query_option or query
+        if not selected_query:
+            raise ValidationError("provide QUERY or --query")
+        return runtime.container.service.answer(
+            runtime.context,
+            AnswerRequest(query=selected_query, limit=limit, max_chars=max_chars),
+        )
+
     _run(ctx, action)
 
 
@@ -706,17 +746,36 @@ def projection_verify(ctx: typer.Context, name: str = typer.Option("lexical", "-
 def projection_activate(
     ctx: typer.Context,
     name: str = typer.Option("semantic", "--name"),
+    report: Path = typer.Option(
+        ...,
+        "--report",
+        exists=True,
+        dir_okay=False,
+        readable=True,
+        help="Full evaluation report containing lexical and candidate variants",
+    ),
+    candidate: str = typer.Option(..., "--candidate"),
 ) -> None:
     """Activate a complete semantic projection after an evaluation gate passes."""
 
     def action(runtime: Runtime):
         if name not in {"semantic", "vector"}:
             raise ValidationError("only semantic projections require explicit activation")
+        evaluation = json.loads(report.read_text(encoding="utf-8"))
+        decision = validate_activation_report(
+            evaluation,
+            candidate=candidate,
+            configuration=runtime.container.settings.raw,
+            code_root=runtime.container.settings.project_root,
+        )
         space = runtime.container.service.activate_semantic_projection(runtime.context)
         return {
             "projection": "semantic",
             "status": space.status,
             "space": space,
+            "evaluation_run_id": evaluation["run"]["id"],
+            "candidate": candidate,
+            "decision": decision["decision"],
         }
 
     _run(ctx, action)
@@ -828,6 +887,59 @@ def evaluate_compare(
     def action(runtime: Runtime):
         payload = json.loads(report.read_text(encoding="utf-8"))
         return compare_variants(payload, baseline, candidate)
+
+    _run(ctx, action)
+
+
+@quality_app.command("validate-manifest")
+def quality_validate_manifest(
+    ctx: typer.Context,
+    manifest: Path = typer.Option(..., "--manifest", exists=True, dir_okay=False, readable=True),
+) -> None:
+    _run(ctx, lambda runtime: load_experiment(manifest))
+
+
+@quality_app.command("recommend")
+def quality_recommend(
+    ctx: typer.Context,
+    manifest: Path = typer.Option(..., "--manifest", exists=True, dir_okay=False, readable=True),
+    report: Path = typer.Option(..., "--report", exists=True, dir_okay=False, readable=True),
+) -> None:
+    def action(runtime: Runtime):
+        return recommend(load_experiment(manifest), load_quality_report(report))
+
+    _run(ctx, action)
+
+
+@ontology_app.command("validate")
+def ontology_validate(
+    ctx: typer.Context,
+    root: Path = typer.Option(..., "--root", exists=True, file_okay=False, readable=True),
+) -> None:
+    def action(runtime: Runtime):
+        errors = validate_ontology(root)
+        if errors:
+            raise ValidationError("invalid ontology contract: " + "; ".join(errors))
+        catalog = OntologyCatalog.load(root)
+        return {"version": catalog.version, "predicate_count": len(catalog.predicates)}
+
+    _run(ctx, action)
+
+
+@ontology_app.command("diff")
+def ontology_diff(
+    ctx: typer.Context,
+    before: Path = typer.Option(..., "--before", exists=True, file_okay=False, readable=True),
+    after: Path = typer.Option(..., "--after", exists=True, file_okay=False, readable=True),
+    migration: Path | None = typer.Option(None, "--migration", dir_okay=False, readable=True),
+) -> None:
+    def action(runtime: Runtime):
+        result = diff_ontologies(before, after)
+        selected = load_migration(migration) if migration is not None else None
+        errors = validate_migration_coverage(result, selected)
+        if errors:
+            raise ValidationError("invalid ontology migration: " + "; ".join(errors))
+        return result
 
     _run(ctx, action)
 

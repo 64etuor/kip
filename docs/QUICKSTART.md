@@ -1,5 +1,9 @@
 # Quickstart
 
+처음 복제하거나 제3자 환경에 적용한다면 명령을 실행하기 전에
+[`STARTER_KIT_GUIDE.md`](STARTER_KIT_GUIDE.md)의 데이터 경계, ACL, 외부
+전송, 품질 기준 결정을 먼저 완료한다.
+
 ## Local CLI profile
 
 ```bash
@@ -12,6 +16,8 @@ cp config/kip.example.toml config/kip.toml
 ./scripts/kip search "참여율 변경" --limit 10
 ./scripts/kip xlsx-read --artifact-id ARTIFACT_ID --sheet "정산" --range "A1:F40"
 ```
+
+For a real read-only OneDrive audit, use [`docs/AI_OPERATOR_RUNBOOK.md`](AI_OPERATOR_RUNBOOK.md); it defines parser comparison, source-grounded validation, A/B scoring, and the post-fix cycle.
 
 ## Application profile
 
@@ -59,4 +65,4 @@ make evaluate
 ```
 
 The semantic projection stays in shadow mode. See `docs/RAG_EVALUATION.md`
-before considering `projection activate`.
+before considering `projection activate --report REPORT --candidate VARIANT`.

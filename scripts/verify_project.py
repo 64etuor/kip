@@ -6,6 +6,8 @@ import json
 import sys
 from pathlib import Path
 
+from kip.ontology import validate_ontology
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -25,6 +27,7 @@ def main() -> int:
     require((ROOT / "docs/TRD.md").is_file(), "docs/TRD.md is missing", errors)
     require((ROOT / "skills/knowledge-fabric/SKILL.md").is_file(), "project Skill is missing", errors)
     require((ROOT / ".claude/skills/knowledge-fabric/SKILL.md").is_file(), "Claude project Skill is missing", errors)
+    errors.extend(validate_ontology(ROOT / "ontology"))
 
     claude_skill_root = ROOT / ".claude/skills/knowledge-fabric"
     project_skill_root = ROOT / "skills/knowledge-fabric"

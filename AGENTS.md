@@ -11,6 +11,7 @@ This repository implements an evidence-first knowledge fabric for NAS documents,
 - Security: `docs/SECURITY.md`
 - Connector rules: `docs/CONNECTORS.md`
 - Current implementation status: `docs/IMPLEMENTATION_STATUS.md`
+- Starter-kit adoption and upgrade guide: `docs/STARTER_KIT_GUIDE.md`
 
 ## Architecture rules
 

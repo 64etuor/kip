@@ -4,7 +4,13 @@ import json
 import os
 
 from kip.container import build_container
-from kip.domain.models import ContextRequest, GraphNeighborsRequest, GraphPathRequest, SearchRequest
+from kip.domain.models import (
+    AnswerRequest,
+    ContextRequest,
+    GraphNeighborsRequest,
+    GraphPathRequest,
+    SearchRequest,
+)
 from kip.errors import DependencyUnavailableError
 
 
@@ -57,6 +63,10 @@ def create_server():
     def kip_context(query: str, limit: int = 5, max_chars: int = 40000) -> str:
         """Build a bounded evidence pack with source hashes and locators."""
         return _json(service.context_bundle(context(), ContextRequest(query=query, limit=limit, max_chars=max_chars)))
+
+    @mcp.tool()
+    def kip_answer(query: str, limit: int = 5, max_chars: int = 12000) -> str:
+        return _json(service.answer(context(), AnswerRequest(query=query, limit=limit, max_chars=max_chars)))
 
     @mcp.tool()
     def kip_vocabulary(prefix: str, limit: int = 20) -> str:

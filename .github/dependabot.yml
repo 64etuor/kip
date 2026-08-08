@@ -4,11 +4,34 @@ updates:
     directory: /
     schedule:
       interval: weekly
+      day: monday
+      time: "02:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 10
+    groups:
+      runtime-minor-patch:
+        dependency-type: production
+        update-types: ["minor", "patch"]
+      development-minor-patch:
+        dependency-type: development
+        update-types: ["minor", "patch"]
+    labels: ["dependencies", "quality-candidate"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+      day: monday
+      time: "02:15"
+      timezone: Asia/Seoul
+    groups:
+      github-actions:
+        patterns: ["*"]
+    labels: ["dependencies", "quality-candidate"]
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
+      day: monday
+      time: "02:30"
+      timezone: Asia/Seoul
+    labels: ["dependencies", "quality-candidate"]

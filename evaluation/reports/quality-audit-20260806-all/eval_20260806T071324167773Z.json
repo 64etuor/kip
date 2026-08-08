@@ -1,0 +1,3539 @@
+{
+  "decision": {
+    "reasons": [],
+    "status": "baseline"
+  },
+  "fingerprints": {
+    "code": "sha256:951bdb669cef5f8bd982e84b98b2de088cf8b18d2bbf73bcb48537bc81f1cd6c",
+    "configuration": "sha256:a4897d46860430df697ff814c3889649ec0316fdb4deaaafc7480ef4fe616ae5",
+    "corpus": "sha256:68d47873a9c605021581b1522b6b6e0fd1e486cb6ee0cf82b4633e35a76fb6f8",
+    "dataset": "sha256:c61d3bb5c4b1306bf8ff1f69fc9bba54cc338c5136e7bcdc2b5c5aa5fbed2d08"
+  },
+  "gates": {},
+  "run": {
+    "completed_at": "2026-08-06T07:18:57.217611Z",
+    "dataset": "public-government-ko-v1",
+    "hardware": {
+      "machine": "arm64",
+      "platform": "Darwin",
+      "python": "3.13.13"
+    },
+    "id": "eval_20260806T071324167773Z",
+    "started_at": "2026-08-06T07:13:24.167773Z",
+    "warmup_passes": 1,
+    "workspace": "default"
+  },
+  "schema_version": "kip.evaluation-report.v1",
+  "variants": {
+    "hybrid": {
+      "cases": [
+        {
+          "case_id": "GOV-PP-001",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 623.435542,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-PP-002",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 717.207833,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd",
+            "ldoc_79ac82399e1984a1bc64f3b8cdb1e966",
+            "ldoc_fc02a81d6b1f21610f441ba4463d4a23",
+            "ldoc_b23b1c76b5e8a3134775502ac4bd49c0"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-PP-003",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 655.899458,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd",
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_5bbfe4f5850a5c0813c570fa402b0d1b"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-PP-004",
+          "category": "exact_fact",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 672.977625,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd",
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_195a5e7579bda5c719af24463b9cbbe3"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-PP-005",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 572.76625,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-001",
+          "category": "exact_date",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 464.140625,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-002",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 574.847209,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-003",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 569.418459,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-004",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 734.948875,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-005",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 738.25075,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_a84f9298cd36db778139e94be5c9d19e",
+            "ldoc_ea035c0108a010e9e2d8e66e884a1bbd",
+            "ldoc_e440d7565c95d5b4df31c91305a8ce37",
+            "ldoc_71ef6376728e27bee292aed6aeecdb98",
+            "ldoc_b23b1c76b5e8a3134775502ac4bd49c0"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-001",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 674.317625,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-002",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 488.90225,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_195a5e7579bda5c719af24463b9cbbe3",
+            "ldoc_0c0755d42750b1b41cb9dcdf247b0b43",
+            "ldoc_bdf640bf4f943e78b7faa864bb55ebbf"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-003",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 629.106375,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-004",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 591.928167,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd",
+            "ldoc_28f608e4912d0d12bcc2b8036e65d181"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-005",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 632.0155,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 0.6309297535714575,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 0.5,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-001",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 654.968667,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_e440d7565c95d5b4df31c91305a8ce37",
+            "ldoc_680efa46088880a266cd115187b07c4c",
+            "ldoc_8bd59e9cc99f77ed80e28a2bb5f7f814",
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_146173cff379c06370a79c7aa02cba77"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-002",
+          "category": "exact_entity",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 592.558667,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-003",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 580.610084,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_71ef6376728e27bee292aed6aeecdb98",
+            "ldoc_479d9ab21465ab86ab52532124d2e135",
+            "ldoc_a84f9298cd36db778139e94be5c9d19e",
+            "ldoc_04f1ab22628cf03a11c6fa3b5f4d6723",
+            "ldoc_680efa46088880a266cd115187b07c4c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-004",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 587.957916,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_680efa46088880a266cd115187b07c4c",
+            "ldoc_28f608e4912d0d12bcc2b8036e65d181",
+            "ldoc_146173cff379c06370a79c7aa02cba77"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-005",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 655.665875,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_c66b573d03a1d8a7d4eb5fa0a47f85bd",
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_146173cff379c06370a79c7aa02cba77",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_04f1ab22628cf03a11c6fa3b5f4d6723"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-001",
+          "category": "exact_entity",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 417.0615,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-002",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 674.139125,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_9cdca76677d68303a5c414a1b11dee6a",
+            "ldoc_2925bf4b9a8dc92e58a54a22d48dda0f"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-003",
+          "category": "exact_entity",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 593.788292,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_c66b573d03a1d8a7d4eb5fa0a47f85bd"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-004",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 517.434667,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_6625f9b3b8edc0d3da2da963c2cea2f0",
+            "ldoc_c4842c828e27e9aaaa70316c46bd79d5",
+            "ldoc_e440d7565c95d5b4df31c91305a8ce37",
+            "ldoc_680efa46088880a266cd115187b07c4c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-005",
+          "category": "exact_fact",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 630.633,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_e440d7565c95d5b4df31c91305a8ce37",
+            "ldoc_9cdca76677d68303a5c414a1b11dee6a",
+            "ldoc_a84f9298cd36db778139e94be5c9d19e",
+            "ldoc_4561119c154ee73b36c7b236d25dda10",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-001",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 812.478083,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_79ac82399e1984a1bc64f3b8cdb1e966",
+            "ldoc_fc02a81d6b1f21610f441ba4463d4a23"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-002",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 567.859333,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_195a5e7579bda5c719af24463b9cbbe3",
+            "ldoc_6625f9b3b8edc0d3da2da963c2cea2f0",
+            "ldoc_903235ebe5b02adc4e2f47513c5056b1"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-003",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 641.2695,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_a84f9298cd36db778139e94be5c9d19e",
+            "ldoc_c66b573d03a1d8a7d4eb5fa0a47f85bd"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-004",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 568.307125,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_71ef6376728e27bee292aed6aeecdb98"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-005",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 526.657666,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ACL-001",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 67.183125,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-002",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 65.778916,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-003",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 65.8955,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-004",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 65.402542,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-005",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 68.32275,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-006",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 68.585417,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        }
+      ],
+      "categories": {
+        "access_denied": {
+          "case_count": 6,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 1.0,
+          "zero_result_recovery_rate": null
+        },
+        "exact_date": {
+          "case_count": 1,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        },
+        "exact_entity": {
+          "case_count": 3,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        },
+        "exact_fact": {
+          "case_count": 2,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        },
+        "exact_numeric": {
+          "case_count": 12,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        },
+        "semantic_paraphrase": {
+          "case_count": 12,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 0.9583333333333334,
+          "ndcg_at_k": 0.9692441461309548,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        }
+      },
+      "latency_ms": {
+        "max": 812.478083,
+        "p50": 589.9430414999999,
+        "p95": 735.7743437500001
+      },
+      "metrics": {
+        "case_count": 36,
+        "failed_case_count": 0,
+        "latest_version_accuracy": null,
+        "locator_accuracy": null,
+        "mrr": 0.9861111111111112,
+        "ndcg_at_k": 0.9897480487103183,
+        "recall_at_k": 1.0,
+        "stale_warning_rate": null,
+        "unauthorized_result_count": 0,
+        "zero_result_rate": 0.16666666666666666,
+        "zero_result_recovery_rate": null
+      }
+    },
+    "lexical": {
+      "cases": [
+        {
+          "case_id": "GOV-PP-001",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 554.337834,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_5bbfe4f5850a5c0813c570fa402b0d1b"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-PP-002",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 645.061875,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 0.38685280723454163,
+          "ranked_documents": [
+            "ldoc_79ac82399e1984a1bc64f3b8cdb1e966",
+            "ldoc_fc02a81d6b1f21610f441ba4463d4a23",
+            "ldoc_b23b1c76b5e8a3134775502ac4bd49c0",
+            "ldoc_6bb80696e50ee700e8daf8c67866e1d7",
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd",
+            "ldoc_c2c21a366878e73bdac3623f47a258b8",
+            "ldoc_61f877173114adb34f20198dcd7ff78b",
+            "ldoc_6d7f3eed6759ce28639291718b2f0cfd"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 0.2,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-PP-003",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 566.166209,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd",
+            "ldoc_5bbfe4f5850a5c0813c570fa402b0d1b",
+            "ldoc_2e41b84e62c88f377d92e8e1c989db02",
+            "ldoc_e440d7565c95d5b4df31c91305a8ce37"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-PP-004",
+          "category": "exact_fact",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 680.00075,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd",
+            "ldoc_195a5e7579bda5c719af24463b9cbbe3",
+            "ldoc_bd3f87d4f6165f1bbf5163f7d259919f",
+            "ldoc_2e41b84e62c88f377d92e8e1c989db02",
+            "ldoc_680efa46088880a266cd115187b07c4c",
+            "ldoc_6625f9b3b8edc0d3da2da963c2cea2f0"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-PP-005",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 552.618125,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd",
+            "ldoc_9cdca76677d68303a5c414a1b11dee6a",
+            "ldoc_e440d7565c95d5b4df31c91305a8ce37",
+            "ldoc_5bbfe4f5850a5c0813c570fa402b0d1b"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-001",
+          "category": "exact_date",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 510.811792,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-002",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 659.663041,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-003",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 710.13,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-004",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 1119.811292,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_479d9ab21465ab86ab52532124d2e135",
+            "ldoc_c66b573d03a1d8a7d4eb5fa0a47f85bd",
+            "ldoc_680efa46088880a266cd115187b07c4c",
+            "ldoc_e440d7565c95d5b4df31c91305a8ce37",
+            "ldoc_4561119c154ee73b36c7b236d25dda10",
+            "ldoc_04f1ab22628cf03a11c6fa3b5f4d6723"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-005",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 1090.444917,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 0.43067655807339306,
+          "ranked_documents": [
+            "ldoc_a84f9298cd36db778139e94be5c9d19e",
+            "ldoc_ea035c0108a010e9e2d8e66e884a1bbd",
+            "ldoc_e440d7565c95d5b4df31c91305a8ce37",
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_71ef6376728e27bee292aed6aeecdb98",
+            "ldoc_b23b1c76b5e8a3134775502ac4bd49c0",
+            "ldoc_d0f291f89bed6e04b6b6a4b7f6af21e7",
+            "ldoc_9cdca76677d68303a5c414a1b11dee6a",
+            "ldoc_d3c4890c5a04127c038e198961952cd0",
+            "ldoc_8bd59e9cc99f77ed80e28a2bb5f7f814"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 0.25,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-001",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 967.599667,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_4561119c154ee73b36c7b236d25dda10",
+            "ldoc_e440d7565c95d5b4df31c91305a8ce37"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-002",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 733.227792,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_195a5e7579bda5c719af24463b9cbbe3",
+            "ldoc_0c0755d42750b1b41cb9dcdf247b0b43",
+            "ldoc_bdf640bf4f943e78b7faa864bb55ebbf",
+            "ldoc_903235ebe5b02adc4e2f47513c5056b1",
+            "ldoc_c4842c828e27e9aaaa70316c46bd79d5",
+            "ldoc_784af8da4a7879ee2f7afffc65e70866",
+            "ldoc_e940e3be83eafeac16fe800e44b67dc8",
+            "ldoc_73143d9db35c4aae3eae3f92198f8882"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-003",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 812.759375,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_390fb328deb16e0e1480882aaffc5fa9",
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_146173cff379c06370a79c7aa02cba77",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-004",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 772.074542,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_28f608e4912d0d12bcc2b8036e65d181",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_5bbfe4f5850a5c0813c570fa402b0d1b",
+            "ldoc_400aa6b3856b455f15cfbe53d75d6e46",
+            "ldoc_0c3df7875764df07378c649932b55dbd",
+            "ldoc_e4e5c8de14e31e67f1e4a6179233c120",
+            "ldoc_1a367e79778bf32e3e9f592c901c6c31"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-005",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 820.783666,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-001",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 842.3715,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_e440d7565c95d5b4df31c91305a8ce37",
+            "ldoc_680efa46088880a266cd115187b07c4c",
+            "ldoc_8bd59e9cc99f77ed80e28a2bb5f7f814",
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_146173cff379c06370a79c7aa02cba77",
+            "ldoc_b23b1c76b5e8a3134775502ac4bd49c0",
+            "ldoc_9b81161edd4e69d1cec61e49c6865a54",
+            "ldoc_0347246080ec90d5ee8979fb7f42432b"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-002",
+          "category": "exact_entity",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 792.945417,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_680efa46088880a266cd115187b07c4c",
+            "ldoc_195a5e7579bda5c719af24463b9cbbe3",
+            "ldoc_0c0755d42750b1b41cb9dcdf247b0b43",
+            "ldoc_146173cff379c06370a79c7aa02cba77",
+            "ldoc_04f1ab22628cf03a11c6fa3b5f4d6723",
+            "ldoc_479d9ab21465ab86ab52532124d2e135",
+            "ldoc_664d025aef912447d21a07c1cca5bfb7",
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-003",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 896.612334,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_479d9ab21465ab86ab52532124d2e135",
+            "ldoc_a84f9298cd36db778139e94be5c9d19e",
+            "ldoc_04f1ab22628cf03a11c6fa3b5f4d6723",
+            "ldoc_680efa46088880a266cd115187b07c4c",
+            "ldoc_195a5e7579bda5c719af24463b9cbbe3",
+            "ldoc_e440d7565c95d5b4df31c91305a8ce37",
+            "ldoc_b23b1c76b5e8a3134775502ac4bd49c0",
+            "ldoc_9cdca76677d68303a5c414a1b11dee6a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-004",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 746.257708,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_680efa46088880a266cd115187b07c4c",
+            "ldoc_28f608e4912d0d12bcc2b8036e65d181",
+            "ldoc_146173cff379c06370a79c7aa02cba77",
+            "ldoc_195a5e7579bda5c719af24463b9cbbe3",
+            "ldoc_87c02c597408c3f004cbd7dc754ece42",
+            "ldoc_71ef6376728e27bee292aed6aeecdb98",
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_0c0755d42750b1b41cb9dcdf247b0b43",
+            "ldoc_aefb0bb0df2fb77e90089dc48f12368b"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-005",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 878.153542,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_c66b573d03a1d8a7d4eb5fa0a47f85bd",
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_146173cff379c06370a79c7aa02cba77",
+            "ldoc_04f1ab22628cf03a11c6fa3b5f4d6723",
+            "ldoc_195a5e7579bda5c719af24463b9cbbe3",
+            "ldoc_14659b77c84794bcddb47566182ee566",
+            "ldoc_680efa46088880a266cd115187b07c4c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-001",
+          "category": "exact_entity",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 455.548208,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_784af8da4a7879ee2f7afffc65e70866",
+            "ldoc_903235ebe5b02adc4e2f47513c5056b1",
+            "ldoc_c4842c828e27e9aaaa70316c46bd79d5",
+            "ldoc_680efa46088880a266cd115187b07c4c",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_71ef6376728e27bee292aed6aeecdb98",
+            "ldoc_e440d7565c95d5b4df31c91305a8ce37",
+            "ldoc_2925bf4b9a8dc92e58a54a22d48dda0f"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-002",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 717.556333,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_9cdca76677d68303a5c414a1b11dee6a",
+            "ldoc_2925bf4b9a8dc92e58a54a22d48dda0f",
+            "ldoc_0c0755d42750b1b41cb9dcdf247b0b43",
+            "ldoc_146173cff379c06370a79c7aa02cba77",
+            "ldoc_4561119c154ee73b36c7b236d25dda10",
+            "ldoc_b23b1c76b5e8a3134775502ac4bd49c0",
+            "ldoc_71ef6376728e27bee292aed6aeecdb98"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-003",
+          "category": "exact_entity",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 592.935917,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_c66b573d03a1d8a7d4eb5fa0a47f85bd",
+            "ldoc_680efa46088880a266cd115187b07c4c",
+            "ldoc_e440d7565c95d5b4df31c91305a8ce37",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-004",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 473.920625,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_6625f9b3b8edc0d3da2da963c2cea2f0",
+            "ldoc_c4842c828e27e9aaaa70316c46bd79d5",
+            "ldoc_e440d7565c95d5b4df31c91305a8ce37",
+            "ldoc_680efa46088880a266cd115187b07c4c",
+            "ldoc_390fb328deb16e0e1480882aaffc5fa9",
+            "ldoc_784af8da4a7879ee2f7afffc65e70866",
+            "ldoc_903235ebe5b02adc4e2f47513c5056b1",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-005",
+          "category": "exact_fact",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 581.977875,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_e440d7565c95d5b4df31c91305a8ce37",
+            "ldoc_9cdca76677d68303a5c414a1b11dee6a",
+            "ldoc_a84f9298cd36db778139e94be5c9d19e",
+            "ldoc_4561119c154ee73b36c7b236d25dda10",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_9486fb4d2bf54481a1514169c0791985",
+            "ldoc_5bbfe4f5850a5c0813c570fa402b0d1b"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-001",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 744.057375,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 0.38685280723454163,
+          "ranked_documents": [
+            "ldoc_79ac82399e1984a1bc64f3b8cdb1e966",
+            "ldoc_fc02a81d6b1f21610f441ba4463d4a23",
+            "ldoc_6bb80696e50ee700e8daf8c67866e1d7",
+            "ldoc_b23b1c76b5e8a3134775502ac4bd49c0",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_c2c21a366878e73bdac3623f47a258b8",
+            "ldoc_61f877173114adb34f20198dcd7ff78b",
+            "ldoc_6d7f3eed6759ce28639291718b2f0cfd",
+            "ldoc_a14ad3b66a97181bd586a24e957c92fc"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 0.2,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-002",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 511.8465,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_195a5e7579bda5c719af24463b9cbbe3",
+            "ldoc_6625f9b3b8edc0d3da2da963c2cea2f0",
+            "ldoc_903235ebe5b02adc4e2f47513c5056b1",
+            "ldoc_c4842c828e27e9aaaa70316c46bd79d5",
+            "ldoc_784af8da4a7879ee2f7afffc65e70866",
+            "ldoc_390fb328deb16e0e1480882aaffc5fa9",
+            "ldoc_c66b573d03a1d8a7d4eb5fa0a47f85bd",
+            "ldoc_6679d3e1f3329367f7e4b65ddbc07318"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-003",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 847.842292,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_a84f9298cd36db778139e94be5c9d19e",
+            "ldoc_c66b573d03a1d8a7d4eb5fa0a47f85bd",
+            "ldoc_9e4a3c1b458f1e51ed7390287d6d60e3",
+            "ldoc_71ef6376728e27bee292aed6aeecdb98",
+            "ldoc_390fb328deb16e0e1480882aaffc5fa9",
+            "ldoc_04f1ab22628cf03a11c6fa3b5f4d6723",
+            "ldoc_6679d3e1f3329367f7e4b65ddbc07318"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-004",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 626.808,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_71ef6376728e27bee292aed6aeecdb98",
+            "ldoc_e440d7565c95d5b4df31c91305a8ce37",
+            "ldoc_9cdca76677d68303a5c414a1b11dee6a",
+            "ldoc_9e4a3c1b458f1e51ed7390287d6d60e3",
+            "ldoc_d5491e68f2d8b4aa161b0ab667602ecb",
+            "ldoc_2925bf4b9a8dc92e58a54a22d48dda0f",
+            "ldoc_d3c4890c5a04127c038e198961952cd0"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-005",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 516.887417,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_4561119c154ee73b36c7b236d25dda10",
+            "ldoc_0c0755d42750b1b41cb9dcdf247b0b43",
+            "ldoc_c4842c828e27e9aaaa70316c46bd79d5"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ACL-001",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 39.473,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-002",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 37.399375,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-003",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 29.698167,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-004",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 32.949292,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-005",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 29.019917,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-006",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 27.49875,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        }
+      ],
+      "categories": {
+        "access_denied": {
+          "case_count": 6,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 1.0,
+          "zero_result_recovery_rate": null
+        },
+        "exact_date": {
+          "case_count": 1,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        },
+        "exact_entity": {
+          "case_count": 3,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        },
+        "exact_fact": {
+          "case_count": 2,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        },
+        "exact_numeric": {
+          "case_count": 12,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 0.8666666666666667,
+          "ndcg_at_k": 0.8978088012057569,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        },
+        "semantic_paraphrase": {
+          "case_count": 12,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 0.9375,
+          "ndcg_at_k": 0.9525563798394495,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        }
+      },
+      "latency_ms": {
+        "max": 1119.811292,
+        "p50": 652.3624580000001,
+        "p95": 998.3109795
+      },
+      "metrics": {
+        "case_count": 36,
+        "failed_case_count": 0,
+        "latest_version_accuracy": null,
+        "locator_accuracy": null,
+        "mrr": 0.9347222222222222,
+        "ndcg_at_k": 0.9501217270150687,
+        "recall_at_k": 1.0,
+        "stale_warning_rate": null,
+        "unauthorized_result_count": 0,
+        "zero_result_rate": 0.16666666666666666,
+        "zero_result_recovery_rate": null
+      }
+    },
+    "reranked": {
+      "cases": [
+        {
+          "case_id": "GOV-PP-001",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 1458.736,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-PP-002",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 1622.28775,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-PP-003",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 1388.868958,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-PP-004",
+          "category": "exact_fact",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 1349.778625,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd",
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-PP-005",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 1355.391959,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-001",
+          "category": "exact_date",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 1540.863375,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-002",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 1400.632208,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-003",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 1318.37525,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-004",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 1449.8675,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-005",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 13792.24925,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_ea035c0108a010e9e2d8e66e884a1bbd",
+            "ldoc_a84f9298cd36db778139e94be5c9d19e",
+            "ldoc_e440d7565c95d5b4df31c91305a8ce37"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-001",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 2211.489125,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-002",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 10538.964042,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_195a5e7579bda5c719af24463b9cbbe3",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-003",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 2076.820583,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-004",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 1485.329375,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-005",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 1376.283541,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 0.6309297535714575,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 0.5,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-001",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 9004.422792,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_680efa46088880a266cd115187b07c4c",
+            "ldoc_e440d7565c95d5b4df31c91305a8ce37"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-002",
+          "category": "exact_entity",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 1793.11475,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-003",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 7229.328542,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_71ef6376728e27bee292aed6aeecdb98",
+            "ldoc_a84f9298cd36db778139e94be5c9d19e",
+            "ldoc_479d9ab21465ab86ab52532124d2e135"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-004",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 1450.558667,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-005",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 2885.7465,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_c66b573d03a1d8a7d4eb5fa0a47f85bd",
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-001",
+          "category": "exact_entity",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 1073.884792,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-002",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 1252.356458,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-003",
+          "category": "exact_entity",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 1112.25,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-004",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 2382.920709,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_6625f9b3b8edc0d3da2da963c2cea2f0"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-005",
+          "category": "exact_fact",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 11622.446416,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_e440d7565c95d5b4df31c91305a8ce37",
+            "ldoc_9cdca76677d68303a5c414a1b11dee6a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-001",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 2247.832667,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-002",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 11620.749167,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_195a5e7579bda5c719af24463b9cbbe3"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-003",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 2264.051417,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-004",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 4675.105542,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_71ef6376728e27bee292aed6aeecdb98"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-005",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 1801.412584,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ACL-001",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 132.69,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-002",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 74.041875,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-003",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 76.280709,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-004",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 69.308167,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-005",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 73.27625,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-006",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 73.75525,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        }
+      ],
+      "categories": {
+        "access_denied": {
+          "case_count": 6,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 1.0,
+          "zero_result_recovery_rate": null
+        },
+        "exact_date": {
+          "case_count": 1,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        },
+        "exact_entity": {
+          "case_count": 3,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        },
+        "exact_fact": {
+          "case_count": 2,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        },
+        "exact_numeric": {
+          "case_count": 12,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        },
+        "semantic_paraphrase": {
+          "case_count": 12,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 0.9583333333333334,
+          "ndcg_at_k": 0.9692441461309548,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        }
+      },
+      "latency_ms": {
+        "max": 13792.24925,
+        "p50": 1472.0326875,
+        "p95": 11621.17347925
+      },
+      "metrics": {
+        "case_count": 36,
+        "failed_case_count": 0,
+        "latest_version_accuracy": null,
+        "locator_accuracy": null,
+        "mrr": 0.9861111111111112,
+        "ndcg_at_k": 0.9897480487103183,
+        "recall_at_k": 1.0,
+        "stale_warning_rate": null,
+        "unauthorized_result_count": 0,
+        "zero_result_rate": 0.16666666666666666,
+        "zero_result_recovery_rate": null
+      }
+    },
+    "vector": {
+      "cases": [
+        {
+          "case_id": "GOV-PP-001",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 959.43225,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-PP-002",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 1102.917583,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-PP-003",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 840.421667,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-PP-004",
+          "category": "exact_fact",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 877.207541,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd",
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-PP-005",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "latency_ms": 830.207292,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-001",
+          "category": "exact_date",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 836.866833,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-002",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 925.155,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-003",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 916.212708,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-004",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 1278.609209,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-CARE-005",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "latency_ms": 1693.764459,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-001",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 1793.531375,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-002",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 1253.772083,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-003",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 2523.296084,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-004",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 1312.069,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 0.6309297535714575,
+          "ranked_documents": [
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 0.5,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-HI-005",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "latency_ms": 783.302125,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 0.6309297535714575,
+          "ranked_documents": [
+            "ldoc_479b58f482b49d2bc7d157071accc34c",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 0.5,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-001",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 917.448333,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-002",
+          "category": "exact_entity",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 725.839875,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-003",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 594.995458,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_98f04ef1e6491c07109039ea3ab183f4"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-004",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 600.027041,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-VOTE-005",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_6cfee518392af474da107b6918214410"
+          ],
+          "latency_ms": 830.180792,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_6e9065f41ec8032df5bf5803e8d8211a",
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-001",
+          "category": "exact_entity",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 501.263541,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-002",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 691.171708,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_cfd2bd88577581978e86b11a828a5b0e",
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-003",
+          "category": "exact_entity",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 612.842167,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_6cfee518392af474da107b6918214410",
+            "ldoc_479b58f482b49d2bc7d157071accc34c"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-004",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 529.992083,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_cfd2bd88577581978e86b11a828a5b0e"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ADOPT-005",
+          "category": "exact_fact",
+          "error": null,
+          "expected_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64"
+          ],
+          "latency_ms": 629.708333,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_edc362e3d349c3572ee4dbc591b11f64",
+            "ldoc_cfd2bd88577581978e86b11a828a5b0e"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-001",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 819.45175,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-002",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 580.752333,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-003",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 640.036542,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-004",
+          "category": "semantic_paraphrase",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 543.327667,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_71ef6376728e27bee292aed6aeecdb98"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-MOE-005",
+          "category": "exact_numeric",
+          "error": null,
+          "expected_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368"
+          ],
+          "latency_ms": 502.29375,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [
+            "ldoc_f8828d40c4bf7fc6acfe0855e37c9368",
+            "ldoc_f6286f72ff69b81b7f879e4035b64bdd"
+          ],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": false
+        },
+        {
+          "case_id": "GOV-ACL-001",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 75.831833,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-002",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 67.325833,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-003",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 79.902833,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-004",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 76.102625,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-005",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 72.714333,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        },
+        {
+          "case_id": "GOV-ACL-006",
+          "category": "access_denied",
+          "error": null,
+          "expected_documents": [],
+          "latency_ms": 72.205375,
+          "latest_version_match": null,
+          "locator_match": null,
+          "ndcg_at_k": 1.0,
+          "ranked_documents": [],
+          "recall_at_k": 1.0,
+          "reciprocal_rank": 1.0,
+          "stale_warning_match": null,
+          "unauthorized_result_count": 0,
+          "zero_results": true
+        }
+      ],
+      "categories": {
+        "access_denied": {
+          "case_count": 6,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 1.0,
+          "zero_result_recovery_rate": null
+        },
+        "exact_date": {
+          "case_count": 1,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        },
+        "exact_entity": {
+          "case_count": 3,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        },
+        "exact_fact": {
+          "case_count": 2,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 1.0,
+          "ndcg_at_k": 1.0,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        },
+        "exact_numeric": {
+          "case_count": 12,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 0.9583333333333334,
+          "ndcg_at_k": 0.9692441461309548,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        },
+        "semantic_paraphrase": {
+          "case_count": 12,
+          "failed_case_count": 0,
+          "latest_version_accuracy": null,
+          "locator_accuracy": null,
+          "mrr": 0.9583333333333334,
+          "ndcg_at_k": 0.9692441461309548,
+          "recall_at_k": 1.0,
+          "stale_warning_rate": null,
+          "unauthorized_result_count": 0,
+          "zero_result_rate": 0.0,
+          "zero_result_recovery_rate": null
+        }
+      },
+      "latency_ms": {
+        "max": 2523.296084,
+        "p50": 754.571,
+        "p95": 1718.706188
+      },
+      "metrics": {
+        "case_count": 36,
+        "failed_case_count": 0,
+        "latest_version_accuracy": null,
+        "locator_accuracy": null,
+        "mrr": 0.9722222222222222,
+        "ndcg_at_k": 0.9794960974206366,
+        "recall_at_k": 1.0,
+        "stale_warning_rate": null,
+        "unauthorized_result_count": 0,
+        "zero_result_rate": 0.16666666666666666,
+        "zero_result_recovery_rate": null
+      }
+    }
+  }
+}

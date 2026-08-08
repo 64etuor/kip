@@ -42,8 +42,8 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         "## Variant scorecard",
         "",
-        "| Variant | Cases | Recall@K | MRR | nDCG@K | Unauthorized | P50 ms | P95 ms |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|",
+        "| Variant | Cases | Failures | Recall@K | MRR | nDCG@K | Unauthorized | P50 ms | P95 ms |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for name, result in report["variants"].items():
         metrics = result["metrics"]
@@ -54,6 +54,7 @@ def render_markdown(report: dict[str, Any]) -> str:
                 [
                     name,
                     str(metrics["case_count"]),
+                    str(metrics.get("failed_case_count", 0)),
                     _percentage(metrics["recall_at_k"]),
                     _percentage(metrics["mrr"]),
                     _percentage(metrics["ndcg_at_k"]),

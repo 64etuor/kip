@@ -1,0 +1,23 @@
+schema_version: kip.quality-experiment.v1
+id: example-qwen3-reranker
+dataset: evaluation/golden/public-government.yaml
+baseline_variant: hybrid
+candidate_variant: reranked
+components:
+  - kind: reranker
+    adapter: huggingface
+    identifier: Qwen/Qwen3-Reranker-0.6B
+    revision: f3f3c8a
+    configuration:
+      max_length: 1024
+fingerprints:
+  corpus: sha256:replace-with-corpus-fingerprint
+  dataset: sha256:replace-with-dataset-fingerprint
+  configuration: sha256:replace-with-configuration-fingerprint
+  code: sha256:replace-with-code-fingerprint
+policy:
+  minimum_recall_delta: 0.0
+  maximum_category_regression: 0.01
+  maximum_p95_latency_ms: 500.0
+  required_categories: [semantic, exact]
+  required_metrics: [locator_accuracy, stale_warning_rate]

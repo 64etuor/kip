@@ -1,21 +1,39 @@
 from __future__ import annotations
 
-import re
 import zipfile
 from collections import OrderedDict
-from io import BytesIO
 from pathlib import Path, PurePosixPath
 from xml.etree import ElementTree as ET
 
+from kip.adapters.parsers.xlsx_read import read_xlsx_range
 from kip.application.analyzer import normalize_text
 from kip.domain.models import ContentUnit, EvidenceLocator, ExtractionRun
-from kip.errors import DependencyUnavailableError, ParserError, ValidationError
+from kip.errors import ParserError, ValidationError
 from kip.ids import new_id, sha256_bytes, stable_id
+
+__all__ = ["XlsxShallowParser", "read_xlsx_range"]
 
 _MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
 _REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 _PACKAGE_REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
-_CELL_RANGE_RE = re.compile(r"^[A-Za-z]{1,3}[1-9][0-9]*(?::[A-Za-z]{1,3}[1-9][0-9]*)?$")
+
+
+def _split_text(text: str, max_chars: int) -> list[str]:
+    if max_chars < 1:
+        raise ValueError("max_chars must be positive")
+    if len(text) <= max_chars:
+        return [text] if text else []
+    chunks: list[str] = []
+    start = 0
+    while start < len(text):
+        end = min(start + max_chars, len(text))
+        if end < len(text):
+            line_break = text.rfind("\n", start, end)
+            if line_break > start + max_chars // 2:
+                end = line_break + 1
+        chunks.append(text[start:end])
+        start = end
+    return chunks
 
 
 def _tag(local: str) -> str:
@@ -38,7 +56,7 @@ def _read_shared_strings(archive: zipfile.ZipFile) -> list[str]:
         return []
     values: list[str] = []
     with archive.open(name) as stream:
-        for event, elem in ET.iterparse(stream, events=("end",)):
+        for _event, elem in ET.iterparse(stream, events=("end",)):
             if elem.tag == _tag("si"):
                 texts = [node.text or "" for node in elem.iter(_tag("t"))]
                 values.append("".join(texts))
@@ -70,6 +88,7 @@ def _sheet_paths(archive: zipfile.ZipFile) -> list[tuple[str, str]]:
 def _parse_sheet(archive: zipfile.ZipFile, path: str, shared: list[str], max_chars: int) -> tuple[str | None, list[str], bool]:
     dimension: str | None = None
     values: OrderedDict[str, None] = OrderedDict()
+    value_chars = 0
     truncated = False
     current_cell_type: str | None = None
     current_value: str | None = None
@@ -97,9 +116,10 @@ def _parse_sheet(archive: zipfile.ZipFile, path: str, shared: list[str], max_cha
                         text = "".join(current_inline) if current_inline else current_value
                     if text:
                         normalized = normalize_text(text)
-                        if normalized:
-                            values.setdefault(normalized, None)
-                            if sum(len(v) + 1 for v in values) > max_chars:
+                        if normalized and normalized not in values:
+                            values[normalized] = None
+                            value_chars += len(normalized) + 1
+                            if value_chars > max_chars:
                                 truncated = True
                                 break
                     current_cell_type = None
@@ -113,57 +133,76 @@ class XlsxShallowParser:
     name = "xlsx-shallow"
     version = "1.0"
 
-    def __init__(self, max_chars_per_sheet: int = 240_000) -> None:
+    def __init__(self, max_chars_per_sheet: int = 240_000, max_chars_per_unit: int = 4000) -> None:
         self.max_chars_per_sheet = max_chars_per_sheet
+        self.max_chars_per_unit = max_chars_per_unit
 
     def supports(self, path: Path) -> bool:
-        return path.suffix.lower() == ".xlsx"
+        return path.suffix.lower() in {".xlsx", ".xlsm"}
 
     def parse(self, path: Path, *, artifact_id: str, document_id: str, acl_scopes: list[str]) -> tuple[ExtractionRun, list[ContentUnit]]:
         extraction_id = new_id("ext")
         units: list[ContentUnit] = []
         warnings: list[str] = []
+        aggregate_parts: list[str] = []
         try:
             with zipfile.ZipFile(path) as archive:
                 _safe_zip_check(archive)
                 shared = _read_shared_strings(archive)
-                for ordinal, (sheet_name, sheet_path) in enumerate(_sheet_paths(archive)):
+                next_ordinal = 0
+                for sheet_name, sheet_path in _sheet_paths(archive):
                     dimension, strings, truncated = _parse_sheet(
                         archive, sheet_path, shared, self.max_chars_per_sheet
                     )
                     header = f"Sheet: {sheet_name}\nUsed range: {dimension or 'unknown'}"
                     body = header + ("\n" + "\n".join(strings) if strings else "")
-                    normalized = normalize_text(body)
+                    aggregate_parts.append(body)
+                    chunks = _split_text(body, self.max_chars_per_unit)
                     if truncated:
                         warnings.append(f"sheet {sheet_name}: shallow text truncated")
-                    units.append(
-                        ContentUnit(
-                            id=stable_id("unit", extraction_id, str(ordinal)),
-                            extraction_id=extraction_id,
-                            document_id=document_id,
-                            artifact_id=artifact_id,
-                            ordinal=ordinal,
-                            unit_type="xlsx_sheet_shallow",
-                            title=f"{path.name} - {sheet_name}",
-                            body=body,
-                            body_normalized=normalized,
-                            lexical_text=normalized,
-                            locator=EvidenceLocator(
-                                type="xlsx_sheet", data={"sheet": sheet_name, "range": dimension}
-                            ),
-                            acl_scopes=acl_scopes,
-                            metadata={
-                                "sheet": sheet_name,
-                                "used_range": dimension,
-                                "shared_string_count": len(strings),
-                                "truncated": truncated,
-                                "deep_read_required_for_numbers": True,
-                            },
+                    chunk_start = 0
+                    for chunk_index, chunk in enumerate(chunks):
+                        normalized = normalize_text(chunk)
+                        locator_data: dict[str, object] = {"sheet": sheet_name, "range": dimension}
+                        if len(chunks) > 1:
+                            locator_data.update(
+                                {
+                                    "chunk": chunk_index,
+                                    "chunk_count": len(chunks),
+                                    "char_start": chunk_start,
+                                    "char_end": chunk_start + len(chunk),
+                                }
+                            )
+                        units.append(
+                            ContentUnit(
+                                id=stable_id("unit", extraction_id, str(next_ordinal)),
+                                extraction_id=extraction_id,
+                                document_id=document_id,
+                                artifact_id=artifact_id,
+                                ordinal=next_ordinal,
+                                unit_type="xlsx_sheet_shallow",
+                                title=f"{path.name} - {sheet_name}",
+                                body=chunk,
+                                body_normalized=normalized,
+                                lexical_text=normalized,
+                                locator=EvidenceLocator(type="xlsx_sheet", data=locator_data),
+                                acl_scopes=acl_scopes,
+                                metadata={
+                                    "sheet": sheet_name,
+                                    "used_range": dimension,
+                                    "shared_string_count": len(strings),
+                                    "truncated": truncated,
+                                    "deep_read_required_for_numbers": True,
+                                    "chunk": chunk_index,
+                                    "chunk_count": len(chunks),
+                                },
+                            )
                         )
-                    )
+                        next_ordinal += 1
+                        chunk_start += len(chunk)
         except (zipfile.BadZipFile, KeyError, ET.ParseError) as exc:
             raise ParserError(f"XLSX parse failed: {path}: {exc}") from exc
-        aggregate = "\n".join(unit.body for unit in units)
+        aggregate = "\n".join(aggregate_parts)
         extraction = ExtractionRun(
             id=extraction_id,
             artifact_id=artifact_id,
@@ -176,42 +215,3 @@ class XlsxShallowParser:
             metadata={"mode": "shallow", "numeric_values_indexed": False},
         )
         return extraction, units
-
-
-def read_xlsx_range(path: Path, sheet: str, cell_range: str, *, include_formula_and_cached: bool = True) -> dict:
-    if not _CELL_RANGE_RE.fullmatch(cell_range):
-        raise ValidationError("invalid XLSX cell range")
-    try:
-        from openpyxl import load_workbook
-    except ImportError as exc:
-        raise DependencyUnavailableError("Install the extractors extra for XLSX deep reads") from exc
-
-    def read(data_only: bool) -> list[list[dict]]:
-        workbook = load_workbook(path, read_only=True, data_only=data_only)
-        if sheet not in workbook.sheetnames:
-            workbook.close()
-            raise ValidationError(f"sheet does not exist: {sheet}")
-        worksheet = workbook[sheet]
-        rows: list[list[dict]] = []
-        for row in worksheet[cell_range]:
-            rows.append(
-                [
-                    {
-                        "coordinate": cell.coordinate,
-                        "value": cell.value,
-                        "data_type": cell.data_type,
-                    }
-                    for cell in row
-                ]
-            )
-        workbook.close()
-        return rows
-
-    formulas = read(data_only=False)
-    result = {"sheet": sheet, "range": cell_range, "cells": formulas}
-    if include_formula_and_cached:
-        cached = read(data_only=True)
-        for row_index, row in enumerate(result["cells"]):
-            for col_index, cell in enumerate(row):
-                cell["cached_value"] = cached[row_index][col_index]["value"]
-    return result

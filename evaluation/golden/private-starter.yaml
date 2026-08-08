@@ -1,0 +1,66 @@
+schema_version: kip.golden-dataset.v1
+name: private-starter-scenarios-v1
+description: Redacted sample cases for validating a private Korean evidence-first deployment before replacing them with reviewed internal cases.
+corpus_fingerprint: sha256:sample-data-v1
+cases:
+  - id: PRIVATE-EXACT-001
+    question: A과제 참여율 변경 논의는 어떤 상태인가?
+    category: exact_evidence
+    principal: principal_local
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_98f04ef1e6491c07109039ea3ab183f4]
+    forbidden_documents: []
+    expected_evidence:
+      - type: text_line_range
+        data: {start_line: 1, end_line: 5}
+    recall_at: 5
+    notes: The evidence requires a separate approval document, so an answer must not claim approval.
+  - id: PRIVATE-PARAPHRASE-001
+    question: 연구원 투입 비율을 바꾸기로 최종 승인했어?
+    category: semantic_paraphrase_refusal
+    principal: principal_local
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_98f04ef1e6491c07109039ea3ab183f4]
+    forbidden_documents: []
+    recall_at: 5
+    notes: Retrieve the memo but refuse to infer final approval.
+  - id: PRIVATE-XLSX-001
+    question: A과제 정산 인건비와 장비비 금액은?
+    category: xlsx_exact_range
+    principal: principal_local
+    acl_scopes: [workspace:default]
+    expected_documents: [ldoc_2e926e3a9a098d985268c3198e549612]
+    forbidden_documents: []
+    expected_evidence:
+      - type: xlsx_sheet
+        data: {sheet: 정산, range: A1:D3}
+    recall_at: 5
+    notes: The answer surface must require xlsx-read before stating numbers.
+  - id: PRIVATE-WEAK-001
+    question: 정산 증빙은 언제까지 내야 해?
+    category: weak_query_refusal
+    principal: principal_local
+    acl_scopes: [workspace:default]
+    expected_documents: []
+    forbidden_documents: []
+    recall_at: 5
+    notes: Refuse when no relevant fresh evidence survives admissibility checks.
+  - id: PRIVATE-ACL-001
+    question: A과제 참여율 변경
+    category: access_denied
+    principal: principal_restricted
+    acl_scopes: [project:other]
+    expected_documents: []
+    forbidden_documents: [ldoc_98f04ef1e6491c07109039ea3ab183f4]
+    recall_at: 5
+    notes: Search, answer, graph, snippets, and citations must reveal nothing.
+  - id: PRIVATE-LATEST-001
+    question: 삭제되거나 바뀐 원본을 최신 근거로 사용할 수 있나?
+    category: stale_source_refusal
+    principal: principal_local
+    acl_scopes: [workspace:default]
+    expected_documents: []
+    forbidden_documents: []
+    expected_stale_warning: true
+    recall_at: 5
+    notes: A missing current source hash is stale or unavailable, never fresh.

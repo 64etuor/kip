@@ -63,12 +63,13 @@ class CaseMetrics(EvaluationModel):
 
 class AggregateMetrics(EvaluationModel):
     case_count: int = Field(ge=0)
+    failed_case_count: int = Field(default=0, ge=0)
     recall_at_k: float = Field(ge=0, le=1)
     mrr: float = Field(ge=0, le=1)
     ndcg_at_k: float = Field(ge=0, le=1)
     zero_result_rate: float = Field(ge=0, le=1)
-    zero_result_recovery_rate: float = Field(default=0, ge=0, le=1)
+    zero_result_recovery_rate: float | None = Field(default=None, ge=0, le=1)
     unauthorized_result_count: int = Field(ge=0)
-    locator_accuracy: float = Field(ge=0, le=1)
-    latest_version_accuracy: float = Field(ge=0, le=1)
-    stale_warning_rate: float = Field(ge=0, le=1)
+    locator_accuracy: float | None = Field(default=None, ge=0, le=1)
+    latest_version_accuracy: float | None = Field(default=None, ge=0, le=1)
+    stale_warning_rate: float | None = Field(default=None, ge=0, le=1)

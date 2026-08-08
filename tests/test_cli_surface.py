@@ -1,3 +1,5 @@
+import json
+import shutil
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -20,7 +22,17 @@ def test_cli_exposes_agent_and_application_compatibility_commands():
     runner = CliRunner()
     result = runner.invoke(app, ["--help"], env=_env())
     assert result.exit_code == 0
-    for command in ["doctor", "sync", "xlsx-read", "projection", "export", "explain", "evaluate"]:
+    for command in [
+        "doctor",
+        "sync",
+        "xlsx-read",
+        "projection",
+        "export",
+        "explain",
+        "evaluate",
+        "quality",
+        "ontology",
+    ]:
         assert command in result.stdout
 
 
@@ -34,6 +46,18 @@ def test_source_neutral_sync_run_supports_dry_run():
     assert result.exit_code == 0, result.stdout
     assert '"ok": true' in result.stdout
     assert '"source": "sample"' in result.stdout
+
+
+def test_answer_command_returns_versioned_evidence_response() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["answer", "참여율 변경"], env=_env())
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["schema_version"] == "kip.envelope.v1"
+    assert payload["data"]["schema_version"] == "kip.answer.v1"
+    assert "citations" in payload["data"]
 
 
 def test_projection_and_export_command_groups_are_stable(tmp_path: Path):
@@ -112,3 +136,128 @@ cases:
     assert executed.exit_code == 0, executed.stdout
     assert '"ok": true' in executed.stdout
     assert (output / "latest.json").is_file()
+
+
+def test_quality_commands_validate_and_recommend_without_activation(tmp_path: Path) -> None:
+    # Given a pinned experiment and matching evaluation report
+    manifest = ROOT / "evaluation/experiments/example.yaml"
+    metrics = {
+        "case_count": 2,
+        "failed_case_count": 0,
+        "recall_at_k": 1.0,
+        "mrr": 1.0,
+        "ndcg_at_k": 1.0,
+        "zero_result_rate": 0.0,
+        "unauthorized_result_count": 0,
+        "locator_accuracy": 1.0,
+        "latest_version_accuracy": 1.0,
+        "stale_warning_rate": 1.0,
+    }
+    report = tmp_path / "report.json"
+    report.write_text(
+        json.dumps(
+            {
+                "schema_version": "kip.evaluation-report.v1",
+                "fingerprints": {
+                    "corpus": "sha256:replace-with-corpus-fingerprint",
+                    "dataset": "sha256:replace-with-dataset-fingerprint",
+                    "configuration": "sha256:replace-with-configuration-fingerprint",
+                    "code": "sha256:replace-with-code-fingerprint",
+                },
+                "variants": {
+                    name: {
+                        "metrics": metrics,
+                        "latency_ms": {"p50": 10.0, "p95": 20.0, "max": 30.0},
+                        "categories": {"semantic": metrics, "exact": metrics},
+                    }
+                    for name in ("hybrid", "reranked")
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+
+    # When the operator validates and evaluates the experiment
+    validated = runner.invoke(
+        app,
+        ["quality", "validate-manifest", "--manifest", str(manifest)],
+        env=_env(),
+    )
+    recommended = runner.invoke(
+        app,
+        [
+            "quality",
+            "recommend",
+            "--manifest",
+            str(manifest),
+            "--report",
+            str(report),
+        ],
+        env=_env(),
+    )
+
+    # Then both surfaces emit stable envelopes and only recommend promotion
+    assert validated.exit_code == 0, validated.stdout
+    assert json.loads(validated.stdout)["data"]["schema_version"] == "kip.quality-experiment.v1"
+    assert recommended.exit_code == 0, recommended.stdout
+    payload = json.loads(recommended.stdout)
+    assert payload["data"]["status"] == "promote"
+
+
+def test_quality_validation_does_not_initialize_optional_model_clients(tmp_path: Path) -> None:
+    # Given a valid manifest and an unusable inherited SOCKS proxy
+    manifest = ROOT / "evaluation/experiments/example.yaml"
+    config = tmp_path / "models-enabled.toml"
+    config.write_text(
+        (ROOT / "config/kip.example.toml")
+        .read_text(encoding="utf-8")
+        .replace("enabled = false", "enabled = true"),
+        encoding="utf-8",
+    )
+    environment = {**_env(), "ALL_PROXY": "socks5h://127.0.0.1:1"}
+
+    # When the model-independent quality command runs
+    result = CliRunner().invoke(
+        app,
+        [
+            "--config",
+            str(config),
+            "quality",
+            "validate-manifest",
+            "--manifest",
+            str(manifest),
+        ],
+        env=environment,
+    )
+
+    # Then optional embedding and reranker clients are not constructed
+    assert result.exit_code == 0, result.stdout
+    assert json.loads(result.stdout)["ok"] is True
+
+
+def test_ontology_commands_validate_and_diff_releases(tmp_path: Path) -> None:
+    # Given two identical valid ontology releases
+    before = tmp_path / "before"
+    after = tmp_path / "after"
+    shutil.copytree(ROOT / "ontology", before)
+    shutil.copytree(ROOT / "ontology", after)
+    runner = CliRunner()
+
+    # When the operator validates and compares them
+    validated = runner.invoke(
+        app,
+        ["ontology", "validate", "--root", str(before)],
+        env=_env(),
+    )
+    compared = runner.invoke(
+        app,
+        ["ontology", "diff", "--before", str(before), "--after", str(after)],
+        env=_env(),
+    )
+
+    # Then compatibility is exposed through versioned JSON
+    assert validated.exit_code == 0, validated.stdout
+    assert json.loads(validated.stdout)["data"]["version"] == "core/1.0.0"
+    assert compared.exit_code == 0, compared.stdout
+    assert json.loads(compared.stdout)["data"]["classification"] == "compatible"

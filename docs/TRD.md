@@ -4917,6 +4917,7 @@ All of the following must pass:
 | ADR-008 | XLSX uses shallow-all/deep-candidate retrieval | Accepted |
 | ADR-009 | HWP uses parser broker and paired-PDF evidence | Accepted |
 | ADR-010 | Source revisions are immutable | Accepted |
+| ADR-017 | hwp-hwpx-parser is the native HWP primary with broker fallback | Accepted |
 | ADR-011 | CLI/JSON is the baseline agent interface | Accepted |
 | ADR-012 | Frontend, REST, and MCP are optional edge adapters | Accepted |
 | ADR-013 | Slack and mail ACLs propagate to all derived knowledge | Accepted |

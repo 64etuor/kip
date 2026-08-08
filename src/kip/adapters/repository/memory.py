@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 from collections import deque
+from collections.abc import Sequence
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
@@ -423,13 +424,18 @@ class MemoryRepository:
         items.sort(key=lambda item: (-item.document_frequency, -item.corpus_frequency, item.term))
         return items[:limit]
 
+    def get_content_units(self, context: RequestContext, unit_ids: Sequence[str]) -> list[ContentUnit]:
+        units: list[ContentUnit] = []
+        allowed_scopes = set(context.acl_scopes)
+        for unit_id in unit_ids:
+            unit = self.units.get(unit_id)
+            if not unit or (unit.acl_scopes and not set(unit.acl_scopes).issubset(allowed_scopes)):
+                raise NotFoundError(f"content unit not found: {unit_id}")
+            units.append(unit.model_copy(deep=True))
+        return units
+
     def get_content_unit(self, context: RequestContext, unit_id: str) -> ContentUnit:
-        unit = self.units.get(unit_id)
-        if not unit:
-            raise NotFoundError(f"content unit not found: {unit_id}")
-        if unit.acl_scopes and not set(unit.acl_scopes).issubset(set(context.acl_scopes)):
-            raise NotFoundError(f"content unit not found: {unit_id}")
-        return unit.model_copy(deep=True)
+        return self.get_content_units(context, [unit_id])[0]
 
     def get_artifact(self, context: RequestContext, artifact_id: str) -> ArtifactView:
         view = self.artifacts.get(artifact_id)

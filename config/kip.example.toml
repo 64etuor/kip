@@ -52,9 +52,15 @@ space_name = "qwen3-embedding-0.6b-1024"
 
 [models.reranker]
 enabled = false
+# Set backend = "huggingface" to run the optional pinned Jina adapter locally.
+backend = "http"
 base_url = "http://127.0.0.1:7997"
 model = "kip-bge-reranker-v2-m3"
 revision = "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
+# model = "jinaai/jina-reranker-v2-base-multilingual"
+# revision = "9cfeff2df7d40d1b78e75e5e9cebec92a99813c9"
+# max_length = 1024
+# device = "mps"
 timeout_seconds = 120
 
 [graph]
@@ -68,7 +74,11 @@ minimum_quality_score = 0.70
 shadow_parse_critical_documents = true
 
 [parsers.hwp]
-order = ["kordoc", "unhwp", "paired_pdf"]
+order = ["hwp-hwpx-parser", "kordoc", "unhwp", "paired_pdf"]
+
+[parsers.hwp.hwp-hwpx-parser]
+enabled = true
+max_chars_per_unit = 4000
 
 [parsers.hwp.kordoc]
 enabled = true
@@ -84,7 +94,7 @@ root = "./sample-data"
 enabled = true
 read_only = true
 settle_seconds = 2
-include_extensions = [".md", ".txt", ".pdf", ".xlsx", ".hwp", ".hwpx", ".docx", ".csv"]
+include_extensions = [".md", ".txt", ".pdf", ".xlsx", ".xlsm", ".hwp", ".hwpx", ".docx", ".csv"]
 exclude_globs = ["**/.DS_Store", "**/~$*", "**/.~lock.*"]
 acl_scope = "workspace:default"
 

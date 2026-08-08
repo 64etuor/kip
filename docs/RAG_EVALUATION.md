@@ -7,6 +7,10 @@ hybrid, and BGE reranking paths are operational and remain available as a
 complete shadow projection, but this public pilot does not prove a quality gain
 over the corrected PostgreSQL lexical path.
 
+The latest loaded-corpus audit, including the corrected unmeasured-metric
+semantics and all four retrieval variants, is
+[`RAG_QUALITY_AUDIT_2026-08-06.md`](RAG_QUALITY_AUDIT_2026-08-06.md).
+
 ## Reproducible pilot
 
 - Hardware: Apple Silicon M4 Pro, arm64, 24 GB unified memory
@@ -51,6 +55,50 @@ warmup pass per variant. The final warmed steady-state P95 is 1095.22 ms and
 passes the two-second gate. Reranking still did not improve quality over
 lexical, so the promotion decision remains `keep_disabled`.
 
+## Jina Hugging Face trial: 2026-08-06
+
+The optional local backend is configured with a pinned Jina v2 revision:
+
+```toml
+[models.reranker]
+enabled = true
+backend = "huggingface"
+model = "jinaai/jina-reranker-v2-base-multilingual"
+revision = "9cfeff2df7d40d1b78e75e5e9cebec92a99813c9"
+max_length = 1024
+device = "mps"
+```
+
+Install it with `uv sync --extra semantic` (or include `semantic` in the
+`all` extra). The adapter is deliberately opt-in and uses the model's pinned
+Transformers remote-code API. Review the model's `CC BY-NC 4.0` license before
+any production or commercial deployment.
+
+The fresh trial synced six PDFs into 70 current content units and evaluated
+all 36 public-government cases after one untimed warmup pass. The Jina model
+was exercised through the local Infinity sidecar for the full scorecard and
+directly through the Hugging Face adapter in a service-level smoke test.
+
+| Variant | Recall@10 | MRR | nDCG@10 | P95 ms | ACL leaks |
+|---|---:|---:|---:|---:|---:|
+| lexical | 1.000 | 0.986 | 0.990 | 9.04 | 0 |
+| hybrid | 1.000 | 0.986 | 0.990 | 55.98 | 0 |
+| Jina reranked | 0.972 | 0.972 | 0.972 | 613.31 | 0 |
+
+`kip evaluate compare --baseline lexical --candidate reranked` returned
+`keep_disabled`: overall recall delta `-0.0278`, semantic recall delta
+`-0.0833`, exact regression `0.0000`; ACL, stale-source, and latency gates
+passed. The failing case was `GOV-HI-005`, where Jina ranked the related
+integrated-care document above the health-insurance document containing the
+expected numeric expansion target. The report and decision artifact are
+`evaluation/reports/jina-reranker-v2/latest.json` and
+`evaluation/reports/jina-reranker-v2/decision.json`; the direct adapter smoke
+is recorded in `evaluation/reports/jina-reranker-v2/huggingface-smoke.json`.
+
+The result is a useful improvement in experimentability, not a quality
+promotion: lexical remains the active default for this corpus until a larger,
+harder internal golden set produces a gate-passing candidate.
+
 ## Commands
 
 ```bash
@@ -81,3 +129,56 @@ set with explicitly allowlisted internal documents, confusing near-duplicates,
 tables, document revisions, stale-source cases, and harder paraphrases. Add
 HNSW only when exact pgvector latency is measured to be insufficient at the
 real corpus size.
+
+## Quality control plane
+
+Candidate comparisons are now declared with a versioned manifest rather than
+an informal configuration change. The manifest pins the candidate component,
+adapter, package or model revision, dataset, corpus, configuration, code
+fingerprints, category coverage, latency ceiling, and evidence metrics.
+
+```bash
+./scripts/kip quality validate-manifest \
+  --manifest evaluation/experiments/example.yaml
+
+./scripts/kip quality recommend \
+  --manifest evaluation/experiments/example.yaml \
+  --report evaluation/reports/CANDIDATE/latest.json
+```
+
+`quality recommend` is deliberately read-only. It emits
+`kip.quality-recommendation.v1` with machine-readable gates and either
+`promote` or `keep_disabled`; it never activates a parser, embedding space, or
+reranker. The operator must run the existing atomic activation surface after
+reviewing the report.
+
+Reviewed answer annotations use `kip.answer-review.v1`. Deterministic metrics
+cover grounded claims, expected-claim completeness, citation locator
+correctness, unsupported claim count, and safe refusal. A dimension without
+review annotations is `null`, not a passing score. LLM-as-judge may be added as
+a shadow adapter, but it cannot create canonical truth or auto-promote a
+candidate.
+
+Production telemetry is not automatically added to the golden set. A failed
+query enters `golden`, `challenge`, or `canary` only after a reviewer records
+the expected document/evidence, principal, ACL scopes, and source revision.
+That change produces a new dataset fingerprint and invalidates stale
+recommendations.
+
+## Ontology release evaluation
+
+Compare complete release roots before activating a new meaning contract:
+
+```bash
+./scripts/kip ontology validate --root ontology
+./scripts/kip ontology diff \
+  --before /path/to/ontology-1.0.0 \
+  --after /path/to/ontology-1.1.0
+```
+
+Additions are compatible. Domain/range widening and policy tightening require
+review. Symbol removal, parent changes, domain/range narrowing, and risk or
+review weakening are breaking. Breaking changes require a reviewed
+`kip.ontology-migration.v1` manifest passed with `--migration`; uncovered or
+invalid symbols fail closed. Migration creates target-version candidates and
+never rewrites approved assertions in place.

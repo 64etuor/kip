@@ -26,6 +26,7 @@ def _report() -> dict:
             "lexical": {
                 "metrics": {
                     "case_count": 2,
+                    "failed_case_count": 0,
                     "recall_at_k": 0.5,
                     "mrr": 0.5,
                     "ndcg_at_k": 0.5,

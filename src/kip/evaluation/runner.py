@@ -14,6 +14,7 @@ from typing import Any
 import yaml
 
 from kip.domain.models import SearchHit
+from kip.errors import ValidationError
 from kip.evaluation.metrics import (
     deduplicate_ranked_documents,
     forbidden_document_count,
@@ -42,7 +43,7 @@ def load_dataset(path: Path) -> GoldenDataset:
 def _code_fingerprint(root: Path) -> str:
     digest = hashlib.sha256()
     paths: list[Path] = []
-    for relative in ("src/kip", "migrations", "pyproject.toml"):
+    for relative in ("src/kip", "migrations", "pyproject.toml", "uv.lock"):
         candidate = root / relative
         if candidate.is_file():
             paths.append(candidate)
@@ -59,6 +60,14 @@ def _code_fingerprint(root: Path) -> str:
 def _configuration_fingerprint(configuration: dict[str, Any]) -> str:
     payload = json.dumps(configuration, ensure_ascii=False, sort_keys=True, default=str).encode()
     return _sha256(payload)
+
+
+def code_fingerprint(root: Path) -> str:
+    return _code_fingerprint(root)
+
+
+def configuration_fingerprint(configuration: dict[str, Any]) -> str:
+    return _configuration_fingerprint(configuration)
 
 
 def _case_result(case: GoldenCase, hits: list[SearchHit], latency_ms: float) -> CaseMetrics:
@@ -128,9 +137,9 @@ def _failed_case(case: GoldenCase, error: Exception, latency_ms: float) -> CaseM
     )
 
 
-def _average_optional(results: Sequence[CaseMetrics], field: str) -> float:
+def _average_optional(results: Sequence[CaseMetrics], field: str) -> float | None:
     values = [getattr(result, field) for result in results if getattr(result, field) is not None]
-    return fmean(values) if values else 1.0
+    return fmean(values) if values else None
 
 
 def _aggregate(results: Sequence[CaseMetrics]) -> AggregateMetrics:
@@ -138,17 +147,16 @@ def _aggregate(results: Sequence[CaseMetrics]) -> AggregateMetrics:
     if not count:
         return AggregateMetrics(
             case_count=0,
+            failed_case_count=0,
             recall_at_k=0,
             mrr=0,
             ndcg_at_k=0,
             zero_result_rate=0,
             unauthorized_result_count=0,
-            locator_accuracy=1,
-            latest_version_accuracy=1,
-            stale_warning_rate=1,
         )
     return AggregateMetrics(
         case_count=count,
+        failed_case_count=sum(result.error is not None for result in results),
         recall_at_k=fmean(result.recall_at_k for result in results),
         mrr=fmean(result.reciprocal_rank for result in results),
         ndcg_at_k=fmean(result.ndcg_at_k for result in results),
@@ -295,7 +303,8 @@ def compare_variants(
         for name in category_names
         if "semantic" in name or "paraphrase" in name
     ]
-    semantic_delta = max(semantic_deltas, default=0.0)
+    semantic_delta = fmean(semantic_deltas) if semantic_deltas else 0.0
+    worst_semantic_delta = min(semantic_deltas, default=0.0)
     exact_deltas = [
         candidate_result["categories"][name]["recall_at_k"]
         - baseline_result["categories"][name]["recall_at_k"]
@@ -315,6 +324,11 @@ def compare_variants(
             "threshold": 0.10,
             "passed": semantic_delta >= 0.10,
         },
+        "semantic_regression": {
+            "value": worst_semantic_delta,
+            "minimum": -0.01,
+            "passed": worst_semantic_delta >= -0.01,
+        },
         "exact_regression": {
             "value": exact_delta,
             "minimum": -0.01,
@@ -331,9 +345,14 @@ def compare_variants(
             "passed": candidate_result["latency_ms"]["p95"] <= 2000.0,
         },
         "stale_warning_rate": {
-            "value": candidate_metrics.get("stale_warning_rate", 1.0),
+            "value": candidate_metrics.get("stale_warning_rate"),
             "minimum": 1.0,
-            "passed": candidate_metrics.get("stale_warning_rate", 1.0) >= 1.0,
+            "passed": candidate_metrics.get("stale_warning_rate") == 1.0,
+        },
+        "failed_cases": {
+            "value": candidate_metrics.get("failed_case_count", 0),
+            "maximum": 0,
+            "passed": candidate_metrics.get("failed_case_count", 0) == 0,
         },
     }
     quality_improved = (
@@ -344,9 +363,11 @@ def compare_variants(
         gates[name]["passed"]
         for name in (
             "exact_regression",
+            "semantic_regression",
             "unauthorized_results",
             "latency_p95_ms",
             "stale_warning_rate",
+            "failed_cases",
         )
     )
     promoted = quality_improved and mandatory
@@ -371,3 +392,25 @@ def compare_variants(
             "reasons": reasons,
         },
     }
+
+
+def validate_activation_report(
+    report: dict[str, Any],
+    *,
+    candidate: str,
+    configuration: dict[str, Any],
+    code_root: Path,
+) -> dict[str, Any]:
+    if report.get("schema_version") != "kip.evaluation-report.v1":
+        raise ValidationError("activation requires a kip.evaluation-report.v1 report")
+    if candidate not in {"vector", "hybrid", "reranked"}:
+        raise ValidationError("activation candidate must be vector, hybrid, or reranked")
+    fingerprints = report.get("fingerprints", {})
+    if fingerprints.get("configuration") != configuration_fingerprint(configuration):
+        raise ValidationError("evaluation configuration fingerprint does not match current settings")
+    if fingerprints.get("code") != code_fingerprint(code_root):
+        raise ValidationError("evaluation code fingerprint does not match current code")
+    decision = compare_variants(report, "lexical", candidate)
+    if decision["decision"]["status"] != "promote":
+        raise ValidationError(f"evaluation report does not promote {candidate}")
+    return decision

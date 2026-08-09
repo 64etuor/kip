@@ -1,0 +1,161 @@
+contracts/ontology-mining-submission.schema.json
+  s_41856199ee83ad::t_fc310b0caab0bf 1-19
+src/kip/domain/generation.py
+  s_41856199ee83ad::t_fc0f4433b52adb 3,84-87,89-93
+  s_41856199ee83ad::t_66857afa3aa3f3 88
+  s_80cdafa7f5ecd2::t_fba51288ce5b4f 94-98
+src/kip/worker.py
+  s_41856199ee83ad::t_c7d4e5b9c7d343 41-47,49-51
+  s_41856199ee83ad::t_564e33ec048960 7-8,10,48,55-75
+  s_41856199ee83ad::t_c055bef3f0eefa 76-77
+tests/test_ontology_mining_workflow.py
+  s_41856199ee83ad::t_ac8451e37ddd98 1-245
+contracts/structured-generation-result.schema.json
+  s_41856199ee83ad::t_fc310b0caab0bf 1-91
+contracts/relation-mining-result.schema.json
+  s_41856199ee83ad::t_fc310b0caab0bf 1-228
+contracts/ontology-mining-summary.schema.json
+  s_41856199ee83ad::t_fc310b0caab0bf 1-465
+docs/OPERATIONS.md
+  s_41856199ee83ad::t_9d37f25e8792b5 36-56
+contracts/entity-candidate.schema.json
+  s_41856199ee83ad::t_fc310b0caab0bf 1-204
+docs/adr/ADR-025-reviewed-ontology-mining-jobs.md
+  s_41856199ee83ad::t_9d37f25e8792b5 1-44
+src/kip/adapters/generators/anthropic.py
+  s_41856199ee83ad::t_72dd7d3ed0785d 22,176-180
+  s_41856199ee83ad::t_a091a1b8567ee2 18-21,23-25,61-68,70-86,90,95,174-175
+  s_41856199ee83ad::t_66857afa3aa3f3 69,104
+docs/SECURITY.md
+  s_41856199ee83ad::t_9d37f25e8792b5 41-44,69-72
+migrations/0010_entity_candidates.sql
+  s_41856199ee83ad::t_7fb22f19f45525 1-92
+src/kip/adapters/repository/postgres/database.py
+  s_41856199ee83ad::t_698a4901363c07 20-26,1564-1576,1581,1583-1618,1635,1642-1677,1694,1701-1714,1731,1738-1754,1771-1773,1781-1798,1815-1816,1823-1840,1845,1847-1960,1977-1978,1987-2011
+  s_41856199ee83ad::t_6d5ef65943a714 2036-2051,2053-2058,2116-2136,2223-2251,2259-2284,2314-2340,2362-2365,2368-2372,2449-2464,2467-2474
+  s_41856199ee83ad::t_b8129194e30bd7 1577-1580,1582,1619-1634,1636-1641,1678-1693,1695-1700,1715-1730,1732-1737,1755-1770,1774-1780,1799-1814,1817-1822,1841-1844,1846,1961-1976,1979-1986
+  s_41856199ee83ad::t_70a6aa4cb3dced 1526-1534,1552-1555,1559
+  s_80cdafa7f5ecd2::t_6a2ecdfd1db89f 2012
+tests/test_ontology_rag_cli.py
+  s_41856199ee83ad::t_b40d44e2a55410 49,63
+  s_41856199ee83ad::t_84b6d8711f8935 62
+  s_41856199ee83ad::t_ff34e4ff54fea6 1-48,50-61,64-65
+sdk/python/kip_client.py
+  s_41856199ee83ad::t_a86343bedfa991 162-266
+src/kip/ports/generation.py
+  s_41856199ee83ad::t_fc0f4433b52adb 5-10,20-24
+scripts/generate_contracts.py
+  s_41856199ee83ad::t_3759767296023c 23-24,27,29-30,52-53,101-102,104-108
+contracts/openapi.json
+  s_41856199ee83ad::t_fc310b0caab0bf 424-503,1273-1813
+tests/test_relation_miner_contract.py
+  s_41856199ee83ad::t_ff34e4ff54fea6 1-117,119-218
+  s_41856199ee83ad::t_66857afa3aa3f3 118
+src/kip/domain/knowledge.py
+  s_41856199ee83ad::t_2f4a44e181b406 12-17,121-190,193-202,206-233
+  s_41856199ee83ad::t_8e1a9e6942af7f 191-192,203-205,290-299
+  s_41856199ee83ad::t_d6de8a13d94b4b 234-235
+config/kip.example.toml
+  s_41856199ee83ad::t_9d37f25e8792b5 107-113
+docs/DATA_CONTRACTS.md
+  s_41856199ee83ad::t_9d37f25e8792b5 62-63,71-83
+  s_41856199ee83ad::t_da4163dbe4b0d2 84
+src/kip/ports/knowledge.py
+  s_41856199ee83ad::t_8e1a9e6942af7f 5,37-76
+  s_41856199ee83ad::t_c37a083d550669 77
+src/kip/cli.py
+  s_41856199ee83ad::t_1247f332cfb24c 10,80,988-1094
+  s_80cdafa7f5ecd2::t_8320602f339c94 1095-1096
+src/kip/adapters/repository/memory/state.py
+  s_41856199ee83ad::t_8e1a9e6942af7f 5,27-28
+src/kip/mcp_server.py
+  s_41856199ee83ad::t_ea3f5af7190354 7,102-207
+  s_80cdafa7f5ecd2::t_5b995ee44f77c9 208
+docs/IMPLEMENTATION_STATUS.md
+  s_41856199ee83ad::t_9d37f25e8792b5 32,60-62
+src/kip/adapters/relation_miners/__init__.py
+  s_41856199ee83ad::t_f2d9c8b5d1778f 1-3
+src/kip/domain/models.py
+  s_41856199ee83ad::t_d72ff9888438ca 11-15,360-366
+  s_41856199ee83ad::t_f9b9c9b04506f9 369-372
+  s_80cdafa7f5ecd2::t_bd84a560b1b041 367-368
+src/kip/container.py
+  s_41856199ee83ad::t_b6b7e205e35b1c 180-184
+  s_41856199ee83ad::t_98cc031c0b2180 52,66,76,176-179,185-196,234-264,274,446-464
+  s_41856199ee83ad::t_94e2fffeaf9977 17
+src/kip/ontology.py
+  s_41856199ee83ad::t_f2d9c8b5d1778f 233-248
+contracts/relation-mining-request.schema.json
+  s_41856199ee83ad::t_fc310b0caab0bf 1-136
+src/kip/ports/relation_miner.py
+  s_41856199ee83ad::t_f2d9c8b5d1778f 5,13
+src/kip/adapters/repository/postgres/knowledge.py
+  s_41856199ee83ad::t_698a4901363c07 6,44-102
+  s_03506c0be5fcc9::t_57c45270ecfe5d 103
+src/kip/application/ontology_rag.py
+  s_41856199ee83ad::t_68a6e676da4260 268-278,473-481
+  s_41856199ee83ad::t_564e33ec048960 9,169-173,187-204,208
+  s_41856199ee83ad::t_d72ff9888438ca 4,6,8,12,14-15,17,22-28,32,34,43-50,55-61,114-168,174-185,205-207,209-267,279-352,450-454,461-472
+  s_41856199ee83ad::t_72dd7d3ed0785d 186
+contracts/structured-generation-request.schema.json
+  s_41856199ee83ad::t_fc310b0caab0bf 1-41
+tests/test_sdk_client.py
+  s_41856199ee83ad::t_a90cbd04c25deb 60-86
+tests/test_api.py
+  s_41856199ee83ad::t_a90cbd04c25deb 285-287,297-330
+  s_41856199ee83ad::t_e0905cfaa25c04 2,9,288-296
+src/kip/adapters/generators/openai_compatible.py
+  s_41856199ee83ad::t_c16bc05220863d 18-21,23-25,62-69,71-87,96,101,110,180-181
+  s_41856199ee83ad::t_66857afa3aa3f3 70,111
+  s_41856199ee83ad::t_72dd7d3ed0785d 22,182-186
+src/kip/adapters/relation_miners/generator.py
+  s_41856199ee83ad::t_f2d9c8b5d1778f 1-95,101-105,108-228
+  s_41856199ee83ad::t_13867b33fe75f7 96-100,106-107
+src/kip/adapters/repository/memory/knowledge.py
+  s_41856199ee83ad::t_f8965edaf01b1a 14,50
+  s_41856199ee83ad::t_8e1a9e6942af7f 10,12-13,15-16,89-198,260-264,278,470-473,475-485,487-495
+  s_41856199ee83ad::t_7677aa7588d18c 11,474,486
+  s_41856199ee83ad::t_b7a3f55cc041ce 208-215,238-243,249,288,319-325,336,339-347
+  s_80cdafa7f5ecd2::t_e7fcf706c337aa 199
+contracts/openapi.yaml
+  s_41856199ee83ad::t_fc310b0caab0bf 667-970,1466-1526
+tests/integration/test_postgres_repository.py
+  s_41856199ee83ad::t_cd11542ea310db 3,15-24,191-244,250-254,259-266
+  s_41856199ee83ad::t_759413e99b05c9 245-249,255-258
+  s_80cdafa7f5ecd2::t_a1330f4aa3d081 267
+src/kip/api.py
+  s_41856199ee83ad::t_f9b9c9b04506f9 13,23,324-424
+  s_80cdafa7f5ecd2::t_64c8f54214e1ff 425
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "a7324e37d18f582455a4d0ef5e4753a1d1e1711f",
+  "prompts": {},
+  "sessions": {
+    "s_03506c0be5fcc9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe45d-d747-77b2-a41f-9b77d2b510d0",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_80cdafa7f5ecd2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe564-ad79-7650-a2dc-053afe41b9ca",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

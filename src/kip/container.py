@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import assert_never
 
+from kip.adapters.connectors.registry import ConfiguredSourceCatalog
 from kip.adapters.embeddings.http import HttpEmbeddingAdapter
 from kip.adapters.embeddings.noop import DisabledEmbeddingAdapter
 from kip.adapters.parsers.registry import ParserRegistry
@@ -14,19 +15,30 @@ from kip.adapters.rerankers.huggingface import (
     RerankerBackend,
     parse_reranker_backend,
 )
+from kip.adapters.storage import (
+    LocalContentAddressedStore,
+    LocalSourceFileInspector,
+    LocalWorkbookReader,
+)
 from kip.application.analyzer import KoreanNgramAnalyzer
-from kip.application.services import KnowledgeService
+from kip.application.evidence import EvidenceUseCases
+from kip.application.ingestion import IngestionUseCases
+from kip.application.knowledge import KnowledgeUseCases
+from kip.application.operations import OperationsUseCases
+from kip.application.runtime import Application
+from kip.application.search import RetrievalUseCases
+from kip.ontology import OntologyCatalog
 from kip.ports.embedding import EmbeddingPort
 from kip.ports.repository import RepositoryPort
 from kip.ports.reranker import RerankerPort
 from kip.settings import Settings
 
 
-@dataclass(slots=True)
+@dataclass(frozen=True, slots=True)
 class Container:
     settings: Settings
     repository: RepositoryPort
-    service: KnowledgeService
+    application: Application
     embedding: EmbeddingPort
     reranker: RerankerPort | None
 
@@ -40,15 +52,19 @@ def build_container(
     load_models: bool = True,
 ) -> Container:
     selected = settings or Settings.load()
-    if repository is None:
-        if selected.is_memory:
-            repository = MemoryRepository()
-        else:
-            repository = PostgresRepository(
-                selected.database_url,
-                statement_timeout_ms=int(selected.get("database.statement_timeout_ms", 15000)),
-            )
+    if repository is not None:
+        selected_repository = repository
+    elif selected.is_memory:
+        selected_repository = MemoryRepository()
+    else:
+        selected_repository = PostgresRepository(
+            selected.database_url,
+            statement_timeout_ms=int(
+                selected.get("database.statement_timeout_ms", 15000)
+            ),
+        )
     parsers = ParserRegistry.from_settings(selected)
+    sources = ConfiguredSourceCatalog(selected)
     analyzer = KoreanNgramAnalyzer(
         min_n=int(selected.get("search.korean_ngram_min", 2)),
         max_n=int(selected.get("search.korean_ngram_max", 4)),
@@ -96,18 +112,51 @@ def build_container(
                 )
             case unreachable:
                 assert_never(unreachable)
-    service = KnowledgeService(
+    selected.cas_path.mkdir(parents=True, exist_ok=True)
+    evidence = EvidenceUseCases(
+        selected_repository,
+        LocalSourceFileInspector(),
+        LocalWorkbookReader(),
+    )
+    retrieval = RetrievalUseCases(
         selected,
-        repository,
-        parsers,
+        selected_repository,
+        selected_repository,
+        evidence,
         analyzer,
         selected_embedding,
         selected_reranker,
     )
+    ontology_root = selected.project_root / "ontology"
+    ontology = (
+        OntologyCatalog.load(ontology_root) if ontology_root.is_dir() else None
+    )
+    application = Application(
+        ingestion=IngestionUseCases(
+            selected_repository,
+            selected_repository,
+            sources,
+            parsers,
+            analyzer,
+            LocalContentAddressedStore(selected.cas_path),
+        ),
+        retrieval=retrieval,
+        evidence=evidence,
+        knowledge=KnowledgeUseCases(selected_repository, evidence, ontology),
+        operations=OperationsUseCases(
+            selected,
+            selected_repository,
+            selected_repository,
+            selected_repository,
+            sources,
+            parsers,
+            selected_embedding,
+        ),
+    )
     return Container(
         settings=selected,
-        repository=repository,
-        service=service,
+        repository=selected_repository,
+        application=application,
         embedding=selected_embedding,
         reranker=selected_reranker,
     )

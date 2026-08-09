@@ -22,11 +22,11 @@ def test_xlsx_shallow_search_and_deep_range(test_container):
     sheet.append(["인건비", "참여율", "=C2*2"])
     workbook.save(path)
 
-    context = test_container.service.request_context()
-    summary = test_container.service.sync_filesystem(context, "fixture")
+    context = test_container.application.operations.request_context()
+    summary = test_container.application.ingestion.sync_filesystem(context, "fixture")
     assert summary.inserted == 1
 
-    hits = test_container.service.search(context, SearchRequest(query="장비비 카메라", limit=10))
+    hits = test_container.application.retrieval.search(context, SearchRequest(query="장비비 카메라", limit=10))
     assert hits
     unit = test_container.repository.get_content_unit(context, hits[0].unit_id)
     assert unit.unit_type == "xlsx_sheet_shallow"
@@ -34,7 +34,7 @@ def test_xlsx_shallow_search_and_deep_range(test_container):
     assert "890000" not in unit.body
     assert unit.metadata["deep_read_required_for_numbers"] is True
 
-    deep = test_container.service.read_xlsx(
+    deep = test_container.application.evidence.read_xlsx(
         context,
         hits[0].artifact_id,
         sheet="정산",
@@ -87,13 +87,13 @@ def test_xlsm_sync_and_service_deep_read(test_container):
     sheet["B1"] = "=1+2"
     workbook.save(path)
 
-    context = test_container.service.request_context()
-    summary = test_container.service.sync_filesystem(context, "fixture")
+    context = test_container.application.operations.request_context()
+    summary = test_container.application.ingestion.sync_filesystem(context, "fixture")
     assert summary.inserted == 1
 
-    hits = test_container.service.search(context, SearchRequest(query="승인", limit=10))
+    hits = test_container.application.retrieval.search(context, SearchRequest(query="승인", limit=10))
     assert hits
-    deep = test_container.service.read_xlsx(context, hits[0].artifact_id, sheet="MacroSheet", cell_range="A1:B1")
+    deep = test_container.application.evidence.read_xlsx(context, hits[0].artifact_id, sheet="MacroSheet", cell_range="A1:B1")
 
     assert deep.cells[0][1]["value"] == "=1+2"
 

@@ -1,0 +1,162 @@
+from __future__ import annotations
+
+from enum import StrEnum, unique
+
+from kip.application.analyzer import KoreanNgramAnalyzer
+from kip.application.retrieval import apply_rerank, reciprocal_rank_fusion
+from kip.application.semantic import SemanticProjectionUseCases
+from kip.domain.models import RequestContext, SearchHit, SearchRequest
+from kip.errors import DependencyUnavailableError, ValidationError
+from kip.ports.embedding import EmbeddingPort
+from kip.ports.reranker import RerankerPort
+from kip.ports.retrieval import RetrievalStore
+from kip.settings import Settings
+
+
+@unique
+class SearchMode(StrEnum):
+    LEXICAL = "lexical"
+    VECTOR = "vector"
+    HYBRID = "hybrid"
+    RERANKED = "reranked"
+
+
+class SearchEngine:
+    def __init__(
+        self,
+        settings: Settings,
+        store: RetrievalStore,
+        analyzer: KoreanNgramAnalyzer,
+        embedding: EmbeddingPort,
+        semantic: SemanticProjectionUseCases,
+        reranker: RerankerPort | None = None,
+    ) -> None:
+        self._settings = settings
+        self._store = store
+        self._analyzer = analyzer
+        self._embedding = embedding
+        self._semantic = semantic
+        self._reranker = reranker
+
+    def search(
+        self,
+        context: RequestContext,
+        request: SearchRequest,
+        *,
+        mode: str | None = None,
+    ) -> list[SearchHit]:
+        explicit = mode is not None
+        configured_mode = (
+            str(self._settings.get("search.default_mode", "reranked"))
+            if self._settings.get("search.semantic_enabled", False)
+            else SearchMode.LEXICAL.value
+        )
+        raw_mode = mode or configured_mode
+        try:
+            selected_mode = SearchMode(raw_mode)
+        except ValueError as exc:
+            raise ValidationError(f"unsupported search mode: {raw_mode}") from exc
+        lexemes = self._analyzer.analyze(request.query)
+        if selected_mode is SearchMode.LEXICAL:
+            return self._annotate_lexical(
+                self._store.search(context, request, lexemes)
+            )
+
+        candidate_limit = min(
+            100,
+            max(
+                request.limit,
+                int(self._settings.get("search.hybrid_candidate_limit", 40)),
+            ),
+        )
+        candidate_request = request.model_copy(update={"limit": candidate_limit})
+        lexical = self._annotate_lexical(
+            self._store.search(context, candidate_request, lexemes)
+        )
+        try:
+            space = self._semantic.search_space(context, explicit=explicit)
+            vector = self._store.vector_search(
+                context,
+                candidate_request,
+                self._embedding.embed_query(request.query),
+                space_id=space.id,
+                limit=candidate_limit,
+            )
+            if selected_mode is SearchMode.VECTOR:
+                return vector[: request.limit]
+            fused = reciprocal_rank_fusion(
+                lexical,
+                vector,
+                limit=candidate_limit,
+                rank_constant=int(
+                    self._settings.get("search.rrf_rank_constant", 60)
+                ),
+            )
+            if selected_mode is SearchMode.HYBRID:
+                return fused[: request.limit]
+            return self._rerank(context, request, fused)
+        except DependencyUnavailableError:
+            if explicit:
+                raise
+            return [
+                hit.model_copy(
+                    update={
+                        "metadata": {
+                            **hit.metadata,
+                            "semantic_degraded": True,
+                        }
+                    },
+                    deep=True,
+                )
+                for hit in lexical[: request.limit]
+            ]
+
+    def _rerank(
+        self,
+        context: RequestContext,
+        request: SearchRequest,
+        fused: list[SearchHit],
+    ) -> list[SearchHit]:
+        if self._reranker is None:
+            raise DependencyUnavailableError("reranker adapter is disabled")
+        rerank_depth = min(
+            len(fused),
+            int(self._settings.get("search.rerank_candidate_limit", 20)),
+        )
+        rerank_hits = fused[:rerank_depth]
+        rerank_units = {
+            unit.id: unit
+            for unit in self._store.get_content_units(
+                context,
+                [hit.unit_id for hit in rerank_hits],
+            )
+        }
+        documents = [
+            "\n".join(
+                part
+                for part in (
+                    hit.title,
+                    rerank_units[hit.unit_id].body,
+                )
+                if part
+            )
+            for hit in rerank_hits
+        ]
+        scores = self._reranker.rerank(request.query, documents)
+        return apply_rerank(rerank_hits, scores, limit=request.limit)
+
+    @staticmethod
+    def _annotate_lexical(hits: list[SearchHit]) -> list[SearchHit]:
+        return [
+            hit.model_copy(
+                update={
+                    "metadata": {
+                        **hit.metadata,
+                        "retrieval_channels": ["lexical"],
+                        "lexical_rank": rank,
+                    }
+                },
+                deep=True,
+            )
+            for rank, hit in enumerate(hits, start=1)
+        ]

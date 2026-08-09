@@ -62,18 +62,18 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
     repository = PostgresRepository(str(URL))
     container = build_container(settings, repository=repository)
     repository.migrate(settings.project_root / "migrations")
-    context = container.service.request_context(
+    context = container.application.operations.request_context(
         workspace=workspace,
         acl_scopes=[f"workspace:{workspace}"],
     )
     try:
-        summary = container.service.sync_filesystem(context, "fixture")
+        summary = container.application.ingestion.sync_filesystem(context, "fixture")
         assert summary.inserted == 1
-        hits = container.service.search(context, SearchRequest(query="참여율 변경 승인", limit=10))
+        hits = container.application.retrieval.search(context, SearchRequest(query="참여율 변경 승인", limit=10))
         assert hits
         bulk_units = repository.get_content_units(context, [hit.unit_id for hit in hits])
         assert [unit.id for unit in bulk_units] == [hit.unit_id for hit in hits]
-        natural_hits = container.service.search(
+        natural_hits = container.application.retrieval.search(
             context,
             SearchRequest(
                 query="A과제에서 참여 비율을 바꾸는 내용은 언제부터 허가된다고 적혀 있는가?",
@@ -82,7 +82,7 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
         )
         assert natural_hits
         assert natural_hits[0].document_id == hits[0].document_id
-        evidence = container.service.read_unit(context, hits[0].unit_id)
+        evidence = container.application.evidence.read_unit(context, hits[0].unit_id)
         assert evidence.source_changed_since_index is False
 
         embeddable = repository.list_embeddable_units(context)
@@ -127,9 +127,9 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
             ontology_version="core/1.0.0",
             evidence=[{"content_unit_id": hits[0].unit_id}],
         )
-        container.service.create_candidate(context, candidate)
-        assertion = container.service.review_approve(context, candidate.id)
-        explanation = container.service.explain_assertion(context, assertion.id)
+        container.application.knowledge.create_candidate(context, candidate)
+        assertion = container.application.knowledge.review_approve(context, candidate.id)
+        explanation = container.application.knowledge.explain_assertion(context, assertion.id)
         assert explanation.assertion.id == assertion.id
         assert explanation.evidence[0].unit.id == hits[0].unit_id
         edges = repository.graph_neighbors(

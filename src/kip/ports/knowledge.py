@@ -1,0 +1,68 @@
+from __future__ import annotations
+
+from typing import Protocol
+
+from kip.domain.models import (
+    ApprovedAssertion,
+    AssertionCandidate,
+    GraphEdge,
+    GraphNeighborsRequest,
+    GraphPath,
+    GraphPathRequest,
+    RequestContext,
+)
+
+
+class KnowledgeStore(Protocol):
+    def save_candidate(
+        self,
+        context: RequestContext,
+        candidate: AssertionCandidate,
+    ) -> AssertionCandidate: ...
+
+    def get_candidate(
+        self,
+        context: RequestContext,
+        candidate_id: str,
+    ) -> AssertionCandidate: ...
+
+    def list_candidates(
+        self,
+        context: RequestContext,
+        status: str = "proposed",
+        limit: int = 100,
+    ) -> list[AssertionCandidate]: ...
+
+    def approve_candidate(
+        self,
+        context: RequestContext,
+        candidate_id: str,
+        reviewer_id: str,
+        note: str | None = None,
+    ) -> ApprovedAssertion: ...
+
+    def reject_candidate(
+        self,
+        context: RequestContext,
+        candidate_id: str,
+        reviewer_id: str,
+        note: str | None = None,
+    ) -> AssertionCandidate: ...
+
+    def get_assertion(
+        self,
+        context: RequestContext,
+        assertion_id: str,
+    ) -> ApprovedAssertion: ...
+
+    def graph_neighbors(
+        self,
+        context: RequestContext,
+        request: GraphNeighborsRequest,
+    ) -> list[GraphEdge]: ...
+
+    def graph_path(
+        self,
+        context: RequestContext,
+        request: GraphPathRequest,
+    ) -> list[GraphPath]: ...

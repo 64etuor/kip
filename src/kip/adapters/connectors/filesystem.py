@@ -4,20 +4,13 @@ import fnmatch
 import hashlib
 import os
 import time
-from dataclasses import dataclass
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 from kip.errors import SourceUnavailableError, ValidationError
+from kip.ports.ingestion import DiscoveredFile
 
-
-@dataclass(slots=True)
-class FileRecord:
-    path: Path
-    relative_path: str
-    size: int
-    mtime_ns: int
-    sha256: str
+FileRecord = DiscoveredFile
 
 
 class FileSystemConnector:

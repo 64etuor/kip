@@ -6,6 +6,7 @@ import json
 import sys
 from pathlib import Path
 
+from kip.architecture_rules import application_adapter_imports
 from kip.ontology import validate_ontology
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -79,6 +80,14 @@ def main() -> int:
                     root = name.split(".")[0]
                     if root in forbidden_roots:
                         errors.append(f"vendor dependency {name} imported by {path.relative_to(ROOT)}")
+
+    errors.extend(
+        f"concrete adapter imported by application layer: {violation}"
+        for violation in application_adapter_imports(
+            ROOT,
+            ROOT / "src/kip/application",
+        )
+    )
 
     for path in (ROOT / "scripts").glob("*.sh"):
         require(path.stat().st_mode & 0o111 != 0, f"shell script is not executable: {path.relative_to(ROOT)}", errors)

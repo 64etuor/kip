@@ -117,47 +117,47 @@ def create_app(container: Container | None = None) -> FastAPI:
 
     @app.get("/v1/capabilities", response_model=Envelope)
     async def capabilities(context: RequestContext = Depends(authenticated_context)):
-        return ok(selected.service.capabilities(), context)
+        return ok(selected.application.operations.capabilities(), context)
 
     @app.get("/v1/status", response_model=Envelope)
     async def status(context: RequestContext = Depends(authenticated_context)):
-        return ok(selected.repository.status(context), context)
+        return ok(selected.application.operations.status(context), context)
 
     @app.post("/v1/search", response_model=Envelope)
     async def search(payload: SearchRequest, context: RequestContext = Depends(authenticated_context)):
-        return ok(selected.service.search(context, payload), context)
+        return ok(selected.application.retrieval.search(context, payload), context)
 
     @app.post("/v1/context", response_model=Envelope)
     async def context_bundle(payload: ContextRequest, context: RequestContext = Depends(authenticated_context)):
-        return ok(selected.service.context_bundle(context, payload), context)
+        return ok(selected.application.retrieval.context_bundle(context, payload), context)
 
     @app.post("/v1/answer", response_model=Envelope)
     async def answer(payload: AnswerRequest, context: RequestContext = Depends(authenticated_context)):
-        return ok(selected.service.answer(context, payload), context)
+        return ok(selected.application.retrieval.answer(context, payload), context)
 
     @app.get("/v1/vocabulary", response_model=Envelope)
     async def vocabulary(prefix: str, limit: int = 20, context: RequestContext = Depends(authenticated_context)):
-        return ok(selected.service.vocabulary(context, prefix, limit), context)
+        return ok(selected.application.retrieval.vocabulary(context, prefix, limit), context)
 
     @app.get("/v1/units/{unit_id}", response_model=Envelope)
     async def read_unit(unit_id: str, context: RequestContext = Depends(authenticated_context)):
-        return ok(selected.service.read_unit(context, unit_id), context)
+        return ok(selected.application.evidence.read_unit(context, unit_id), context)
 
     @app.get("/v1/artifacts/{artifact_id}", response_model=Envelope)
     async def get_artifact(artifact_id: str, context: RequestContext = Depends(authenticated_context)):
-        return ok(selected.repository.get_artifact(context, artifact_id), context)
+        return ok(selected.application.evidence.get_artifact(context, artifact_id), context)
 
     @app.get("/v1/documents/{document_id}", response_model=Envelope)
     async def get_document(document_id: str, context: RequestContext = Depends(authenticated_context)):
-        return ok(selected.repository.get_document(context, document_id), context)
+        return ok(selected.application.evidence.get_document(context, document_id), context)
 
     @app.get("/v1/assertions/{assertion_id}", response_model=Envelope)
     async def get_assertion(assertion_id: str, context: RequestContext = Depends(authenticated_context)):
-        return ok(selected.repository.get_assertion(context, assertion_id), context)
+        return ok(selected.application.knowledge.get_assertion(context, assertion_id), context)
 
     @app.get("/v1/assertions/{assertion_id}/explain", response_model=Envelope)
     async def explain_assertion(assertion_id: str, context: RequestContext = Depends(authenticated_context)):
-        return ok(selected.service.explain_assertion(context, assertion_id), context)
+        return ok(selected.application.knowledge.explain_assertion(context, assertion_id), context)
 
     @app.get("/v1/xlsx/{artifact_id}/range", response_model=Envelope)
     async def xlsx_range(
@@ -168,7 +168,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         context: RequestContext = Depends(authenticated_context),
     ):
         return ok(
-            selected.service.read_xlsx(
+            selected.application.evidence.read_xlsx(
                 context,
                 artifact_id,
                 sheet=sheet,
@@ -180,11 +180,11 @@ def create_app(container: Container | None = None) -> FastAPI:
 
     @app.post("/v1/graph/neighbors", response_model=Envelope)
     async def graph_neighbors(payload: GraphNeighborsRequest, context: RequestContext = Depends(authenticated_context)):
-        return ok(selected.repository.graph_neighbors(context, payload), context)
+        return ok(selected.application.knowledge.graph_neighbors(context, payload), context)
 
     @app.post("/v1/graph/path", response_model=Envelope)
     async def graph_path(payload: GraphPathRequest, context: RequestContext = Depends(authenticated_context)):
-        return ok(selected.repository.graph_path(context, payload), context)
+        return ok(selected.application.knowledge.graph_path(context, payload), context)
 
     @app.post("/v1/sync/filesystem/{source_name}", response_model=Envelope)
     async def sync_filesystem(
@@ -194,9 +194,9 @@ def create_app(container: Container | None = None) -> FastAPI:
         context: RequestContext = Depends(admin_context),
     ):
         data = (
-            {"job_id": selected.service.enqueue_sync(context, source_name)}
+            {"job_id": selected.application.ingestion.enqueue_sync(context, source_name)}
             if enqueue
-            else selected.service.sync_filesystem(context, source_name, dry_run=dry_run)
+            else selected.application.ingestion.sync_filesystem(context, source_name, dry_run=dry_run)
         )
         return ok(data, context)
 
@@ -205,7 +205,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         source_name: str,
         context: RequestContext = Depends(admin_context),
     ):
-        return ok({"source": source_name, "job_id": selected.service.enqueue_sync(context, source_name)}, context)
+        return ok({"source": source_name, "job_id": selected.application.ingestion.enqueue_sync(context, source_name)}, context)
 
     @app.get("/v1/jobs", response_model=Envelope)
     async def jobs(
@@ -213,11 +213,11 @@ def create_app(container: Container | None = None) -> FastAPI:
         limit: int = 100,
         context: RequestContext = Depends(admin_context),
     ):
-        return ok(selected.repository.list_jobs(context, status, limit), context)
+        return ok(selected.application.operations.list_jobs(context, status, limit), context)
 
     @app.post("/v1/connectors/events", response_model=Envelope)
     async def connector_event(payload: ConnectorEvent, context: RequestContext = Depends(admin_context)):
-        return ok(selected.service.ingest_connector_event(context, payload), context)
+        return ok(selected.application.ingestion.ingest_connector_event(context, payload), context)
 
     @app.get("/v1/review/candidates", response_model=Envelope)
     async def candidates(
@@ -225,19 +225,19 @@ def create_app(container: Container | None = None) -> FastAPI:
         limit: int = 100,
         context: RequestContext = Depends(admin_context),
     ):
-        return ok(selected.repository.list_candidates(context, status, limit), context)
+        return ok(selected.application.knowledge.list_candidates(context, status, limit), context)
 
     @app.get("/v1/review/candidates/{candidate_id}", response_model=Envelope)
     async def candidate(candidate_id: str, context: RequestContext = Depends(admin_context)):
-        return ok(selected.repository.get_candidate(context, candidate_id), context)
+        return ok(selected.application.knowledge.get_candidate(context, candidate_id), context)
 
     @app.post("/v1/review/candidates/{candidate_id}/approve", response_model=Envelope)
     async def approve(candidate_id: str, note: str | None = None, context: RequestContext = Depends(admin_context)):
-        return ok(selected.service.review_approve(context, candidate_id, note), context)
+        return ok(selected.application.knowledge.review_approve(context, candidate_id, note), context)
 
     @app.post("/v1/review/candidates/{candidate_id}/reject", response_model=Envelope)
     async def reject(candidate_id: str, note: str | None = None, context: RequestContext = Depends(admin_context)):
-        return ok(selected.service.review_reject(context, candidate_id, note), context)
+        return ok(selected.application.knowledge.review_reject(context, candidate_id, note), context)
 
     return app
 
@@ -247,7 +247,7 @@ def _context_from_headers(container: Container, request: Request) -> RequestCont
     principal = request.headers.get("X-KIP-Principal") or "principal_api"
     scopes_value = request.headers.get("X-KIP-ACL-Scopes")
     scopes = [item.strip() for item in scopes_value.split(",") if item.strip()] if scopes_value else [f"workspace:{workspace}"]
-    return container.service.request_context(
+    return container.application.operations.request_context(
         workspace=workspace,
         principal_id=principal,
         acl_scopes=scopes,

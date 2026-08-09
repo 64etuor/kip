@@ -115,12 +115,16 @@ def test_default_lexical_mode_makes_no_model_call(
 ) -> None:
     source_root = tmp_path / "source"
     (source_root / "승인.txt").write_text("참여율 변경을 승인한다.", encoding="utf-8")
-    context = test_container.service.request_context()
-    test_container.service.sync_filesystem(context, "fixture")
     embedding = FixtureEmbedding()
-    test_container.service.embedding = embedding
+    container = build_container(
+        test_container.settings,
+        repository=test_container.repository,
+        embedding=embedding,
+    )
+    context = container.application.operations.request_context()
+    container.application.ingestion.sync_filesystem(context, "fixture")
 
-    hits = test_container.service.search(context, SearchRequest(query="승인"))
+    hits = container.application.retrieval.search(context, SearchRequest(query="승인"))
 
     assert hits
     assert embedding.query_calls == 0
@@ -129,17 +133,21 @@ def test_default_lexical_mode_makes_no_model_call(
 def test_embedding_space_identity_ignores_operational_batch_settings(
     test_container,
 ) -> None:
-    context = test_container.service.request_context()
-    test_container.service.embedding = FixtureEmbedding()
+    container = build_container(
+        test_container.settings,
+        repository=test_container.repository,
+        embedding=FixtureEmbedding(),
+    )
+    context = container.application.operations.request_context()
     embedding_config = test_container.settings.raw.setdefault("models", {}).setdefault(
         "embedding", {}
     )
     embedding_config.update({"batch_size": 16, "timeout_seconds": 30})
-    original = test_container.service.embedding_space(context)
+    original = container.application.retrieval.embedding_space(context)
 
     embedding_config["batch_size"] = 1
     embedding_config["timeout_seconds"] = 999
-    changed = test_container.service.embedding_space(context)
+    changed = container.application.retrieval.embedding_space(context)
 
     assert changed.id == original.id
     assert changed.name == original.name
@@ -152,21 +160,25 @@ def test_explicit_hybrid_search_and_reranking_use_shadow_space(
     source_root = tmp_path / "source"
     (source_root / "승인.txt").write_text("참여율 변경을 승인한다.", encoding="utf-8")
     (source_root / "허가.txt").write_text("계약 조건의 수정을 허가한다.", encoding="utf-8")
-    context = test_container.service.request_context()
-    test_container.service.sync_filesystem(context, "fixture")
     embedding = FixtureEmbedding()
     reranker = FixtureReranker()
-    test_container.service.embedding = embedding
-    test_container.service.reranker = reranker
-    rebuild = test_container.service.rebuild_semantic_projection(context)
-    verification = test_container.service.verify_semantic_projection(context)
+    container = build_container(
+        test_container.settings,
+        repository=test_container.repository,
+        embedding=embedding,
+        reranker=reranker,
+    )
+    context = container.application.operations.request_context()
+    container.application.ingestion.sync_filesystem(context, "fixture")
+    rebuild = container.application.retrieval.rebuild_semantic_projection(context)
+    verification = container.application.retrieval.verify_semantic_projection(context)
 
-    hybrid = test_container.service.search(
+    hybrid = container.application.retrieval.search(
         context,
         SearchRequest(query="승인", limit=10),
         mode="hybrid",
     )
-    reranked = test_container.service.search(
+    reranked = container.application.retrieval.search(
         context,
         SearchRequest(query="승인", limit=10),
         mode="reranked",
@@ -193,14 +205,17 @@ def test_reranking_fetches_candidate_units_in_one_repository_call(
     (source_root / "승인.txt").write_text("참여율 변경을 승인한다.", encoding="utf-8")
     (source_root / "허가.txt").write_text("계약 조건의 수정을 허가한다.", encoding="utf-8")
     repository = CountingMemoryRepository()
-    container = build_container(test_container.settings, repository=repository)
-    context = container.service.request_context()
-    container.service.sync_filesystem(context, "fixture")
-    container.service.embedding = FixtureEmbedding()
-    container.service.reranker = FixtureReranker()
-    container.service.rebuild_semantic_projection(context)
+    container = build_container(
+        test_container.settings,
+        repository=repository,
+        embedding=FixtureEmbedding(),
+        reranker=FixtureReranker(),
+    )
+    context = container.application.operations.request_context()
+    container.application.ingestion.sync_filesystem(context, "fixture")
+    container.application.retrieval.rebuild_semantic_projection(context)
 
-    container.service.search(
+    container.application.retrieval.search(
         context,
         SearchRequest(query="승인", limit=10),
         mode="reranked",
@@ -216,21 +231,25 @@ def test_optional_default_mode_falls_back_but_explicit_hybrid_fails(
 ) -> None:
     source_root = tmp_path / "source"
     (source_root / "승인.txt").write_text("참여율 변경을 승인한다.", encoding="utf-8")
-    context = test_container.service.request_context()
-    test_container.service.sync_filesystem(context, "fixture")
     embedding = FailingEmbedding()
-    test_container.service.embedding = embedding
     test_container.settings.raw["search"]["semantic_enabled"] = True
-    space = test_container.service.embedding_space(context)
-    test_container.repository.save_embedding_space(context, space)
-    test_container.repository.activate_embedding_space(context, space.id)
+    container = build_container(
+        test_container.settings,
+        repository=test_container.repository,
+        embedding=embedding,
+    )
+    context = container.application.operations.request_context()
+    container.application.ingestion.sync_filesystem(context, "fixture")
+    space = container.application.retrieval.embedding_space(context)
+    container.repository.save_embedding_space(context, space)
+    container.repository.activate_embedding_space(context, space.id)
 
-    fallback = test_container.service.search(context, SearchRequest(query="승인"))
+    fallback = container.application.retrieval.search(context, SearchRequest(query="승인"))
 
     assert fallback
     assert fallback[0].metadata["semantic_degraded"] is True
     with pytest.raises(DependencyUnavailableError):
-        test_container.service.search(
+        container.application.retrieval.search(
             context,
             SearchRequest(query="승인"),
             mode="hybrid",
@@ -243,16 +262,24 @@ def test_failed_rebuild_does_not_replace_active_space(
 ) -> None:
     source_root = tmp_path / "source"
     (source_root / "승인.txt").write_text("참여율 변경을 승인한다.", encoding="utf-8")
-    context = test_container.service.request_context()
-    test_container.service.sync_filesystem(context, "fixture")
     good = FixtureEmbedding()
-    test_container.service.embedding = good
-    built = test_container.service.rebuild_semantic_projection(context)
-    test_container.repository.activate_embedding_space(context, built["space_id"])
-    test_container.service.embedding = FailingEmbedding()
+    container = build_container(
+        test_container.settings,
+        repository=test_container.repository,
+        embedding=good,
+    )
+    context = container.application.operations.request_context()
+    container.application.ingestion.sync_filesystem(context, "fixture")
+    built = container.application.retrieval.rebuild_semantic_projection(context)
+    container.repository.activate_embedding_space(context, built["space_id"])
+    failing_container = build_container(
+        test_container.settings,
+        repository=test_container.repository,
+        embedding=FailingEmbedding(),
+    )
 
     with pytest.raises(DependencyUnavailableError):
-        test_container.service.rebuild_semantic_projection(context)
+        failing_container.application.retrieval.rebuild_semantic_projection(context)
 
     active = test_container.repository.active_embedding_space(context)
     assert active is not None

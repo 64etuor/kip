@@ -83,7 +83,7 @@ def test_application_rejects_candidate_outside_ontology_contract(tmp_path: Path)
         cas_path=tmp_path / "cas",
     )
     container = build_container(settings, repository=MemoryRepository())
-    context = container.service.request_context()
+    context = container.application.operations.request_context()
     candidate = AssertionCandidate(
         id=new_id("cand"),
         subject_id="doc_new",
@@ -94,7 +94,7 @@ def test_application_rejects_candidate_outside_ontology_contract(tmp_path: Path)
     )
 
     with pytest.raises(ValidationError, match="unknown ontology predicate"):
-        container.service.create_candidate(context, candidate)
+        container.application.knowledge.create_candidate(context, candidate)
 
 
 def test_ontology_diff_marks_addition_as_compatible(tmp_path: Path) -> None:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 from kip.adapters.parsers.docx import DocxParser
 from kip.adapters.parsers.hwp_broker import CommandParserConfig, HwpParserBroker
@@ -10,11 +9,12 @@ from kip.adapters.parsers.pdf import PdfParser
 from kip.adapters.parsers.plain import PlainTextParser
 from kip.adapters.parsers.xlsx import XlsxShallowParser
 from kip.errors import ParserError
+from kip.ports.parser import ParserPort
 from kip.settings import Settings
 
 
 class ParserRegistry:
-    def __init__(self, parsers: list[Any]) -> None:
+    def __init__(self, parsers: list[ParserPort]) -> None:
         self.parsers = parsers
 
     @classmethod
@@ -53,7 +53,7 @@ class ParserRegistry:
             ]
         )
 
-    def find(self, path: Path) -> Any:
+    def find(self, path: Path) -> ParserPort:
         for parser in self.parsers:
             if parser.supports(path):
                 return parser
@@ -62,5 +62,5 @@ class ParserRegistry:
     def capabilities(self) -> dict[str, str]:
         result: dict[str, str] = {}
         for parser in self.parsers:
-            result[parser.name] = getattr(parser, "version", "unknown")
+            result[parser.name] = parser.version
         return result

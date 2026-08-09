@@ -95,7 +95,7 @@ def root(
     selected_scopes = list(acl_scope or [])
     if acl_scopes:
         selected_scopes.extend(item.strip() for item in acl_scopes.split(",") if item.strip())
-    request_context = container.service.request_context(
+    request_context = container.application.operations.request_context(
         workspace=workspace,
         principal_id=principal,
         acl_scopes=list(dict.fromkeys(selected_scopes)) or None,
@@ -234,30 +234,35 @@ def _sync_one(
     if enqueue:
         if dry_run:
             raise ValidationError("--enqueue and --dry-run cannot be combined")
-        return {"source": selected, "job_id": runtime.container.service.enqueue_sync(runtime.context, selected)}
+        return {"source": selected, "job_id": runtime.container.application.ingestion.enqueue_sync(runtime.context, selected)}
     if selected in _enabled_filesystem_sources(runtime):
-        return runtime.container.service.sync_filesystem(runtime.context, selected, dry_run=dry_run)
+        return runtime.container.application.ingestion.sync_filesystem(runtime.context, selected, dry_run=dry_run)
     if dry_run:
         raise ValidationError("--dry-run is currently supported only for filesystem sources")
     if selected == "slack":
-        return runtime.container.service.sync_slack(runtime.context, oldest=since)
+        return runtime.container.application.ingestion.sync_slack(runtime.context, oldest=since)
     if selected == "apple-mail":
-        return runtime.container.service.sync_apple_mail(runtime.context)
+        return runtime.container.application.ingestion.sync_apple_mail(runtime.context)
     if selected == "imap":
-        return runtime.container.service.sync_imap(runtime.context)
+        return runtime.container.application.ingestion.sync_imap(runtime.context)
     raise ValidationError(f"unsupported source: {selected}")
 
 
 @app.command()
 def capabilities(ctx: typer.Context) -> None:
     """Report available parsers, connectors, projections, and edge adapters."""
-    _run(ctx, lambda runtime: runtime.container.service.capabilities())
+    _run(ctx, lambda runtime: runtime.container.application.operations.capabilities())
 
 
 @app.command()
 def status(ctx: typer.Context) -> None:
     """Report canonical and projection counts."""
-    _run(ctx, lambda runtime: runtime.container.repository.status(runtime.context))
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.operations.status(
+            runtime.context
+        ),
+    )
 
 
 @app.command()
@@ -266,6 +271,7 @@ def doctor(ctx: typer.Context) -> None:
 
     def action(runtime: Runtime):
         settings = runtime.container.settings
+        capabilities = runtime.container.application.operations.capabilities()
         checks: list[dict[str, Any]] = []
         checks.append(
             {
@@ -278,9 +284,9 @@ def doctor(ctx: typer.Context) -> None:
         checks.append(
             {
                 "name": "canonical_repository",
-                "ok": runtime.container.repository.name in {"postgresql", "memory"},
+                "ok": capabilities.repository in {"postgresql", "memory"},
                 "required": True,
-                "details": {"backend": runtime.container.repository.name},
+                "details": {"backend": capabilities.repository},
             }
         )
         checks.append(
@@ -307,7 +313,6 @@ def doctor(ctx: typer.Context) -> None:
                     },
                 }
             )
-        capabilities = runtime.container.service.capabilities()
         required_failures = [item["name"] for item in checks if item["required"] and not item["ok"]]
         return {
             "healthy": not required_failures,
@@ -322,7 +327,7 @@ def doctor(ctx: typer.Context) -> None:
 @app.command()
 def migrate(ctx: typer.Context) -> None:
     """Apply append-only PostgreSQL migrations."""
-    _run(ctx, lambda runtime: {"applied": runtime.container.service.migrate()})
+    _run(ctx, lambda runtime: {"applied": runtime.container.application.operations.migrate()})
 
 
 @app.command()
@@ -347,7 +352,7 @@ def search(
             document_types=_split_values(document_type),
             project_ids=_split_values(project_id),
         )
-        return runtime.container.service.search(runtime.context, request)
+        return runtime.container.application.retrieval.search(runtime.context, request)
     _run(ctx, action)
 
 
@@ -363,7 +368,7 @@ def vocab(
         selected = term or prefix
         if not selected:
             raise ValidationError("provide PREFIX or --term")
-        return runtime.container.service.vocabulary(runtime.context, selected, limit)
+        return runtime.container.application.retrieval.vocabulary(runtime.context, selected, limit)
 
     _run(ctx, action)
 
@@ -388,7 +393,7 @@ def context_command(
             max_chars=max_chars,
             source_kinds=_split_values(source_kind),
         )
-        return runtime.container.service.context_bundle(runtime.context, request)
+        return runtime.container.application.retrieval.context_bundle(runtime.context, request)
     _run(ctx, action)
 
 
@@ -404,7 +409,7 @@ def answer(
         selected_query = query_option or query
         if not selected_query:
             raise ValidationError("provide QUERY or --query")
-        return runtime.container.service.answer(
+        return runtime.container.application.retrieval.answer(
             runtime.context,
             AnswerRequest(query=selected_query, limit=limit, max_chars=max_chars),
         )
@@ -422,33 +427,57 @@ def read(
     selected = unit_id_option or unit_id
     if not selected:
         raise typer.BadParameter("provide UNIT_ID or --unit-id")
-    _run(ctx, lambda runtime: runtime.container.service.read_unit(runtime.context, selected))
+    _run(ctx, lambda runtime: runtime.container.application.evidence.read_unit(runtime.context, selected))
 
 
 @get_app.command("artifact")
 def get_artifact(ctx: typer.Context, artifact_id: str = typer.Argument(...)) -> None:
-    _run(ctx, lambda runtime: runtime.container.repository.get_artifact(runtime.context, artifact_id))
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.evidence.get_artifact(
+            runtime.context,
+            artifact_id,
+        ),
+    )
 
 
 @get_app.command("document")
 def get_document(ctx: typer.Context, document_id: str = typer.Argument(...)) -> None:
-    _run(ctx, lambda runtime: runtime.container.repository.get_document(runtime.context, document_id))
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.evidence.get_document(
+            runtime.context,
+            document_id,
+        ),
+    )
 
 
 @get_app.command("candidate")
 def get_candidate(ctx: typer.Context, candidate_id: str = typer.Argument(...)) -> None:
-    _run(ctx, lambda runtime: runtime.container.repository.get_candidate(runtime.context, candidate_id))
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.knowledge.get_candidate(
+            runtime.context,
+            candidate_id,
+        ),
+    )
 
 
 @get_app.command("assertion")
 def get_assertion(ctx: typer.Context, assertion_id: str = typer.Argument(...)) -> None:
-    _run(ctx, lambda runtime: runtime.container.repository.get_assertion(runtime.context, assertion_id))
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.knowledge.get_assertion(
+            runtime.context,
+            assertion_id,
+        ),
+    )
 
 
 @app.command()
 def explain(ctx: typer.Context, assertion_id: str = typer.Option(..., "--assertion-id")) -> None:
     """Explain an approved assertion with its exact evidence units."""
-    _run(ctx, lambda runtime: runtime.container.service.explain_assertion(runtime.context, assertion_id))
+    _run(ctx, lambda runtime: runtime.container.application.knowledge.explain_assertion(runtime.context, assertion_id))
 
 
 @sync_app.command("all")
@@ -517,7 +546,7 @@ def xlsx_read(
 ) -> None:
     _run(
         ctx,
-        lambda runtime: runtime.container.service.read_xlsx(
+        lambda runtime: runtime.container.application.evidence.read_xlsx(
             runtime.context,
             artifact_id,
             sheet=sheet,
@@ -542,7 +571,7 @@ def xlsx_read_alias(
         raise typer.BadParameter("provide ARTIFACT_ID or --artifact-id")
     _run(
         ctx,
-        lambda runtime: runtime.container.service.read_xlsx(
+        lambda runtime: runtime.container.application.evidence.read_xlsx(
             runtime.context,
             selected_artifact,
             sheet=sheet,
@@ -562,7 +591,7 @@ def graph_neighbors(
 ) -> None:
     _run(
         ctx,
-        lambda runtime: runtime.container.repository.graph_neighbors(
+        lambda runtime: runtime.container.application.knowledge.graph_neighbors(
             runtime.context,
             GraphNeighborsRequest(
                 node_id=node_id,
@@ -584,7 +613,7 @@ def graph_path(
 ) -> None:
     _run(
         ctx,
-        lambda runtime: runtime.container.repository.graph_path(
+        lambda runtime: runtime.container.application.knowledge.graph_path(
             runtime.context,
             GraphPathRequest(
                 from_node_id=from_node,
@@ -602,7 +631,14 @@ def review_list(
     status_value: str = typer.Option("proposed", "--status"),
     limit: int = typer.Option(100, min=1, max=1000),
 ) -> None:
-    _run(ctx, lambda runtime: runtime.container.repository.list_candidates(runtime.context, status_value, limit))
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.knowledge.list_candidates(
+            runtime.context,
+            status_value,
+            limit,
+        ),
+    )
 
 
 @review_app.command("propose")
@@ -632,7 +668,7 @@ def review_propose(
             ontology_version=ontology_version,
             evidence=[{"content_unit_id": value} for value in (evidence_unit_id or [])],
         )
-        return runtime.container.service.create_candidate(runtime.context, candidate)
+        return runtime.container.application.knowledge.create_candidate(runtime.context, candidate)
     _run(ctx, action)
 
 
@@ -642,7 +678,7 @@ def review_approve(
     candidate_id: str = typer.Argument(...),
     note: str | None = typer.Option(None),
 ) -> None:
-    _run(ctx, lambda runtime: runtime.container.service.review_approve(runtime.context, candidate_id, note))
+    _run(ctx, lambda runtime: runtime.container.application.knowledge.review_approve(runtime.context, candidate_id, note))
 
 
 @review_app.command("reject")
@@ -651,7 +687,7 @@ def review_reject(
     candidate_id: str = typer.Argument(...),
     note: str | None = typer.Option(None),
 ) -> None:
-    _run(ctx, lambda runtime: runtime.container.service.review_reject(runtime.context, candidate_id, note))
+    _run(ctx, lambda runtime: runtime.container.application.knowledge.review_reject(runtime.context, candidate_id, note))
 
 
 @jobs_app.command("list")
@@ -660,7 +696,14 @@ def jobs_list(
     status_value: str | None = typer.Option(None, "--status"),
     limit: int = typer.Option(100, min=1, max=1000),
 ) -> None:
-    _run(ctx, lambda runtime: runtime.container.repository.list_jobs(runtime.context, status_value, limit))
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.operations.list_jobs(
+            runtime.context,
+            status_value,
+            limit,
+        ),
+    )
 
 
 @projection_app.command("status")
@@ -668,7 +711,7 @@ def projection_status(ctx: typer.Context) -> None:
     """Report projection counts and configured optional backends."""
 
     def action(runtime: Runtime):
-        status_report = runtime.container.repository.status(runtime.context)
+        status_report = runtime.container.application.operations.status(runtime.context)
         return {
             "lexical": {
                 "content_units": status_report.content_units,
@@ -682,7 +725,7 @@ def projection_status(ctx: typer.Context) -> None:
             },
             "semantic": {
                 "enabled": bool(runtime.container.settings.get("search.semantic_enabled", False)),
-                **runtime.container.repository.semantic_status(runtime.context),
+                **runtime.container.application.operations.semantic_status(runtime.context),
             },
         }
 
@@ -699,7 +742,7 @@ def projection_rebuild(
 
     def action(runtime: Runtime):
         if enqueue:
-            job_id = runtime.container.repository.enqueue_job(
+            job_id = runtime.container.application.operations.enqueue_job(
                 runtime.context,
                 "rebuild.projection",
                 {"projection": name, "workspace": runtime.context.workspace},
@@ -707,8 +750,11 @@ def projection_rebuild(
             )
             return {"projection": name, "job_id": job_id}
         if name in {"semantic", "vector"}:
-            return runtime.container.service.rebuild_semantic_projection(runtime.context)
-        return runtime.container.repository.rebuild_projection(runtime.context, name)
+            return runtime.container.application.retrieval.rebuild_semantic_projection(runtime.context)
+        return runtime.container.application.operations.rebuild_projection(
+            runtime.context,
+            name,
+        )
 
     _run(ctx, action)
 
@@ -718,7 +764,7 @@ def projection_verify(ctx: typer.Context, name: str = typer.Option("lexical", "-
     """Run low-cost parity checks for a projection."""
 
     def action(runtime: Runtime):
-        report = runtime.container.repository.status(runtime.context)
+        report = runtime.container.application.operations.status(runtime.context)
         if name == "lexical":
             ok = report.content_units == report.lexical_units
             return {
@@ -736,7 +782,7 @@ def projection_verify(ctx: typer.Context, name: str = typer.Option("lexical", "-
                 "note": "the baseline queries canonical PostgreSQL assertions directly",
             }
         if name in {"semantic", "vector"}:
-            return runtime.container.service.verify_semantic_projection(runtime.context)
+            return runtime.container.application.retrieval.verify_semantic_projection(runtime.context)
         raise ValidationError(f"unsupported projection verification: {name}")
 
     _run(ctx, action)
@@ -768,7 +814,7 @@ def projection_activate(
             configuration=runtime.container.settings.raw,
             code_root=runtime.container.settings.project_root,
         )
-        space = runtime.container.service.activate_semantic_projection(runtime.context)
+        space = runtime.container.application.retrieval.activate_semantic_projection(runtime.context)
         return {
             "projection": "semantic",
             "status": space.status,
@@ -791,7 +837,7 @@ def rebuild(
 
     def action(runtime: Runtime):
         if enqueue:
-            job_id = runtime.container.repository.enqueue_job(
+            job_id = runtime.container.application.operations.enqueue_job(
                 runtime.context,
                 "rebuild.projection",
                 {"projection": projection, "workspace": runtime.context.workspace},
@@ -799,8 +845,11 @@ def rebuild(
             )
             return {"projection": projection, "job_id": job_id}
         if projection in {"semantic", "vector"}:
-            return runtime.container.service.rebuild_semantic_projection(runtime.context)
-        return runtime.container.repository.rebuild_projection(runtime.context, projection)
+            return runtime.container.application.retrieval.rebuild_semantic_projection(runtime.context)
+        return runtime.container.application.operations.rebuild_projection(
+            runtime.context,
+            projection,
+        )
 
     _run(ctx, action)
 
@@ -833,12 +882,12 @@ def evaluate_run(
         loaded = load_dataset(dataset)
 
         def search_case(case, variant):
-            context = runtime.container.service.request_context(
+            context = runtime.container.application.operations.request_context(
                 workspace=runtime.context.workspace,
                 principal_id=case.principal,
                 acl_scopes=case.acl_scopes,
             )
-            return runtime.container.service.search(
+            return runtime.container.application.retrieval.search(
                 context,
                 SearchRequest(query=case.question, limit=case.recall_at),
                 mode=variant,
@@ -950,7 +999,13 @@ def export_canonical(
     output: Path = typer.Option(Path("exports/canonical.jsonl"), "--output"),
 ) -> None:
     """Export canonical records as deterministic JSONL for migration or backup."""
-    _run(ctx, lambda runtime: runtime.container.repository.export_canonical(runtime.context, output))
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.operations.export_canonical(
+            runtime.context,
+            output,
+        ),
+    )
 
 
 @app.command(name="export-file", hidden=True)
@@ -959,7 +1014,13 @@ def export_file_alias(
     output: Path = typer.Option(Path("exports/canonical.jsonl"), "--output"),
 ) -> None:
     """Legacy alias retained for scripts created before v3.1."""
-    _run(ctx, lambda runtime: runtime.container.repository.export_canonical(runtime.context, output))
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.operations.export_canonical(
+            runtime.context,
+            output,
+        ),
+    )
 
 
 @api_app.command("serve")

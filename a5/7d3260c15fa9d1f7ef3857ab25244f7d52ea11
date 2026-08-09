@@ -1,0 +1,25 @@
+scripts/create_sample_xlsx.py
+  s_41856199ee83ad::t_d745855ad67a07 6-9
+src/kip/adapters/parsers/plain.py
+  s_41856199ee83ad::t_d745855ad67a07 5,15-23
+src/kip/ids.py
+  s_41856199ee83ad::t_2150361a0420b8 17
+src/kip/ports/graph.py
+  s_41856199ee83ad::t_2150361a0420b8 5-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "a57d3260c15fa9d1f7ef3857ab25244f7d52ea11",
+  "prompts": {},
+  "sessions": {
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

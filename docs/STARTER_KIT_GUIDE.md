@@ -11,7 +11,7 @@
 | 데이터 경계 | workspace, source root, 개인/회사 자료 분리, 보존 기간 |
 | 신원과 ACL | JWT issuer/audience/JWKS, admin group, principal 발급자, source ACL을 어떤 scope와 만료 정책으로 변환하는지 |
 | 허용 소스 | 파일 확장자, Slack 채널, 메일 계정·mailbox allowlist |
-| 외부 전송 | embedding/OCR/LLM이 로컬인지 원격인지, 전송 가능한 데이터 등급 |
+| 외부 전송 | embedding/OCR/LLM이 로컬인지 원격인지, 전송 가능한 데이터 등급, 원격 provider 보존 계약 |
 | 품질 기준 | 실제 내부 문서 기반 golden query, parser 표본, 지연시간과 실패 허용치 |
 | 검토 책임 | assertion, ontology migration, 모델·parser 승격 승인자 |
 
@@ -24,6 +24,8 @@
    identity mode를 묻고, `proxy_jwt`이면 issuer/audience/JWKS/admin group을,
    `api_key`이면 API/admin key secret reference를 이어서 묻는다. credential은
    값이 아니라 secret reference만 제공한다.
+   원격 생성 모델을 고르면 허용 분류, provider retention 정책, credential
+   reference를 각각 별도 질문으로 확인한다.
 3. `setup preview`의 파일 수, 용량, 확장자, 제외 건수와 symlink 건수를 확인한다.
 4. `setup plan`의 source scope, read-only mount, egress, reviewer, warning과 fingerprint를 승인한다.
 5. agent가 `setup apply`와 `setup verify`를 마치고 redacted receipt를 제시하게 한다.
@@ -66,6 +68,8 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 ### Source connector
 
 - stable external ID, immutable revision, cursor, tombstone, ACL mapping을 정의한다.
+- source configuration에 canonical data classification을 선언한다. Event
+  payload가 classification을 주장하더라도 사용하지 않는다.
 - outage를 삭제로 해석하지 않고 source를 수정하지 않는다.
 - 재실행의 idempotency와 실패 후 cursor 복구를 검증한다.
 

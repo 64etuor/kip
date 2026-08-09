@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from kip.adapters.repository.memory.state import MemoryState
+from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
 from kip.domain.models import (
     ArtifactView,
@@ -22,6 +23,7 @@ class MemoryIngestionStore:
         context: RequestContext,
         source_object_id: str,
         snapshot: AclSnapshot,
+        classification: DataClassification,
     ) -> None:
         self.state.acl_snapshots[snapshot.id] = snapshot.model_copy(deep=True)
         revision_id = self.state.current_revision_by_object.get(source_object_id)
@@ -29,8 +31,10 @@ class MemoryIngestionStore:
         if packet is None or packet.workspace_id != context.workspace:
             return
         packet.source_object.acl_snapshot = snapshot.model_copy(deep=True)
+        packet.source_object.classification = classification
         for unit in packet.units:
             unit.acl_snapshot_id = snapshot.id
+            unit.classification = classification
             self.state.units[unit.id] = unit
         view = self.state.artifacts.get(packet.artifact.id)
         if view is not None:
@@ -70,6 +74,15 @@ class MemoryIngestionStore:
                 raise ValidationError(
                     "every content unit must reference the source ACL snapshot"
                 )
+            classification_mismatches = [
+                unit.id
+                for unit in packet.units
+                if unit.classification != packet.source_object.classification
+            ]
+            if classification_mismatches:
+                raise ValidationError(
+                    "every content unit must match the source data classification"
+                )
             self.state.acl_snapshots[snapshot.id] = snapshot.model_copy(deep=True)
         old_revision_id = self.state.current_revision_by_object.get(
             packet.source_object.id
@@ -80,6 +93,7 @@ class MemoryIngestionStore:
                 old_packet.source_object = packet.source_object.model_copy(deep=True)
                 for unit in old_packet.units:
                     unit.acl_snapshot_id = snapshot.id
+                    unit.classification = packet.source_object.classification
                 view = self.state.artifacts.get(old_packet.artifact.id)
                 if view is not None:
                     view.source_object = packet.source_object.model_copy(deep=True)

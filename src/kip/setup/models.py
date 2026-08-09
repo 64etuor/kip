@@ -69,7 +69,9 @@ class SecretReference(StrictModel):
 class FilesystemSourceAnswer(StrictModel):
     name: str
     root: str
-    classification: Literal["public", "internal", "confidential", "restricted"]
+    classification: Literal[
+        "public", "internal", "confidential", "restricted", "personal"
+    ]
     acl_scope: str = Field(min_length=1)
     include_extensions: list[str] = Field(
         default_factory=lambda: list(_DEFAULT_EXTENSIONS),
@@ -126,10 +128,11 @@ class SetupAnswers(StrictModel):
     identity_owner: str | None = None
     source_ownership: Literal["company", "personal"] | None = None
     filesystem_sources: list[FilesystemSourceAnswer] | None = None
-    model_provider: Literal["disabled", "openai", "anthropic"] | None = None
+    model_provider: Literal["disabled", "local", "openai", "anthropic"] | None = None
     model_egress_classifications: list[
-        Literal["public", "internal", "confidential", "restricted"]
+        Literal["public", "internal", "confidential", "restricted", "personal"]
     ] | None = None
+    model_retention_policy: Literal["provider_default", "zero_retention"] | None = None
     model_secret_ref: SecretReference | None = None
     database_secret_ref: SecretReference | None = None
     cas_path: str | None = None
@@ -238,8 +241,9 @@ class SetupPlan(StrictModel):
     source_ownership: Literal["company", "personal"]
     sources: list[SourcePlan]
     mounts: list[MountPlan]
-    model_provider: Literal["disabled", "openai", "anthropic"]
+    model_provider: Literal["disabled", "local", "openai", "anthropic"]
     model_egress_classifications: list[str]
+    model_retention_policy: Literal["provider_default", "zero_retention"] | None
     model_secret_ref: SecretReference | None
     database_secret_ref: SecretReference
     cas_path: str

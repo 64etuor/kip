@@ -14,6 +14,7 @@ from kip.adapters.connectors.apple_mail import AppleMailConnector
 from kip.adapters.connectors.filesystem import FileSystemConnector
 from kip.adapters.connectors.imap import ImapConnector
 from kip.adapters.connectors.slack import SlackConnector
+from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
 from kip.domain.models import ConnectorEvent
 from kip.errors import ConfigurationError
@@ -36,6 +37,7 @@ class SlackSourceConfig(BaseModel):
     workspace_id: str = ""
     allowed_conversation_ids: list[str] = Field(default_factory=list)
     token_env: str = "KIP_SLACK_BOT_TOKEN"
+    classification: DataClassification = DataClassification.RESTRICTED
 
 
 class AppleMailSourceConfig(BaseModel):
@@ -46,6 +48,7 @@ class AppleMailSourceConfig(BaseModel):
     allowed_mailboxes: list[str] = Field(default_factory=list)
     lookback_days: int = 30
     limit_per_mailbox: int = 500
+    classification: DataClassification = DataClassification.RESTRICTED
 
 
 class ImapSourceConfig(BaseModel):
@@ -58,6 +61,7 @@ class ImapSourceConfig(BaseModel):
     username_env: str = "KIP_IMAP_USERNAME"
     password_env: str = "KIP_IMAP_PASSWORD"
     use_ssl: bool = True
+    classification: DataClassification = DataClassification.RESTRICTED
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +70,7 @@ class ConfiguredFilesystemSource:
     root: Path
     acl_scope: str | None
     acl_snapshot: AclSnapshot
+    classification: DataClassification
     connector: FileSystemConnector
 
     def scan(self) -> Iterable[DiscoveredFile]:
@@ -135,11 +140,16 @@ class ConfiguredSourceCatalog:
             ),
         )
         scope = str(source["acl_scope"]) if source.get("acl_scope") else f"workspace:{self.settings.workspace}"
+        classification = _classification(
+            source.get("classification", DataClassification.RESTRICTED),
+            source_name,
+        )
         policy_bytes = json.dumps(
             {
                 "name": source_name,
                 "root": str(root.resolve()),
                 "acl_scope": scope,
+                "classification": classification,
             },
             ensure_ascii=False,
             sort_keys=True,
@@ -159,14 +169,50 @@ class ConfiguredSourceCatalog:
                 provider=f"filesystem:{source_name}",
                 scopes=[scope],
             ),
+            classification=classification,
             connector=connector,
+        )
+
+    def event_classification(self, event: ConnectorEvent) -> DataClassification:
+        if event.connector_name in {item.value for item in RemoteSourceName}:
+            config_key = _remote_config_key(event.connector_name)
+            return _classification(
+                self.settings.get(
+                    f"sources.{config_key}.classification",
+                    DataClassification.RESTRICTED,
+                ),
+                event.connector_name,
+            )
+        policy = self._connector_policy(event.connector_name)
+        if policy is None:
+            if self.settings.environment not in {"development", "test"}:
+                raise ConfigurationError(
+                    f"connector classification is not configured: {event.connector_name}"
+                )
+            return DataClassification.RESTRICTED
+        try:
+            return _classification(policy["classification"], event.connector_name)
+        except (KeyError, ValueError) as exc:
+            raise ConfigurationError(
+                f"connector classification is invalid: {event.connector_name}"
+            ) from exc
+
+    def _connector_policy(self, connector_name: str) -> dict[str, object] | None:
+        policies = self.settings.get("sources.connector_policies", []) or []
+        return next(
+            (
+                item
+                for item in policies
+                if isinstance(item, dict) and item.get("name") == connector_name
+            ),
+            None,
         )
 
     def event_acl_snapshot(self, event: ConnectorEvent) -> AclSnapshot:
         if event.acl_snapshot is not None:
             return event.acl_snapshot
         configured = self.settings.get(
-            f"sources.{event.connector_name}.acl_snapshot_ttl_seconds",
+            f"sources.{_remote_config_key(event.connector_name)}.acl_snapshot_ttl_seconds",
             None,
         )
         if event.connector_name in {item.value for item in RemoteSourceName}:
@@ -180,15 +226,7 @@ class ConfiguredSourceCatalog:
                 captured_at=captured_at,
                 expires_at=captured_at + timedelta(seconds=ttl_seconds),
             )
-        policies = self.settings.get("sources.connector_policies", []) or []
-        policy = next(
-            (
-                item
-                for item in policies
-                if isinstance(item, dict) and item.get("name") == event.connector_name
-            ),
-            None,
-        )
+        policy = self._connector_policy(event.connector_name)
         if policy is None:
             if self.settings.environment not in {"development", "test"}:
                 raise ConfigurationError(
@@ -223,7 +261,7 @@ class ConfiguredSourceCatalog:
             raise ConfigurationError(
                 f"unsupported connector ACL mode for {event.connector_name}: {mode}"
             )
-        ttl_seconds = int(policy.get("acl_snapshot_ttl_seconds", 900))
+        ttl_seconds = int(str(policy.get("acl_snapshot_ttl_seconds", 900)))
         if ttl_seconds <= 0:
             raise ConfigurationError("connector ACL snapshot TTL must be positive")
         captured_at = datetime.now(UTC)
@@ -291,3 +329,16 @@ class ConfiguredSourceCatalog:
                 return imap_connector.pull()
             case unreachable:
                 assert_never(unreachable)
+
+
+def _remote_config_key(connector_name: str) -> str:
+    return "apple_mail" if connector_name == RemoteSourceName.APPLE_MAIL else connector_name
+
+
+def _classification(value: object, source_name: str) -> DataClassification:
+    try:
+        return DataClassification(str(value))
+    except ValueError as exc:
+        raise ConfigurationError(
+            f"source classification is invalid: {source_name}"
+        ) from exc

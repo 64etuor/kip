@@ -29,6 +29,18 @@ projection row to that snapshot. Configuration-owned snapshots may be
 non-expiring; connector-derived snapshots must expire. Repository queries deny
 rows whose dynamic snapshot is stale.
 
+`SourceObject.classification` and `ContentUnit.classification` carry the same
+typed canonical value. Ingestion derives it from approved source configuration,
+checks source/unit equality, and persists it in PostgreSQL. Existing rows are
+backfilled as `restricted`; a subsequent approved source sync may reclassify
+them. Model egress never accepts a classification supplied with an answer
+request.
+
+`EgressDecision` contains the destination, redacted policy fingerprint,
+admitted evidence IDs, denied evidence IDs, and a typed denial reason.
+`allowed=false` prohibits a generator call even when an admitted subset is
+non-empty.
+
 ## Knowledge sequence
 
 ```text

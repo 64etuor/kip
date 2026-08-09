@@ -16,6 +16,7 @@ if str(SRC) not in sys.path:
 from kip.adapters.repository.memory import MemoryRepository  # noqa: E402
 from kip.api import create_app  # noqa: E402
 from kip.container import build_container  # noqa: E402
+from kip.domain.egress import EgressDecision  # noqa: E402
 from kip.domain.models import (  # noqa: E402
     ApprovedAssertion,
     Artifact,
@@ -75,6 +76,7 @@ MODELS = {
     "capabilities": Capabilities,
     "status-report": StatusReport,
     "vocabulary-item": VocabularyItem,
+    "egress-decision": EgressDecision,
     "setup-answers": SetupAnswers,
     "setup-inspection": SetupInspection,
     "setup-plan": SetupPlan,

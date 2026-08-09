@@ -26,12 +26,20 @@ from kip.adapters.storage import (
     LocalWorkbookReader,
 )
 from kip.application.analyzer import KoreanNgramAnalyzer
+from kip.application.egress import EgressPolicyUseCases
 from kip.application.evidence import EvidenceUseCases
 from kip.application.ingestion import IngestionUseCases
 from kip.application.knowledge import KnowledgeUseCases
 from kip.application.operations import OperationsUseCases
 from kip.application.runtime import Application
 from kip.application.search import RetrievalUseCases
+from kip.domain.egress import (
+    DataClassification,
+    EgressPolicy,
+    EgressProvider,
+    RetentionPolicy,
+)
+from kip.errors import ConfigurationError
 from kip.ontology import OntologyCatalog
 from kip.ports.embedding import EmbeddingPort
 from kip.ports.identity import IdentityResolverPort
@@ -164,6 +172,7 @@ def build_container(
             parsers,
             selected_embedding,
         ),
+        egress=EgressPolicyUseCases(_build_egress_policy(selected)),
     )
     return Container(
         settings=selected,
@@ -252,3 +261,34 @@ def _build_identity(settings: Settings) -> IdentityResolverPort:
             )
         )
     raise ValueError(f"unsupported identity mode: {mode}")
+
+
+def _build_egress_policy(settings: Settings) -> EgressPolicy:
+    raw = settings.get("models.generation", {}) or {}
+    if not isinstance(raw, dict):
+        raise ConfigurationError("models.generation must be a table")
+    enabled = bool(raw.get("enabled", False))
+    provider_value = str(raw.get("provider", "")).strip()
+    if provider_value == "disabled":
+        provider_value = ""
+    try:
+        provider = EgressProvider(provider_value) if provider_value else None
+        classifications = tuple(
+            DataClassification(str(item))
+            for item in raw.get("allowed_classifications", []) or []
+        )
+        retention_value = str(raw.get("retention_policy", "")).strip()
+        retention = RetentionPolicy(retention_value) if retention_value else None
+    except ValueError as exc:
+        raise ConfigurationError("invalid generation egress policy") from exc
+    return EgressPolicy(
+        enabled=enabled,
+        provider=provider,
+        allow_remote=bool(
+            settings.get("security.allow_remote_model_egress", False)
+        ),
+        allowed_classifications=classifications,
+        retention_policy=retention,
+        secret_reference=str(raw.get("secret_ref", "")).strip() or None,
+        base_url=str(raw.get("base_url", "")).strip() or None,
+    )

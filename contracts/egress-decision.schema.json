@@ -1,0 +1,84 @@
+{
+  "$defs": {
+    "EgressDenialReason": {
+      "enum": [
+        "no_evidence",
+        "policy_disabled",
+        "missing_provider",
+        "missing_classification",
+        "remote_egress_disabled",
+        "missing_retention_policy",
+        "retention_not_allowed",
+        "missing_secret_reference",
+        "invalid_local_endpoint",
+        "classification_not_allowed"
+      ],
+      "title": "EgressDenialReason",
+      "type": "string"
+    },
+    "EgressProvider": {
+      "enum": [
+        "local",
+        "openai",
+        "anthropic"
+      ],
+      "title": "EgressProvider",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "allowed": {
+      "title": "Allowed",
+      "type": "boolean"
+    },
+    "allowed_evidence_ids": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowed Evidence Ids",
+      "type": "array"
+    },
+    "denial_reason": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EgressDenialReason"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "denied_evidence_ids": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Denied Evidence Ids",
+      "type": "array"
+    },
+    "policy_fingerprint": {
+      "title": "Policy Fingerprint",
+      "type": "string"
+    },
+    "provider": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EgressProvider"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "allowed",
+    "provider",
+    "policy_fingerprint"
+  ],
+  "title": "EgressDecision",
+  "type": "object"
+}

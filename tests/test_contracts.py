@@ -10,3 +10,4 @@ def test_generated_contracts_exist():
     assert "/v1/search" in openapi["paths"]
     assert (ROOT / "contracts/document-packet.schema.json").is_file()
     assert (ROOT / "contracts/connector-event.schema.json").is_file()
+    assert (ROOT / "contracts/egress-decision.schema.json").is_file()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from kip.application.egress import EgressPolicyUseCases
 from kip.application.evidence import EvidenceUseCases
 from kip.application.ingestion import IngestionUseCases
 from kip.application.knowledge import KnowledgeUseCases
@@ -16,3 +17,4 @@ class Application:
     evidence: EvidenceUseCases
     knowledge: KnowledgeUseCases
     operations: OperationsUseCases
+    egress: EgressPolicyUseCases

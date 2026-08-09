@@ -10,6 +10,27 @@
 - The local model sidecar binds only to loopback and disables Infinity and
   Hugging Face telemetry in the provided launcher.
 
+## Model egress
+
+- Source data classification is canonical ingestion state, not a request or
+  prompt parameter. Filesystem and connector configuration assigns one of
+  `public`, `internal`, `confidential`, `restricted`, or `personal`; missing
+  configuration falls back to `restricted` only in development and is rejected
+  for custom production connectors.
+- A local generation destination must use a loopback HTTP endpoint. Local
+  processing admits every classification because document content does not
+  cross the host boundary.
+- OpenAI and Anthropic require the global remote-egress switch, an explicit
+  provider and classification allowlist, a valid secret reference, and an
+  explicit retention policy. Non-public evidence additionally requires a
+  verified zero-retention contract.
+- The central decision reports admitted and denied evidence IDs plus a
+  machine-readable reason. If any selected evidence is denied, generation does
+  not run; callers cannot silently drop it and present a complete answer.
+- `zero_retention` is an operator attestation about the applicable provider
+  contract. Setup records the decision but cannot establish the account-level
+  provider setting on the operator's behalf.
+
 ## Secrets
 
 - Keep secrets in environment variables or an approved secret manager.

@@ -5,6 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
 
 
@@ -50,6 +51,7 @@ class SourceObject(StrictModel):
     external_id: str
     object_type: str
     canonical_uri: str
+    classification: DataClassification = DataClassification.RESTRICTED
     container_external_id: str | None = None
     acl_scopes: list[str] = Field(default_factory=list)
     acl_snapshot: AclSnapshot | None = None
@@ -121,6 +123,7 @@ class ContentUnit(StrictModel):
     body_normalized: str
     lexical_text: str
     locator: EvidenceLocator
+    classification: DataClassification = DataClassification.RESTRICTED
     acl_scopes: list[str] = Field(default_factory=list)
     acl_snapshot_id: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)

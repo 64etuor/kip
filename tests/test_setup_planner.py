@@ -30,6 +30,19 @@ def test_setup_inspection_resumes_with_dynamic_provider_questions(
         "model_egress_classifications"
     ]
 
+    retention = inspect_setup(
+        answers.model_copy(
+            update={
+                "model_egress_classifications": ["public"],
+                "model_retention_policy": None,
+            }
+        ),
+        project_root=tmp_path,
+    )
+    assert [question.id for question in retention.questions] == [
+        "model_retention_policy"
+    ]
+
 
 def test_proxy_jwt_setup_collects_verification_metadata_one_question_at_a_time(
     tmp_path: Path,
@@ -110,6 +123,7 @@ def _complete_answers(tmp_path: Path) -> SetupAnswers:
         ],
         model_provider="openai",
         model_egress_classifications=["public", "internal"],
+        model_retention_policy="zero_retention",
         model_secret_ref=SecretReference.parse("env:KIP_OPENAI_API_KEY"),
         database_secret_ref=SecretReference.parse("env:KIP_DATABASE_URL"),
         cas_path=str((tmp_path / "cas").resolve()),

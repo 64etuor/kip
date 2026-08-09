@@ -89,7 +89,10 @@ def _config_payload(plan: SetupPlan) -> dict[str, object]:
         "enabled": plan.model_provider != "disabled",
         "provider": plan.model_provider,
         "allowed_classifications": plan.model_egress_classifications,
+        "retention_policy": plan.model_retention_policy or "provider_default",
     }
+    if plan.model_provider == "local":
+        model["base_url"] = "http://127.0.0.1:7998"
     if plan.model_secret_ref is not None:
         model["secret_ref"] = plan.model_secret_ref.display()
         if plan.model_secret_ref.scheme == "env":

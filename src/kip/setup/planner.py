@@ -137,6 +137,7 @@ def build_setup_plan(
         model_egress_classifications=list(
             answers.model_egress_classifications or []
         ),
+        model_retention_policy=answers.model_retention_policy,
         model_secret_ref=answers.model_secret_ref,
         database_secret_ref=answers.database_secret_ref,
         cas_path=answers.cas_path,
@@ -194,6 +195,8 @@ def _first_missing_question(answers: SetupAnswers) -> SetupQuestion | None:
     if answers.model_provider in {"openai", "anthropic"}:
         if answers.model_egress_classifications is None:
             return _question("model_egress_classifications")
+        if answers.model_retention_policy is None:
+            return _question("model_retention_policy")
         if answers.model_secret_ref is None:
             return _question("model_secret_ref")
     trailing: list[tuple[str, object | None]] = [
@@ -295,18 +298,25 @@ _QUESTIONS = {
     ),
     "model_provider": SetupQuestion(
         id="model_provider",
-        prompt="생성 모델은 비활성화, OpenAI, Anthropic 중 무엇을 사용하나요?",
+        prompt="생성 모델은 비활성화, 로컬, OpenAI, Anthropic 중 무엇을 사용하나요?",
         answer_format="one choice",
-        choices=["disabled", "openai", "anthropic"],
+        choices=["disabled", "local", "openai", "anthropic"],
         why="모델 공급자와 외부 전송 정책을 명시적으로 고정합니다.",
     ),
     "model_egress_classifications": SetupQuestion(
         id="model_egress_classifications",
         prompt="선택한 원격 모델로 전송을 허용할 데이터 등급은 무엇인가요?",
         answer_format="JSON array",
-        choices=["public", "internal", "confidential", "restricted"],
+        choices=["public", "internal", "confidential", "restricted", "personal"],
         example='["public"]',
         why="허용되지 않은 등급의 근거가 외부 모델로 나가는 것을 차단합니다.",
+    ),
+    "model_retention_policy": SetupQuestion(
+        id="model_retention_policy",
+        prompt="선택한 원격 모델 계약의 데이터 보존 정책은 무엇인가요?",
+        answer_format="one choice",
+        choices=["provider_default", "zero_retention"],
+        why="비공개 자료는 zero-retention 계약이 확인된 경우에만 원격 전송합니다.",
     ),
     "model_secret_ref": SetupQuestion(
         id="model_secret_ref",

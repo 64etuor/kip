@@ -13,7 +13,8 @@
             "public",
             "internal",
             "confidential",
-            "restricted"
+            "restricted",
+            "personal"
           ],
           "title": "Classification",
           "type": "string"
@@ -263,7 +264,8 @@
               "public",
               "internal",
               "confidential",
-              "restricted"
+              "restricted",
+              "personal"
             ],
             "type": "string"
           },
@@ -281,6 +283,7 @@
         {
           "enum": [
             "disabled",
+            "local",
             "openai",
             "anthropic"
           ],
@@ -292,6 +295,22 @@
       ],
       "default": null,
       "title": "Model Provider"
+    },
+    "model_retention_policy": {
+      "anyOf": [
+        {
+          "enum": [
+            "provider_default",
+            "zero_retention"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Retention Policy"
     },
     "model_secret_ref": {
       "anyOf": [

@@ -9,6 +9,7 @@ import pytest
 
 from kip.adapters.repository.postgres import PostgresRepository
 from kip.container import build_container
+from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
 from kip.domain.models import (
     AssertionCandidate,
@@ -49,8 +50,9 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
                         "root": str(source_root),
                         "enabled": True,
                         "settle_seconds": 0,
-                        "include_extensions": [".txt"],
-                        "acl_scope": f"workspace:{workspace}",
+                            "include_extensions": [".txt"],
+                            "acl_scope": f"workspace:{workspace}",
+                            "classification": "internal",
                     }
                 ]
             },
@@ -153,6 +155,11 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
             hits[0].artifact_id,
         ).source_object
         assert source_object is not None
+        assert source_object.classification is DataClassification.INTERNAL
+        assert repository.evidence.get_content_unit(
+            context,
+            hits[0].unit_id,
+        ).classification is DataClassification.INTERNAL
         now = datetime.now(UTC)
         stale_snapshot = AclSnapshot(
             id=new_id("aclsnap"),
@@ -166,6 +173,7 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
             context,
             source_object.id,
             stale_snapshot,
+            source_object.classification,
         )
         assert container.application.retrieval.search(
             context,
@@ -192,6 +200,7 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
             context,
             source_object.id,
             fresh_snapshot,
+            source_object.classification,
         )
         assert container.application.retrieval.search(
             context,

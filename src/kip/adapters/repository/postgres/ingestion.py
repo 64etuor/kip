@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from kip.adapters.repository.postgres.database import PostgresDatabase
+from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
 from kip.domain.models import DocumentPacket, IngestResult, RequestContext
 
@@ -16,8 +17,14 @@ class PostgresIngestionStore:
         context: RequestContext,
         source_object_id: str,
         snapshot: AclSnapshot,
+        classification: DataClassification,
     ) -> None:
-        self.database.upsert_acl_snapshot(context, source_object_id, snapshot)
+        self.database.upsert_acl_snapshot(
+            context,
+            source_object_id,
+            snapshot,
+            classification,
+        )
 
     def has_revision(
         self,

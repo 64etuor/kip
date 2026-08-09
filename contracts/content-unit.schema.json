@@ -1,5 +1,16 @@
 {
   "$defs": {
+    "DataClassification": {
+      "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "restricted",
+        "personal"
+      ],
+      "title": "DataClassification",
+      "type": "string"
+    },
     "EvidenceLocator": {
       "additionalProperties": false,
       "properties": {
@@ -53,6 +64,10 @@
     "body_normalized": {
       "title": "Body Normalized",
       "type": "string"
+    },
+    "classification": {
+      "$ref": "#/$defs/DataClassification",
+      "default": "restricted"
     },
     "document_id": {
       "anyOf": [

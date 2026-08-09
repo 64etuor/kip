@@ -241,6 +241,10 @@
           "title": "Body Normalized",
           "type": "string"
         },
+        "classification": {
+          "$ref": "#/$defs/DataClassification",
+          "default": "restricted"
+        },
         "document_id": {
           "anyOf": [
             {
@@ -307,6 +311,17 @@
       ],
       "title": "ContentUnit",
       "type": "object"
+    },
+    "DataClassification": {
+      "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "restricted",
+        "personal"
+      ],
+      "title": "DataClassification",
+      "type": "string"
     },
     "EvidenceLocator": {
       "additionalProperties": false,

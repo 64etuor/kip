@@ -271,11 +271,27 @@
     "model_provider": {
       "enum": [
         "disabled",
+        "local",
         "openai",
         "anthropic"
       ],
       "title": "Model Provider",
       "type": "string"
+    },
+    "model_retention_policy": {
+      "anyOf": [
+        {
+          "enum": [
+            "provider_default",
+            "zero_retention"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Model Retention Policy"
     },
     "model_secret_ref": {
       "anyOf": [
@@ -363,6 +379,7 @@
     "mounts",
     "model_provider",
     "model_egress_classifications",
+    "model_retention_policy",
     "model_secret_ref",
     "database_secret_ref",
     "cas_path",

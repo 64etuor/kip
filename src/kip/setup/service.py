@@ -224,7 +224,12 @@ class SetupService:
             if not value.strip():
                 raise ValidationError(f"{question_id} cannot be blank")
             return value.strip()
-        if question_id in {"identity_mode", "source_ownership", "model_provider"}:
+        if question_id in {
+            "identity_mode",
+            "source_ownership",
+            "model_provider",
+            "model_retention_policy",
+        }:
             return value
         raise ValidationError(f"unknown setup question: {question_id}")
 

@@ -10,6 +10,7 @@
 | CLI | Ready for pilot | JSON-first commands; source-neutral `sync run`, top-level `xlsx-read`, projection and canonical export aliases |
 | REST API | Ready for pilot | Read, exact evidence, assertion explain, connector event, sync, and review endpoints; trusted API-key or verified JWT identity |
 | Identity and ACL snapshots | Ready for pilot | JWT issuer/audience/JWKS verification, configured API-key principal, stale dynamic snapshot exclusion, and legacy identity-header rejection |
+| Data classification and model egress | Ready for pilot | Canonical source/unit classification, local loopback policy, remote provider/classification/retention/secret gates, and atomic denial decisions; generator adapters are not yet bundled |
 | MCP | Reference adapter | Requires optional dependency and client validation |
 | Filesystem connector | Ready for pilot | Read-only traversal, hash, settle-time checks |
 | XLSX shallow/deep | Ready for pilot | Shared-string shallow index and exact `.xlsx`/`.xlsm` range reader; formula/cached values, formats, dates, and hidden dimensions are explicit |
@@ -41,6 +42,9 @@
   configured JWT claims. KIP verifies those claims directly and rejects legacy
   caller identity/ACL headers; target-provider revocation latency is bounded by
   the shorter of token and ACL-snapshot expiry.
+- Remote model use requires an approved provider contract and classification
+  allowlist. The `zero_retention` field is configuration evidence, not
+  independent verification of the provider account setting.
 - Optional HWP parser commands, Slack scopes, Apple Mail Automation permissions, and IMAP provider behavior must be validated against the target environment.
 - Neo4j remains an adoption-gate adapter stub; canonical assertions are queried from PostgreSQL.
 - The current public pilot is small and lexically distinctive. Its `keep_disabled` decision must not be generalized to a private corpus without adding reviewed internal golden cases. The private OneDrive shadow A/B also showed no gain over lexical retrieval on its small golden set, so semantic projection remains shadow-only.

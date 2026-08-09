@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from kip.application.analyzer import KoreanNgramAnalyzer
+from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
 from kip.domain.models import (
     Artifact,
@@ -74,6 +75,7 @@ class FileIngestionWorkflow:
         record: DiscoveredFile,
         acl_scopes: list[str],
         acl_snapshot: AclSnapshot,
+        classification: DataClassification,
     ) -> IngestResult:
         path = _safe_source_path(record.path, source_root)
         system_id = stable_id("srcsys", context.workspace, source_name)
@@ -87,7 +89,12 @@ class FileIngestionWorkflow:
                 "acl_scopes": sorted(set(context.acl_scopes).union(acl_scopes))
             }
         )
-        self._store.upsert_acl_snapshot(ingest_context, object_id, acl_snapshot)
+        self._store.upsert_acl_snapshot(
+            ingest_context,
+            object_id,
+            acl_snapshot,
+            classification,
+        )
         if self._store.has_revision(ingest_context, object_id, record.sha256):
             return IngestResult(
                 status="unchanged",
@@ -111,6 +118,7 @@ class FileIngestionWorkflow:
         )
         for unit in units:
             unit.acl_snapshot_id = acl_snapshot.id
+            unit.classification = classification
             unit.lexical_text = self._analyzer.analyze(
                 "\n".join(
                     (
@@ -131,6 +139,7 @@ class FileIngestionWorkflow:
                 external_id=record.relative_path,
                 object_type="file",
                 canonical_uri=path.as_uri(),
+                classification=classification,
                 acl_scopes=acl_scopes,
                 acl_snapshot=acl_snapshot,
                 metadata={"relative_path": record.relative_path},

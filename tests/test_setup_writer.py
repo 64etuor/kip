@@ -36,6 +36,8 @@ def test_apply_writes_generated_files_atomically_and_preserves_previous(
     assert "read_only: true" in (project_root / "compose.generated.yaml").read_text(
         encoding="utf-8"
     )
+    generated = config.read_text(encoding="utf-8")
+    assert 'retention_policy = "zero_retention"' in generated
 
 
 def test_generated_compose_selects_approved_cas_without_yaml_aliases(
@@ -149,6 +151,7 @@ def _complete_answers(tmp_path: Path) -> SetupAnswers:
         ],
         model_provider="openai",
         model_egress_classifications=["public", "internal"],
+        model_retention_policy="zero_retention",
         model_secret_ref=SecretReference.parse("env:KIP_OPENAI_API_KEY"),
         database_secret_ref=SecretReference.parse("env:KIP_DATABASE_URL"),
         cas_path=str((tmp_path / "cas").resolve()),

@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from psycopg import Connection
     from psycopg.rows import DictRow
 
+from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
 from kip.domain.models import (
     ApprovedAssertion,
@@ -211,6 +212,7 @@ class PostgresDatabase:
         context: RequestContext,
         source_object_id: str,
         snapshot: AclSnapshot,
+        classification: DataClassification,
     ) -> None:
         with self._connection(context) as connection:
             self._ensure_workspace_and_principal(connection, context)
@@ -219,12 +221,14 @@ class PostgresDatabase:
                 cursor.execute(
                     """
                     UPDATE source.objects
-                    SET acl_snapshot_id=%s, acl_scopes=%s, last_seen_at=now()
+                    SET acl_snapshot_id=%s, acl_scopes=%s,
+                        data_classification=%s, last_seen_at=now()
                     WHERE workspace_id=%s AND id=%s
                     """,
                     (
                         snapshot.id,
                         snapshot.scopes,
+                        classification,
                         context.workspace,
                         source_object_id,
                     ),
@@ -232,7 +236,7 @@ class PostgresDatabase:
                 cursor.execute(
                     """
                     UPDATE content.units unit
-                    SET acl_snapshot_id=%s, acl_scopes=%s
+                    SET acl_snapshot_id=%s, acl_scopes=%s, data_classification=%s
                     FROM content.artifacts artifact
                     JOIN source.revisions revision ON revision.id=artifact.revision_id
                     WHERE unit.workspace_id=%s
@@ -242,6 +246,7 @@ class PostgresDatabase:
                     (
                         snapshot.id,
                         snapshot.scopes,
+                        classification,
                         context.workspace,
                         source_object_id,
                     ),
@@ -312,6 +317,13 @@ class PostgresDatabase:
             raise ValidationError(
                 "every content unit must reference the source ACL snapshot"
             )
+        if any(
+            unit.classification != packet.source_object.classification
+            for unit in packet.units
+        ):
+            raise ValidationError(
+                "every content unit must match the source data classification"
+            )
 
         with self._connection(context) as connection:
             self._ensure_workspace_and_principal(connection, context)
@@ -333,12 +345,14 @@ class PostgresDatabase:
                         cursor.execute(
                             """
                             UPDATE source.objects
-                            SET acl_snapshot_id=%s, acl_scopes=%s, last_seen_at=now()
+                            SET acl_snapshot_id=%s, acl_scopes=%s,
+                                data_classification=%s, last_seen_at=now()
                             WHERE workspace_id=%s AND id=%s
                             """,
                             (
                                 snapshot.id,
                                 snapshot.scopes,
+                                packet.source_object.classification,
                                 context.workspace,
                                 packet.source_object.id,
                             ),
@@ -346,7 +360,8 @@ class PostgresDatabase:
                         cursor.execute(
                             """
                             UPDATE content.units unit
-                            SET acl_snapshot_id=%s, acl_scopes=%s
+                            SET acl_snapshot_id=%s, acl_scopes=%s,
+                                data_classification=%s
                             FROM content.artifacts artifact
                             WHERE unit.workspace_id=%s
                               AND unit.artifact_id=artifact.id
@@ -355,6 +370,7 @@ class PostgresDatabase:
                             (
                                 snapshot.id,
                                 snapshot.scopes,
+                                packet.source_object.classification,
                                 context.workspace,
                                 old_revision_id,
                             ),
@@ -395,12 +411,14 @@ class PostgresDatabase:
                     """
                     INSERT INTO source.objects(
                         id, workspace_id, system_id, external_id, object_type, canonical_uri,
-                        acl_scopes, acl_snapshot_id, metadata, last_seen_at
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,now())
+                        acl_scopes, acl_snapshot_id, data_classification, metadata,
+                        last_seen_at
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,now())
                     ON CONFLICT (id) DO UPDATE SET
                         canonical_uri=EXCLUDED.canonical_uri,
                         acl_scopes=EXCLUDED.acl_scopes,
                         acl_snapshot_id=EXCLUDED.acl_snapshot_id,
+                        data_classification=EXCLUDED.data_classification,
                         metadata=EXCLUDED.metadata,
                         last_seen_at=now(),
                         deleted_at=NULL
@@ -414,6 +432,7 @@ class PostgresDatabase:
                         packet.source_object.canonical_uri,
                         packet.source_object.acl_scopes,
                         snapshot.id,
+                        packet.source_object.classification,
                         _json(packet.source_object.metadata),
                     ),
                 )
@@ -528,8 +547,8 @@ class PostgresDatabase:
                         INSERT INTO content.units(
                             id, workspace_id, extraction_id, document_id, artifact_id, ordinal, unit_type,
                             title, body, body_normalized, locator, acl_scopes, acl_snapshot_id,
-                            char_count, metadata
-                        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s::jsonb)
+                            data_classification, char_count, metadata
+                        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,%s::jsonb)
                         ON CONFLICT (id) DO NOTHING
                         """,
                         (
@@ -546,6 +565,7 @@ class PostgresDatabase:
                             _json(unit.locator.model_dump(mode="json")),
                             unit.acl_scopes,
                             unit.acl_snapshot_id,
+                            unit.classification,
                             len(unit.body),
                             _json(unit.metadata),
                         ),
@@ -1084,6 +1104,7 @@ class PostgresDatabase:
                 locator=EvidenceLocator.model_validate(row["locator"]),
                 acl_scopes=list(row["acl_scopes"] or []),
                 acl_snapshot_id=row["acl_snapshot_id"],
+                classification=row["data_classification"],
                 metadata=row["metadata"] or {},
             )
             for row in rows
@@ -1106,6 +1127,7 @@ class PostgresDatabase:
                     r.is_tombstone, r.metadata AS revision_metadata,
                     o.system_id, o.external_id, o.object_type, o.canonical_uri,
                     o.acl_scopes AS object_acl_scopes, o.metadata AS object_metadata,
+                    o.data_classification AS object_data_classification,
                     snapshot.id AS acl_snapshot_id,
                     snapshot.provider AS acl_snapshot_provider,
                     snapshot.snapshot_version AS acl_snapshot_version,
@@ -1149,6 +1171,7 @@ class PostgresDatabase:
             id=row["object_id"], system_id=row["system_id"], system_name=row["system_name"],
             system_kind=row["system_kind"], external_id=row["external_id"], object_type=row["object_type"],
             canonical_uri=row["canonical_uri"], acl_scopes=list(row["object_acl_scopes"] or []),
+            classification=row["object_data_classification"],
             acl_snapshot=AclSnapshot(
                 id=row["acl_snapshot_id"],
                 version=row["acl_snapshot_version"],

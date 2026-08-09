@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
 from kip.domain.models import ConnectorEvent, DocumentPacket, IngestResult, RequestContext
 from kip.ports.parser import ParserPort
@@ -32,6 +33,9 @@ class FilesystemSourcePort(Protocol):
     @property
     def acl_snapshot(self) -> AclSnapshot: ...
 
+    @property
+    def classification(self) -> DataClassification: ...
+
     def scan(self) -> Iterable[DiscoveredFile]: ...
 
 
@@ -51,6 +55,8 @@ class SourceCatalogPort(Protocol):
 
     def event_acl_snapshot(self, event: ConnectorEvent) -> AclSnapshot: ...
 
+    def event_classification(self, event: ConnectorEvent) -> DataClassification: ...
+
 
 class ParserRegistryPort(Protocol):
     def find(self, path: Path) -> ParserPort: ...
@@ -68,6 +74,7 @@ class IngestionStore(Protocol):
         context: RequestContext,
         source_object_id: str,
         snapshot: AclSnapshot,
+        classification: DataClassification,
     ) -> None: ...
 
     def has_revision(

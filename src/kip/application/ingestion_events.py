@@ -5,6 +5,7 @@ from enum import StrEnum
 from typing import assert_never
 
 from kip.application.analyzer import KoreanNgramAnalyzer, normalize_text
+from kip.domain.egress import DataClassification
 from kip.domain.models import (
     Artifact,
     ConnectorEvent,
@@ -47,6 +48,8 @@ class EventIngestionWorkflow:
         self,
         context: RequestContext,
         event: ConnectorEvent,
+        *,
+        classification: DataClassification,
     ) -> IngestResult:
         payload_bytes = json.dumps(
             event.payload,
@@ -79,7 +82,12 @@ class EventIngestionWorkflow:
                 )
             }
         )
-        self._store.upsert_acl_snapshot(ingest_context, object_id, snapshot)
+        self._store.upsert_acl_snapshot(
+            ingest_context,
+            object_id,
+            snapshot,
+            classification,
+        )
         if self._store.has_revision(ingest_context, object_id, revision_hash):
             return IngestResult(
                 status="unchanged",
@@ -102,6 +110,7 @@ class EventIngestionWorkflow:
             body=body,
             locator=locator,
             acl_snapshot_id=snapshot.id,
+            classification=classification,
         )
         packet = DocumentPacket(
             workspace_id=context.workspace,
@@ -113,6 +122,7 @@ class EventIngestionWorkflow:
                 external_id=event.external_id,
                 object_type="message",
                 canonical_uri=_event_uri(event, family),
+                classification=classification,
                 acl_scopes=list(event.acl_scopes),
                 acl_snapshot=snapshot,
                 metadata={"connector_event_id": event.event_id},
@@ -173,6 +183,7 @@ class EventIngestionWorkflow:
         body: str,
         locator: EvidenceLocator,
         acl_snapshot_id: str,
+        classification: DataClassification,
     ) -> list[ContentUnit]:
         if event.operation == "delete":
             return []
@@ -194,6 +205,7 @@ class EventIngestionWorkflow:
                     f"{title}\n{normalized}\n{event.external_id}"
                 ),
                 locator=locator,
+                classification=classification,
                 acl_scopes=list(event.acl_scopes),
                 acl_snapshot_id=acl_snapshot_id,
                 metadata={"connector": event.connector_name},

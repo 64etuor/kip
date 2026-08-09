@@ -17,6 +17,10 @@ from kip.adapters.repository.memory import MemoryRepository  # noqa: E402
 from kip.api import create_app  # noqa: E402
 from kip.container import build_container  # noqa: E402
 from kip.domain.egress import EgressDecision  # noqa: E402
+from kip.domain.generation import (  # noqa: E402
+    GenerationRequest,
+    GenerationResult,
+)
 from kip.domain.models import (  # noqa: E402
     ApprovedAssertion,
     Artifact,
@@ -77,6 +81,8 @@ MODELS = {
     "status-report": StatusReport,
     "vocabulary-item": VocabularyItem,
     "egress-decision": EgressDecision,
+    "generation-request": GenerationRequest,
+    "generation-result": GenerationResult,
     "setup-answers": SetupAnswers,
     "setup-inspection": SetupInspection,
     "setup-plan": SetupPlan,

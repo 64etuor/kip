@@ -10,7 +10,8 @@
 | CLI | Ready for pilot | JSON-first commands; source-neutral `sync run`, top-level `xlsx-read`, projection and canonical export aliases |
 | REST API | Ready for pilot | Read, exact evidence, assertion explain, connector event, sync, and review endpoints; trusted API-key or verified JWT identity |
 | Identity and ACL snapshots | Ready for pilot | JWT issuer/audience/JWKS verification, configured API-key principal, stale dynamic snapshot exclusion, and legacy identity-header rejection |
-| Data classification and model egress | Ready for pilot | Canonical source/unit classification, local loopback policy, remote provider/classification/retention/secret gates, and atomic denial decisions; generator adapters are not yet bundled |
+| Data classification and model egress | Ready for pilot | Canonical source/unit classification, local loopback policy, remote provider/classification/retention/secret gates, and atomic denial decisions |
+| Structured generation adapters | Ready for pilot | Provider-neutral typed contract with bounded HTTP responses, explicit timeouts, pinned model revisions, request IDs, token accounting, citation-ID validation, and OpenAI Responses/Anthropic Messages adapters; answer orchestration remains separately gated |
 | MCP | Reference adapter | Requires optional dependency and client validation |
 | Filesystem connector | Ready for pilot | Read-only traversal, hash, settle-time checks |
 | XLSX shallow/deep | Ready for pilot | Shared-string shallow index and exact `.xlsx`/`.xlsm` range reader; formula/cached values, formats, dates, and hidden dimensions are explicit |
@@ -23,7 +24,7 @@
 | Evaluation reports | Ready with coverage gaps | Recall, MRR, nDCG, ACL, latency, failure counts, fingerprints, Markdown scorecard, append-only ledger; locator/latest/stale/recovery remain unmeasured in the public set |
 | Quality control plane | Ready for pilot | Version-pinned parser/embedding/reranker/retrieval experiment manifests and fail-closed, read-only promotion recommendations; manifest-driven orchestration is not yet a scheduler |
 | Answer-quality rubric | Contract ready | Deterministic reviewed groundedness, completeness, citation-locator, unsupported-claim, and refusal metrics; current golden datasets still need answer annotations |
-| Evidence-bounded answer | Ready for pilot | CLI/API/MCP exact-evidence extractive answer with ACL, relevance, freshness, refusal, and XLSX deep-read gates; an LLM synthesis adapter is still not bundled |
+| Evidence-bounded answer | Ready for pilot | CLI/API/MCP exact-evidence extractive answer with ACL, relevance, freshness, refusal, and XLSX deep-read gates; structured generation exists but is not yet connected to this path |
 | Local embedding sidecar | Validated shadow | Infinity 0.0.77, Qwen3 0.6B 1024d, pinned revisions, MPS smoke passed |
 | Local reranker | Validated shadow | BGE reranker v2 M3 plus opt-in pinned Jina Hugging Face adapter; Jina trial measured 613.31 ms P95 but failed quality gates, so remains shadow-only |
 | pgvector | Complete shadow, disabled | PostgreSQL 18/pgvector 0.8.2, 74/74 vectors, RLS and source-hash filtering; public pilot did not beat lexical |
@@ -45,6 +46,10 @@
 - Remote model use requires an approved provider contract and classification
   allowlist. The `zero_retention` field is configuration evidence, not
   independent verification of the provider account setting.
+- The bundled remote generators disable ambient proxy discovery and require an
+  explicit endpoint, immutable model revision, and environment-backed secret
+  reference. Keychain and external secret-manager resolution require a runtime
+  integration and fail closed in the reference container.
 - Optional HWP parser commands, Slack scopes, Apple Mail Automation permissions, and IMAP provider behavior must be validated against the target environment.
 - Neo4j remains an adoption-gate adapter stub; canonical assertions are queried from PostgreSQL.
 - The current public pilot is small and lexically distinctive. Its `keep_disabled` decision must not be generalized to a private corpus without adding reviewed internal golden cases. The private OneDrive shadow A/B also showed no gain over lexical retrieval on its small golden set, so semantic projection remains shadow-only.

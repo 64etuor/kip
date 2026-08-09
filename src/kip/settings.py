@@ -165,6 +165,19 @@ class Settings:
                 return source
         return None
 
+    def resolve_secret_reference(self, reference: str) -> str:
+        scheme, separator, name = reference.partition(":")
+        if not separator or not name:
+            raise ConfigurationError("secret must be an opaque reference")
+        if scheme != "env":
+            raise ConfigurationError(
+                f"secret reference scheme is not available in this runtime: {scheme}"
+            )
+        value = os.environ.get(name)
+        if value is None or not value:
+            raise ConfigurationError(f"required secret environment variable is not set: {name}")
+        return value
+
     @property
     def is_memory(self) -> bool:
         return self.database_url.startswith("memory://")

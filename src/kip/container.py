@@ -6,6 +6,8 @@ from typing import assert_never
 from kip.adapters.connectors.registry import ConfiguredSourceCatalog
 from kip.adapters.embeddings.http import HttpEmbeddingAdapter
 from kip.adapters.embeddings.noop import DisabledEmbeddingAdapter
+from kip.adapters.generators.anthropic import AnthropicGenerationAdapter
+from kip.adapters.generators.openai_compatible import OpenAICompatibleGenerationAdapter
 from kip.adapters.identity import (
     ApiKeyIdentityAdapter,
     JwtIdentityAdapter,
@@ -42,6 +44,7 @@ from kip.domain.egress import (
 from kip.errors import ConfigurationError
 from kip.ontology import OntologyCatalog
 from kip.ports.embedding import EmbeddingPort
+from kip.ports.generation import GenerationPort
 from kip.ports.identity import IdentityResolverPort
 from kip.ports.repository import RepositoryPort
 from kip.ports.reranker import RerankerPort
@@ -55,6 +58,7 @@ class Container:
     application: Application
     embedding: EmbeddingPort
     reranker: RerankerPort | None
+    generator: GenerationPort | None
     identity: IdentityResolverPort
 
 
@@ -63,6 +67,7 @@ def build_container(
     repository: RepositoryPort | None = None,
     embedding: EmbeddingPort | None = None,
     reranker: RerankerPort | None = None,
+    generator: GenerationPort | None = None,
     *,
     load_models: bool = True,
 ) -> Container:
@@ -128,6 +133,20 @@ def build_container(
                 )
             case unreachable:
                 assert_never(unreachable)
+    selected_generator = generator
+    generation_config = selected.get("models.generation", {}) or {}
+    if not isinstance(generation_config, dict):
+        raise ConfigurationError("models.generation must be a table")
+    if (
+        load_models
+        and selected_generator is None
+        and generation_config.get("enabled", False)
+    ):
+        selected_generator = _build_generator(
+            selected,
+            generation_config,
+            allow_remote_egress=allow_remote_egress,
+        )
     selected.cas_path.mkdir(parents=True, exist_ok=True)
     evidence = EvidenceUseCases(
         selected_repository.evidence,
@@ -180,7 +199,67 @@ def build_container(
         application=application,
         embedding=selected_embedding,
         reranker=selected_reranker,
+        generator=selected_generator,
         identity=selected_identity,
+    )
+
+
+def _build_generator(
+    settings: Settings,
+    raw: dict[str, object],
+    *,
+    allow_remote_egress: bool,
+) -> GenerationPort:
+    provider = str(raw.get("provider", "")).strip()
+    model = str(raw.get("model", "")).strip()
+    revision = str(raw.get("revision", "")).strip()
+    if not model or not revision:
+        raise ConfigurationError(
+            "enabled generation requires pinned model and revision values"
+        )
+    timeout_seconds = float(str(raw.get("timeout_seconds", 60)))
+    max_response_bytes = int(str(raw.get("max_response_bytes", 1024 * 1024)))
+    if provider == "local":
+        return OpenAICompatibleGenerationAdapter(
+            base_url=str(raw.get("base_url", "http://127.0.0.1:7998")),
+            api_key="",
+            model=model,
+            revision=revision,
+            provider="local",
+            allow_remote_egress=False,
+            timeout_seconds=timeout_seconds,
+            max_response_bytes=max_response_bytes,
+        )
+    if provider not in {"openai", "anthropic"}:
+        raise ConfigurationError(f"unsupported generation provider: {provider or 'missing'}")
+    secret_reference = str(raw.get("secret_ref", "")).strip()
+    if not secret_reference:
+        raise ConfigurationError("remote generation requires secret_ref")
+    api_key = settings.resolve_secret_reference(secret_reference)
+    base_url = str(
+        raw.get(
+            "base_url",
+            "https://api.openai.com" if provider == "openai" else "https://api.anthropic.com",
+        )
+    )
+    if provider == "openai":
+        return OpenAICompatibleGenerationAdapter(
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+            revision=revision,
+            allow_remote_egress=allow_remote_egress,
+            timeout_seconds=timeout_seconds,
+            max_response_bytes=max_response_bytes,
+        )
+    return AnthropicGenerationAdapter(
+        base_url=base_url,
+        api_key=api_key,
+        model=model,
+        revision=revision,
+        allow_remote_egress=allow_remote_egress,
+        timeout_seconds=timeout_seconds,
+        max_response_bytes=max_response_bytes,
     )
 
 

@@ -293,7 +293,7 @@ def test_container_builds_one_central_remote_egress_policy(tmp_path: Path) -> No
         cas_path=tmp_path / "cas",
     )
 
-    policy = build_container(settings).application.egress.policy
+    policy = build_container(settings, load_models=False).application.egress.policy
 
     assert policy.provider is EgressProvider.ANTHROPIC
     assert policy.allowed_classifications == (

@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 from enum import StrEnum
-from typing import Protocol
+from typing import Protocol, cast
 
 from kip.errors import ConfigurationError, DependencyUnavailableError
 from kip.ports.reranker import RerankScore
@@ -72,12 +72,15 @@ class HuggingFaceJinaRerankerAdapter:
                 "Hugging Face Jina reranking requires the semantic dependencies"
             ) from error
         try:
-            return AutoModelForSequenceClassification.from_pretrained(
-                model,
-                revision=revision,
-                dtype="auto",
-                trust_remote_code=True,
-                use_flash_attn=False,
+            return cast(
+                JinaSequenceClassifier,
+                AutoModelForSequenceClassification.from_pretrained(
+                    model,
+                    revision=revision,
+                    dtype="auto",
+                    trust_remote_code=True,
+                    use_flash_attn=False,
+                ),
             )
         except (OSError, RuntimeError) as error:
             raise DependencyUnavailableError(

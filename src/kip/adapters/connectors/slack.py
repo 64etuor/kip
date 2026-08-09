@@ -4,7 +4,7 @@ import os
 import time
 from collections.abc import Iterator
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -67,7 +67,7 @@ class SlackConnector:
                 time.sleep(max(1, int(response.headers.get("Retry-After", "1"))))
                 continue
             response.raise_for_status()
-            data = response.json()
+            data = cast(dict[str, Any], response.json())
             if not data.get("ok"):
                 raise SourceUnavailableError(f"Slack {method} failed: {data.get('error', 'unknown_error')}")
             return data

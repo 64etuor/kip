@@ -6,7 +6,7 @@ import os
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from email import policy
-from email.message import Message
+from email.message import EmailMessage
 
 from kip.domain.models import ConnectorEvent
 from kip.errors import ConfigurationError, SourceUnavailableError
@@ -37,7 +37,7 @@ class ImapConnector:
                 if status != "OK":
                     continue
                 start_uid = int(cursors.get(mailbox, 0)) + 1
-                status, data = client.uid("search", None, f"UID {start_uid}:*")
+                status, data = client.uid("search", f"UID {start_uid}:*")
                 if status != "OK" or not data:
                     continue
                 for uid in data[0].split():
@@ -79,7 +79,7 @@ class ImapConnector:
         )
 
     @staticmethod
-    def _body(message: Message) -> str:
+    def _body(message: EmailMessage) -> str:
         if message.is_multipart():
             parts: list[str] = []
             for part in message.walk():
@@ -89,8 +89,16 @@ class ImapConnector:
                     try:
                         parts.append(part.get_content())
                     except Exception:
-                        payload = part.get_payload(decode=True) or b""
-                        parts.append(payload.decode(part.get_content_charset() or "utf-8", errors="replace"))
+                        payload = part.get_payload(decode=True)
+                        if isinstance(payload, bytes):
+                            parts.append(
+                                payload.decode(
+                                    part.get_content_charset() or "utf-8",
+                                    errors="replace",
+                                )
+                            )
+                        elif isinstance(payload, str):
+                            parts.append(payload)
             return "\n".join(parts)
         try:
             return str(message.get_content())

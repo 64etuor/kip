@@ -1,3 +1,6 @@
+from collections.abc import Sequence
+
+
 class DisabledEmbeddingAdapter:
     name = "disabled"
     provider = "disabled"
@@ -6,8 +9,8 @@ class DisabledEmbeddingAdapter:
     dimensions = 0
     normalized = False
 
-    def embed_query(self, text):
+    def embed_query(self, text: str) -> list[float]:
         raise RuntimeError("semantic search is disabled")
 
-    def embed_documents(self, texts):
+    def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
         raise RuntimeError("semantic search is disabled")

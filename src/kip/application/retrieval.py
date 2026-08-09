@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from kip.domain.models import SearchHit
 from kip.ports.reranker import RerankScore
 
@@ -13,7 +15,7 @@ def reciprocal_rank_fusion(
 ) -> list[SearchHit]:
     by_unit: dict[str, SearchHit] = {}
     scores: dict[str, float] = {}
-    metadata: dict[str, dict] = {}
+    metadata: dict[str, dict[str, Any]] = {}
     for channel, hits in (("lexical", lexical), ("vector", vector)):
         for rank, hit in enumerate(hits, start=1):
             if hit.unit_id not in by_unit or channel == "lexical":
@@ -80,4 +82,3 @@ def apply_rerank(
             )
         )
     return result
-

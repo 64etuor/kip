@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import typer
 
 from kip.container import Container, build_container
-from kip.domain.knowledge import KnowledgeEntity
+from kip.domain.knowledge import CandidateEvidence, KnowledgeEntity
 from kip.domain.models import (
     AnswerRequest,
     AssertionCandidate,
@@ -18,9 +19,11 @@ from kip.domain.models import (
     GraphNeighborsRequest,
     GraphPathRequest,
     RequestContext,
+    SearchHit,
     SearchRequest,
 )
 from kip.errors import AuthorizationError, ConflictError, KipError, NotFoundError, ValidationError
+from kip.evaluation.models import GoldenCase
 from kip.evaluation.reporting import append_evolution_record, write_report
 from kip.evaluation.reviews import load_review_bundle
 from kip.evaluation.runner import (
@@ -135,14 +138,18 @@ def _emit(runtime: Runtime, data: Any) -> None:
     typer.echo(envelope.model_dump_json(indent=2))
 
 
-def _emit_error(runtime: Runtime | None, exc: Exception) -> None:
+def _emit_error(runtime: Runtime | None, exc: BaseException) -> None:
     context = runtime.context if runtime else RequestContext(request_id=new_id("req"))
-    code = {
-        NotFoundError: "not_found",
-        ConflictError: "conflict",
-        ValidationError: "validation_error",
-        AuthorizationError: "forbidden",
-    }.get(type(exc), "internal_error")
+    if isinstance(exc, NotFoundError):
+        code = "not_found"
+    elif isinstance(exc, ConflictError):
+        code = "conflict"
+    elif isinstance(exc, ValidationError):
+        code = "validation_error"
+    elif isinstance(exc, AuthorizationError):
+        code = "forbidden"
+    else:
+        code = "internal_error"
     envelope = Envelope(
         ok=False,
         error=ErrorInfo(code=code, message=str(exc)),
@@ -154,7 +161,7 @@ def _emit_error(runtime: Runtime | None, exc: Exception) -> None:
     typer.echo(envelope.model_dump_json(indent=2), err=True)
 
 
-def _run(ctx: typer.Context, function) -> None:
+def _run(ctx: typer.Context, function: Callable[[Runtime], Any]) -> None:
     runtime: Runtime | None = None
     try:
         runtime = _runtime(ctx)
@@ -282,7 +289,7 @@ def status(ctx: typer.Context) -> None:
 def doctor(ctx: typer.Context) -> None:
     """Check configuration, source mounts, storage, and adapter availability."""
 
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         settings = runtime.container.settings
         capabilities = runtime.container.application.operations.capabilities()
         checks: list[dict[str, Any]] = []
@@ -354,7 +361,7 @@ def search(
     project_id: list[str] | None = typer.Option(None, "--project-id"),
 ) -> None:
     """Search exact identifiers and lexical evidence units."""
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         selected_query = query_option or query
         if not selected_query:
             raise ValidationError("provide QUERY or --query")
@@ -377,7 +384,7 @@ def vocab(
     limit: int = typer.Option(20, min=1, max=100),
 ) -> None:
     """Inspect terms that actually exist in the lexical projection."""
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         selected = term or prefix
         if not selected:
             raise ValidationError("provide PREFIX or --term")
@@ -396,7 +403,7 @@ def context_command(
     source_kind: list[str] | None = typer.Option(None, "--source-kind"),
 ) -> None:
     """Build a bounded evidence bundle for an AI agent or application."""
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         selected_query = query_option or query
         if not selected_query:
             raise ValidationError("provide QUERY or --query")
@@ -418,7 +425,7 @@ def answer(
     limit: int = typer.Option(5, min=1, max=20),
     max_chars: int = typer.Option(12000, min=1000, max=40000),
 ) -> None:
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         selected_query = query_option or query
         if not selected_query:
             raise ValidationError("provide QUERY or --query")
@@ -513,7 +520,7 @@ def sync_run(
 ) -> None:
     """Compatibility entry point for source-neutral synchronization."""
 
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         if mode != "incremental":
             raise ValidationError(
                 "the starter kit implements safe incremental sync only; "
@@ -666,7 +673,7 @@ def review_propose(
     ontology_version: str = typer.Option("core/1.0.0"),
     confidence: float | None = typer.Option(None),
 ) -> None:
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         object_value: Any = None
         if object_json is not None:
             object_value = json.loads(object_json)
@@ -679,7 +686,10 @@ def review_propose(
             origin=origin,
             confidence=confidence,
             ontology_version=ontology_version,
-            evidence=[{"content_unit_id": value} for value in (evidence_unit_id or [])],
+            evidence=[
+                CandidateEvidence(content_unit_id=value)
+                for value in (evidence_unit_id or [])
+            ],
         )
         return runtime.container.application.knowledge.create_candidate(runtime.context, candidate)
     _run(ctx, action)
@@ -723,7 +733,7 @@ def jobs_list(
 def projection_status(ctx: typer.Context) -> None:
     """Report projection counts and configured optional backends."""
 
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         status_report = runtime.container.application.operations.status(runtime.context)
         return {
             "lexical": {
@@ -753,7 +763,7 @@ def projection_rebuild(
 ) -> None:
     """Rebuild a disposable projection without mutating canonical assertions."""
 
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         if enqueue:
             job_id = runtime.container.application.operations.enqueue_job(
                 runtime.context,
@@ -776,7 +786,7 @@ def projection_rebuild(
 def projection_verify(ctx: typer.Context, name: str = typer.Option("lexical", "--name")) -> None:
     """Run low-cost parity checks for a projection."""
 
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         report = runtime.container.application.operations.status(runtime.context)
         if name == "lexical":
             ok = report.content_units == report.lexical_units
@@ -817,7 +827,7 @@ def projection_activate(
 ) -> None:
     """Activate a complete semantic projection after an evaluation gate passes."""
 
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         if name not in {"semantic", "vector"}:
             raise ValidationError("only semantic projections require explicit activation")
         evaluation = json.loads(report.read_text(encoding="utf-8"))
@@ -848,7 +858,7 @@ def rebuild(
 ) -> None:
     """Backward-compatible alias for `projection rebuild`."""
 
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         if enqueue:
             job_id = runtime.container.application.operations.enqueue_job(
                 runtime.context,
@@ -872,7 +882,7 @@ def evaluate_validate(
     ctx: typer.Context,
     dataset: Path = typer.Option(..., "--dataset", exists=True, dir_okay=False, readable=True),
 ) -> None:
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         loaded = load_dataset(dataset)
         return {
             "dataset": loaded.name,
@@ -903,10 +913,10 @@ def evaluate_run(
         help="Reviewed answer and ontology observations bound to this dataset version",
     ),
 ) -> None:
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         loaded = load_dataset(dataset)
 
-        def search_case(case, variant):
+        def search_case(case: GoldenCase, variant: str) -> list[SearchHit]:
             context = runtime.container.application.operations.request_context(
                 workspace=runtime.context.workspace,
                 principal_id=case.principal,
@@ -959,7 +969,7 @@ def evaluate_compare(
     baseline: str = typer.Option("lexical", "--baseline"),
     candidate: str = typer.Option(..., "--candidate"),
 ) -> None:
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         payload = json.loads(report.read_text(encoding="utf-8"))
         return compare_variants(payload, baseline, candidate)
 
@@ -980,7 +990,7 @@ def quality_recommend(
     manifest: Path = typer.Option(..., "--manifest", exists=True, dir_okay=False, readable=True),
     report: Path = typer.Option(..., "--report", exists=True, dir_okay=False, readable=True),
 ) -> None:
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         return recommend(load_experiment(manifest), load_quality_report(report))
 
     _run(ctx, action)
@@ -991,7 +1001,7 @@ def ontology_validate(
     ctx: typer.Context,
     root: Path = typer.Option(..., "--root", exists=True, file_okay=False, readable=True),
 ) -> None:
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         errors = validate_ontology(root)
         if errors:
             raise ValidationError("invalid ontology contract: " + "; ".join(errors))
@@ -1038,7 +1048,7 @@ def ontology_entity_create(
     alias: list[str] | None = typer.Option(None, "--alias"),
     acl_scope: list[str] | None = typer.Option(None, "--acl-scope"),
 ) -> None:
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         return runtime.container.application.ontology_rag.create_entity(
             runtime.context,
             KnowledgeEntity(
@@ -1075,7 +1085,7 @@ def ontology_candidates(
     status_value: str = typer.Option("proposed", "--status"),
     limit: int = typer.Option(100, min=1, max=1000),
 ) -> None:
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         return {
             "entities": runtime.container.application.ontology_rag.list_entity_candidates(
                 runtime.context,
@@ -1131,7 +1141,7 @@ def ontology_diff(
     after: Path = typer.Option(..., "--after", exists=True, file_okay=False, readable=True),
     migration: Path | None = typer.Option(None, "--migration", dir_okay=False, readable=True),
 ) -> None:
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         result = diff_ontologies(before, after)
         selected = load_migration(migration) if migration is not None else None
         errors = validate_migration_coverage(result, selected)
@@ -1184,7 +1194,7 @@ def telemetry_traces(
     request_id: str | None = typer.Option(None, "--request-id"),
     limit: int = typer.Option(100, "--limit", min=1, max=1000),
 ) -> None:
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         roles = list(dict.fromkeys([*runtime.context.roles, "admin"]))
         context = runtime.context.model_copy(update={"roles": roles})
         return runtime.container.application.telemetry.list_traces(
@@ -1198,7 +1208,7 @@ def telemetry_traces(
 
 @telemetry_app.command("prune")
 def telemetry_prune(ctx: typer.Context) -> None:
-    def action(runtime: Runtime):
+    def action(runtime: Runtime) -> Any:
         roles = list(dict.fromkeys([*runtime.context.roles, "admin"]))
         context = runtime.context.model_copy(update={"roles": roles})
         return {

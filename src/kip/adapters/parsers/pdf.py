@@ -18,7 +18,7 @@ class PdfParser:
 
     def parse(self, path: Path, *, artifact_id: str, document_id: str, acl_scopes: list[str]) -> tuple[ExtractionRun, list[ContentUnit]]:
         try:
-            import fitz
+            import fitz  # type: ignore[import-untyped]
         except ImportError as exc:
             raise DependencyUnavailableError("Install the extractors extra for PDF parsing") from exc
         extraction_id = new_id("ext")

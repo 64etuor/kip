@@ -47,7 +47,7 @@ def _contains(actual: Any, expected: Any) -> bool:
         )
     if isinstance(expected, list):
         return isinstance(actual, list) and actual == expected
-    return actual == expected
+    return bool(actual == expected)
 
 
 def locator_matches(actual: Mapping[str, Any], expected: Sequence[Mapping[str, Any]]) -> bool:
@@ -69,4 +69,3 @@ def percentile(values: Sequence[float], quantile: float) -> float:
         return float(ordered[lower])
     fraction = position - lower
     return float(ordered[lower] + (ordered[upper] - ordered[lower]) * fraction)
-

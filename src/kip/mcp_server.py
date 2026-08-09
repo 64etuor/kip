@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from typing import TYPE_CHECKING, Any, Literal
 
 from kip.container import build_container
 from kip.domain.knowledge import KnowledgeEntity
@@ -10,12 +11,16 @@ from kip.domain.models import (
     ContextRequest,
     GraphNeighborsRequest,
     GraphPathRequest,
+    RequestContext,
     SearchRequest,
 )
 from kip.errors import DependencyUnavailableError
 
+if TYPE_CHECKING:
+    from mcp.server.fastmcp import FastMCP
 
-def _json(value) -> str:
+
+def _json(value: Any) -> str:
     if hasattr(value, "model_dump"):
         value = value.model_dump(mode="json")
     elif isinstance(value, list):
@@ -23,7 +28,7 @@ def _json(value) -> str:
     return json.dumps(value, ensure_ascii=False, default=str)
 
 
-def create_server():
+def create_server() -> FastMCP:
     try:
         from mcp.server.fastmcp import FastMCP
     except ImportError as exc:
@@ -33,7 +38,7 @@ def create_server():
     application = container.application
     mcp = FastMCP("KIP Knowledge Fabric")
 
-    def context():
+    def context() -> RequestContext:
         workspace = os.environ.get("KIP_WORKSPACE") or container.settings.workspace
         principal = os.environ.get("KIP_PRINCIPAL_ID", "principal_mcp")
         raw_scopes = os.environ.get("KIP_ACL_SCOPES", "")
@@ -85,7 +90,11 @@ def create_server():
         return _json(application.evidence.read_xlsx(context(), artifact_id, sheet=sheet, cell_range=cell_range, require_fresh=not allow_stale))
 
     @mcp.tool()
-    def kip_graph_neighbors(node_id: str, predicates: list[str] | None = None, direction: str = "both") -> str:
+    def kip_graph_neighbors(
+        node_id: str,
+        predicates: list[str] | None = None,
+        direction: Literal["out", "in", "both"] = "both",
+    ) -> str:
         """Traverse approved assertion neighbors only."""
         return _json(application.knowledge.graph_neighbors(context(), GraphNeighborsRequest(node_id=node_id, predicates=predicates or [], direction=direction)))
 

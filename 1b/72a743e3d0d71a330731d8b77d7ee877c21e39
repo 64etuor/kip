@@ -1,0 +1,124 @@
+src/kip/adapters/repository/memory/__init__.py
+  s_41856199ee83ad::t_090eca282eb905 12,32
+docs/adr/ADR-028-redacted-query-tracing.md
+  s_41856199ee83ad::t_52add64682d410 1-41
+tests/integration/test_postgres_repository.py
+  s_41856199ee83ad::t_d5d5c2998b11b7 35,140-151
+  s_41856199ee83ad::t_744f551477dbb1 134-139
+contracts/query-trace.schema.json
+  s_41856199ee83ad::t_3e767415ede832 1-318
+src/kip/adapters/repository/postgres/__init__.py
+  s_41856199ee83ad::t_090eca282eb905 12,34
+docs/DATA_CONTRACTS.md
+  s_41856199ee83ad::t_2b5a75b9e45e99 127-142
+src/kip/api.py
+  s_41856199ee83ad::t_eb483c00c421f8 317-331
+  s_41856199ee83ad::t_705e7ab7053ffd 332-340
+src/kip/application/answering.py
+  s_41856199ee83ad::t_a287367f02a7a5 4-6,17,33-37,39-41,56,84,98-124,244-281,283-329,416-418
+  s_41856199ee83ad::t_572c98b26b48b9 38,282
+docs/SECURITY.md
+  s_41856199ee83ad::t_9dfe60ed5b2a20 52-65
+docs/OPERATIONS.md
+  s_41856199ee83ad::t_01f92c59c07cb1 94-118
+migrations/0012_query_traces.sql
+  s_41856199ee83ad::t_fa29d5fc7c86eb 1-28
+src/kip/application/telemetry.py
+  s_41856199ee83ad::t_3205fbf3bdefe0 3,5,33,36
+  s_41856199ee83ad::t_fa29d5fc7c86eb 1-2,6-7,9-17,19-22,24-32,34-35,37-47,50-53,68
+  s_41856199ee83ad::t_1d6614a644c5bc 8,48-49
+  s_41856199ee83ad::t_bb8f90a8aeeaf6 4,18,23,54-67
+docs/IMPLEMENTATION_STATUS.md
+  s_41856199ee83ad::t_90c6ff3b9fa533 27,72-74
+src/kip/cli.py
+  s_41856199ee83ad::t_705e7ab7053ffd 1185-1196
+  s_41856199ee83ad::t_61a24f8117b065 1167-1184
+  s_41856199ee83ad::t_05997c962d045e 56,71,82
+src/kip/application/search.py
+  s_41856199ee83ad::t_572c98b26b48b9 26,200
+  s_41856199ee83ad::t_be89d775f2b070 3-5,9,21-25,27-29,48,66-68,98-123,138-139,163,169-199,201-299
+src/kip/domain/telemetry.py
+  s_41856199ee83ad::t_fa29d5fc7c86eb 1-98
+src/kip/adapters/telemetry/postgres.py
+  s_41856199ee83ad::t_bb8f90a8aeeaf6 3,78-91
+  s_41856199ee83ad::t_3205fbf3bdefe0 51-54,77
+  s_41856199ee83ad::t_eddde5399322dd 55-76
+  s_41856199ee83ad::t_fa29d5fc7c86eb 1-2,4-50
+pyproject.toml
+  s_41856199ee83ad::t_429d062646303d 55-56
+  s_41856199ee83ad::t_464e16798754c2 29-33,57
+config/kip.example.toml
+  s_41856199ee83ad::t_e64cfccf25b102 57-58,60-63,65
+  s_41856199ee83ad::t_bb8f90a8aeeaf6 59
+  s_41856199ee83ad::t_464e16798754c2 64
+src/kip/adapters/telemetry/__init__.py
+  s_41856199ee83ad::t_7b0f25ac6f883b 1
+src/kip/ports/repository.py
+  s_41856199ee83ad::t_090eca282eb905 11,35-37
+src/kip/application/runtime.py
+  s_41856199ee83ad::t_090eca282eb905 15,30
+src/kip/container.py
+  s_41856199ee83ad::t_572c98b26b48b9 173
+  s_41856199ee83ad::t_7f5ebd33a8c353 31,44,59,73,83
+  s_41856199ee83ad::t_bb8f90a8aeeaf6 189-196
+  s_41856199ee83ad::t_f55214e8952598 175-179,183
+  s_41856199ee83ad::t_970f54d8241c28 255
+  s_41856199ee83ad::t_03e1ba2b4e91b8 362,367,378
+  s_41856199ee83ad::t_f699ea42975231 164-172,174,180-182,184-188,197-198,212
+scripts/generate_contracts.py
+  s_41856199ee83ad::t_3205fbf3bdefe0 65
+  s_41856199ee83ad::t_5b684c096d417a 125
+contracts/openapi.yaml
+  s_41856199ee83ad::t_9e509e269af032 607,676-682
+  s_41856199ee83ad::t_3e767415ede832 600-606,608-675
+src/kip/adapters/repository/memory/state.py
+  s_41856199ee83ad::t_090eca282eb905 16,39
+contracts/openapi.json
+  s_41856199ee83ad::t_3e767415ede832 623-710
+  s_41856199ee83ad::t_9e509e269af032 711-772
+src/kip/application/ontology_rag.py
+  s_41856199ee83ad::t_ea1e89620d0476 5-6,10,33-39,56,69,221-247,391-445
+  s_41856199ee83ad::t_690569619637f3 446
+src/kip/ports/telemetry.py
+  s_41856199ee83ad::t_fa29d5fc7c86eb 1-2,4-19,22-25
+  s_41856199ee83ad::t_bb8f90a8aeeaf6 3,20-21
+src/kip/setup/writer.py
+  s_41856199ee83ad::t_62c18d7d3523f2 175-183
+tests/test_query_tracing.py
+  s_41856199ee83ad::t_7b4b222a882199 132
+  s_41856199ee83ad::t_27113bd44aba0e 4,6,348-393
+  s_41856199ee83ad::t_38fc2405aeaefc 3,71-72,74,317-347
+  s_41856199ee83ad::t_744f551477dbb1 13,73,75-119,270-290
+  s_41856199ee83ad::t_4deb24a94b0d89 68-70
+  s_41856199ee83ad::t_1d6614a644c5bc 203-205,232-234
+  s_41856199ee83ad::t_5df8093745f3c8 1-2,5,7-8,10-12,15-26,28-40,42-67,120-131,133-165,168-202,206-225,227-230,235-261,394-408
+  s_41856199ee83ad::t_9c1a0f18b4e544 9,14,166-167,291-316
+  s_41856199ee83ad::t_6c1c10da6b1201 41,226,231
+  s_41856199ee83ad::t_81ae6b013ce2fd 27,262-269
+src/kip/adapters/telemetry/otel.py
+  s_41856199ee83ad::t_27113bd44aba0e 26-27,29-34,82-88,90-102,138-143
+  s_41856199ee83ad::t_572c98b26b48b9 3,37-39
+  s_41856199ee83ad::t_fa29d5fc7c86eb 1-2,4,6-7,9-13,35-36,40-80
+  s_41856199ee83ad::t_464e16798754c2 5,8,14-25,28,81,89,103-137,144
+src/kip/adapters/telemetry/memory.py
+  s_41856199ee83ad::t_fa29d5fc7c86eb 1-2,4-33
+  s_41856199ee83ad::t_bb8f90a8aeeaf6 3,34-43
+uv.lock
+  s_41856199ee83ad::t_8e8d3def14d4fc 475-486,702-704,746-750,769-774,796,1355-1435,1463-1477
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "1b72a743e3d0d71a330731d8b77d7ee877c21e39",
+  "prompts": {},
+  "sessions": {
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

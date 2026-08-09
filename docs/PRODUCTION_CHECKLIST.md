@@ -6,6 +6,10 @@ The default Compose profile is a local pilot profile. Before serving multiple us
 
 - Create separate migration, worker, read-agent, reviewer, and backup roles.
 - Do not run API or worker with `kip_owner`.
+- Apply and review `deploy/sql/roles.sql.template` as the object owner; bind
+  platform login roles to its NOLOGIN groups.
+- Give only the backup role verified `BYPASSRLS`; keep API, worker, and reviewer
+  roles `NOBYPASSRLS`.
 - Put API behind an organization-approved identity-aware proxy.
 - Derive workspace, principal, and ACL scopes from trusted identity; do not trust arbitrary client headers at an internet-facing boundary.
 - Run RLS tests using non-owner roles and verify inaccessible graph paths return no evidence of existence.
@@ -15,6 +19,8 @@ The default Compose profile is a local pilot profile. Before serving multiple us
 - Keep PostgreSQL, Neo4j, and MCP stdio off public interfaces.
 - Bind the reference API to loopback or a private network.
 - Store secrets in the platform secret manager, not `.env` in production.
+- Materialize secret references as absolute, operator-only, regular one-line
+  files; reject symlinks and trailing multiline payloads.
 - Deny model egress unless a provider and data classification are explicitly approved.
 
 ## Sources
@@ -37,7 +43,18 @@ The default Compose profile is a local pilot profile. Before serving multiple us
 
 ## Operations
 
-- Test restore into a new database and CAS path.
+- Require the current commit to pass Python 3.12 and 3.13 CI, generated-contract
+  and architecture checks, Ruff, mypy, runtime dependency audit, migrations,
+  tests, and the 75% coverage floor.
+- Verify both the release directory and archive. Record the wheel, archive,
+  SPDX SBOM, SLSA provenance, image lock, manifest, and checksums.
+- Publish only from a `v$(cat VERSION)` tag after quality and distribution jobs
+  pass. Verify the GHCR digest and GitHub attestations against the repository.
+- Never deploy a branch candidate or a `local/kip` image reference. Use one
+  immutable image digest for migration, API, and worker.
+- Test restore into a new empty database and absent or empty CAS path.
+- Keep encrypted off-host backups under an explicit retention policy, and
+  preserve the checksummed restore-drill receipt with measured RPO/RTO.
 - Monitor failed jobs, extraction failure rate, stale-source warnings, queue age, and search latency.
 - Pin production image digests and schedule upgrades.
 - Enable Dependabot and `upstream-watch`, create the `dependencies` and

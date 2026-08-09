@@ -4,6 +4,9 @@
 |---|---|---|
 | Root agent files | Ready | `AGENTS.md`, `CLAUDE.md`, `.mcp.json` included |
 | Canonical contracts | Ready | Pydantic models and generated JSON Schema |
+| Production distribution | Ready | Digest-pinned non-root image, read-only Compose profile, locked runtime/build inputs, wheel, image lock, SPDX SBOM, SLSA provenance, deterministic archive, private-data scan, and directory/archive verifier |
+| CI supply-chain gates | Ready | SHA-pinned actions, Python 3.12/3.13 matrix, contracts, architecture, Ruff, mypy, dependency audit, migrations, tests, 75% coverage, clean-wheel smoke, hardened-image smoke, candidate bundle, and tag-only GHCR publish with attestations |
+| Backup and recovery | Ready for operational adoption | Sealed PostgreSQL/CAS/config backup, `row_security=off` manifest, explicit empty-target restore, row/migration/extension/RLS/CAS comparison, projection rebuild, fingerprinted evaluation comparison, and checksummed drill receipt |
 | Memory repository | Ready | Used for tests and offline smoke checks |
 | PostgreSQL migrations | Ready for pilot | Workspace, required-scope, and ACL-snapshot freshness RLS included; test with non-owner production roles |
 | PostgreSQL repository | Pilot reference | Core ingest, search, exact read, ACL, job, assertion, export, and rebuild methods implemented; evidence and graph reads are ACL- and freshness-prefiltered |
@@ -38,6 +41,16 @@
 
 ## Explicit pilot limitations
 
+- Release archives are deliberately not encrypted, scheduled, uploaded, or
+  retained by KIP. Production must provide an external secret manager,
+  encrypted off-host backup policy, identity-aware TLS edge, and alerting.
+- Tag publishing requires repository permissions for GHCR packages, OIDC, and
+  GitHub attestations. A locally verified candidate does not prove that the
+  repository's tag-only publication path has run.
+- `compose.production.yaml` is a hardened reference, not an orchestrator or
+  secret manager. Operators must supply non-owner database login URLs, regular
+  secret files, immutable image digests, storage, TLS/IAP, and deployment-level
+  rollback and monitoring.
 - The default sync mode is incremental. Forced full re-extraction and destructive source reconciliation are intentionally not exposed as one-step starter commands.
 - The PostgreSQL integration test is gated by `KIP_TEST_POSTGRES_URL`; CI or a local PostgreSQL service must run it before deployment.
 - Multi-user production requires an identity-aware proxy that issues the

@@ -142,3 +142,28 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 - CI, Dependabot, upstream watch, verification scripts
 
 비밀, 실제 사내 경로, private golden corpus, DB dump, CAS는 starter repository에 포함하지 않는다. 별도 승인된 안전한 채널과 환경별 bootstrap 절차로 전달한다.
+
+## 9. 검증된 배포 패키지 생성
+
+깨끗한 tree에서 실제 배포할 단일 image digest를 지정한 뒤 디렉터리와 압축
+아카이브를 모두 검증한다.
+
+```bash
+export KIP_API_IMAGE='registry.example/kip@sha256:<verified-digest>'
+export KIP_WORKER_IMAGE="$KIP_API_IMAGE"
+export KIP_MIGRATE_IMAGE="$KIP_API_IMAGE"
+make release RELEASE_OUTPUT="dist/kip-$(tr -d '[:space:]' < VERSION)"
+make verify-release BUNDLE="dist/kip-$(tr -d '[:space:]' < VERSION)"
+make verify-release BUNDLE="dist/kip-$(tr -d '[:space:]' < VERSION).tar.gz"
+```
+
+패키지는 설치 가능한 wheel, digest image lock, SPDX SBOM, SLSA provenance,
+release manifest와 SHA-256 checksums, 독립 starter tree를 포함한다. verifier는
+비밀·사내 절대 경로·DB dump·CAS·개인 평가 자료가 섞이면 실패한다.
+
+branch/PR CI 결과는 검증용 candidate다. `v$(cat VERSION)` tag가 `VERSION`과
+정확히 일치할 때만 CI가 GHCR에 image를 push하고 wheel 및 archive provenance와
+wheel SBOM attestation을 발행한다. 운영자는 GitHub repository identity로
+attestation을 검증하고, bundle의 `local/kip` candidate가 아니라 GHCR digest를
+`deploy/production.env`의 세 image 변수에 동일하게 기록한다. 구체적인 역할,
+secret file, 배포, backup, restore drill 명령은 `docs/OPERATIONS.md`를 따른다.

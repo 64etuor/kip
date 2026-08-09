@@ -122,6 +122,8 @@ def test_setup_cli_answers_previews_plans_applies_and_verifies(
     assert receipt["source_summaries"][0]["file_count"] == 1
     assert (project_root / "config/kip.generated.toml").is_file()
     assert (project_root / "compose.generated.yaml").is_file()
+    assert (project_root / ".mcp.json").is_file()
+    assert any(check["name"] == "mcp_adapter" for check in receipt["checks"])
 
 
 def test_setup_cli_rejects_stale_plan_before_apply(tmp_path: Path) -> None:

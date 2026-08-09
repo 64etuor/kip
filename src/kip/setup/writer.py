@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import tempfile
@@ -68,6 +69,7 @@ def atomic_write_json(path: Path, content: str) -> None:
 def _render_files(plan: SetupPlan) -> dict[str, str]:
     config = _config_payload(plan)
     compose = _compose_payload(plan)
+    mcp = _mcp_payload(plan)
     return {
         "config/kip.generated.toml": tomli_w.dumps(config),
         "compose.generated.yaml": yaml.safe_dump(
@@ -75,6 +77,13 @@ def _render_files(plan: SetupPlan) -> dict[str, str]:
             allow_unicode=True,
             sort_keys=False,
         ),
+        ".mcp.json": json.dumps(
+            mcp,
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
     }
 
 
@@ -223,6 +232,21 @@ def _compose_payload(plan: SetupPlan) -> dict[str, object]:
         "services": {
             "api": _compose_service(plan, environment),
             "worker": _compose_service(plan, environment),
+        }
+    }
+
+
+def _mcp_payload(plan: SetupPlan) -> dict[str, object]:
+    return {
+        "mcpServers": {
+            "kip": {
+                "command": "bash",
+                "args": ["scripts/mcp.sh"],
+                "env": {
+                    "KIP_CONFIG": "config/kip.generated.toml",
+                    "KIP_WORKSPACE": plan.workspace,
+                },
+            }
         }
     }
 

@@ -149,6 +149,7 @@ def build_setup_plan(
         generated_files=[
             "config/kip.generated.toml",
             "compose.generated.yaml",
+            ".mcp.json",
         ],
         warnings=warnings,
     )

@@ -61,6 +61,24 @@ def test_generated_compose_selects_approved_cas_without_yaml_aliases(
     )
 
 
+def test_generated_mcp_uses_generated_config_without_secret_material(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    (project_root / ".mcp.json").write_text('{"legacy": true}\n', encoding="utf-8")
+    plan = build_setup_plan(_complete_answers(tmp_path), project_root=project_root)
+
+    receipt = apply_setup_plan(plan, project_root=project_root)
+
+    generated = (project_root / ".mcp.json").read_text(encoding="utf-8")
+    assert '"KIP_CONFIG": "config/kip.generated.toml"' in generated
+    assert '"KIP_WORKSPACE": "acme-rnd"' in generated
+    assert "KIP_OPENAI_API_KEY" not in generated
+    assert ".mcp.json" in receipt.written_files
+    assert ".mcp.json.previous" in receipt.previous_files
+
+
 def test_apply_rejects_tampered_plan_before_writing(tmp_path: Path) -> None:
     project_root = tmp_path / "project"
     project_root.mkdir()

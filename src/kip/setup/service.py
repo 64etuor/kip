@@ -102,10 +102,12 @@ class SetupService:
         plan.verify_fingerprint()
         config_path = self.project_root / "config/kip.generated.toml"
         compose_path = self.project_root / "compose.generated.yaml"
+        mcp_path = self.project_root / ".mcp.json"
         checks: list[SetupCheck] = []
         checks.append(_file_check("generated_config", config_path))
         checks.append(_file_check("compose_override", compose_path))
-        checks.extend(self._parse_checks(plan, config_path, compose_path))
+        checks.append(_file_check("mcp_adapter", mcp_path))
+        checks.extend(self._parse_checks(plan, config_path, compose_path, mcp_path))
         source_summaries: list[JsonObject] = []
         for source in plan.sources:
             exists = Path(source.host_root).is_dir()
@@ -279,22 +281,26 @@ class SetupService:
         plan: SetupPlan,
         config_path: Path,
         compose_path: Path,
+        mcp_path: Path,
     ) -> list[SetupCheck]:
-        if not config_path.is_file() or not compose_path.is_file():
+        if not config_path.is_file() or not compose_path.is_file() or not mcp_path.is_file():
             return []
         try:
             with config_path.open("rb") as handle:
                 config = tomllib.load(handle)
             compose_value = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
             compose = compose_value if isinstance(compose_value, dict) else {}
+            mcp_value = json.loads(mcp_path.read_text(encoding="utf-8"))
             fingerprint_ok = (
                 config.get("setup", {}).get("plan_fingerprint")
                 == plan.plan_fingerprint
             )
             read_only_ok = _all_source_mounts_read_only(compose, plan)
-        except (OSError, ValueError, yaml.YAMLError):
+            mcp_ok = _mcp_uses_generated_config(mcp_value, plan)
+        except (OSError, ValueError, TypeError, yaml.YAMLError):
             fingerprint_ok = False
             read_only_ok = False
+            mcp_ok = False
         return [
             SetupCheck(
                 name="plan_fingerprint",
@@ -305,6 +311,11 @@ class SetupService:
                 name="read_only_source_mounts",
                 ok=read_only_ok,
                 detail="enforced" if read_only_ok else "missing",
+            ),
+            SetupCheck(
+                name="mcp_runtime_config",
+                ok=mcp_ok,
+                detail="generated config selected" if mcp_ok else "mismatch",
             ),
         ]
 
@@ -349,3 +360,22 @@ def _all_source_mounts_read_only(
             if len(matches) != 1 or matches[0].get("read_only") is not True:
                 return False
     return True
+
+
+def _mcp_uses_generated_config(value: object, plan: SetupPlan) -> bool:
+    if not isinstance(value, dict):
+        return False
+    servers = value.get("mcpServers")
+    if not isinstance(servers, dict):
+        return False
+    server = servers.get("kip")
+    if not isinstance(server, dict):
+        return False
+    environment = server.get("env")
+    return bool(
+        server.get("command") == "bash"
+        and server.get("args") == ["scripts/mcp.sh"]
+        and isinstance(environment, dict)
+        and environment.get("KIP_CONFIG") == "config/kip.generated.toml"
+        and environment.get("KIP_WORKSPACE") == plan.workspace
+    )

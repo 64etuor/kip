@@ -12,10 +12,10 @@ Make the CLI state machine the only configuration writer. Never infer missing de
 3. Record only that response with `kip setup answer --question ID --value VALUE`.
 4. Repeat inspect and answer until complete. Do not request credential values; accept only `env:`, `keychain:`, or `secret-manager:` references.
 5. Run `kip setup preview`. Show source name, classification, file count, byte count, extension counts, exclusions, symlinks, and unreadable entries. Stop if scope is broader than the user intended.
-6. Run `kip setup plan --output PLAN`. Summarize read-only mounts, egress, generated files, warnings, and the fingerprint. Ask for explicit approval.
+6. Run `kip setup plan --output PLAN`. Summarize read-only mounts, egress, generated files (including the MCP runtime config), warnings, and the fingerprint. Ask for explicit approval.
 7. Only after approval, run `kip setup apply --plan PLAN`, then `kip setup verify --plan PLAN`.
 8. Report the receipt and every limitation. A missing evaluation dataset means installation-ready, not production-ready.
 
-Never edit TOML, Compose YAML, setup state, plans, or secrets yourself. Never bypass a rejected root, stale fingerprint, failed read-only check, or incomplete question. Resume from `inspect` after any interruption.
+Never edit TOML, Compose YAML, `.mcp.json`, setup state, plans, or secrets yourself. Never bypass a rejected root, stale fingerprint, failed read-only check, or incomplete question. Resume from `inspect` after any interruption.
 
 Read `references/questions.md` only when the returned answer format needs clarification.

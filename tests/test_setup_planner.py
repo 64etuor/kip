@@ -84,6 +84,7 @@ def test_setup_plan_is_deterministic_and_contains_read_only_mounts(
     assert first.generated_files == [
         "config/kip.generated.toml",
         "compose.generated.yaml",
+        ".mcp.json",
     ]
 
 

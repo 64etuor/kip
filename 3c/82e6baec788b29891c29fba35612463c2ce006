@@ -1,0 +1,74 @@
+scripts/postgres-tools.sh
+  s_41856199ee83ad::t_a74463e7d88275 1-12,15-37,39-66,68-89,92-96
+  s_41856199ee83ad::t_be322c5d68f354 13-14,38,67,90-91
+src/kip/py.typed
+  s_41856199ee83ad::t_0d4d08299a8605 1
+tests/test_settings_secrets.py
+  s_41856199ee83ad::t_aa6f31480a5f00 64-75
+docs/DATA_CONTRACTS.md
+  s_41856199ee83ad::t_4511e02f347c91 26-30
+src/kip/adapters/repository/postgres/database.py
+  s_41856199ee83ad::t_304ad14c7c35ca 1116
+  s_41856199ee83ad::t_c99938a218b1cd 2685-2686,2689,2694,2706-2759
+  s_41856199ee83ad::t_391efde4d0fb01 2687-2688,2690-2693
+  s_41856199ee83ad::t_b0693f27325dc8 561,563,577
+pyproject.toml
+  s_41856199ee83ad::t_0d4d08299a8605 72-74
+scripts/restore.sh
+  s_41856199ee83ad::t_aa6f31480a5f00 73
+  s_41856199ee83ad::t_a74463e7d88275 15,37,50-52,56-57,59-60
+  s_41856199ee83ad::t_1c65b17fd7b4a6 78
+  s_41856199ee83ad::t_746b46acd1c28e 3-5,8-12,16-36,38-49,53-55,58,61-72,74-77,79-87
+scripts/restore-drill.sh
+  s_41856199ee83ad::t_a96a92fbaa386e 41-49,56
+  s_41856199ee83ad::t_aa6f31480a5f00 53
+  s_41856199ee83ad::t_746b46acd1c28e 1-40,50-52,54-55,57-67
+scripts/common.sh
+  s_41856199ee83ad::t_34c4917a4e86bb 8-24
+tests/test_operational_recovery.py
+  s_41856199ee83ad::t_ca5d451711ccc5 1-166,168-170
+  s_41856199ee83ad::t_1c65b17fd7b4a6 167
+scripts/load_dotenv.py
+  s_41856199ee83ad::t_34c4917a4e86bb 1-71
+tests/integration/test_postgres_repository.py
+  s_41856199ee83ad::t_9fff1d0d91f94e 134-138,142-148
+  s_41856199ee83ad::t_391efde4d0fb01 139-141
+scripts/secret_value.py
+  s_41856199ee83ad::t_746b46acd1c28e 1-28
+migrations/0013_rebuildable_lexical_text.sql
+  s_41856199ee83ad::t_b0693f27325dc8 1-18
+docs/adr/ADR-030-sealed-backup-and-rebuildable-lexical-projection.md
+  s_41856199ee83ad::t_4511e02f347c91 1-44
+deploy/sql/backup-manifest.sql
+  s_41856199ee83ad::t_34c4917a4e86bb 1-34
+scripts/backup_artifacts.py
+  s_41856199ee83ad::t_34c4917a4e86bb 1-13,16-17,19-78,80-107,110-111,118-134,137-148,150-163,165-226,229,232-258,261-278,280-338,341-379,382-424,505-525,533-544,546,551-559
+  s_41856199ee83ad::t_746b46acd1c28e 425-477,480-504,526-532,545,547-550
+  s_41856199ee83ad::t_9ae39759952523 18,79,164
+  s_41856199ee83ad::t_3a4fdd116c9d0d 14
+  s_41856199ee83ad::t_2949ceb05f286f 15,108-109,112-117,135-136,149,227-228,230-231,259-260,279,339-340,380-381,478-479
+src/kip/settings.py
+  s_41856199ee83ad::t_74188d1452eed8 77-86,156,160-161
+  s_41856199ee83ad::t_aa6f31480a5f00 95,157-159,162,236
+scripts/backup.sh
+  s_41856199ee83ad::t_746b46acd1c28e 3,8-15,17-38,42,45,48-65
+  s_41856199ee83ad::t_a74463e7d88275 6,39-41,43-44,46-47
+src/kip/container.py
+  s_41856199ee83ad::t_aa6f31480a5f00 96
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "3c82e6baec788b29891c29fba35612463c2ce006",
+  "prompts": {},
+  "sessions": {
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

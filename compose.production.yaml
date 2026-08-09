@@ -1,0 +1,158 @@
+name: kip-production
+
+x-app-security: &app-security
+  user: "10001:10001"
+  read_only: true
+  init: true
+  cap_drop: ["ALL"]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs:
+    - /tmp:size=256m,mode=1777,noexec,nosuid,nodev
+  stop_grace_period: 30s
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "5"
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.2-pg18-trixie@sha256:b7337db8fe39d12fe8ecb0003c72680f24479813a744b43154eee6f2eab5a5f3
+    restart: unless-stopped
+    read_only: true
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-kip}
+      POSTGRES_USER: ${POSTGRES_USER:-kip_owner}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - type: volume
+        source: kip_pgdata
+        target: /var/lib/postgresql
+    tmpfs:
+      - /tmp:size=256m,mode=1777,noexec,nosuid,nodev
+      - /var/run/postgresql:size=16m,mode=3775,nosuid,nodev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    networks: [database]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    shm_size: 1gb
+
+  migrate:
+    <<: *app-security
+    image: ${KIP_MIGRATE_IMAGE:?set a digest-pinned migration image}
+    restart: "no"
+    profiles: ["migration"]
+    environment:
+      KIP_DATABASE_URL_FILE: /run/secrets/migrate_database_url
+      KIP_CONFIG: /app/config/kip.container.toml
+      KIP_ENV: production
+    secrets:
+      - migrate_database_url
+    command: ["migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [database]
+    pids_limit: 256
+
+  api:
+    <<: *app-security
+    image: ${KIP_API_IMAGE:?set a digest-pinned API image}
+    restart: unless-stopped
+    environment:
+      KIP_DATABASE_URL_FILE: /run/secrets/api_database_url
+      KIP_CONFIG: /app/config/kip.container.toml
+      KIP_ENV: production
+      KIP_API_HOST: 0.0.0.0
+      KIP_CAS_PATH: /data/cas
+      KIP_IDENTITY_MODE: jwt
+      KIP_JWT_ISSUER: ${KIP_JWT_ISSUER:?set the trusted JWT issuer}
+      KIP_JWT_AUDIENCE: ${KIP_JWT_AUDIENCE:?set the trusted JWT audience}
+      KIP_JWT_JWKS_URL: ${KIP_JWT_JWKS_URL:?set the trusted JWKS URL}
+    secrets:
+      - api_database_url
+    command: ["api", "serve", "--host", "0.0.0.0", "--port", "8080"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${KIP_API_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    volumes:
+      - type: volume
+        source: kip_cas
+        target: /data/cas
+        read_only: true
+    networks: [edge, database]
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2g
+          pids: 256
+
+  worker:
+    <<: *app-security
+    image: ${KIP_WORKER_IMAGE:?set a digest-pinned worker image}
+    restart: unless-stopped
+    environment:
+      KIP_DATABASE_URL_FILE: /run/secrets/worker_database_url
+      KIP_CONFIG: /app/config/kip.container.toml
+      KIP_ENV: production
+      KIP_CAS_PATH: /data/cas
+    secrets:
+      - worker_database_url
+    command: ["worker", "run"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - type: volume
+        source: kip_cas
+        target: /data/cas
+      - type: bind
+        source: ${KIP_NAS_PATH:?set the approved collection root}
+        target: /sources/nas
+        read_only: true
+        bind:
+          create_host_path: false
+    networks: [database]
+    tmpfs:
+      - /tmp:size=1g,mode=1777,noexec,nosuid,nodev
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 8g
+          pids: 256
+
+networks:
+  edge:
+  database:
+    internal: true
+
+volumes:
+  kip_pgdata:
+  kip_cas:
+
+secrets:
+  postgres_password:
+    file: ${KIP_POSTGRES_PASSWORD_FILE:?set the PostgreSQL password secret file}
+  migrate_database_url:
+    file: ${KIP_MIGRATE_DATABASE_URL_FILE:?set the migration database URL secret file}
+  api_database_url:
+    file: ${KIP_API_DATABASE_URL_FILE:?set the non-owner API database URL secret file}
+  worker_database_url:
+    file: ${KIP_WORKER_DATABASE_URL_FILE:?set the non-owner worker database URL secret file}

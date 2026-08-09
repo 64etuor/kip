@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import os
+import stat
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from kip.errors import ConfigurationError
+
+_MAX_SECRET_BYTES = 64 * 1024
 
 
 def _deep_get(data: dict[str, Any], path: str, default: Any = None) -> Any:
@@ -16,6 +19,59 @@ def _deep_get(data: dict[str, Any], path: str, default: Any = None) -> Any:
             return default
         current = current[part]
     return current
+
+
+def _read_secret_file(path_value: str) -> str:
+    path = Path(path_value)
+    if not path.is_absolute():
+        raise ConfigurationError("secret file path must be absolute")
+    flags = os.O_RDONLY
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as error:
+        if path.is_symlink():
+            raise ConfigurationError("secret file must not be a symlink") from error
+        raise ConfigurationError("secret file is not readable") from error
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise ConfigurationError("secret file must be a regular file")
+        if metadata.st_size > _MAX_SECRET_BYTES:
+            raise ConfigurationError("secret file exceeds the size limit")
+        with os.fdopen(descriptor, "rb", closefd=False) as handle:
+            payload = handle.read(_MAX_SECRET_BYTES + 1)
+    except OSError as error:
+        raise ConfigurationError("secret file is not readable") from error
+    finally:
+        os.close(descriptor)
+    if len(payload) > _MAX_SECRET_BYTES:
+        raise ConfigurationError("secret file exceeds the size limit")
+    if payload.endswith(b"\n"):
+        payload = payload[:-1]
+        if payload.endswith(b"\r"):
+            payload = payload[:-1]
+    try:
+        value = payload.decode("utf-8")
+    except UnicodeError as error:
+        raise ConfigurationError("secret file is not valid UTF-8") from error
+    if not value:
+        raise ConfigurationError("secret file is empty")
+    if "\n" in value or "\r" in value:
+        raise ConfigurationError("secret file must contain a single line")
+    return value
+
+
+def _environment_secret(name: str) -> str:
+    file_name = f"{name}_FILE"
+    if name in os.environ and file_name in os.environ:
+        raise ConfigurationError(f"{name} and {file_name} cannot both be set")
+    if file_name in os.environ:
+        return _read_secret_file(os.environ[file_name])
+    return os.environ.get(name, "")
 
 
 @dataclass(slots=True)
@@ -56,10 +112,16 @@ class Settings:
         elif os.environ.get("KIP_ENV", "development") not in {"test", "development"}:
             raise ConfigurationError(f"configuration file does not exist: {path}")
 
-        database_url = os.environ.get("KIP_DATABASE_URL", "")
+        database_url = _environment_secret("KIP_DATABASE_URL")
         if not database_url:
             env_name = _deep_get(raw, "database.url_env", "KIP_DATABASE_URL")
-            database_url = os.environ.get(str(env_name), "memory://")
+            database_url = (
+                _environment_secret(str(env_name))
+                if str(env_name) != "KIP_DATABASE_URL"
+                else ""
+            )
+        if not database_url:
+            database_url = "memory://"
 
         cas_value = os.environ.get("KIP_CAS_PATH", _deep_get(raw, "storage.cas_path", "./var/cas"))
         cas_path = Path(str(cas_value))
@@ -83,10 +145,18 @@ class Settings:
             cas_path=cas_path,
             api_host=os.environ.get("KIP_API_HOST", str(_deep_get(raw, "api.host", "127.0.0.1"))),
             api_port=int(os.environ.get("KIP_API_PORT", _deep_get(raw, "api.port", 8080))),
-            api_key=os.environ.get("KIP_API_KEY")
-            or os.environ.get(api_key_env, ""),
-            admin_key=os.environ.get("KIP_ADMIN_KEY")
-            or os.environ.get(admin_key_env, ""),
+            api_key=_environment_secret("KIP_API_KEY")
+            or (
+                _environment_secret(api_key_env)
+                if api_key_env != "KIP_API_KEY"
+                else ""
+            ),
+            admin_key=_environment_secret("KIP_ADMIN_KEY")
+            or (
+                _environment_secret(admin_key_env)
+                if admin_key_env != "KIP_ADMIN_KEY"
+                else ""
+            ),
             identity_mode=os.environ.get(
                 "KIP_IDENTITY_MODE",
                 str(_deep_get(raw, "identity.mode", "api_key")),
@@ -169,12 +239,14 @@ class Settings:
         scheme, separator, name = reference.partition(":")
         if not separator or not name:
             raise ConfigurationError("secret must be an opaque reference")
+        if scheme == "file":
+            return _read_secret_file(name)
         if scheme != "env":
             raise ConfigurationError(
                 f"secret reference scheme is not available in this runtime: {scheme}"
             )
-        value = os.environ.get(name)
-        if value is None or not value:
+        value = _environment_secret(name)
+        if not value:
             raise ConfigurationError(f"required secret environment variable is not set: {name}")
         return value
 

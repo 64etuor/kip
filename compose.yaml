@@ -36,6 +36,10 @@ services:
       postgres:
         condition: service_healthy
     read_only: true
+    init: true
+    cap_drop:
+      - ALL
+    pids_limit: 128
     tmpfs:
       - /tmp:size=128m,mode=1777
     security_opt:
@@ -65,6 +69,10 @@ services:
       - kip_cas:/data/cas
       - ${KIP_NAS_PATH:-./sample-data}:/sources/nas:ro
     read_only: true
+    init: true
+    cap_drop:
+      - ALL
+    pids_limit: 256
     tmpfs:
       - /tmp:size=512m,mode=1777
     security_opt:
@@ -91,6 +99,10 @@ services:
       - kip_cas:/data/cas
       - ${KIP_NAS_PATH:-./sample-data}:/sources/nas:ro
     read_only: true
+    init: true
+    cap_drop:
+      - ALL
+    pids_limit: 256
     tmpfs:
       - /tmp:size=1g,mode=1777
     security_opt:

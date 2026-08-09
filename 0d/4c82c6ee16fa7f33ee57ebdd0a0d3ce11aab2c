@@ -1,0 +1,84 @@
+docs/adr/ADR-024-typed-ontology-relation-candidates.md
+  s_41856199ee83ad::t_6b78cba53b4df7 1-37
+src/kip/ports/knowledge.py
+  s_41856199ee83ad::t_ce333a2b3a16e7 5,18-50
+src/kip/application/ontology_rag.py
+  s_41856199ee83ad::t_282f1007143a54 1-185
+src/kip/adapters/repository/postgres/knowledge.py
+  s_41856199ee83ad::t_fc56be2b5661ac 6,22-62
+  s_03506c0be5fcc9::t_642a18b38c1d0d 63
+contracts/relation-proposal.schema.json
+  s_41856199ee83ad::t_e5c172977f7a7f 1-154
+src/kip/domain/knowledge.py
+  s_41856199ee83ad::t_a124dcd67dc572 68-69
+  s_41856199ee83ad::t_59ba70d2a4b9a0 1-67,70-168
+docs/DATA_CONTRACTS.md
+  s_41856199ee83ad::t_6b78cba53b4df7 65-76
+docs/IMPLEMENTATION_STATUS.md
+  s_41856199ee83ad::t_6b78cba53b4df7 32
+src/kip/ports/relation_miner.py
+  s_41856199ee83ad::t_bd084c0addaded 1-20
+src/kip/container.py
+  s_41856199ee83ad::t_282f1007143a54 36,205-208
+  s_41856199ee83ad::t_3fa98e6f05b465 209
+migrations/0009_ontology_rag.sql
+  s_41856199ee83ad::t_2e5fba30a8e8ca 1-148
+src/kip/ontology.py
+  s_41856199ee83ad::t_631104585d4434 6,125-134,139-140,147-178,180-183,193-232
+contracts/knowledge-entity.schema.json
+  s_41856199ee83ad::t_e5c172977f7a7f 1-61
+src/kip/domain/models.py
+  s_41856199ee83ad::t_59ba70d2a4b9a0 11,334,336-341,347-352
+contracts/assertion-candidate.schema.json
+  s_41856199ee83ad::t_e5c172977f7a7f 2-103,118-135,138,143-154,199-208,223-248
+src/kip/application/runtime.py
+  s_41856199ee83ad::t_282f1007143a54 10,24
+scripts/generate_contracts.py
+  s_41856199ee83ad::t_5204f8c3b39c69 24-27,94-95
+src/kip/adapters/repository/memory/knowledge.py
+  s_41856199ee83ad::t_ce333a2b3a16e7 10,38-108,114-120,162,183-184,324-327
+tests/test_ontology_rag_domain.py
+  s_41856199ee83ad::t_31ebcfe1adba36 249-297
+  s_41856199ee83ad::t_c1942e5bdfcdb6 1-248
+src/kip/application/knowledge.py
+  s_41856199ee83ad::t_aa223776657524 35
+tests/integration/test_postgres_repository.py
+  s_41856199ee83ad::t_200bbf7e87e656 14,128-143,148-162,164-165
+src/kip/adapters/repository/postgres/database.py
+  s_41856199ee83ad::t_1ced08f4c0a290 1767,1803-1804,1811,1815-1819,1825-1831,1847
+  s_41856199ee83ad::t_02c5d1ec62a237 1430-1614
+  s_41856199ee83ad::t_86c883462aa531 1896-1899
+  s_41856199ee83ad::t_516ae1aad1ad37 1616-1625,1632-1639,1641-1650,1656-1658,1661-1708,1739-1747
+  s_41856199ee83ad::t_a0a8ce1749f46e 20,54,68-73
+tests/test_relation_candidate_idempotency.py
+  s_41856199ee83ad::t_c1942e5bdfcdb6 1-95
+contracts/assertion-explanation.schema.json
+  s_41856199ee83ad::t_e5c172977f7a7f 132-149,152,157-168,213-222,237-262,275-318,501-555
+  s_41856199ee83ad::t_27f68dbeabb9f4 556
+src/kip/adapters/repository/memory/state.py
+  s_41856199ee83ad::t_ce333a2b3a16e7 5,25-26,28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "0d4c82c6ee16fa7f33ee57ebdd0a0d3ce11aab2c",
+  "prompts": {},
+  "sessions": {
+    "s_03506c0be5fcc9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe45d-d747-77b2-a41f-9b77d2b510d0",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

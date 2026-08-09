@@ -1,0 +1,194 @@
+src/kip/domain/models.py
+  s_41856199ee83ad::t_aa9103488f4e21 21
+  s_41856199ee83ad::t_81eb90275109c4 8-9,20,55,125
+  s_41856199ee83ad::t_c9fffd7aed7491 300
+  s_41856199ee83ad::t_06a06a6b1a9a9b 336
+src/kip/adapters/repository/memory/lexical.py
+  s_41856199ee83ad::t_ecba83e4326e97 5,33,79,108
+src/kip/cli.py
+  s_41856199ee83ad::t_ac9df91c4a8bc2 78-81,102
+contracts/setup-answers.schema.json
+  s_41856199ee83ad::t_c90a0952907209 157-178,207-257
+tests/integration/test_postgres_repository.py
+  s_41856199ee83ad::t_d06b896fc4f14f 5,12,151-203
+  s_41856199ee83ad::t_1a188554aee298 204
+contracts/approved-assertion.schema.json
+  s_41856199ee83ad::t_c90a0952907209 11-17
+src/kip/setup/models.py
+  s_41856199ee83ad::t_391c2343466dc5 8,120-125,149-172,231-236
+tests/test_api.py
+  s_41856199ee83ad::t_961d9b99c476ba 1-2,6
+  s_41856199ee83ad::t_7518d72158c5aa 142-151
+contracts/evidence-read.schema.json
+  s_41856199ee83ad::t_c90a0952907209 13-24
+docs/adr/ADR-020-trusted-identity-and-acl-snapshots.md
+  s_41856199ee83ad::t_e1d0345ba60a56 1-43
+tests/test_setup_cli.py
+  s_41856199ee83ad::t_c01aa4ee4d39d4 55-61,184-189
+contracts/openapi.json
+  s_41856199ee83ad::t_c90a0952907209 4-60,126-135,528-534
+src/kip/container.py
+  s_41856199ee83ad::t_54d5e03716fd7a 9-13,37,50,62,174,176-178,180,183-186,188-197,201-214,219-254
+  s_41856199ee83ad::t_27545098aafb5f 179,181-182,187,198-200
+  s_41856199ee83ad::t_aa9103488f4e21 215-218
+tests/test_connector_event_api.py
+  s_41856199ee83ad::t_961d9b99c476ba 1-2,5,10-18
+docs/SECURITY.md
+  s_41856199ee83ad::t_e1d0345ba60a56 21-35,49-60
+contracts/document-packet.schema.json
+  s_41856199ee83ad::t_c90a0952907209 3-60,177-188,438-448
+docs/DATA_CONTRACTS.md
+  s_41856199ee83ad::t_e1d0345ba60a56 26-31,40-50
+  s_41856199ee83ad::t_1cc61c42089ff3 51
+src/kip/adapters/repository/memory/state.py
+  s_41856199ee83ad::t_ecba83e4326e97 3,31
+src/kip/adapters/repository/postgres/ingestion.py
+  s_41856199ee83ad::t_15b3e003cad5cc 6,14-20
+  s_03506c0be5fcc9::t_8562e1b8d3d117 21
+src/kip/setup/service.py
+  s_41856199ee83ad::t_391c2343466dc5 163,169-174,218-223,225
+src/kip/ports/identity.py
+  s_41856199ee83ad::t_81eb90275109c4 1-15
+src/kip/setup/writer.py
+  s_41856199ee83ad::t_391c2343466dc5 111-148,167,204-209
+src/kip/application/ingestion_files.py
+  s_41856199ee83ad::t_c9fffd7aed7491 10,76,113,135
+  s_41856199ee83ad::t_e6243f697795c4 85-91
+src/kip/settings.py
+  s_41856199ee83ad::t_2150361a0420b8 44,136
+  s_41856199ee83ad::t_6da4c5b66c6d37 45-49
+  s_41856199ee83ad::t_27545098aafb5f 34-39,90-128,151-153
+  s_41856199ee83ad::t_9e232f6125f565 69-75,86-89
+src/kip/adapters/repository/memory/semantic.py
+  s_41856199ee83ad::t_ecba83e4326e97 6,126
+tests/test_acl_freshness.py
+  s_41856199ee83ad::t_f749bc20a571ba 1-157
+contracts/content-unit.schema.json
+  s_41856199ee83ad::t_c90a0952907209 33-44
+src/kip/adapters/repository/memory/acl.py
+  s_41856199ee83ad::t_ecba83e4326e97 1-37
+tests/test_setup_planner.py
+  s_41856199ee83ad::t_9daebd620eb2ec 34-58
+  s_41856199ee83ad::t_391c2343466dc5 94-97
+src/kip/adapters/repository/postgres/database.py
+  s_41856199ee83ad::t_4c77fa10a5bbe0 249-253,255-288,361-365
+  s_41856199ee83ad::t_15b3e003cad5cc 18,162-248,254,289,306-314,319,333-360,366-367,398-399,403,416,530-532,548
+  s_41856199ee83ad::t_9a3bb08fa45fe1 650-654,753,948,1040,1043-1044,1051,1067,1086,1109-1115,1122,1128,1152-1160,1190,1196-1197,1201-1206,1262-1266,1476-1482,1491-1496,1505-1507,1512-1513,1541,1578-1582,1603
+  s_41856199ee83ad::t_e6243f697795c4 1473
+docs/STARTER_KIT_GUIDE.md
+  s_41856199ee83ad::t_e1d0345ba60a56 12,23-26,42-45
+  s_41856199ee83ad::t_f2cb514d13d72e 46
+contracts/openapi.yaml
+  s_41856199ee83ad::t_c90a0952907209 17-21,853-893,972-975
+src/kip/application/ingestion_events.py
+  s_41856199ee83ad::t_c9fffd7aed7491 72-73,104,117,175,198
+  s_41856199ee83ad::t_e6243f697795c4 21,74-83
+config/kip.example.toml
+  s_41856199ee83ad::t_27545098aafb5f 23-39,41-48,126,143,152,162
+  s_41856199ee83ad::t_aa9103488f4e21 40
+docs/IMPLEMENTATION_STATUS.md
+  s_41856199ee83ad::t_e1d0345ba60a56 8-9,11-12,40-43
+src/kip/adapters/connectors/registry.py
+  s_41856199ee83ad::t_29603ab183b42d 3
+  s_41856199ee83ad::t_c9fffd7aed7491 6,17,20,68,137-147,151-161,165-237
+  s_41856199ee83ad::t_80d82f99ed7c84 238
+src/kip/api.py
+  s_41856199ee83ad::t_54d5e03716fd7a 3,50,63-67,70,96,108-149,162,356-360
+  s_41856199ee83ad::t_aa9103488f4e21 157-160
+  s_41856199ee83ad::t_29603ab183b42d 12
+  s_41856199ee83ad::t_dec12262d66710 4,9,40-43,58-62,75-78,85,174,178-180,184-186,190-193,197-200,204-207,211-215,219-222,226-229,233-236,240-243,247-250,260,273-276,280-283,292,304,312,316-319,327,331-334,338-342,346-350
+contracts/source-object.schema.json
+  s_41856199ee83ad::t_c90a0952907209 2-61,71-80
+  s_41856199ee83ad::t_ce5c74e587ea06 81
+src/kip/application/ingestion.py
+  s_41856199ee83ad::t_e6243f697795c4 9,45
+  s_41856199ee83ad::t_c9fffd7aed7491 53,78,136-139
+tests/test_setup_writer.py
+  s_41856199ee83ad::t_391c2343466dc5 133-136
+src/kip/ports/ingestion.py
+  s_41856199ee83ad::t_c9fffd7aed7491 8,32-34,52-53,66-72
+src/kip/setup/planner.py
+  s_41856199ee83ad::t_6da4c5b66c6d37 160,168,178,199
+  s_41856199ee83ad::t_391c2343466dc5 59-74,126-131,163-167,169-177,179-185,240-281
+src/kip/adapters/repository/memory/knowledge.py
+  s_41856199ee83ad::t_ecba83e4326e97 8,92-94,138-139,151,184
+  s_41856199ee83ad::t_29603ab183b42d 19
+  s_41856199ee83ad::t_e6243f697795c4 89,95-96,107
+src/kip/adapters/identity/jwt.py
+  s_41856199ee83ad::t_dec12262d66710 6,109-110
+  s_41856199ee83ad::t_29e881dafb503e 65
+  s_41856199ee83ad::t_aa9103488f4e21 25,161
+  s_41856199ee83ad::t_81eb90275109c4 1-5,7-24,26-64,66-108,111-160,162-198
+contracts/connector-event.schema.json
+  s_41856199ee83ad::t_c90a0952907209 2-61,71-80
+  s_41856199ee83ad::t_ba4c160636846b 81
+tests/test_cli_runtime_boundaries.py
+  s_41856199ee83ad::t_ac9df91c4a8bc2 1-6
+src/kip/domain/identity.py
+  s_41856199ee83ad::t_81eb90275109c4 1-74
+src/kip/adapters/identity/api_key.py
+  s_41856199ee83ad::t_aa9103488f4e21 21,31,68
+  s_41856199ee83ad::t_ecba83e4326e97 53-55
+  s_41856199ee83ad::t_81eb90275109c4 1-20,22-30,32-52,56-67,69
+pyproject.toml
+  s_41856199ee83ad::t_d745855ad67a07 78
+  s_41856199ee83ad::t_dec12262d66710 76-77
+  s_41856199ee83ad::t_27545098aafb5f 24,41
+  s_41856199ee83ad::t_09c9bfaddc0d4a 79
+deploy/sql/roles.sql.template
+  s_41856199ee83ad::t_e6243f697795c4 23,36-54
+contracts/assertion-explanation.schema.json
+  s_41856199ee83ad::t_c90a0952907209 13-19,220-231
+.env.example
+  s_41856199ee83ad::t_27545098aafb5f 23-28
+migrations/0007_identity_acl_snapshots.sql
+  s_41856199ee83ad::t_27a48cf2144803 1-25,27-32,35-46,48-59,61-73,86-140,154-157
+  s_41856199ee83ad::t_fd7fd56ca41cb9 26,47,60
+  s_41856199ee83ad::t_06a06a6b1a9a9b 33-34,74-85,141-153
+tests/test_identity_adapters.py
+  s_41856199ee83ad::t_f749bc20a571ba 1-2,4-14,16-17,19-85,87-107,109-144,173-209
+  s_41856199ee83ad::t_6da4c5b66c6d37 3,15,145-172
+  s_41856199ee83ad::t_aa9103488f4e21 86,108
+  s_41856199ee83ad::t_ecba83e4326e97 18
+src/kip/adapters/identity/__init__.py
+  s_41856199ee83ad::t_81eb90275109c4 1-4
+src/kip/adapters/repository/memory/evidence.py
+  s_41856199ee83ad::t_ecba83e4326e97 7,26,49-51,62-72
+  s_03506c0be5fcc9::t_f6bc1d1c5ac17d 73
+docs/QUICKSTART.md
+  s_41856199ee83ad::t_e1d0345ba60a56 60-64
+  s_41856199ee83ad::t_504b10730c015c 65
+contracts/setup-plan.schema.json
+  s_41856199ee83ad::t_c90a0952907209 192-211,224-263,354-359
+src/kip/adapters/repository/memory/ingestion.py
+  s_41856199ee83ad::t_c9fffd7aed7491 20-37
+  s_41856199ee83ad::t_ecba83e4326e97 62-73,79-85
+  s_41856199ee83ad::t_29603ab183b42d 6
+  s_41856199ee83ad::t_6caf981cf693e2 38
+uv.lock
+  s_41856199ee83ad::t_3e8f3c6c57771b 691,714-716,752-753,770
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "05f6dc3cdbca534d5081113f680a7d2407581bdc",
+  "prompts": {},
+  "sessions": {
+    "s_03506c0be5fcc9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe45d-d747-77b2-a41f-9b77d2b510d0",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

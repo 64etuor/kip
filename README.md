@@ -115,10 +115,10 @@ Claude Code loads root `CLAUDE.md`, which imports `AGENTS.md`. The project skill
 .claude/skills/knowledge-fabric/SKILL.md
 ```
 
-The root `.mcp.json` starts the optional stdio MCP adapter without embedding secrets in the file. Guided setup rewrites it atomically to select `config/kip.generated.toml` and preserves the previous file. Install the MCP extra first:
+The root `.mcp.json` starts the optional stdio MCP adapter without embedding secrets in the file. Guided setup rewrites it atomically to select `config/kip.generated.toml` and preserves the previous file. `./scripts/bootstrap.sh` installs the MCP and identity runtimes. For a standalone package install, select the MCP extra explicitly:
 
 ```bash
-python -m pip install -e '.[mcp]'
+python -m pip install 'kip-knowledge-fabric[mcp]'
 ```
 
 MCP is optional; the CLI remains the lowest-dependency agent interface.

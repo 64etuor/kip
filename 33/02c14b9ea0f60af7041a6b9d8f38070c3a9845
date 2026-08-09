@@ -1,0 +1,128 @@
+src/kip/application/answering.py
+  s_41856199ee83ad::t_dc8d6b9052cdac 12,17,26,42,69,85-87,90-91,97-100,105-109,116-124,144-148,171,206,235-236,238,259-277,287
+  s_41856199ee83ad::t_6378e2ed9c8a93 112-115,278-286
+  s_41856199ee83ad::t_a0e487f7fbbb80 210,229-230,237
+  s_41856199ee83ad::t_995935dd0a5c70 258
+src/kip/api.py
+  s_41856199ee83ad::t_d03bf699125cb0 334-346
+config/kip.example.toml
+  s_41856199ee83ad::t_f77509667370cd 114-118
+tests/integration/test_postgres_repository.py
+  s_41856199ee83ad::t_c501c65813ba3d 143,154-159,302-307
+  s_41856199ee83ad::t_e869f3e81d512b 197-241
+contracts/openapi.json
+  s_41856199ee83ad::t_89aad2a290f450 1273-1328
+src/kip/adapters/repository/memory/knowledge.py
+  s_41856199ee83ad::t_d391ca5ee02b4b 90-117
+  s_41856199ee83ad::t_e8dc2b3f667283 6,396,400-401,430,434-435,507-510
+  s_41856199ee83ad::t_ca1600b0688655 511-514
+  s_41856199ee83ad::t_b46a1e03df0429 515-521
+  s_80cdafa7f5ecd2::t_1b295875ba9428 522-523
+src/kip/adapters/generators/openai_compatible.py
+  s_41856199ee83ad::t_f77509667370cd 67-68
+src/kip/application/answers.py
+  s_41856199ee83ad::t_dc8d6b9052cdac 7-12,78,80-86,148,162-169,175
+sdk/python/kip_client.py
+  s_41856199ee83ad::t_d03bf699125cb0 203-210
+src/kip/domain/knowledge.py
+  s_41856199ee83ad::t_f77509667370cd 112-116,154-158
+docs/OPERATIONS.md
+  s_41856199ee83ad::t_22e2459c4aac9f 57-65
+contracts/openapi.yaml
+  s_41856199ee83ad::t_89aad2a290f450 747-778
+src/kip/adapters/repository/postgres/knowledge.py
+  s_41856199ee83ad::t_d391ca5ee02b4b 44-56
+docs/adr/ADR-026-approved-graph-answer-context.md
+  s_41856199ee83ad::t_22e2459c4aac9f 1-43
+contracts/generation-request.schema.json
+  s_41856199ee83ad::t_89aad2a290f450 29-80,111-118
+src/kip/domain/models.py
+  s_41856199ee83ad::t_4ce7009848f9b5 248-281,304
+src/kip/application/ontology_context.py
+  s_41856199ee83ad::t_b46a1e03df0429 247-250
+  s_41856199ee83ad::t_ab723929ca552b 1-8,10-220,222,224-242
+  s_41856199ee83ad::t_ca1600b0688655 243-246
+  s_41856199ee83ad::t_fe2894849b9402 9,221,223
+docs/DATA_CONTRACTS.md
+  s_41856199ee83ad::t_22e2459c4aac9f 47-50,97-102
+  s_03506c0be5fcc9::t_c86f296a407fd5 103
+src/kip/application/runtime.py
+  s_41856199ee83ad::t_c0217aa6b10d6d 10,26
+contracts/answer-response.schema.json
+  s_41856199ee83ad::t_89aad2a290f450 269-456,502-507,509-510,512
+  s_41856199ee83ad::t_3a8fca3f9e3ef7 508,511
+docs/IMPLEMENTATION_STATUS.md
+  s_41856199ee83ad::t_22e2459c4aac9f 27,63-66
+src/kip/adapters/generators/_http.py
+  s_41856199ee83ad::t_4ce7009848f9b5 67-69
+src/kip/application/ontology_rag.py
+  s_41856199ee83ad::t_d391ca5ee02b4b 95-101
+  s_41856199ee83ad::t_9888551889da45 176-181,266-277
+src/kip/cli.py
+  s_41856199ee83ad::t_d03bf699125cb0 1002-1015
+contracts/generation-relation.schema.json
+  s_41856199ee83ad::t_89aad2a290f450 1-52
+src/kip/application/citations.py
+  s_41856199ee83ad::t_dc8d6b9052cdac 11,35,53-65,79
+src/kip/ports/knowledge.py
+  s_41856199ee83ad::t_d391ca5ee02b4b 37-44
+contracts/ontology-answer-context.schema.json
+  s_41856199ee83ad::t_89aad2a290f450 1-190
+src/kip/adapters/repository/postgres/database.py
+  s_41856199ee83ad::t_d391ca5ee02b4b 1568-1606
+  s_41856199ee83ad::t_e8dc2b3f667283 1238-1239,1297-1298
+docs/SECURITY.md
+  s_41856199ee83ad::t_22e2459c4aac9f 69-72
+src/kip/mcp_server.py
+  s_41856199ee83ad::t_d03bf699125cb0 107-109
+  s_03506c0be5fcc9::t_b7c9591ee83043 106
+src/kip/adapters/generators/anthropic.py
+  s_41856199ee83ad::t_f77509667370cd 66-67
+scripts/generate_contracts.py
+  s_41856199ee83ad::t_41ed4bd57eedf7 21,102,112
+  s_41856199ee83ad::t_b46a1e03df0429 53
+tests/test_ontology_answer_context.py
+  s_41856199ee83ad::t_1dc019245eda81 122,126,234
+  s_41856199ee83ad::t_c365443cfe2472 268-360
+  s_41856199ee83ad::t_088a7e24a63bc3 6-7,9,361-388
+  s_41856199ee83ad::t_477060009ed120 1-5,8,10-121,123-125,127-233,235-267
+src/kip/container.py
+  s_41856199ee83ad::t_c0217aa6b10d6d 37,198-274,286,303,305-306,491,501,504
+tests/test_sdk_client.py
+  s_41856199ee83ad::t_088a7e24a63bc3 87-113
+src/kip/domain/generation.py
+  s_41856199ee83ad::t_4ce7009848f9b5 20-38,42,57-75
+  s_41856199ee83ad::t_0e04d8e580be0b 76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "3302c14b9ea0f60af7041a6b9d8f38070c3a9845",
+  "prompts": {},
+  "sessions": {
+    "s_03506c0be5fcc9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe45d-d747-77b2-a41f-9b77d2b510d0",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_80cdafa7f5ecd2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe564-ad79-7650-a2dc-053afe41b9ca",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

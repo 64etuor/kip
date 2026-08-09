@@ -331,6 +331,19 @@ def create_app(container: Container | None = None) -> FastAPI:
             context,
         )
 
+    @app.post("/v1/ontology/context", response_model=Envelope)
+    async def ontology_context(
+        payload: ContextRequest,
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
+        return ok(
+            selected.application.ontology_context.build(
+                context,
+                payload.query,
+            ).context,
+            context,
+        )
+
     @app.post("/v1/ontology/entities", response_model=Envelope)
     async def ontology_entity_create(
         payload: KnowledgeEntity,

@@ -1,0 +1,190 @@
+{
+  "$defs": {
+    "OntologyAnswerEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "assertion_id": {
+          "title": "Assertion Id",
+          "type": "string"
+        },
+        "evidence_unit_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Unit Ids",
+          "type": "array"
+        },
+        "object_entity_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Object Entity Id"
+        },
+        "object_value": {
+          "default": null,
+          "title": "Object Value"
+        },
+        "ontology_version": {
+          "title": "Ontology Version",
+          "type": "string"
+        },
+        "predicate": {
+          "title": "Predicate",
+          "type": "string"
+        },
+        "subject_id": {
+          "title": "Subject Id",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "assertion_id",
+        "subject_id",
+        "predicate",
+        "ontology_version"
+      ],
+      "title": "OntologyAnswerEdge",
+      "type": "object"
+    },
+    "OntologyAnswerEntity": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "canonical_name": {
+          "title": "Canonical Name",
+          "type": "string"
+        },
+        "entity_type": {
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "entity_type",
+        "canonical_name"
+      ],
+      "title": "OntologyAnswerEntity",
+      "type": "object"
+    },
+    "OntologyAnswerPath": {
+      "additionalProperties": false,
+      "properties": {
+        "assertion_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Assertion Ids",
+          "type": "array"
+        },
+        "depth": {
+          "title": "Depth",
+          "type": "integer"
+        },
+        "node_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Node Ids",
+          "type": "array"
+        },
+        "predicates": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Predicates",
+          "type": "array"
+        }
+      },
+      "required": [
+        "node_ids",
+        "assertion_ids",
+        "predicates",
+        "depth"
+      ],
+      "title": "OntologyAnswerPath",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "edges": {
+      "items": {
+        "$ref": "#/$defs/OntologyAnswerEdge"
+      },
+      "title": "Edges",
+      "type": "array"
+    },
+    "entities": {
+      "items": {
+        "$ref": "#/$defs/OntologyAnswerEntity"
+      },
+      "title": "Entities",
+      "type": "array"
+    },
+    "evidence_unit_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidence Unit Ids",
+      "type": "array"
+    },
+    "paths": {
+      "items": {
+        "$ref": "#/$defs/OntologyAnswerPath"
+      },
+      "title": "Paths",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "kip.ontology-context.v1",
+      "default": "kip.ontology-context.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "title": "OntologyAnswerContext",
+  "type": "object"
+}

@@ -111,6 +111,11 @@ max_characters = 120000
 max_entity_proposals = 32
 max_relation_proposals = 64
 
+[ontology.answer_context]
+entity_limit = 8
+edge_limit = 50
+max_depth = 4
+
 [graph]
 backend = "postgres"
 max_depth_default = 4

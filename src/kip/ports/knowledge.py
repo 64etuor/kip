@@ -34,6 +34,14 @@ class KnowledgeStore(Protocol):
         limit: int = 100,
     ) -> list[KnowledgeEntity]: ...
 
+    def resolve_entities(
+        self,
+        context: RequestContext,
+        normalized_text: str,
+        *,
+        limit: int = 20,
+    ) -> list[KnowledgeEntity]: ...
+
     def save_entity_candidate(
         self,
         context: RequestContext,

@@ -140,6 +140,7 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
                 id="doc_new",
                 entity_type="Document",
                 canonical_name="변경 공문",
+                aliases=["변경승인공문"],
                 acl_scopes=[f"workspace:{workspace}"],
             ),
             KnowledgeEntity(
@@ -150,6 +151,12 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
             ),
         ):
             container.application.ontology_rag.create_entity(context, entity)
+        assert [
+            entity.id
+            for entity in repository.knowledge.resolve_entities(
+                context, "변경승인공문", limit=8
+            )
+        ] == ["doc_new"]
         proposal = RelationProposal(
             subject_id="doc_new",
             predicate="amends",
@@ -187,6 +194,51 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
             GraphPathRequest(from_node_id="doc_new", to_node_id="doc_old"),
         )
         assert [path.assertion_ids for path in paths] == [[assertion.id]]
+        container.application.ontology_rag.create_entity(
+            context,
+            KnowledgeEntity(
+                id="doc_expired",
+                entity_type="Document",
+                canonical_name="효력 만료 협약",
+                acl_scopes=[f"workspace:{workspace}"],
+            ),
+        )
+        validity_now = datetime.now(UTC)
+        expired_candidate = container.application.ontology_rag.propose_relation(
+            context,
+            RelationProposal(
+                subject_id="doc_new",
+                predicate="amends",
+                object_entity_id="doc_expired",
+                ontology_version="core/1.0.0",
+                evidence_unit_ids=(hits[0].unit_id,),
+                valid_from=validity_now - timedelta(days=2),
+                valid_to=validity_now - timedelta(days=1),
+                derivation=RelationDerivation(
+                    kind="manual",
+                    name="postgres-temporal-integration",
+                    revision="expired-v1",
+                ),
+            ),
+        )
+        expired_assertion = container.application.knowledge.review_approve(
+            context,
+            expired_candidate.id,
+        )
+        current_edges = repository.knowledge.graph_neighbors(
+            context,
+            GraphNeighborsRequest(node_id="doc_new", direction="out"),
+        )
+        assert expired_assertion.id not in {
+            edge.assertion_id for edge in current_edges
+        }
+        assert repository.knowledge.graph_path(
+            context,
+            GraphPathRequest(
+                from_node_id="doc_new",
+                to_node_id="doc_expired",
+            ),
+        ) == []
 
         entity_derivation = RelationDerivation(
             kind="model",
@@ -247,6 +299,12 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
             status="approved",
         ) == []
         assert repository.knowledge.list_entities(hidden_context) == []
+        assert (
+            repository.knowledge.resolve_entities(
+                hidden_context, "변경승인공문", limit=8
+            )
+            == []
+        )
         with pytest.raises(NotFoundError):
             repository.knowledge.get_entity_candidate(
                 hidden_context,

@@ -999,6 +999,20 @@ def ontology_entities(
     )
 
 
+@ontology_app.command("context")
+def ontology_context(
+    ctx: typer.Context,
+    query: str = typer.Argument(...),
+) -> None:
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.ontology_context.build(
+            runtime.context,
+            query,
+        ).context,
+    )
+
+
 @ontology_app.command("entity-create")
 def ontology_entity_create(
     ctx: typer.Context,

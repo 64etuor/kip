@@ -44,7 +44,10 @@ non-empty.
 ## Generated answer boundary
 
 `GenerationRequest` contains a query plus bounded exact evidence bodies,
-reproducible locators, and public content-unit IDs. `GenerationResult` contains
+reproducible locators, public content-unit IDs, and optional
+`GenerationRelation` records. A generation relation is an already-approved,
+currently valid assertion whose complete evidence IDs are present in the same
+request; it is context rather than independent evidence. `GenerationResult` contains
 typed claims, the configured provider/model/revision, token usage, and a
 provider request ID. A supported claim must cite evidence, evidence IDs must be
 unique, and all returned IDs must be a subset of the request.
@@ -90,6 +93,13 @@ Overlapping active assertions with a different object are recorded as explicit
 contradictions; no candidate is silently promoted or used as a fact.
 
 `AssertionExplanation` is a read model that combines one approved assertion with the exact `EvidenceRead` units supporting it. It is not stored as a second source of truth.
+
+`OntologyAnswerContext` is a versioned read model containing ACL-visible matched
+entities, current approved edges, bounded paths, and their exact evidence-unit
+IDs. The application removes candidates, non-active assertions, future or
+expired validity intervals, inaccessible evidence, and source-changed evidence
+before constructing it. An answer exposes the context only with citations for
+all included graph evidence.
 
 `ApprovedAssertion.evidence_acl_snapshot_ids` is the denormalized freshness
 guard for its reviewed evidence. It is rebuilt from canonical evidence and does

@@ -4,7 +4,12 @@ import re
 from dataclasses import dataclass
 
 from kip.application.citations import citation_from_evidence
-from kip.domain.models import AnswerRequest, AnswerResponse, EvidenceRead
+from kip.domain.models import (
+    AnswerRequest,
+    AnswerResponse,
+    EvidenceRead,
+    OntologyAnswerContext,
+)
 
 _WORD_RE = re.compile(r"[0-9A-Za-z가-힣]{2,}")
 _NUMERIC_INTENT = frozenset({"금액", "얼마", "합계", "총액", "수량", "비율", "날짜", "기한"})
@@ -70,8 +75,15 @@ def prepare_answer_evidence(
     evidence: list[EvidenceRead],
     *,
     had_stale_evidence: bool,
+    ontology_evidence_ids: set[str] | None = None,
 ) -> AnswerPreparation:
-    relevant = [item for item in evidence if _is_relevant(request.query, item.unit.body)]
+    ontology_ids = ontology_evidence_ids or set()
+    relevant = [
+        item
+        for item in evidence
+        if item.unit.id in ontology_ids
+        or _is_relevant(request.query, item.unit.body)
+    ]
     if any(_requires_exact_xlsx(request, item) for item in relevant):
         return AnswerPreparation(
             evidence=(),
@@ -133,6 +145,7 @@ def prepare_answer_evidence(
 def assemble_extractive_answer(
     request: AnswerRequest,
     evidence: tuple[EvidenceRead, ...],
+    ontology_context: OntologyAnswerContext | None = None,
 ) -> AnswerResponse:
     remaining = request.max_chars
     passages: list[str] = []
@@ -146,11 +159,20 @@ def assemble_extractive_answer(
         remaining -= len(passage)
         if remaining <= 0:
             break
+    if ontology_context is not None:
+        cited_ids = {item.unit_id for item in citations}
+        evidence_by_id = {item.unit.id: item for item in evidence}
+        for unit_id in ontology_context.evidence_unit_ids:
+            if unit_id in cited_ids or unit_id not in evidence_by_id:
+                continue
+            citations.append(citation_from_evidence(evidence_by_id[unit_id]))
+            cited_ids.add(unit_id)
     return AnswerResponse(
         query=request.query,
         answer="\n\n".join(passages),
         refused=False,
         citations=citations,
+        ontology_context=ontology_context,
     )
 
 

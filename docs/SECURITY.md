@@ -66,6 +66,10 @@
 - Apply ACL before lexical, vector, and graph retrieval. An assertion cannot be
   more visible than its exact evidence, and inaccessible paths must not reveal
   their existence.
+- Ontology answer context is built only from active assertions whose valid-time
+  interval contains the database/application statement time. Every graph edge
+  is discarded if any exact evidence unit is inaccessible, freshness-stale, or
+  source-changed. Candidate tables are never queried by the answer service.
 - Asynchronous ontology jobs capture the verified submitting principal, scopes,
   roles, and ACL snapshot. Workers reject malformed or expired snapshots before
   reading evidence; candidates remain no more visible than every supporting

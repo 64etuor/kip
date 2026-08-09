@@ -245,6 +245,40 @@ class AnswerGeneration(StrictModel):
     provider_request_id: str | None = None
 
 
+class OntologyAnswerEntity(StrictModel):
+    id: str
+    entity_type: str
+    canonical_name: str
+    aliases: list[str] = Field(default_factory=list)
+
+
+class OntologyAnswerEdge(StrictModel):
+    assertion_id: str
+    subject_id: str
+    predicate: str
+    object_entity_id: str | None = None
+    object_value: Any = None
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+    ontology_version: str
+    evidence_unit_ids: list[str] = Field(default_factory=list)
+
+
+class OntologyAnswerPath(StrictModel):
+    node_ids: list[str]
+    assertion_ids: list[str]
+    predicates: list[str]
+    depth: int
+
+
+class OntologyAnswerContext(StrictModel):
+    schema_version: Literal["kip.ontology-context.v1"] = "kip.ontology-context.v1"
+    entities: list[OntologyAnswerEntity] = Field(default_factory=list)
+    edges: list[OntologyAnswerEdge] = Field(default_factory=list)
+    paths: list[OntologyAnswerPath] = Field(default_factory=list)
+    evidence_unit_ids: list[str] = Field(default_factory=list)
+
+
 AnswerRefusalReason = Literal[
     "no_admissible_evidence",
     "no_fresh_evidence",
@@ -267,6 +301,7 @@ class AnswerResponse(StrictModel):
     retrieval_mode: Literal["extractive", "generated"] = "extractive"
     generation: AnswerGeneration | None = None
     egress_decision: EgressDecision | None = None
+    ontology_context: OntologyAnswerContext | None = None
     warnings: list[str] = Field(default_factory=list)
 
 

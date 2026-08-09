@@ -200,6 +200,14 @@ class KipClient:
             )
         )
 
+    def ontology_context(self, query: str) -> dict[str, Any] | None:
+        value = self._request(
+            "POST",
+            "/v1/ontology/context",
+            json={"query": query},
+        )
+        return None if value is None else _require_object(value)
+
     def create_ontology_entity(self, entity: dict[str, Any]) -> dict[str, Any]:
         return _require_object(
             self._request(

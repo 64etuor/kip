@@ -64,6 +64,9 @@ def evidence_payload(request: GenerationRequest) -> dict[str, Any]:
         "query": request.query,
         "max_claims": request.max_claims,
         "evidence": [item.model_dump(mode="json") for item in request.evidence],
+        "approved_relations": [
+            item.model_dump(mode="json") for item in request.relations
+        ],
     }
 
 

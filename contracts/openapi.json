@@ -1270,6 +1270,62 @@
         "summary": "Jobs"
       }
     },
+    "/v1/ontology/context": {
+      "post": {
+        "operationId": "ontology_context_v1_ontology_context_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-kip-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContextRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ontology Context"
+      }
+    },
     "/v1/ontology/entities": {
       "get": {
         "operationId": "ontology_entities_v1_ontology_entities_get",

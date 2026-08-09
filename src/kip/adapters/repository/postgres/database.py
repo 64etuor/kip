@@ -1235,6 +1235,8 @@ class PostgresDatabase:
     def graph_neighbors(self, context: RequestContext, request: GraphNeighborsRequest) -> list[GraphEdge]:
         conditions = [
             "a.workspace_id=%s",
+            "(a.valid_from IS NULL OR a.valid_from <= statement_timestamp())",
+            "(a.valid_to IS NULL OR a.valid_to > statement_timestamp())",
             "(cardinality(a.acl_scopes)=0 OR a.acl_scopes <@ %s::text[])",
             "NOT EXISTS (SELECT 1 FROM unnest(a.evidence_acl_snapshot_ids) snapshot_id "
             "WHERE NOT kip.acl_snapshot_is_fresh(snapshot_id))",
@@ -1292,6 +1294,8 @@ class PostgresDatabase:
                 WHERE a.workspace_id=%s
                   {status_clause}
                   {predicate_clause}
+                  AND (a.valid_from IS NULL OR a.valid_from <= statement_timestamp())
+                  AND (a.valid_to IS NULL OR a.valid_to > statement_timestamp())
                   AND a.object_entity_id IS NOT NULL
                   AND (cardinality(a.acl_scopes)=0 OR a.acl_scopes <@ %s::text[])
                   AND NOT EXISTS (
@@ -1557,6 +1561,45 @@ class PostgresDatabase:
                 LIMIT %s
                 """,
                 (context.workspace, context.acl_scopes, limit),
+            )
+            rows = cursor.fetchall()
+        return [self._entity(row) for row in rows]
+
+    def resolve_entities(
+        self,
+        context: RequestContext,
+        normalized_text: str,
+        *,
+        limit: int = 20,
+    ) -> list[KnowledgeEntity]:
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT entity.*,
+                       min(strpos(%s, alias.alias_normalized)) AS match_position,
+                       max(length(alias.alias_normalized)) AS match_length
+                FROM knowledge.entities entity
+                JOIN knowledge.entity_aliases alias
+                  ON alias.workspace_id=entity.workspace_id
+                 AND alias.entity_id=entity.id
+                WHERE entity.workspace_id=%s
+                  AND entity.status='active'
+                  AND strpos(%s, alias.alias_normalized) > 0
+                  AND (
+                      cardinality(entity.acl_scopes)=0
+                      OR entity.acl_scopes <@ %s::text[]
+                  )
+                GROUP BY entity.id
+                ORDER BY match_position, match_length DESC, entity.id
+                LIMIT %s
+                """,
+                (
+                    normalized_text,
+                    context.workspace,
+                    normalized_text,
+                    context.acl_scopes,
+                    limit,
+                ),
             )
             rows = cursor.fetchall()
         return [self._entity(row) for row in rows]

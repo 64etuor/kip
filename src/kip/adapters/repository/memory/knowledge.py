@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import deque
 from copy import deepcopy
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Final, assert_never
 
 from kip.adapters.repository.memory.acl import assertion_is_visible, unit_is_visible
@@ -85,6 +86,34 @@ class MemoryKnowledgeStore:
             )
             if _entity_is_visible(entity, context)
         ][:limit]
+
+    def resolve_entities(
+        self,
+        context: RequestContext,
+        normalized_text: str,
+        *,
+        limit: int = 20,
+    ) -> list[KnowledgeEntity]:
+        matches: list[tuple[int, int, str, KnowledgeEntity]] = []
+        for entity in self.state.entities.values():
+            if not _entity_is_visible(entity, context):
+                continue
+            names = [entity.canonical_name, *entity.aliases]
+            positions = [
+                normalized_text.find(normalize_entity_name(name))
+                for name in names
+                if normalize_entity_name(name) in normalized_text
+            ]
+            if not positions:
+                continue
+            longest = max(
+                len(normalize_entity_name(name))
+                for name in names
+                if normalize_entity_name(name) in normalized_text
+            )
+            matches.append((min(positions), -longest, entity.id, entity))
+        matches.sort(key=lambda item: item[:3])
+        return [item[3].model_copy(deep=True) for item in matches[:limit]]
 
     def save_entity_candidate(
         self,
@@ -364,8 +393,11 @@ class MemoryKnowledgeStore:
         request: GraphNeighborsRequest,
     ) -> list[GraphEdge]:
         edges: list[GraphEdge] = []
+        now = datetime.now(UTC)
         for assertion in self.state.assertions.values():
             if request.approved_only and assertion.status != "active":
+                continue
+            if not _assertion_is_current(assertion, now):
                 continue
             if not assertion_is_visible(self.state, assertion, context):
                 continue
@@ -395,8 +427,11 @@ class MemoryKnowledgeStore:
         request: GraphPathRequest,
     ) -> list[GraphPath]:
         adjacency: dict[str, list[tuple[str, ApprovedAssertion]]] = {}
+        now = datetime.now(UTC)
         for assertion in self.state.assertions.values():
             if request.approved_only and assertion.status != "active":
+                continue
+            if not _assertion_is_current(assertion, now):
                 continue
             if assertion.object_entity_id is None:
                 continue
@@ -467,6 +502,23 @@ def _edge(assertion: ApprovedAssertion) -> GraphEdge:
 
 def _entity_is_visible(entity: KnowledgeEntity, context: RequestContext) -> bool:
     return not entity.acl_scopes or set(entity.acl_scopes).issubset(context.acl_scopes)
+
+
+def _assertion_is_current(
+    assertion: ApprovedAssertion,
+    now: datetime,
+) -> bool:
+    if assertion.valid_from is not None and (
+        assertion.valid_from.utcoffset() is None or assertion.valid_from > now
+    ):
+        return False
+    return not (
+        assertion.valid_to is not None
+        and (
+            assertion.valid_to.utcoffset() is None
+            or assertion.valid_to <= now
+        )
+    )
 
 
 def _candidate_evidence_is_visible(

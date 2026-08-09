@@ -84,3 +84,30 @@ def test_sdk_ontology_mining_uses_admin_contract(monkeypatch) -> None:
         "admin": True,
         "kwargs": {"json": {"unit_ids": ["unit_1", "unit_2"]}},
     }
+
+
+def test_sdk_ontology_context_uses_public_read_contract(monkeypatch) -> None:
+    captured: dict[str, Any] = {}
+
+    def request(
+        self: KipClient,
+        method: str,
+        path: str,
+        *,
+        admin: bool = False,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        captured.update(method=method, path=path, admin=admin, kwargs=kwargs)
+        return {"schema_version": "kip.ontology-context.v1"}
+
+    monkeypatch.setattr(KipClient, "_request", request)
+
+    result = KipClient().ontology_context("비밀별 결정")
+
+    assert result == {"schema_version": "kip.ontology-context.v1"}
+    assert captured == {
+        "method": "POST",
+        "path": "/v1/ontology/context",
+        "admin": False,
+        "kwargs": {"json": {"query": "비밀별 결정"}},
+    }

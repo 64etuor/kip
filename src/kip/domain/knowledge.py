@@ -109,6 +109,11 @@ class RelationProposal(KnowledgeModel):
             raise ValueError(
                 "exactly one of object_entity_id or object_value is required"
             )
+        if any(
+            value is not None and value.utcoffset() is None
+            for value in (self.valid_from, self.valid_to)
+        ):
+            raise ValueError("validity timestamps must be timezone-aware")
         if (
             self.valid_from is not None
             and self.valid_to is not None
@@ -146,6 +151,11 @@ class MinedRelationProposal(KnowledgeModel):
     def valid_interval(self) -> Self:
         if len(self.evidence_ids) != len(set(self.evidence_ids)):
             raise ValueError("evidence IDs must be unique")
+        if any(
+            value is not None and value.utcoffset() is None
+            for value in (self.valid_from, self.valid_to)
+        ):
+            raise ValueError("validity timestamps must be timezone-aware")
         if (
             self.valid_from is not None
             and self.valid_to is not None

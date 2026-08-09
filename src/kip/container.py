@@ -34,6 +34,7 @@ from kip.application.egress import EgressPolicyUseCases
 from kip.application.evidence import EvidenceUseCases
 from kip.application.ingestion import IngestionUseCases
 from kip.application.knowledge import KnowledgeUseCases
+from kip.application.ontology_context import OntologyContextUseCases
 from kip.application.ontology_rag import OntologyRagUseCases
 from kip.application.operations import OperationsUseCases
 from kip.application.runtime import Application
@@ -194,6 +195,83 @@ def build_container(
             selected_generator,
             ontology,
         )
+    ontology_context_config = selected.get("ontology.answer_context", {}) or {}
+    if not isinstance(ontology_context_config, dict):
+        raise ConfigurationError("ontology.answer_context must be a table")
+    knowledge = KnowledgeUseCases(
+        selected_repository.knowledge,
+        evidence,
+        ontology,
+    )
+    ontology_rag = OntologyRagUseCases(
+        selected_repository.knowledge,
+        evidence,
+        ontology,
+        selected_repository.jobs,
+        egress,
+        selected_relation_miner,
+        max_mining_units=_bounded_integer(
+            mining_config,
+            "models.relation_mining",
+            "max_units",
+            default=50,
+            minimum=1,
+            maximum=500,
+        ),
+        max_mining_characters=_bounded_integer(
+            mining_config,
+            "models.relation_mining",
+            "max_characters",
+            default=120_000,
+            minimum=1_000,
+            maximum=2_000_000,
+        ),
+        max_entity_proposals=_bounded_integer(
+            mining_config,
+            "models.relation_mining",
+            "max_entity_proposals",
+            default=32,
+            minimum=0,
+            maximum=256,
+        ),
+        max_relation_proposals=_bounded_integer(
+            mining_config,
+            "models.relation_mining",
+            "max_relation_proposals",
+            default=64,
+            minimum=0,
+            maximum=512,
+        ),
+    )
+    ontology_context = OntologyContextUseCases(
+        ontology_rag,
+        knowledge,
+        evidence,
+        entity_limit=_bounded_integer(
+            ontology_context_config,
+            "ontology.answer_context",
+            "entity_limit",
+            default=8,
+            minimum=1,
+            maximum=50,
+        ),
+        edge_limit=_bounded_integer(
+            ontology_context_config,
+            "ontology.answer_context",
+            "edge_limit",
+            default=50,
+            minimum=1,
+            maximum=500,
+        ),
+        max_depth=_bounded_integer(
+            ontology_context_config,
+            "ontology.answer_context",
+            "max_depth",
+            default=4,
+            minimum=1,
+            maximum=8,
+        ),
+    )
     application = Application(
         ingestion=IngestionUseCases(
             selected_repository.ingestion,
@@ -205,11 +283,7 @@ def build_container(
         ),
         retrieval=retrieval,
         evidence=evidence,
-        knowledge=KnowledgeUseCases(
-            selected_repository.knowledge,
-            evidence,
-            ontology,
-        ),
+        knowledge=knowledge,
         operations=OperationsUseCases(
             selected,
             selected_repository.operations,
@@ -226,43 +300,10 @@ def build_container(
             evidence,
             egress,
             selected_generator,
+            ontology_context,
         ),
-        ontology_rag=OntologyRagUseCases(
-            selected_repository.knowledge,
-            evidence,
-            ontology,
-            selected_repository.jobs,
-            egress,
-            selected_relation_miner,
-            max_mining_units=_bounded_integer(
-                mining_config,
-                "max_units",
-                default=50,
-                minimum=1,
-                maximum=500,
-            ),
-            max_mining_characters=_bounded_integer(
-                mining_config,
-                "max_characters",
-                default=120_000,
-                minimum=1_000,
-                maximum=2_000_000,
-            ),
-            max_entity_proposals=_bounded_integer(
-                mining_config,
-                "max_entity_proposals",
-                default=32,
-                minimum=0,
-                maximum=256,
-            ),
-            max_relation_proposals=_bounded_integer(
-                mining_config,
-                "max_relation_proposals",
-                default=64,
-                minimum=0,
-                maximum=512,
-            ),
-        ),
+        ontology_rag=ontology_rag,
+        ontology_context=ontology_context,
     )
     return Container(
         settings=selected,
@@ -447,6 +488,7 @@ def _build_egress_policy(settings: Settings) -> EgressPolicy:
 
 def _bounded_integer(
     raw: dict[str, object],
+    section: str,
     name: str,
     *,
     default: int,
@@ -456,9 +498,9 @@ def _bounded_integer(
     try:
         value = int(str(raw.get(name, default)))
     except ValueError as error:
-        raise ConfigurationError(f"models.relation_mining.{name} must be an integer") from error
+        raise ConfigurationError(f"{section}.{name} must be an integer") from error
     if not minimum <= value <= maximum:
         raise ConfigurationError(
-            f"models.relation_mining.{name} must be between {minimum} and {maximum}"
+            f"{section}.{name} must be between {minimum} and {maximum}"
         )
     return value

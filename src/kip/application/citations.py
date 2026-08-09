@@ -8,6 +8,7 @@ from kip.domain.models import (
     AnswerRequest,
     AnswerResponse,
     EvidenceRead,
+    OntologyAnswerContext,
 )
 from kip.errors import ValidationError
 
@@ -31,6 +32,7 @@ def assemble_generated_answer(
     evidence: tuple[EvidenceRead, ...],
     result: GenerationResult,
     decision: EgressDecision,
+    ontology_context: OntologyAnswerContext | None = None,
 ) -> AnswerResponse:
     evidence_by_id = {item.unit.id: item for item in evidence}
     cited_ids: list[str] = []
@@ -48,6 +50,19 @@ def assemble_generated_answer(
                 )
             if evidence_id not in cited_ids:
                 cited_ids.append(evidence_id)
+    if ontology_context is not None:
+        for evidence_id in ontology_context.evidence_unit_ids:
+            if evidence_id not in evidence_by_id:
+                raise ValidationError(
+                    f"ontology context cites unknown evidence ID: {evidence_id}"
+                )
+            if evidence_id not in decision.allowed_evidence_ids:
+                raise ValidationError(
+                    "ontology context cites evidence not admitted for egress: "
+                    + evidence_id
+                )
+            if evidence_id not in cited_ids:
+                cited_ids.append(evidence_id)
     return AnswerResponse(
         query=request.query,
         answer="\n\n".join(claim.text for claim in result.claims),
@@ -61,4 +76,5 @@ def assemble_generated_answer(
             provider_request_id=result.provider_request_id,
         ),
         egress_decision=decision,
+        ontology_context=ontology_context,
     )

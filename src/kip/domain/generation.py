@@ -17,9 +17,29 @@ class GenerationEvidence(GenerationModel):
     locator: str = Field(min_length=1)
 
 
+class GenerationRelation(GenerationModel):
+    assertion_id: str = Field(min_length=1)
+    subject_id: str = Field(min_length=1)
+    predicate: str = Field(min_length=1)
+    object_entity_id: str | None = None
+    object_value: Any = None
+    evidence_ids: tuple[str, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def valid_object_and_evidence(self) -> GenerationRelation:
+        if (self.object_entity_id is None) == (self.object_value is None):
+            raise ValueError(
+                "exactly one of object_entity_id or object_value is required"
+            )
+        if len(self.evidence_ids) != len(set(self.evidence_ids)):
+            raise ValueError("relation evidence IDs must be unique")
+        return self
+
+
 class GenerationRequest(GenerationModel):
     query: str = Field(min_length=1)
     evidence: tuple[GenerationEvidence, ...] = Field(min_length=1)
+    relations: tuple[GenerationRelation, ...] = ()
     max_claims: int = Field(default=8, ge=1, le=64)
     max_output_tokens: int = Field(default=1024, ge=64, le=32768)
 
@@ -33,6 +53,26 @@ class GenerationRequest(GenerationModel):
         if len(ids) != len(set(ids)):
             raise ValueError("evidence IDs must be unique")
         return evidence
+
+    @model_validator(mode="after")
+    def relations_reference_supplied_evidence(self) -> GenerationRequest:
+        assertion_ids = [item.assertion_id for item in self.relations]
+        if len(assertion_ids) != len(set(assertion_ids)):
+            raise ValueError("relation assertion IDs must be unique")
+        evidence_ids = {item.id for item in self.evidence}
+        unknown = sorted(
+            {
+                evidence_id
+                for relation in self.relations
+                for evidence_id in relation.evidence_ids
+            }
+            - evidence_ids
+        )
+        if unknown:
+            raise ValueError(
+                "relations reference unknown evidence IDs: " + ", ".join(unknown)
+            )
+        return self
 
 
 class GeneratedClaim(GenerationModel):

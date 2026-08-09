@@ -104,6 +104,10 @@ def create_server():
         return _json(application.ontology_rag.list_entities(context(), limit=limit))
 
     @mcp.tool()
+    def kip_ontology_context(query: str) -> str:
+        return _json(application.ontology_context.build(context(), query).context)
+
+    @mcp.tool()
     def kip_ontology_entity_create(
         entity_id: str,
         entity_type: str,

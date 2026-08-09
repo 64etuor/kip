@@ -92,24 +92,13 @@ class OntologyRagUseCases:
         limit: int = 20,
     ) -> list[KnowledgeEntity]:
         normalized = normalize_entity_name(text)
-        matches: list[tuple[int, int, str, KnowledgeEntity]] = []
-        for entity in self._store.list_entities(context, limit=10_000):
-            names = [entity.canonical_name, *entity.aliases]
-            positions = [
-                normalized.find(normalize_entity_name(name))
-                for name in names
-                if normalize_entity_name(name) in normalized
-            ]
-            if not positions:
-                continue
-            longest = max(
-                len(normalize_entity_name(name))
-                for name in names
-                if normalize_entity_name(name) in normalized
-            )
-            matches.append((min(positions), -longest, entity.id, entity))
-        matches.sort(key=lambda item: item[:3])
-        return [item[3] for item in matches[:limit]]
+        if not normalized:
+            return []
+        return self._store.resolve_entities(
+            context,
+            normalized,
+            limit=limit,
+        )
 
     def get_entity_candidate(
         self,
@@ -184,8 +173,12 @@ class OntologyRagUseCases:
             ).encode()
         ).hexdigest()
         payload_unit_ids: list[JsonValue] = list(selected)
-        payload_scopes: list[JsonValue] = sorted(context.acl_scopes)
-        payload_roles: list[JsonValue] = sorted(context.roles)
+        payload_scopes: list[JsonValue] = []
+        for scope in sorted(context.acl_scopes):
+            payload_scopes.append(scope)
+        payload_roles: list[JsonValue] = []
+        for role in sorted(context.roles):
+            payload_roles.append(role)
         access: JsonObject = {
             "principal_id": context.principal_id,
             "acl_scopes": payload_scopes,
@@ -270,12 +263,18 @@ class OntologyRagUseCases:
         if len(result.relations) > self._max_relation_proposals:
             raise ValidationError("relation proposal count exceeds configured limit")
         allowed_evidence_ids = {item.unit.id for item in reads}
-        for proposal in result.entities:
-            ontology.validate_entity_type(proposal.entity_type)
-            _require_known_evidence(proposal.evidence_ids, allowed_evidence_ids)
-        for proposal in result.relations:
-            ontology.validate_candidate(proposal.predicate, ontology.version)
-            _require_known_evidence(proposal.evidence_ids, allowed_evidence_ids)
+        for entity_proposal in result.entities:
+            ontology.validate_entity_type(entity_proposal.entity_type)
+            _require_known_evidence(
+                entity_proposal.evidence_ids, allowed_evidence_ids
+            )
+        for relation_proposal in result.relations:
+            ontology.validate_candidate(
+                relation_proposal.predicate, ontology.version
+            )
+            _require_known_evidence(
+                relation_proposal.evidence_ids, allowed_evidence_ids
+            )
         exact_evidence = {
             item.unit.id: CandidateEvidence(
                 content_unit_id=item.unit.id,

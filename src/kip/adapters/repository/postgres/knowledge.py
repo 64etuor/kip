@@ -41,6 +41,19 @@ class PostgresKnowledgeStore:
     ) -> list[KnowledgeEntity]:
         return self.database.list_entities(context, limit=limit)
 
+    def resolve_entities(
+        self,
+        context: RequestContext,
+        normalized_text: str,
+        *,
+        limit: int = 20,
+    ) -> list[KnowledgeEntity]:
+        return self.database.resolve_entities(
+            context,
+            normalized_text,
+            limit=limit,
+        )
+
     def save_entity_candidate(
         self,
         context: RequestContext,

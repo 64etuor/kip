@@ -18,6 +18,7 @@ from kip.api import create_app  # noqa: E402
 from kip.container import build_container  # noqa: E402
 from kip.domain.egress import EgressDecision  # noqa: E402
 from kip.domain.generation import (  # noqa: E402
+    GenerationRelation,
     GenerationRequest,
     GenerationResult,
     StructuredGenerationRequest,
@@ -49,6 +50,7 @@ from kip.domain.models import (  # noqa: E402
     GraphNeighborsRequest,
     GraphPathRequest,
     IngestResult,
+    OntologyAnswerContext,
     OntologyMiningSubmission,
     OntologyMiningSummary,
     SearchHit,
@@ -97,6 +99,7 @@ MODELS = {
     "vocabulary-item": VocabularyItem,
     "egress-decision": EgressDecision,
     "generation-request": GenerationRequest,
+    "generation-relation": GenerationRelation,
     "generation-result": GenerationResult,
     "structured-generation-request": StructuredGenerationRequest,
     "structured-generation-result": StructuredGenerationResult,
@@ -106,6 +109,7 @@ MODELS = {
     "relation-mining-result": RelationMiningResult,
     "ontology-mining-submission": OntologyMiningSubmission,
     "ontology-mining-summary": OntologyMiningSummary,
+    "ontology-answer-context": OntologyAnswerContext,
     "relation-proposal": RelationProposal,
     "setup-answers": SetupAnswers,
     "setup-inspection": SetupInspection,

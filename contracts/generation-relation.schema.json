@@ -1,0 +1,52 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "assertion_id": {
+      "minLength": 1,
+      "title": "Assertion Id",
+      "type": "string"
+    },
+    "evidence_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Evidence Ids",
+      "type": "array"
+    },
+    "object_entity_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Object Entity Id"
+    },
+    "object_value": {
+      "default": null,
+      "title": "Object Value"
+    },
+    "predicate": {
+      "minLength": 1,
+      "title": "Predicate",
+      "type": "string"
+    },
+    "subject_id": {
+      "minLength": 1,
+      "title": "Subject Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "assertion_id",
+    "subject_id",
+    "predicate",
+    "evidence_ids"
+  ],
+  "title": "GenerationRelation",
+  "type": "object"
+}

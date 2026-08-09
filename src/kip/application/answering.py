@@ -9,10 +9,12 @@ from kip.application.answers import (
 from kip.application.citations import assemble_generated_answer
 from kip.application.egress import EgressPolicyUseCases
 from kip.application.evidence import EvidenceUseCases
+from kip.application.ontology_context import OntologyContextUseCases
 from kip.application.search import RetrievalUseCases
 from kip.domain.egress import EgressDecision
 from kip.domain.generation import (
     GenerationEvidence,
+    GenerationRelation,
     GenerationRequest,
     validate_generation_result,
 )
@@ -21,6 +23,7 @@ from kip.domain.models import (
     AnswerRequest,
     AnswerResponse,
     EvidenceRead,
+    OntologyAnswerContext,
     RequestContext,
 )
 from kip.errors import ConfigurationError, DependencyUnavailableError, ValidationError
@@ -36,6 +39,7 @@ class AnsweringUseCases:
         evidence: EvidenceUseCases,
         egress: EgressPolicyUseCases,
         generator: GenerationPort | None,
+        ontology_context: OntologyContextUseCases,
     ) -> None:
         raw = settings.get("models.generation", {}) or {}
         if not isinstance(raw, dict):
@@ -62,6 +66,7 @@ class AnsweringUseCases:
         self._evidence = evidence
         self._egress = egress
         self._generator = generator
+        self._ontology_context = ontology_context
         if (
             generator is not None
             and egress.policy.provider is not None
@@ -77,22 +82,46 @@ class AnsweringUseCases:
         request: AnswerRequest,
     ) -> AnswerResponse:
         hits = self._retrieval.search(context, request)
-        fresh: list[EvidenceRead] = []
+        ontology_bundle = self._ontology_context.build(context, request.query)
+        fresh: list[EvidenceRead] = list(ontology_bundle.evidence)
+        seen_ids = {item.unit.id for item in fresh}
         had_stale_evidence = False
         for hit in hits:
+            if hit.unit_id in seen_ids:
+                continue
             item = self._evidence.read_unit(context, hit.unit_id)
             if item.source_changed_since_index:
                 had_stale_evidence = True
                 continue
             fresh.append(item)
+            seen_ids.add(item.unit.id)
+        had_stale_evidence = (
+            had_stale_evidence or ontology_bundle.had_stale_evidence
+        )
         prepared = prepare_answer_evidence(
             request,
             fresh,
             had_stale_evidence=had_stale_evidence,
+            ontology_evidence_ids=set(
+                ontology_bundle.context.evidence_unit_ids
+                if ontology_bundle.context is not None
+                else []
+            ),
         )
         if prepared.refusal is not None:
-            return prepared.refusal
-        extractive = assemble_extractive_answer(request, prepared.evidence)
+            if not _context_is_cited(
+                ontology_bundle.context,
+                {item.unit_id for item in prepared.refusal.citations},
+            ):
+                return prepared.refusal
+            return prepared.refusal.model_copy(
+                update={"ontology_context": ontology_bundle.context}
+            )
+        extractive = assemble_extractive_answer(
+            request,
+            prepared.evidence,
+            ontology_bundle.context,
+        )
         if not self._enabled:
             return extractive
         if self._generator is None:
@@ -112,7 +141,11 @@ class AnsweringUseCases:
                 egress_decision=decision,
             )
 
-        generation_request = self._generation_request(request, prepared.evidence)
+        generation_request = self._generation_request(
+            request,
+            prepared.evidence,
+            ontology_bundle.context,
+        )
         try:
             result = self._generator.generate(generation_request)
             if (
@@ -135,6 +168,7 @@ class AnsweringUseCases:
                 prepared.evidence,
                 result,
                 decision,
+                ontology_bundle.context,
             )
         except DependencyUnavailableError:
             if self._fallback_on_error:
@@ -169,9 +203,11 @@ class AnsweringUseCases:
         self,
         request: AnswerRequest,
         evidence: tuple[EvidenceRead, ...],
+        ontology_context: OntologyAnswerContext | None,
     ) -> GenerationRequest:
         remaining = request.max_chars
         items: list[GenerationEvidence] = []
+        fully_included_ids: set[str] = set()
         for item in evidence:
             if remaining <= 0:
                 break
@@ -190,10 +226,16 @@ class AnsweringUseCases:
                     ),
                 )
             )
+            if len(body) == len(item.unit.body):
+                fully_included_ids.add(item.unit.id)
             remaining -= len(body)
         return GenerationRequest(
             query=request.query,
             evidence=tuple(items),
+            relations=_generation_relations(
+                ontology_context,
+                fully_included_ids,
+            ),
             max_claims=self._max_claims,
             max_output_tokens=self._max_output_tokens,
         )
@@ -213,3 +255,33 @@ class AnsweringUseCases:
             refusal_reason=reason,
             egress_decision=decision,
         )
+
+
+def _generation_relations(
+    context: OntologyAnswerContext | None,
+    evidence_ids: set[str],
+) -> tuple[GenerationRelation, ...]:
+    if context is None:
+        return ()
+    return tuple(
+        GenerationRelation(
+            assertion_id=edge.assertion_id,
+            subject_id=edge.subject_id,
+            predicate=edge.predicate,
+            object_entity_id=edge.object_entity_id,
+            object_value=edge.object_value,
+            evidence_ids=tuple(edge.evidence_unit_ids),
+        )
+        for edge in context.edges
+        if edge.evidence_unit_ids
+        and set(edge.evidence_unit_ids).issubset(evidence_ids)
+    )
+
+
+def _context_is_cited(
+    context: OntologyAnswerContext | None,
+    citation_ids: set[str],
+) -> bool:
+    return context is not None and set(context.evidence_unit_ids).issubset(
+        citation_ids
+    )

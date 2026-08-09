@@ -54,6 +54,15 @@ IDs. If the captured dynamic access snapshot expires before a worker claims the
 job, processing fails closed and must be resubmitted after re-authentication.
 Model output remains a candidate even for low-risk predicates.
 
+Normal answers use `[ontology.answer_context]` bounds. `entity_limit` caps name
+resolution, `edge_limit` caps approved edges, and `max_depth` caps paths. These
+are read-only query limits; raising them never enables candidates or historical
+assertions. Inspect the same context independently with:
+
+```bash
+./scripts/kip ontology context "A과제 변경 승인"
+```
+
 ### Local semantic shadow
 
 ```bash

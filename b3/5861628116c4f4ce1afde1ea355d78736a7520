@@ -1,0 +1,23 @@
+tests/test_root_agent_files.py
+  s_41856199ee83ad::t_6b49f0ec3e3535 16-21
+scripts/bootstrap.sh
+  s_41856199ee83ad::t_962d957839bdcd 20
+README.md
+  s_41856199ee83ad::t_962d957839bdcd 118,121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "b35861628116c4f4ce1afde1ea355d78736a7520",
+  "prompts": {},
+  "sessions": {
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

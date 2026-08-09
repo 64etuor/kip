@@ -1,0 +1,81 @@
+scripts/generate_contracts.py
+  s_41856199ee83ad::t_1587c0a85953ae 25-26,65-66
+config/kip.example.toml
+  s_41856199ee83ad::t_740a431bedaaed 103-105
+docs/DATA_CONTRACTS.md
+  s_41856199ee83ad::t_c1ffef9828bc63 44-58
+src/kip/application/answers.py
+  s_41856199ee83ad::t_a90a5fce7d5662 4,6-7,62-65,68,73,76-83,103-113,117-119,123-128,130,132-136,139-140,145,155-170
+src/kip/domain/models.py
+  s_41856199ee83ad::t_a90a5fce7d5662 8-9,237-242,261-265
+  s_41856199ee83ad::t_e605c2a0355603 243-253,259
+src/kip/application/answering.py
+  s_41856199ee83ad::t_a90a5fce7d5662 1-12,14-18,26-47,61-203,205-206,208-215
+  s_41856199ee83ad::t_1587c0a85953ae 48-60
+  s_41856199ee83ad::t_e605c2a0355603 13,19-25,204,207
+tests/test_sdk_client.py
+  s_41856199ee83ad::t_bb2b63dc2d4668 9
+  s_41856199ee83ad::t_0475602c3e64d4 1-2,5-6,10-59
+  s_41856199ee83ad::t_4d9417d60295e8 3-4,7-8
+src/kip/application/citations.py
+  s_41856199ee83ad::t_a90a5fce7d5662 1-15,18-64
+  s_41856199ee83ad::t_a6444528256e0f 16-17
+src/kip/adapters/embeddings/http.py
+  s_41856199ee83ad::t_93b6ce7a095c97 54-57
+src/kip/application/runtime.py
+  s_41856199ee83ad::t_740a431bedaaed 5,22
+docs/adr/ADR-023-verified-generated-answer-orchestration.md
+  s_41856199ee83ad::t_1587c0a85953ae 1-38
+src/kip/cli.py
+  s_41856199ee83ad::t_740a431bedaaed 421
+tests/test_model_http_adapters.py
+  s_41856199ee83ad::t_93b6ce7a095c97 124-142
+src/kip/api.py
+  s_41856199ee83ad::t_740a431bedaaed 208
+docs/SECURITY.md
+  s_41856199ee83ad::t_c1ffef9828bc63 33-40
+src/kip/adapters/rerankers/http.py
+  s_41856199ee83ad::t_93b6ce7a095c97 30-33
+docs/IMPLEMENTATION_STATUS.md
+  s_41856199ee83ad::t_1587c0a85953ae 14,27
+contracts/answer-request.schema.json
+  s_41856199ee83ad::t_b4788016057f8c 1-55
+tests/test_generated_answers.py
+  s_41856199ee83ad::t_edfbe3f8de8ef2 1-5,7-108,110-253,277-294
+  s_41856199ee83ad::t_a6444528256e0f 6,109,254-276
+sdk/python/kip_client.py
+  s_41856199ee83ad::t_740a431bedaaed 98
+  s_41856199ee83ad::t_1587c0a85953ae 34,39,43-53
+  s_41856199ee83ad::t_76b76b0633b5a3 18-29,75,78,81-86,90-96,99-104,108,111-116,120-122,125-127,130-132,135-137,143-145,149-151,154-160
+  s_80cdafa7f5ecd2::t_644c59775bed8f 97
+src/kip/container.py
+  s_41856199ee83ad::t_740a431bedaaed 31,170,196-203
+contracts/answer-response.schema.json
+  s_41856199ee83ad::t_b4788016057f8c 1-373
+src/kip/mcp_server.py
+  s_41856199ee83ad::t_740a431bedaaed 69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "fa717167cb2583da9735305e49e76e52b80d40f4",
+  "prompts": {},
+  "sessions": {
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_80cdafa7f5ecd2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe564-ad79-7650-a2dc-053afe41b9ca",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

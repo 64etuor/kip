@@ -38,6 +38,10 @@
   response bodies, no automatic retries, and no ambient proxy discovery.
   Provider errors are reduced to status and request ID; response bodies and
   credentials are not reflected to callers.
+- Relation mining uses the same egress decision as generated answers after
+  ACL-filtered exact evidence reopen and freshness checks. Evidence is encoded
+  only as untrusted payload data; unknown ontology values or evidence IDs make
+  the complete mining result invalid.
 
 ## Secrets
 
@@ -62,6 +66,10 @@
 - Apply ACL before lexical, vector, and graph retrieval. An assertion cannot be
   more visible than its exact evidence, and inaccessible paths must not reveal
   their existence.
+- Asynchronous ontology jobs capture the verified submitting principal, scopes,
+  roles, and ACL snapshot. Workers reject malformed or expired snapshots before
+  reading evidence; candidates remain no more visible than every supporting
+  evidence unit.
 
 ## File safety
 

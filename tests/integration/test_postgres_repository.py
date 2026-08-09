@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -11,7 +12,16 @@ from kip.adapters.repository.postgres import PostgresRepository
 from kip.container import build_container
 from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
-from kip.domain.knowledge import KnowledgeEntity, RelationDerivation, RelationProposal
+from kip.domain.knowledge import (
+    CandidateEvidence,
+    EntityCandidate,
+    KnowledgeEntity,
+    MinedEntityProposal,
+    RelationDerivation,
+    RelationProposal,
+    entity_candidate_fingerprint,
+    stable_entity_candidate_id,
+)
 from kip.domain.models import (
     EmbeddingRecord,
     EmbeddingSpace,
@@ -177,6 +187,83 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
             GraphPathRequest(from_node_id="doc_new", to_node_id="doc_old"),
         )
         assert [path.assertion_ids for path in paths] == [[assertion.id]]
+
+        entity_derivation = RelationDerivation(
+            kind="model",
+            name="postgres-integration",
+            model="fixture",
+            revision="r1",
+        )
+        entity_evidence = CandidateEvidence(
+            content_unit_id=hits[0].unit_id,
+            source_revision_sha256=evidence.indexed_source_sha256,
+            locator=evidence.unit.locator.model_dump(mode="json"),
+            quote_hash="sha256:"
+            + hashlib.sha256(evidence.unit.body.encode()).hexdigest(),
+        )
+        entity_proposal = MinedEntityProposal(
+            entity_type="Project",
+            canonical_name="PostgreSQL 통합 과제",
+            aliases=["PG 통합 과제"],
+            evidence_ids=(hits[0].unit_id,),
+            confidence=0.9,
+        )
+        entity_fingerprint = entity_candidate_fingerprint(
+            entity_proposal,
+            ontology_version="core/1.0.0",
+            evidence=(entity_evidence,),
+            derivation=entity_derivation,
+        )
+        entity_candidate = EntityCandidate(
+            id=stable_entity_candidate_id(entity_fingerprint),
+            fingerprint=entity_fingerprint,
+            entity_type=entity_proposal.entity_type,
+            canonical_name=entity_proposal.canonical_name,
+            aliases=entity_proposal.aliases,
+            origin="model:postgres-integration",
+            confidence=entity_proposal.confidence,
+            ontology_version="core/1.0.0",
+            evidence=[entity_evidence],
+            derivation=entity_derivation,
+        )
+        stored_entity_candidate = repository.knowledge.save_entity_candidate(
+            context,
+            entity_candidate,
+        )
+        duplicate_entity_candidate = repository.knowledge.save_entity_candidate(
+            context,
+            entity_candidate,
+        )
+        hidden_context = RequestContext(
+            workspace=workspace,
+            principal_id="principal_hidden_candidate",
+            acl_scopes=[],
+            request_id=new_id("req"),
+        )
+        assert duplicate_entity_candidate.id == stored_entity_candidate.id
+        assert repository.knowledge.list_entity_candidates(hidden_context) == []
+        assert repository.knowledge.list_candidates(
+            hidden_context,
+            status="approved",
+        ) == []
+        assert repository.knowledge.list_entities(hidden_context) == []
+        with pytest.raises(NotFoundError):
+            repository.knowledge.get_entity_candidate(
+                hidden_context,
+                stored_entity_candidate.id,
+            )
+        with pytest.raises(NotFoundError):
+            repository.knowledge.get_candidate(hidden_context, candidate.id)
+        with pytest.raises(NotFoundError):
+            repository.knowledge.get_entity(hidden_context, "doc_new")
+        approved_entity = repository.knowledge.approve_entity_candidate(
+            context,
+            stored_entity_candidate.id,
+            context.principal_id,
+        )
+        assert approved_entity.canonical_name == "PostgreSQL 통합 과제"
+        assert approved_entity.aliases == ["PG 통합 과제"]
+        assert approved_entity.acl_scopes == [f"workspace:{workspace}"]
 
         source_object = repository.evidence.get_artifact(
             context,

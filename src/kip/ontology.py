@@ -230,3 +230,19 @@ class OntologyCatalog:
                 f"entity type {object_type} is outside predicate {predicate} range"
             )
         return spec
+
+    def mining_contract(self) -> dict[str, object]:
+        return {
+            "version": self.version,
+            "entity_types": sorted(self.entity_parents),
+            "predicates": {
+                name: {
+                    "domain": list(spec.domain),
+                    "range": list(spec.range),
+                    "risk": spec.risk,
+                    "review": spec.review,
+                    "extraction": spec.extraction,
+                }
+                for name, spec in sorted(self.predicate_specs.items())
+            },
+        }

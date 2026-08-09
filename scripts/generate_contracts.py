@@ -20,9 +20,14 @@ from kip.domain.egress import EgressDecision  # noqa: E402
 from kip.domain.generation import (  # noqa: E402
     GenerationRequest,
     GenerationResult,
+    StructuredGenerationRequest,
+    StructuredGenerationResult,
 )
 from kip.domain.knowledge import (  # noqa: E402
+    EntityCandidate,
     KnowledgeEntity,
+    RelationMiningRequest,
+    RelationMiningResult,
     RelationProposal,
 )
 from kip.domain.models import (  # noqa: E402
@@ -44,6 +49,8 @@ from kip.domain.models import (  # noqa: E402
     GraphNeighborsRequest,
     GraphPathRequest,
     IngestResult,
+    OntologyMiningSubmission,
+    OntologyMiningSummary,
     SearchHit,
     SearchRequest,
     SourceObject,
@@ -91,7 +98,14 @@ MODELS = {
     "egress-decision": EgressDecision,
     "generation-request": GenerationRequest,
     "generation-result": GenerationResult,
+    "structured-generation-request": StructuredGenerationRequest,
+    "structured-generation-result": StructuredGenerationResult,
     "knowledge-entity": KnowledgeEntity,
+    "entity-candidate": EntityCandidate,
+    "relation-mining-request": RelationMiningRequest,
+    "relation-mining-result": RelationMiningResult,
+    "ontology-mining-submission": OntologyMiningSubmission,
+    "ontology-mining-summary": OntologyMiningSummary,
     "relation-proposal": RelationProposal,
     "setup-answers": SetupAnswers,
     "setup-inspection": SetupInspection,

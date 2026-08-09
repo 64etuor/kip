@@ -33,6 +33,27 @@ Run quarterly. Restore to a new database and CAS path, run migrations, verify ro
 
 Rebuild lexical, vector, and graph projections independently. Never delete approved assertions to rebuild a projection.
 
+## Ontology mining and review
+
+Enable `[models.relation_mining]` only after the generation destination and
+egress policy pass the target corpus review. Mining is never triggered by
+search or answer requests.
+
+```bash
+./scripts/kip ontology entities
+./scripts/kip ontology mine --unit-id UNIT_ID
+./scripts/worker.sh --once
+./scripts/kip ontology candidates --status proposed
+./scripts/kip ontology entity-approve ENTITY_CANDIDATE_ID
+./scripts/kip review approve RELATION_CANDIDATE_ID
+```
+
+Submit small, coherent evidence batches. A job is idempotent for workspace,
+principal access snapshot, ontology release, miner revision, and sorted unit
+IDs. If the captured dynamic access snapshot expires before a worker claims the
+job, processing fails closed and must be resubmitted after re-authentication.
+Model output remains a candidate even for low-risk predicates.
+
 ### Local semantic shadow
 
 ```bash

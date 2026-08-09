@@ -104,6 +104,13 @@ max_claims = 8
 max_output_tokens = 1024
 fallback_on_error = false
 
+[models.relation_mining]
+enabled = false
+max_units = 50
+max_characters = 120000
+max_entity_proposals = 32
+max_relation_proposals = 64
+
 [graph]
 backend = "postgres"
 max_depth_default = 4

@@ -14,6 +14,7 @@ from kip.adapters.identity import (
     JwtIdentityConfig,
 )
 from kip.adapters.parsers.registry import ParserRegistry
+from kip.adapters.relation_miners import GeneratorRelationMiner
 from kip.adapters.repository.memory import MemoryRepository
 from kip.adapters.repository.postgres import PostgresRepository
 from kip.adapters.rerankers.http import HttpRerankerAdapter
@@ -48,6 +49,7 @@ from kip.ontology import OntologyCatalog
 from kip.ports.embedding import EmbeddingPort
 from kip.ports.generation import GenerationPort
 from kip.ports.identity import IdentityResolverPort
+from kip.ports.relation_miner import RelationMinerPort
 from kip.ports.repository import RepositoryPort
 from kip.ports.reranker import RerankerPort
 from kip.settings import Settings
@@ -61,6 +63,7 @@ class Container:
     embedding: EmbeddingPort
     reranker: RerankerPort | None
     generator: GenerationPort | None
+    relation_miner: RelationMinerPort | None
     identity: IdentityResolverPort
 
 
@@ -70,6 +73,7 @@ def build_container(
     embedding: EmbeddingPort | None = None,
     reranker: RerankerPort | None = None,
     generator: GenerationPort | None = None,
+    relation_miner: RelationMinerPort | None = None,
     *,
     load_models: bool = True,
 ) -> Container:
@@ -169,6 +173,27 @@ def build_container(
         OntologyCatalog.load(ontology_root) if ontology_root.is_dir() else None
     )
     egress = EgressPolicyUseCases(_build_egress_policy(selected))
+    mining_config = selected.get("models.relation_mining", {}) or {}
+    if not isinstance(mining_config, dict):
+        raise ConfigurationError("models.relation_mining must be a table")
+    selected_relation_miner = relation_miner
+    if (
+        load_models
+        and selected_relation_miner is None
+        and mining_config.get("enabled", False)
+    ):
+        if selected_generator is None:
+            raise ConfigurationError(
+                "enabled relation mining requires an enabled generation adapter"
+            )
+        if ontology is None:
+            raise ConfigurationError(
+                "enabled relation mining requires an ontology contract"
+            )
+        selected_relation_miner = GeneratorRelationMiner(
+            selected_generator,
+            ontology,
+        )
     application = Application(
         ingestion=IngestionUseCases(
             selected_repository.ingestion,
@@ -206,6 +231,37 @@ def build_container(
             selected_repository.knowledge,
             evidence,
             ontology,
+            selected_repository.jobs,
+            egress,
+            selected_relation_miner,
+            max_mining_units=_bounded_integer(
+                mining_config,
+                "max_units",
+                default=50,
+                minimum=1,
+                maximum=500,
+            ),
+            max_mining_characters=_bounded_integer(
+                mining_config,
+                "max_characters",
+                default=120_000,
+                minimum=1_000,
+                maximum=2_000_000,
+            ),
+            max_entity_proposals=_bounded_integer(
+                mining_config,
+                "max_entity_proposals",
+                default=32,
+                minimum=0,
+                maximum=256,
+            ),
+            max_relation_proposals=_bounded_integer(
+                mining_config,
+                "max_relation_proposals",
+                default=64,
+                minimum=0,
+                maximum=512,
+            ),
         ),
     )
     return Container(
@@ -215,6 +271,7 @@ def build_container(
         embedding=selected_embedding,
         reranker=selected_reranker,
         generator=selected_generator,
+        relation_miner=selected_relation_miner,
         identity=selected_identity,
     )
 
@@ -386,3 +443,22 @@ def _build_egress_policy(settings: Settings) -> EgressPolicy:
         secret_reference=str(raw.get("secret_ref", "")).strip() or None,
         base_url=str(raw.get("base_url", "")).strip() or None,
     )
+
+
+def _bounded_integer(
+    raw: dict[str, object],
+    name: str,
+    *,
+    default: int,
+    minimum: int,
+    maximum: int,
+) -> int:
+    try:
+        value = int(str(raw.get(name, default)))
+    except ValueError as error:
+        raise ConfigurationError(f"models.relation_mining.{name} must be an integer") from error
+    if not minimum <= value <= maximum:
+        raise ConfigurationError(
+            f"models.relation_mining.{name} must be between {minimum} and {maximum}"
+        )
+    return value

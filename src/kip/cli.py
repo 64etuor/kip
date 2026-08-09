@@ -7,6 +7,7 @@ from typing import Any
 import typer
 
 from kip.container import Container, build_container
+from kip.domain.knowledge import KnowledgeEntity
 from kip.domain.models import (
     AnswerRequest,
     AssertionCandidate,
@@ -76,7 +77,7 @@ class Runtime:
 
 
 def command_loads_models(subcommand: str | None) -> bool:
-    return subcommand not in {"migrate", "quality", "ontology"}
+    return subcommand not in {"migrate", "quality"}
 
 
 @app.callback()
@@ -982,6 +983,115 @@ def ontology_validate(
         return {"version": catalog.version, "predicate_count": len(catalog.predicates)}
 
     _run(ctx, action)
+
+
+@ontology_app.command("entities")
+def ontology_entities(
+    ctx: typer.Context,
+    limit: int = typer.Option(100, min=1, max=10_000),
+) -> None:
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.ontology_rag.list_entities(
+            runtime.context,
+            limit=limit,
+        ),
+    )
+
+
+@ontology_app.command("entity-create")
+def ontology_entity_create(
+    ctx: typer.Context,
+    entity_id: str = typer.Option(..., "--id"),
+    entity_type: str = typer.Option(..., "--type"),
+    name: str = typer.Option(..., "--name"),
+    alias: list[str] | None = typer.Option(None, "--alias"),
+    acl_scope: list[str] | None = typer.Option(None, "--acl-scope"),
+) -> None:
+    def action(runtime: Runtime):
+        return runtime.container.application.ontology_rag.create_entity(
+            runtime.context,
+            KnowledgeEntity(
+                id=entity_id,
+                entity_type=entity_type,
+                canonical_name=name,
+                aliases=_split_values(alias),
+                acl_scopes=_split_values(acl_scope),
+            ),
+        )
+
+    _run(ctx, action)
+
+
+@ontology_app.command("mine")
+def ontology_mine(
+    ctx: typer.Context,
+    unit_id: list[str] = typer.Option(..., "--unit-id"),
+) -> None:
+    _run(
+        ctx,
+        lambda runtime: {
+            "job_id": runtime.container.application.ontology_rag.enqueue_mining(
+                runtime.context,
+                _split_values(unit_id),
+            )
+        },
+    )
+
+
+@ontology_app.command("candidates")
+def ontology_candidates(
+    ctx: typer.Context,
+    status_value: str = typer.Option("proposed", "--status"),
+    limit: int = typer.Option(100, min=1, max=1000),
+) -> None:
+    def action(runtime: Runtime):
+        return {
+            "entities": runtime.container.application.ontology_rag.list_entity_candidates(
+                runtime.context,
+                status=status_value,
+                limit=limit,
+            ),
+            "relations": runtime.container.application.knowledge.list_candidates(
+                runtime.context,
+                status_value,
+                limit,
+            ),
+        }
+
+    _run(ctx, action)
+
+
+@ontology_app.command("entity-approve")
+def ontology_entity_approve(
+    ctx: typer.Context,
+    candidate_id: str = typer.Argument(...),
+    note: str | None = typer.Option(None),
+) -> None:
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.ontology_rag.approve_entity_candidate(
+            runtime.context,
+            candidate_id,
+            note,
+        ),
+    )
+
+
+@ontology_app.command("entity-reject")
+def ontology_entity_reject(
+    ctx: typer.Context,
+    candidate_id: str = typer.Argument(...),
+    note: str | None = typer.Option(None),
+) -> None:
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.ontology_rag.reject_entity_candidate(
+            runtime.context,
+            candidate_id,
+            note,
+        ),
+    )
 
 
 @ontology_app.command("diff")

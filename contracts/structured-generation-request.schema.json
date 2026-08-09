@@ -1,0 +1,41 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "max_output_tokens": {
+      "default": 1024,
+      "maximum": 32768,
+      "minimum": 64,
+      "title": "Max Output Tokens",
+      "type": "integer"
+    },
+    "output_schema": {
+      "additionalProperties": true,
+      "title": "Output Schema",
+      "type": "object"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    },
+    "system_instruction": {
+      "minLength": 1,
+      "title": "System Instruction",
+      "type": "string"
+    },
+    "task_name": {
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9_]{1,63}$",
+      "title": "Task Name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "task_name",
+    "system_instruction",
+    "payload",
+    "output_schema"
+  ],
+  "title": "StructuredGenerationRequest",
+  "type": "object"
+}

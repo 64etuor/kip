@@ -17,7 +17,13 @@ if TYPE_CHECKING:
 
 from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
-from kip.domain.knowledge import KnowledgeEntity, RelationDerivation, normalize_entity_name
+from kip.domain.knowledge import (
+    EntityCandidate,
+    KnowledgeEntity,
+    RelationDerivation,
+    normalize_entity_name,
+    stable_entity_id,
+)
 from kip.domain.models import (
     ApprovedAssertion,
     Artifact,
@@ -1517,8 +1523,15 @@ class PostgresDatabase:
     ) -> KnowledgeEntity:
         with self._connection(context) as connection, connection.cursor() as cursor:
             cursor.execute(
-                "SELECT * FROM knowledge.entities WHERE workspace_id=%s AND id=%s",
-                (context.workspace, entity_id),
+                """
+                SELECT * FROM knowledge.entities
+                WHERE workspace_id=%s AND id=%s
+                  AND (
+                      cardinality(acl_scopes)=0
+                      OR acl_scopes <@ %s::text[]
+                  )
+                """,
+                (context.workspace, entity_id, context.acl_scopes),
             )
             row = cursor.fetchone()
         if row is None:
@@ -1536,13 +1549,466 @@ class PostgresDatabase:
                 """
                 SELECT * FROM knowledge.entities
                 WHERE workspace_id=%s AND status='active'
+                  AND (
+                      cardinality(acl_scopes)=0
+                      OR acl_scopes <@ %s::text[]
+                  )
                 ORDER BY canonical_name_normalized, id
                 LIMIT %s
                 """,
-                (context.workspace, limit),
+                (context.workspace, context.acl_scopes, limit),
             )
             rows = cursor.fetchall()
         return [self._entity(row) for row in rows]
+
+    def save_entity_candidate(
+        self,
+        context: RequestContext,
+        candidate: EntityCandidate,
+    ) -> EntityCandidate:
+        evidence_ids = [item.content_unit_id for item in candidate.evidence]
+        with self._connection(context) as connection:
+            self._ensure_workspace_and_principal(connection, context)
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT id
+                    FROM content.units
+                    WHERE workspace_id=%s
+                      AND id = ANY(%s::text[])
+                      AND (cardinality(acl_scopes)=0 OR acl_scopes <@ %s::text[])
+                      AND kip.acl_snapshot_is_fresh(acl_snapshot_id)
+                    """,
+                    (context.workspace, evidence_ids, context.acl_scopes),
+                )
+                if len(cursor.fetchall()) != len(evidence_ids):
+                    raise NotFoundError(
+                        "one or more entity candidate evidence units are unavailable"
+                    )
+                cursor.execute(
+                    """
+                    INSERT INTO knowledge.entity_candidates(
+                        id, workspace_id, fingerprint, entity_type, canonical_name,
+                        aliases, status, origin, confidence, ontology_version,
+                        evidence, derivation, review_note
+                    ) VALUES (
+                        %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s
+                    )
+                    ON CONFLICT (workspace_id, fingerprint) DO NOTHING
+                    """,
+                    (
+                        candidate.id,
+                        context.workspace,
+                        candidate.fingerprint,
+                        candidate.entity_type,
+                        candidate.canonical_name,
+                        candidate.aliases,
+                        candidate.status,
+                        candidate.origin,
+                        candidate.confidence,
+                        candidate.ontology_version,
+                        _json(candidate.evidence),
+                        _json(candidate.derivation),
+                        candidate.review_note,
+                    ),
+                )
+                cursor.execute(
+                    """
+                    SELECT * FROM knowledge.entity_candidates
+                    WHERE workspace_id=%s AND fingerprint=%s
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM jsonb_array_elements(
+                              knowledge.entity_candidates.evidence
+                          ) item
+                          WHERE NOT EXISTS (
+                              SELECT 1 FROM content.units unit
+                              WHERE unit.workspace_id=%s
+                                AND unit.id=item->>'content_unit_id'
+                                AND (
+                                    cardinality(unit.acl_scopes)=0
+                                    OR unit.acl_scopes <@ %s::text[]
+                                )
+                                AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                          )
+                      )
+                    """,
+                    (
+                        context.workspace,
+                        candidate.fingerprint,
+                        context.workspace,
+                        context.acl_scopes,
+                    ),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise NotFoundError("entity candidate is unavailable")
+                stored = self._entity_candidate(row)
+                for evidence in stored.evidence:
+                    cursor.execute(
+                        """
+                        INSERT INTO knowledge.entity_candidate_evidence(
+                            workspace_id, candidate_id, content_unit_id,
+                            source_revision_sha256, locator, quote_hash
+                        ) VALUES (%s,%s,%s,%s,%s::jsonb,%s)
+                        ON CONFLICT DO NOTHING
+                        """,
+                        (
+                            context.workspace,
+                            stored.id,
+                            evidence.content_unit_id,
+                            evidence.source_revision_sha256,
+                            _json(evidence.locator),
+                            evidence.quote_hash,
+                        ),
+                    )
+            connection.commit()
+        return stored
+
+    def get_entity_candidate_by_fingerprint(
+        self,
+        context: RequestContext,
+        fingerprint: str,
+    ) -> EntityCandidate | None:
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT * FROM knowledge.entity_candidates
+                WHERE workspace_id=%s AND fingerprint=%s
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM jsonb_array_elements(
+                          knowledge.entity_candidates.evidence
+                      ) item
+                      WHERE NOT EXISTS (
+                          SELECT 1 FROM content.units unit
+                          WHERE unit.workspace_id=%s
+                            AND unit.id=item->>'content_unit_id'
+                            AND (
+                                cardinality(unit.acl_scopes)=0
+                                OR unit.acl_scopes <@ %s::text[]
+                            )
+                            AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                      )
+                  )
+                """,
+                (
+                    context.workspace,
+                    fingerprint,
+                    context.workspace,
+                    context.acl_scopes,
+                ),
+            )
+            row = cursor.fetchone()
+        return self._entity_candidate(row) if row is not None else None
+
+    def get_entity_candidate(
+        self,
+        context: RequestContext,
+        candidate_id: str,
+    ) -> EntityCandidate:
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT * FROM knowledge.entity_candidates
+                WHERE workspace_id=%s AND id=%s
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM jsonb_array_elements(
+                          knowledge.entity_candidates.evidence
+                      ) item
+                      WHERE NOT EXISTS (
+                          SELECT 1 FROM content.units unit
+                          WHERE unit.workspace_id=%s
+                            AND unit.id=item->>'content_unit_id'
+                            AND (
+                                cardinality(unit.acl_scopes)=0
+                                OR unit.acl_scopes <@ %s::text[]
+                            )
+                            AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                      )
+                  )
+                """,
+                (
+                    context.workspace,
+                    candidate_id,
+                    context.workspace,
+                    context.acl_scopes,
+                ),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            raise NotFoundError(f"entity candidate not found: {candidate_id}")
+        return self._entity_candidate(row)
+
+    def list_entity_candidates(
+        self,
+        context: RequestContext,
+        status: str = "proposed",
+        limit: int = 100,
+    ) -> list[EntityCandidate]:
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT * FROM knowledge.entity_candidates
+                WHERE workspace_id=%s AND status=%s
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM jsonb_array_elements(
+                          knowledge.entity_candidates.evidence
+                      ) item
+                      WHERE NOT EXISTS (
+                          SELECT 1 FROM content.units unit
+                          WHERE unit.workspace_id=%s
+                            AND unit.id=item->>'content_unit_id'
+                            AND (
+                                cardinality(unit.acl_scopes)=0
+                                OR unit.acl_scopes <@ %s::text[]
+                            )
+                            AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                      )
+                  )
+                ORDER BY created_at, id
+                LIMIT %s
+                """,
+                (
+                    context.workspace,
+                    status,
+                    context.workspace,
+                    context.acl_scopes,
+                    limit,
+                ),
+            )
+            rows = cursor.fetchall()
+        return [self._entity_candidate(row) for row in rows]
+
+    def approve_entity_candidate(
+        self,
+        context: RequestContext,
+        candidate_id: str,
+        reviewer_id: str,
+        note: str | None = None,
+    ) -> KnowledgeEntity:
+        with self._connection(context) as connection:
+            self._ensure_workspace_and_principal(connection, context)
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT * FROM knowledge.entity_candidates
+                    WHERE workspace_id=%s AND id=%s
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM jsonb_array_elements(
+                              knowledge.entity_candidates.evidence
+                          ) item
+                          WHERE NOT EXISTS (
+                              SELECT 1 FROM content.units unit
+                              WHERE unit.workspace_id=%s
+                                AND unit.id=item->>'content_unit_id'
+                                AND (
+                                    cardinality(unit.acl_scopes)=0
+                                    OR unit.acl_scopes <@ %s::text[]
+                                )
+                                AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                          )
+                      )
+                    FOR UPDATE
+                    """,
+                    (
+                        context.workspace,
+                        candidate_id,
+                        context.workspace,
+                        context.acl_scopes,
+                    ),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise NotFoundError(
+                        f"entity candidate not found: {candidate_id}"
+                    )
+                candidate = self._entity_candidate(row)
+                if candidate.status != "proposed":
+                    raise ConflictError(
+                        f"entity candidate is already {candidate.status}"
+                    )
+                evidence_ids = [
+                    evidence.content_unit_id for evidence in candidate.evidence
+                ]
+                cursor.execute(
+                    """
+                    SELECT id, acl_scopes
+                    FROM content.units
+                    WHERE workspace_id=%s
+                      AND id = ANY(%s::text[])
+                      AND (cardinality(acl_scopes)=0 OR acl_scopes <@ %s::text[])
+                      AND kip.acl_snapshot_is_fresh(acl_snapshot_id)
+                    """,
+                    (context.workspace, evidence_ids, context.acl_scopes),
+                )
+                evidence_rows = cursor.fetchall()
+                if len(evidence_rows) != len(evidence_ids):
+                    raise NotFoundError(
+                        "one or more entity candidate evidence units are unavailable"
+                    )
+                scopes = sorted(
+                    {
+                        str(scope)
+                        for evidence_row in evidence_rows
+                        for scope in evidence_row["acl_scopes"] or []
+                    }
+                ) or list(context.acl_scopes)
+                if not set(scopes).issubset(context.acl_scopes):
+                    raise AuthorizationError(
+                        "reviewer lacks one or more evidence scopes"
+                    )
+                entity = KnowledgeEntity(
+                    id=stable_entity_id(candidate.fingerprint),
+                    entity_type=candidate.entity_type,
+                    canonical_name=candidate.canonical_name,
+                    aliases=candidate.aliases,
+                    acl_scopes=scopes,
+                    metadata={
+                        "source_candidate_id": candidate.id,
+                        "approved_by": reviewer_id,
+                    },
+                )
+                names = [
+                    entity.canonical_name_normalized,
+                    *(normalize_entity_name(alias) for alias in entity.aliases),
+                ]
+                cursor.execute(
+                    """
+                    SELECT alias_normalized
+                    FROM knowledge.entity_aliases
+                    WHERE workspace_id=%s AND alias_normalized = ANY(%s::text[])
+                    """,
+                    (context.workspace, names),
+                )
+                collision = cursor.fetchone()
+                if collision is not None:
+                    raise ConflictError(
+                        "entity name or alias already exists: "
+                        + str(collision["alias_normalized"])
+                    )
+                cursor.execute(
+                    """
+                    INSERT INTO knowledge.entities(
+                        id, workspace_id, entity_type, canonical_name,
+                        canonical_name_normalized, aliases, status, acl_scopes, metadata
+                    ) VALUES (%s,%s,%s,%s,%s,%s,'active',%s,%s::jsonb)
+                    """,
+                    (
+                        entity.id,
+                        context.workspace,
+                        entity.entity_type,
+                        entity.canonical_name,
+                        entity.canonical_name_normalized,
+                        entity.aliases,
+                        entity.acl_scopes,
+                        _json(entity.metadata),
+                    ),
+                )
+                for display, normalized in zip(
+                    [entity.canonical_name, *entity.aliases],
+                    names,
+                    strict=True,
+                ):
+                    cursor.execute(
+                        """
+                        INSERT INTO knowledge.entity_aliases(
+                            id, workspace_id, entity_id,
+                            alias_display, alias_normalized
+                        ) VALUES (%s,%s,%s,%s,%s)
+                        """,
+                        (
+                            stable_id(
+                                "alias",
+                                f"{context.workspace}:{entity.id}",
+                                normalized,
+                            ),
+                            context.workspace,
+                            entity.id,
+                            display,
+                            normalized,
+                        ),
+                    )
+                cursor.execute(
+                    """
+                    UPDATE knowledge.entity_candidates
+                    SET status='approved', reviewed_at=now(), reviewed_by=%s,
+                        review_note=%s
+                    WHERE workspace_id=%s AND id=%s
+                    """,
+                    (reviewer_id, note, context.workspace, candidate.id),
+                )
+            connection.commit()
+        return entity
+
+    def reject_entity_candidate(
+        self,
+        context: RequestContext,
+        candidate_id: str,
+        reviewer_id: str,
+        note: str | None = None,
+    ) -> EntityCandidate:
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE knowledge.entity_candidates
+                SET status='rejected', reviewed_at=now(), reviewed_by=%s,
+                    review_note=%s
+                WHERE workspace_id=%s AND id=%s AND status='proposed'
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM jsonb_array_elements(
+                          knowledge.entity_candidates.evidence
+                      ) item
+                      WHERE NOT EXISTS (
+                          SELECT 1 FROM content.units unit
+                          WHERE unit.workspace_id=%s
+                            AND unit.id=item->>'content_unit_id'
+                            AND (
+                                cardinality(unit.acl_scopes)=0
+                                OR unit.acl_scopes <@ %s::text[]
+                            )
+                            AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                      )
+                  )
+                RETURNING *
+                """,
+                (
+                    reviewer_id,
+                    note,
+                    context.workspace,
+                    candidate_id,
+                    context.workspace,
+                    context.acl_scopes,
+                ),
+            )
+            row = cursor.fetchone()
+            connection.commit()
+        if row is None:
+            raise NotFoundError(
+                f"proposed entity candidate not found: {candidate_id}"
+            )
+        return self._entity_candidate(row)
+
+    @staticmethod
+    def _entity_candidate(row: dict[str, Any]) -> EntityCandidate:
+        return EntityCandidate(
+            id=row["id"],
+            fingerprint=row["fingerprint"],
+            entity_type=row["entity_type"],
+            canonical_name=row["canonical_name"],
+            aliases=list(row["aliases"] or []),
+            status=row["status"],
+            origin=row["origin"],
+            confidence=row["confidence"],
+            ontology_version=row["ontology_version"],
+            evidence=row["evidence"],
+            derivation=RelationDerivation.model_validate(row["derivation"]),
+            review_note=row.get("review_note"),
+        )
 
     @staticmethod
     def _entity(row: dict[str, Any]) -> KnowledgeEntity:
@@ -1567,8 +2033,29 @@ class PostgresDatabase:
                 """
                 SELECT * FROM knowledge.assertion_candidates
                 WHERE workspace_id=%s AND fingerprint=%s
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM jsonb_array_elements(
+                          knowledge.assertion_candidates.evidence
+                      ) item
+                      WHERE NOT EXISTS (
+                          SELECT 1 FROM content.units unit
+                          WHERE unit.workspace_id=%s
+                            AND unit.id=item->>'content_unit_id'
+                            AND (
+                                cardinality(unit.acl_scopes)=0
+                                OR unit.acl_scopes <@ %s::text[]
+                            )
+                            AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                      )
+                  )
                 """,
-                (context.workspace, fingerprint),
+                (
+                    context.workspace,
+                    fingerprint,
+                    context.workspace,
+                    context.acl_scopes,
+                ),
             )
             row = cursor.fetchone()
         return self._candidate(row) if row is not None else None
@@ -1626,6 +2113,27 @@ class PostgresDatabase:
         with self._connection(context) as connection:
             self._ensure_workspace_and_principal(connection, context)
             with connection.cursor() as cursor:
+                evidence_ids = [
+                    evidence.content_unit_id for evidence in candidate.evidence
+                ]
+                if evidence_ids:
+                    cursor.execute(
+                        """
+                        SELECT id FROM content.units
+                        WHERE workspace_id=%s
+                          AND id = ANY(%s::text[])
+                          AND (
+                              cardinality(acl_scopes)=0
+                              OR acl_scopes <@ %s::text[]
+                          )
+                          AND kip.acl_snapshot_is_fresh(acl_snapshot_id)
+                        """,
+                        (context.workspace, evidence_ids, context.acl_scopes),
+                    )
+                    if len(cursor.fetchall()) != len(set(evidence_ids)):
+                        raise NotFoundError(
+                            "one or more candidate evidence units are unavailable"
+                        )
                 cursor.execute(
                     """
                     INSERT INTO knowledge.assertion_candidates(
@@ -1712,8 +2220,35 @@ class PostgresDatabase:
     def list_candidates(self, context: RequestContext, status: str = "proposed", limit: int = 100) -> list[AssertionCandidate]:
         with self._connection(context) as connection, connection.cursor() as cursor:
             cursor.execute(
-                "SELECT * FROM knowledge.assertion_candidates WHERE workspace_id=%s AND status=%s ORDER BY created_at LIMIT %s",
-                (context.workspace, status, limit),
+                """
+                SELECT * FROM knowledge.assertion_candidates
+                WHERE workspace_id=%s AND status=%s
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM jsonb_array_elements(
+                          knowledge.assertion_candidates.evidence
+                      ) item
+                      WHERE NOT EXISTS (
+                          SELECT 1 FROM content.units unit
+                          WHERE unit.workspace_id=%s
+                            AND unit.id=item->>'content_unit_id'
+                            AND (
+                                cardinality(unit.acl_scopes)=0
+                                OR unit.acl_scopes <@ %s::text[]
+                            )
+                            AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                      )
+                  )
+                ORDER BY created_at
+                LIMIT %s
+                """,
+                (
+                    context.workspace,
+                    status,
+                    context.workspace,
+                    context.acl_scopes,
+                    limit,
+                ),
             )
             rows = cursor.fetchall()
         return [self._candidate(row) for row in rows]
@@ -1721,8 +2256,32 @@ class PostgresDatabase:
     def get_candidate(self, context: RequestContext, candidate_id: str) -> AssertionCandidate:
         with self._connection(context) as connection, connection.cursor() as cursor:
             cursor.execute(
-                "SELECT * FROM knowledge.assertion_candidates WHERE workspace_id=%s AND id=%s",
-                (context.workspace, candidate_id),
+                """
+                SELECT * FROM knowledge.assertion_candidates
+                WHERE workspace_id=%s AND id=%s
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM jsonb_array_elements(
+                          knowledge.assertion_candidates.evidence
+                      ) item
+                      WHERE NOT EXISTS (
+                          SELECT 1 FROM content.units unit
+                          WHERE unit.workspace_id=%s
+                            AND unit.id=item->>'content_unit_id'
+                            AND (
+                                cardinality(unit.acl_scopes)=0
+                                OR unit.acl_scopes <@ %s::text[]
+                            )
+                            AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                      )
+                  )
+                """,
+                (
+                    context.workspace,
+                    candidate_id,
+                    context.workspace,
+                    context.acl_scopes,
+                ),
             )
             row = cursor.fetchone()
         if not row:
@@ -1752,8 +2311,33 @@ class PostgresDatabase:
             self._ensure_workspace_and_principal(connection, context)
             with connection.cursor() as cursor:
                 cursor.execute(
-                    "SELECT * FROM knowledge.assertion_candidates WHERE workspace_id=%s AND id=%s FOR UPDATE",
-                    (context.workspace, candidate_id),
+                    """
+                    SELECT * FROM knowledge.assertion_candidates
+                    WHERE workspace_id=%s AND id=%s
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM jsonb_array_elements(
+                              knowledge.assertion_candidates.evidence
+                          ) item
+                          WHERE NOT EXISTS (
+                              SELECT 1 FROM content.units unit
+                              WHERE unit.workspace_id=%s
+                                AND unit.id=item->>'content_unit_id'
+                                AND (
+                                    cardinality(unit.acl_scopes)=0
+                                    OR unit.acl_scopes <@ %s::text[]
+                                )
+                                AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                          )
+                      )
+                    FOR UPDATE
+                    """,
+                    (
+                        context.workspace,
+                        candidate_id,
+                        context.workspace,
+                        context.acl_scopes,
+                    ),
                 )
                 row = cursor.fetchone()
                 if not row:
@@ -1775,9 +2359,17 @@ class PostgresDatabase:
                         FROM content.units
                         WHERE workspace_id=%s
                           AND id = ANY(%s::text[])
+                          AND (
+                              cardinality(acl_scopes)=0
+                              OR acl_scopes <@ %s::text[]
+                          )
                           AND kip.acl_snapshot_is_fresh(acl_snapshot_id)
                         """,
-                        (context.workspace, evidence_unit_ids),
+                        (
+                            context.workspace,
+                            evidence_unit_ids,
+                            context.acl_scopes,
+                        ),
                     )
                     evidence_rows = cursor.fetchall()
                     if len(evidence_rows) != len(set(evidence_unit_ids)):
@@ -1854,9 +2446,32 @@ class PostgresDatabase:
                 UPDATE knowledge.assertion_candidates
                 SET status='rejected', reviewed_at=now(), reviewed_by=%s, review_note=%s
                 WHERE workspace_id=%s AND id=%s AND status='proposed'
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM jsonb_array_elements(
+                          knowledge.assertion_candidates.evidence
+                      ) item
+                      WHERE NOT EXISTS (
+                          SELECT 1 FROM content.units unit
+                          WHERE unit.workspace_id=%s
+                            AND unit.id=item->>'content_unit_id'
+                            AND (
+                                cardinality(unit.acl_scopes)=0
+                                OR unit.acl_scopes <@ %s::text[]
+                            )
+                            AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                      )
+                  )
                 RETURNING *
                 """,
-                (reviewer_id, note, context.workspace, candidate_id),
+                (
+                    reviewer_id,
+                    note,
+                    context.workspace,
+                    candidate_id,
+                    context.workspace,
+                    context.acl_scopes,
+                ),
             )
             row = cursor.fetchone()
             connection.commit()

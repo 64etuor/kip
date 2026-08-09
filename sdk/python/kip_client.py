@@ -159,3 +159,108 @@ class KipClient:
                 params={"status": status, "limit": limit},
             )
         )
+
+    def approve_review_candidate(
+        self,
+        candidate_id: str,
+        *,
+        note: str | None = None,
+    ) -> dict[str, Any]:
+        return _require_object(
+            self._request(
+                "POST",
+                f"/v1/review/candidates/{candidate_id}/approve",
+                admin=True,
+                params={"note": note} if note is not None else None,
+            )
+        )
+
+    def reject_review_candidate(
+        self,
+        candidate_id: str,
+        *,
+        note: str | None = None,
+    ) -> dict[str, Any]:
+        return _require_object(
+            self._request(
+                "POST",
+                f"/v1/review/candidates/{candidate_id}/reject",
+                admin=True,
+                params={"note": note} if note is not None else None,
+            )
+        )
+
+    def list_ontology_entities(self, *, limit: int = 100) -> list[dict[str, Any]]:
+        return _require_object_list(
+            self._request(
+                "GET",
+                "/v1/ontology/entities",
+                admin=True,
+                params={"limit": limit},
+            )
+        )
+
+    def create_ontology_entity(self, entity: dict[str, Any]) -> dict[str, Any]:
+        return _require_object(
+            self._request(
+                "POST",
+                "/v1/ontology/entities",
+                admin=True,
+                json=entity,
+            )
+        )
+
+    def enqueue_ontology_mining(self, unit_ids: list[str]) -> dict[str, Any]:
+        return _require_object(
+            self._request(
+                "POST",
+                "/v1/ontology/mining-jobs",
+                admin=True,
+                json={"unit_ids": unit_ids},
+            )
+        )
+
+    def list_entity_candidates(
+        self,
+        *,
+        status: str = "proposed",
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        return _require_object_list(
+            self._request(
+                "GET",
+                "/v1/ontology/entity-candidates",
+                admin=True,
+                params={"status": status, "limit": limit},
+            )
+        )
+
+    def approve_entity_candidate(
+        self,
+        candidate_id: str,
+        *,
+        note: str | None = None,
+    ) -> dict[str, Any]:
+        return _require_object(
+            self._request(
+                "POST",
+                f"/v1/ontology/entity-candidates/{candidate_id}/approve",
+                admin=True,
+                params={"note": note} if note is not None else None,
+            )
+        )
+
+    def reject_entity_candidate(
+        self,
+        candidate_id: str,
+        *,
+        note: str | None = None,
+    ) -> dict[str, Any]:
+        return _require_object(
+            self._request(
+                "POST",
+                f"/v1/ontology/entity-candidates/{candidate_id}/reject",
+                admin=True,
+                params={"note": note} if note is not None else None,
+            )
+        )

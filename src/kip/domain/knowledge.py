@@ -9,6 +9,12 @@ from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from kip.domain.generation import (
+    GenerationEvidence,
+    GenerationUsage,
+    ModelRevision,
+)
+
 
 class KnowledgeModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -112,6 +118,121 @@ class RelationProposal(KnowledgeModel):
         return self
 
 
+class MinedEntityProposal(KnowledgeModel):
+    entity_type: str = Field(min_length=1)
+    canonical_name: str = Field(min_length=1)
+    aliases: list[str] = Field(default_factory=list)
+    evidence_ids: tuple[str, ...] = Field(min_length=1)
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+
+    @field_validator("evidence_ids")
+    @classmethod
+    def unique_evidence_ids(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        if len(values) != len(set(values)):
+            raise ValueError("evidence IDs must be unique")
+        return values
+
+
+class MinedRelationProposal(KnowledgeModel):
+    subject_entity_id: str = Field(min_length=1)
+    predicate: str = Field(min_length=1)
+    object_entity_id: str = Field(min_length=1)
+    evidence_ids: tuple[str, ...] = Field(min_length=1)
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+
+    @model_validator(mode="after")
+    def valid_interval(self) -> Self:
+        if len(self.evidence_ids) != len(set(self.evidence_ids)):
+            raise ValueError("evidence IDs must be unique")
+        if (
+            self.valid_from is not None
+            and self.valid_to is not None
+            and self.valid_to <= self.valid_from
+        ):
+            raise ValueError("valid_to must be later than valid_from")
+        return self
+
+
+class RelationMiningRequest(KnowledgeModel):
+    evidence: tuple[GenerationEvidence, ...] = Field(min_length=1)
+    existing_entities: tuple[KnowledgeEntity, ...]
+    ontology_version: str = Field(min_length=1)
+    max_entity_proposals: int = Field(default=32, ge=0, le=256)
+    max_relation_proposals: int = Field(default=64, ge=0, le=512)
+
+
+class RelationMiningResult(KnowledgeModel):
+    entities: tuple[MinedEntityProposal, ...]
+    relations: tuple[MinedRelationProposal, ...]
+    model: ModelRevision
+    usage: GenerationUsage
+    provider_request_id: str | None = None
+
+
+class EntityCandidate(KnowledgeModel):
+    id: str = Field(min_length=1)
+    fingerprint: str = Field(min_length=1)
+    entity_type: str = Field(min_length=1)
+    canonical_name: str = Field(min_length=1)
+    aliases: list[str] = Field(default_factory=list)
+    status: Literal["proposed", "approved", "rejected", "superseded"] = "proposed"
+    origin: str = Field(min_length=1)
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    ontology_version: str = Field(min_length=1)
+    evidence: list[CandidateEvidence] = Field(min_length=1)
+    derivation: RelationDerivation
+    review_note: str | None = None
+
+    @model_validator(mode="after")
+    def normalize_names(self) -> Self:
+        display = _display_name(self.canonical_name)
+        if not display:
+            raise ValueError("canonical entity name cannot be blank")
+        aliases: list[str] = []
+        seen = {normalize_entity_name(display)}
+        for raw_alias in self.aliases:
+            alias = _display_name(raw_alias)
+            normalized = normalize_entity_name(alias)
+            if alias and normalized not in seen:
+                seen.add(normalized)
+                aliases.append(alias)
+        object.__setattr__(self, "canonical_name", display)
+        object.__setattr__(self, "aliases", aliases)
+        evidence_ids = [item.content_unit_id for item in self.evidence]
+        if len(evidence_ids) != len(set(evidence_ids)):
+            raise ValueError("candidate evidence IDs must be unique")
+        return self
+
+
+def entity_candidate_fingerprint(
+    proposal: MinedEntityProposal,
+    *,
+    ontology_version: str,
+    evidence: tuple[CandidateEvidence, ...],
+    derivation: RelationDerivation,
+) -> str:
+    payload = {
+        "ontology_version": ontology_version,
+        "entity_type": proposal.entity_type,
+        "canonical_name": normalize_entity_name(proposal.canonical_name),
+        "aliases": sorted(normalize_entity_name(item) for item in proposal.aliases),
+        "evidence": [
+            item.model_dump(mode="json")
+            for item in sorted(evidence, key=lambda value: value.content_unit_id)
+        ],
+        "derivation": derivation.model_dump(mode="json"),
+    }
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
 def relation_candidate_fingerprint(
     *,
     proposal: RelationProposal,
@@ -166,3 +287,13 @@ def intervals_overlap(
 def stable_candidate_id(fingerprint: str) -> str:
     digest = re.sub(r"^sha256:", "", fingerprint)
     return f"cand_{digest[:32]}"
+
+
+def stable_entity_candidate_id(fingerprint: str) -> str:
+    digest = re.sub(r"^sha256:", "", fingerprint)
+    return f"ecand_{digest[:32]}"
+
+
+def stable_entity_id(fingerprint: str) -> str:
+    digest = re.sub(r"^sha256:", "", fingerprint)
+    return f"ent_{digest[:32]}"

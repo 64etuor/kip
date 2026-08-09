@@ -7,7 +7,13 @@ from typing import Final, assert_never
 
 from kip.adapters.repository.memory.acl import assertion_is_visible, unit_is_visible
 from kip.adapters.repository.memory.state import MemoryState
-from kip.domain.knowledge import KnowledgeEntity
+from kip.domain.knowledge import (
+    CandidateEvidence,
+    EntityCandidate,
+    KnowledgeEntity,
+    normalize_entity_name,
+    stable_entity_id,
+)
 from kip.domain.models import (
     ApprovedAssertion,
     AssertionCandidate,
@@ -41,7 +47,7 @@ class MemoryKnowledgeStore:
         entity: KnowledgeEntity,
     ) -> KnowledgeEntity:
         names = [entity.canonical_name_normalized, *(
-            alias.casefold() for alias in entity.aliases
+            normalize_entity_name(alias) for alias in entity.aliases
         )]
         for name in names:
             existing_id = self.state.entity_names.get(name)
@@ -80,6 +86,117 @@ class MemoryKnowledgeStore:
             if _entity_is_visible(entity, context)
         ][:limit]
 
+    def save_entity_candidate(
+        self,
+        context: RequestContext,
+        candidate: EntityCandidate,
+    ) -> EntityCandidate:
+        existing_id = self.state.entity_candidate_ids_by_fingerprint.get(
+            candidate.fingerprint
+        )
+        if existing_id is not None:
+            return self.get_entity_candidate(context, existing_id)
+        if not _candidate_evidence_is_visible(self.state, candidate.evidence, context):
+            raise NotFoundError("one or more entity candidate evidence units are unavailable")
+        self.state.entity_candidates[candidate.id] = candidate.model_copy(deep=True)
+        self.state.entity_candidate_ids_by_fingerprint[candidate.fingerprint] = (
+            candidate.id
+        )
+        return candidate.model_copy(deep=True)
+
+    def get_entity_candidate_by_fingerprint(
+        self,
+        context: RequestContext,
+        fingerprint: str,
+    ) -> EntityCandidate | None:
+        candidate_id = self.state.entity_candidate_ids_by_fingerprint.get(fingerprint)
+        if candidate_id is None:
+            return None
+        return self.get_entity_candidate(context, candidate_id)
+
+    def get_entity_candidate(
+        self,
+        context: RequestContext,
+        candidate_id: str,
+    ) -> EntityCandidate:
+        candidate = self.state.entity_candidates.get(candidate_id)
+        if candidate is None or not _candidate_evidence_is_visible(
+            self.state,
+            candidate.evidence,
+            context,
+        ):
+            raise NotFoundError(f"entity candidate not found: {candidate_id}")
+        return candidate.model_copy(deep=True)
+
+    def list_entity_candidates(
+        self,
+        context: RequestContext,
+        status: str = "proposed",
+        limit: int = 100,
+    ) -> list[EntityCandidate]:
+        return [
+            candidate.model_copy(deep=True)
+            for candidate in self.state.entity_candidates.values()
+            if candidate.status == status
+            and _candidate_evidence_is_visible(self.state, candidate.evidence, context)
+        ][:limit]
+
+    def approve_entity_candidate(
+        self,
+        context: RequestContext,
+        candidate_id: str,
+        reviewer_id: str,
+        note: str | None = None,
+    ) -> KnowledgeEntity:
+        candidate = self.get_entity_candidate(context, candidate_id)
+        if candidate.status != "proposed":
+            raise ConflictError(f"entity candidate is already {candidate.status}")
+        derived_scopes = _candidate_evidence_scopes(
+            self.state,
+            candidate.evidence,
+            context,
+        )
+        entity = KnowledgeEntity(
+            id=stable_entity_id(candidate.fingerprint),
+            entity_type=candidate.entity_type,
+            canonical_name=candidate.canonical_name,
+            aliases=candidate.aliases,
+            acl_scopes=derived_scopes or list(context.acl_scopes),
+            metadata={
+                "source_candidate_id": candidate.id,
+                "approved_by": reviewer_id,
+            },
+        )
+        saved = self.save_entity(context, entity)
+        self.state.entity_candidates[candidate.id] = candidate.model_copy(
+            update={
+                "status": "approved",
+                "review_note": note or f"approved by {reviewer_id}",
+            },
+            deep=True,
+        )
+        return saved
+
+    def reject_entity_candidate(
+        self,
+        context: RequestContext,
+        candidate_id: str,
+        reviewer_id: str,
+        note: str | None = None,
+    ) -> EntityCandidate:
+        candidate = self.get_entity_candidate(context, candidate_id)
+        if candidate.status != "proposed":
+            raise ConflictError(f"entity candidate is already {candidate.status}")
+        rejected = candidate.model_copy(
+            update={
+                "status": "rejected",
+                "review_note": note or f"rejected by {reviewer_id}",
+            },
+            deep=True,
+        )
+        self.state.entity_candidates[candidate.id] = rejected
+        return rejected.model_copy(deep=True)
+
     def get_candidate_by_fingerprint(
         self,
         context: RequestContext,
@@ -88,7 +205,14 @@ class MemoryKnowledgeStore:
         candidate_id = self.state.candidate_ids_by_fingerprint.get(fingerprint)
         if candidate_id is None:
             return None
-        return self.get_candidate(context, candidate_id)
+        candidate = self.state.candidates[candidate_id]
+        if not _candidate_evidence_is_visible(
+            self.state,
+            candidate.evidence,
+            context,
+        ):
+            return None
+        return candidate.model_copy(deep=True)
 
     def find_assertions(
         self,
@@ -111,12 +235,18 @@ class MemoryKnowledgeStore:
         context: RequestContext,
         candidate: AssertionCandidate,
     ) -> AssertionCandidate:
+        if not _candidate_evidence_is_visible(
+            self.state,
+            candidate.evidence,
+            context,
+        ):
+            raise NotFoundError("one or more candidate evidence units are unavailable")
         if candidate.fingerprint:
             existing_id = self.state.candidate_ids_by_fingerprint.get(
                 candidate.fingerprint
             )
             if existing_id is not None:
-                return self.state.candidates[existing_id].model_copy(deep=True)
+                return self.get_candidate(context, existing_id)
             self.state.candidate_ids_by_fingerprint[candidate.fingerprint] = candidate.id
         self.state.candidates[candidate.id] = candidate.model_copy(deep=True)
         return candidate.model_copy(deep=True)
@@ -127,7 +257,11 @@ class MemoryKnowledgeStore:
         candidate_id: str,
     ) -> AssertionCandidate:
         candidate = self.state.candidates.get(candidate_id)
-        if not candidate:
+        if not candidate or not _candidate_evidence_is_visible(
+            self.state,
+            candidate.evidence,
+            context,
+        ):
             raise NotFoundError(f"candidate not found: {candidate_id}")
         return candidate.model_copy(deep=True)
 
@@ -141,6 +275,7 @@ class MemoryKnowledgeStore:
             candidate.model_copy(deep=True)
             for candidate in self.state.candidates.values()
             if candidate.status == status
+            and _candidate_evidence_is_visible(self.state, candidate.evidence, context)
         ][:limit]
 
     def approve_candidate(
@@ -150,9 +285,7 @@ class MemoryKnowledgeStore:
         reviewer_id: str,
         note: str | None = None,
     ) -> ApprovedAssertion:
-        candidate = self.state.candidates.get(candidate_id)
-        if not candidate:
-            raise NotFoundError(f"candidate not found: {candidate_id}")
+        candidate = self.get_candidate(context, candidate_id)
         if candidate.status != "proposed":
             raise ConflictError(f"candidate is already {candidate.status}")
         if candidate.predicate in _HIGH_RISK_PREDICATES and not candidate.evidence:
@@ -183,8 +316,13 @@ class MemoryKnowledgeStore:
             valid_from=candidate.valid_from,
             valid_to=candidate.valid_to,
         )
-        candidate.status = "approved"
-        candidate.review_note = note or f"approved by {reviewer_id}"
+        self.state.candidates[candidate.id] = candidate.model_copy(
+            update={
+                "status": "approved",
+                "review_note": note or f"approved by {reviewer_id}",
+            },
+            deep=True,
+        )
         self.state.assertions[assertion.id] = assertion
         return assertion.model_copy(deep=True)
 
@@ -195,14 +333,18 @@ class MemoryKnowledgeStore:
         reviewer_id: str,
         note: str | None = None,
     ) -> AssertionCandidate:
-        candidate = self.state.candidates.get(candidate_id)
-        if not candidate:
-            raise NotFoundError(f"candidate not found: {candidate_id}")
+        candidate = self.get_candidate(context, candidate_id)
         if candidate.status != "proposed":
             raise ConflictError(f"candidate is already {candidate.status}")
-        candidate.status = "rejected"
-        candidate.review_note = note or f"rejected by {reviewer_id}"
-        return candidate.model_copy(deep=True)
+        rejected = candidate.model_copy(
+            update={
+                "status": "rejected",
+                "review_note": note or f"rejected by {reviewer_id}",
+            },
+            deep=True,
+        )
+        self.state.candidates[candidate.id] = rejected
+        return rejected.model_copy(deep=True)
 
     def get_assertion(
         self,
@@ -325,3 +467,29 @@ def _edge(assertion: ApprovedAssertion) -> GraphEdge:
 
 def _entity_is_visible(entity: KnowledgeEntity, context: RequestContext) -> bool:
     return not entity.acl_scopes or set(entity.acl_scopes).issubset(context.acl_scopes)
+
+
+def _candidate_evidence_is_visible(
+    state: MemoryState,
+    evidence: list[CandidateEvidence],
+    context: RequestContext,
+) -> bool:
+    return all(
+        (unit := state.units.get(item.content_unit_id)) is not None
+        and unit_is_visible(state, unit, context)
+        for item in evidence
+    )
+
+
+def _candidate_evidence_scopes(
+    state: MemoryState,
+    evidence: list[CandidateEvidence],
+    context: RequestContext,
+) -> list[str]:
+    scopes: set[str] = set()
+    if not _candidate_evidence_is_visible(state, evidence, context):
+        raise NotFoundError("one or more entity candidate evidence units are unavailable")
+    for item in evidence:
+        unit = state.units[item.content_unit_id]
+        scopes.update(unit.acl_scopes)
+    return sorted(scopes)

@@ -4,8 +4,10 @@ import logging
 import time
 import uuid
 
+from pydantic import ValidationError as PydanticValidationError
+
 from kip.container import Container, build_container
-from kip.domain.models import JobRecord
+from kip.domain.models import JobRecord, RequestContext
 from kip.errors import ValidationError
 
 LOGGER = logging.getLogger(__name__)
@@ -36,7 +38,41 @@ def process_job(container: Container, job: JobRecord) -> None:
         else:
             container.application.operations.rebuild_projection(context, projection)
         return
+    if job.job_type == "ontology.mine":
+        raw_unit_ids = job.payload.get("unit_ids")
+        if not isinstance(raw_unit_ids, list) or not all(
+            isinstance(item, str) for item in raw_unit_ids
+        ):
+            raise ValidationError("ontology.mine requires string unit_ids")
+        container.application.ontology_rag.process_mining(
+            _mining_context(job),
+            raw_unit_ids,
+        )
+        return
     raise ValidationError(f"unsupported job type: {job.job_type}")
+
+
+def _mining_context(job: JobRecord) -> RequestContext:
+    raw_access = job.payload.get("access")
+    workspace = job.payload.get("workspace")
+    if not isinstance(raw_access, dict) or not isinstance(workspace, str):
+        raise ValidationError("ontology.mine requires captured access context")
+    try:
+        context = RequestContext.model_validate(
+            {
+                "workspace": workspace,
+                "principal_id": raw_access.get("principal_id"),
+                "acl_scopes": raw_access.get("acl_scopes"),
+                "roles": raw_access.get("roles"),
+                "acl_snapshot": raw_access.get("acl_snapshot"),
+                "request_id": job.id,
+            }
+        )
+    except PydanticValidationError as error:
+        raise ValidationError("ontology.mine access context is invalid") from error
+    if context.acl_snapshot is not None and not context.acl_snapshot.is_fresh():
+        raise ValidationError("ontology.mine access snapshot expired before processing")
+    return context
 
 
 def run_worker(container: Container, *, once: bool = False, poll_seconds: float = 2.0) -> None:

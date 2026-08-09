@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -76,6 +76,21 @@ class GenerationUsage(GenerationModel):
 
 class GenerationResult(GenerationModel):
     claims: tuple[GeneratedClaim, ...] = Field(min_length=1)
+    model: ModelRevision
+    usage: GenerationUsage
+    provider_request_id: str | None = None
+
+
+class StructuredGenerationRequest(GenerationModel):
+    task_name: str = Field(min_length=1, pattern=r"^[a-z][a-z0-9_]{1,63}$")
+    system_instruction: str = Field(min_length=1)
+    payload: dict[str, Any]
+    output_schema: dict[str, Any]
+    max_output_tokens: int = Field(default=1024, ge=64, le=32768)
+
+
+class StructuredGenerationResult(GenerationModel):
+    output: dict[str, Any]
     model: ModelRevision
     usage: GenerationUsage
     provider_request_id: str | None = None

@@ -8,7 +8,11 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from kip.domain.egress import DataClassification, EgressDecision
 from kip.domain.generation import GeneratedClaim, GenerationUsage, ModelRevision
 from kip.domain.identity import AclSnapshot
-from kip.domain.knowledge import CandidateEvidence, RelationDerivation
+from kip.domain.knowledge import (
+    CandidateEvidence,
+    EntityCandidate,
+    RelationDerivation,
+)
 
 
 class StrictModel(BaseModel):
@@ -351,6 +355,19 @@ class AssertionCandidate(StrictModel):
         ):
             raise ValueError("valid_to must be later than valid_from")
         return self
+
+
+class OntologyMiningSummary(StrictModel):
+    schema_version: Literal["kip.ontology-mining.v1"] = "kip.ontology-mining.v1"
+    entity_candidates: list[EntityCandidate] = Field(default_factory=list)
+    relation_candidates: list[AssertionCandidate] = Field(default_factory=list)
+    model: ModelRevision
+    usage: GenerationUsage
+    provider_request_id: str | None = None
+
+
+class OntologyMiningSubmission(StrictModel):
+    unit_ids: list[str] = Field(min_length=1, max_length=500)
 
 
 class ApprovedAssertion(StrictModel):

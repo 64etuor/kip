@@ -4,6 +4,7 @@ import json
 import os
 
 from kip.container import build_container
+from kip.domain.knowledge import KnowledgeEntity
 from kip.domain.models import (
     AnswerRequest,
     ContextRequest,
@@ -97,6 +98,113 @@ def create_server():
     def kip_explain_assertion(assertion_id: str) -> str:
         """Explain one approved assertion with exact evidence units and stale-source checks."""
         return _json(application.knowledge.explain_assertion(context(), assertion_id))
+
+    @mcp.tool()
+    def kip_ontology_entities(limit: int = 100) -> str:
+        return _json(application.ontology_rag.list_entities(context(), limit=limit))
+
+    @mcp.tool()
+    def kip_ontology_entity_create(
+        entity_id: str,
+        entity_type: str,
+        canonical_name: str,
+        aliases: list[str] | None = None,
+        acl_scopes: list[str] | None = None,
+    ) -> str:
+        return _json(
+            application.ontology_rag.create_entity(
+                context(),
+                KnowledgeEntity(
+                    id=entity_id,
+                    entity_type=entity_type,
+                    canonical_name=canonical_name,
+                    aliases=aliases or [],
+                    acl_scopes=acl_scopes or [],
+                ),
+            )
+        )
+
+    @mcp.tool()
+    def kip_ontology_mine(unit_ids: list[str]) -> str:
+        selected_context = context()
+        return _json(
+            {
+                "job_id": application.ontology_rag.enqueue_mining(
+                    selected_context,
+                    unit_ids,
+                )
+            }
+        )
+
+    @mcp.tool()
+    def kip_ontology_candidates(status: str = "proposed", limit: int = 100) -> str:
+        selected_context = context()
+        return _json(
+            {
+                "entities": application.ontology_rag.list_entity_candidates(
+                    selected_context,
+                    status=status,
+                    limit=limit,
+                ),
+                "relations": application.knowledge.list_candidates(
+                    selected_context,
+                    status,
+                    limit,
+                ),
+            }
+        )
+
+    @mcp.tool()
+    def kip_ontology_entity_candidate_approve(
+        candidate_id: str,
+        note: str | None = None,
+    ) -> str:
+        return _json(
+            application.ontology_rag.approve_entity_candidate(
+                context(),
+                candidate_id,
+                note,
+            )
+        )
+
+    @mcp.tool()
+    def kip_ontology_entity_candidate_reject(
+        candidate_id: str,
+        note: str | None = None,
+    ) -> str:
+        return _json(
+            application.ontology_rag.reject_entity_candidate(
+                context(),
+                candidate_id,
+                note,
+            )
+        )
+
+    @mcp.tool()
+    def kip_ontology_relation_candidate_approve(
+        candidate_id: str,
+        note: str | None = None,
+    ) -> str:
+        return _json(
+            application.knowledge.review_approve(
+                context(),
+                candidate_id,
+                note,
+            )
+        )
+
+    @mcp.tool()
+    def kip_ontology_relation_candidate_reject(
+        candidate_id: str,
+        note: str | None = None,
+    ) -> str:
+        return _json(
+            application.knowledge.review_reject(
+                context(),
+                candidate_id,
+                note,
+            )
+        )
 
     return mcp
 

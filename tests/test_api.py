@@ -1,10 +1,12 @@
 from dataclasses import replace
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
 
 from kip.adapters.identity.api_key import ApiKeyIdentityAdapter
 from kip.api import create_app
+from kip.container import build_container
 from kip.domain.models import AssertionCandidate, SearchRequest
 from kip.ids import new_id
 
@@ -280,3 +282,49 @@ def test_rest_explains_approved_assertion_with_evidence(test_container):
     payload = response.json()["data"]
     assert payload["assertion"]["id"] == assertion.id
     assert payload["evidence"][0]["unit"]["id"] == unit_id
+
+
+def test_rest_exposes_shared_ontology_entity_and_mining_contracts(test_container):
+    settings = replace(
+        test_container.settings,
+        project_root=Path(__file__).resolve().parents[1],
+    )
+    ontology_container = build_container(
+        settings,
+        repository=test_container.repository,
+    )
+    client = TestClient(create_app(ontology_container))
+    headers = {
+        "X-KIP-API-Key": "test-key",
+        "X-KIP-Admin-Key": "test-admin",
+        "X-KIP-Workspace": "default",
+        "X-KIP-ACL-Scopes": "workspace:default",
+    }
+
+    created = client.post(
+        "/v1/ontology/entities",
+        headers=headers,
+        json={
+            "id": "ent_api_project",
+            "entity_type": "Project",
+            "canonical_name": "API 과제",
+            "aliases": ["과제 API"],
+        },
+    )
+    listed = client.get(
+        "/v1/ontology/entities",
+        headers=headers,
+    )
+    mining = client.post(
+        "/v1/ontology/mining-jobs",
+        headers=headers,
+        json={"unit_ids": ["unit_missing"]},
+    )
+
+    assert created.status_code == 200
+    assert created.json()["data"]["id"] == "ent_api_project"
+    assert listed.status_code == 200
+    assert listed.json()["data"][0]["aliases"] == ["과제 API"]
+    assert mining.status_code == 422
+    assert mining.json()["error"]["code"] == "validation_error"
+    assert "relation miner" in mining.json()["error"]["message"]

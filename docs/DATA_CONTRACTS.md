@@ -59,13 +59,28 @@ never selected unless configuration explicitly permits it.
 ## Knowledge sequence
 
 ```text
-Entity -> AssertionCandidate -> ApprovedAssertion -> AssertionEvidence
+EntityCandidate -> Entity
+RelationProposal -> AssertionCandidate -> ApprovedAssertion -> AssertionEvidence
 ```
 
 `KnowledgeEntity` stores an ontology type, normalized canonical name, aliases,
 status, and ACL scopes. `RelationProposal` names exact evidence-unit IDs and a
 versioned derivation. The application reopens those units and materializes
 `CandidateEvidence` with source revision hash, locator, and quote hash.
+
+`RelationMiningRequest` contains exact evidence bodies, visible existing
+entities, the active ontology version, and bounded proposal counts.
+`RelationMiningResult` contains only typed entity and relation proposals plus a
+pinned model revision and token usage. The adapter rejects unknown types,
+predicates, entity IDs, evidence IDs, domain/range violations, duplicates, and
+malformed intervals before persistence. Source text remains a data field and
+cannot alter the system instruction.
+
+Model-discovered entities first become `EntityCandidate` records with their own
+stable `ecand_` IDs and exact evidence. Human approval creates a separate
+`KnowledgeEntity` with evidence-derived ACL scopes; rejection never creates an
+entity. Relation and entity candidates are both excluded from graph traversal
+and answer evidence until their independent approvals finish.
 
 Candidate fingerprints cover ontology version, normalized subject/object
 identity, predicate, validity interval, exact source revision and locator, and

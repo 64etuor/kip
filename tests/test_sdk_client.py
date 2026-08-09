@@ -57,3 +57,30 @@ def test_sdk_answer_uses_public_answer_contract(monkeypatch) -> None:
             "json": {"query": "승인됐어?", "limit": 7, "max_chars": 9000}
         },
     }
+
+
+def test_sdk_ontology_mining_uses_admin_contract(monkeypatch) -> None:
+    captured: dict[str, Any] = {}
+
+    def request(
+        self: KipClient,
+        method: str,
+        path: str,
+        *,
+        admin: bool = False,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        captured.update(method=method, path=path, admin=admin, kwargs=kwargs)
+        return {"job_id": "job_ontology"}
+
+    monkeypatch.setattr(KipClient, "_request", request)
+
+    result = KipClient().enqueue_ontology_mining(["unit_1", "unit_2"])
+
+    assert result == {"job_id": "job_ontology"}
+    assert captured == {
+        "method": "POST",
+        "path": "/v1/ontology/mining-jobs",
+        "admin": True,
+        "kwargs": {"json": {"unit_ids": ["unit_1", "unit_2"]}},
+    }

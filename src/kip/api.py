@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse, Response
 
 from kip.container import Container, build_container
 from kip.domain.identity import IdentityCredential
+from kip.domain.knowledge import KnowledgeEntity
 from kip.domain.models import (
     AnswerRequest,
     ConnectorEvent,
@@ -19,6 +20,7 @@ from kip.domain.models import (
     ErrorInfo,
     GraphNeighborsRequest,
     GraphPathRequest,
+    OntologyMiningSubmission,
     RequestContext,
     SearchRequest,
 )
@@ -318,6 +320,108 @@ def create_app(container: Container | None = None) -> FastAPI:
         context: RequestContext = Depends(admin_context),
     ) -> Envelope:
         return ok(selected.application.ingestion.ingest_connector_event(context, payload), context)
+
+    @app.get("/v1/ontology/entities", response_model=Envelope)
+    async def ontology_entities(
+        limit: int = 100,
+        context: RequestContext = Depends(admin_context),
+    ) -> Envelope:
+        return ok(
+            selected.application.ontology_rag.list_entities(context, limit=limit),
+            context,
+        )
+
+    @app.post("/v1/ontology/entities", response_model=Envelope)
+    async def ontology_entity_create(
+        payload: KnowledgeEntity,
+        context: RequestContext = Depends(admin_context),
+    ) -> Envelope:
+        return ok(
+            selected.application.ontology_rag.create_entity(context, payload),
+            context,
+        )
+
+    @app.post("/v1/ontology/mining-jobs", response_model=Envelope)
+    async def ontology_mining_job(
+        payload: OntologyMiningSubmission,
+        context: RequestContext = Depends(admin_context),
+    ) -> Envelope:
+        return ok(
+            {
+                "job_id": selected.application.ontology_rag.enqueue_mining(
+                    context,
+                    payload.unit_ids,
+                )
+            },
+            context,
+        )
+
+    @app.get("/v1/ontology/entity-candidates", response_model=Envelope)
+    async def ontology_entity_candidates(
+        status: str = "proposed",
+        limit: int = 100,
+        context: RequestContext = Depends(admin_context),
+    ) -> Envelope:
+        return ok(
+            selected.application.ontology_rag.list_entity_candidates(
+                context,
+                status=status,
+                limit=limit,
+            ),
+            context,
+        )
+
+    @app.get(
+        "/v1/ontology/entity-candidates/{candidate_id}",
+        response_model=Envelope,
+    )
+    async def ontology_entity_candidate(
+        candidate_id: str,
+        context: RequestContext = Depends(admin_context),
+    ) -> Envelope:
+        return ok(
+            selected.application.ontology_rag.get_entity_candidate(
+                context,
+                candidate_id,
+            ),
+            context,
+        )
+
+    @app.post(
+        "/v1/ontology/entity-candidates/{candidate_id}/approve",
+        response_model=Envelope,
+    )
+    async def ontology_entity_candidate_approve(
+        candidate_id: str,
+        note: str | None = None,
+        context: RequestContext = Depends(admin_context),
+    ) -> Envelope:
+        return ok(
+            selected.application.ontology_rag.approve_entity_candidate(
+                context,
+                candidate_id,
+                note,
+            ),
+            context,
+        )
+
+    @app.post(
+        "/v1/ontology/entity-candidates/{candidate_id}/reject",
+        response_model=Envelope,
+    )
+    async def ontology_entity_candidate_reject(
+        candidate_id: str,
+        note: str | None = None,
+        context: RequestContext = Depends(admin_context),
+    ) -> Envelope:
+        return ok(
+            selected.application.ontology_rag.reject_entity_candidate(
+                context,
+                candidate_id,
+                note,
+            ),
+            context,
+        )
 
     @app.get("/v1/review/candidates", response_model=Envelope)
     async def candidates(

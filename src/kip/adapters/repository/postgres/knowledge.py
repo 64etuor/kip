@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from kip.adapters.repository.postgres.database import PostgresDatabase
-from kip.domain.knowledge import KnowledgeEntity
+from kip.domain.knowledge import EntityCandidate, KnowledgeEntity
 from kip.domain.models import (
     ApprovedAssertion,
     AssertionCandidate,
@@ -40,6 +40,66 @@ class PostgresKnowledgeStore:
         limit: int = 100,
     ) -> list[KnowledgeEntity]:
         return self.database.list_entities(context, limit=limit)
+
+    def save_entity_candidate(
+        self,
+        context: RequestContext,
+        candidate: EntityCandidate,
+    ) -> EntityCandidate:
+        return self.database.save_entity_candidate(context, candidate)
+
+    def get_entity_candidate_by_fingerprint(
+        self,
+        context: RequestContext,
+        fingerprint: str,
+    ) -> EntityCandidate | None:
+        return self.database.get_entity_candidate_by_fingerprint(
+            context,
+            fingerprint,
+        )
+
+    def get_entity_candidate(
+        self,
+        context: RequestContext,
+        candidate_id: str,
+    ) -> EntityCandidate:
+        return self.database.get_entity_candidate(context, candidate_id)
+
+    def list_entity_candidates(
+        self,
+        context: RequestContext,
+        status: str = "proposed",
+        limit: int = 100,
+    ) -> list[EntityCandidate]:
+        return self.database.list_entity_candidates(context, status, limit)
+
+    def approve_entity_candidate(
+        self,
+        context: RequestContext,
+        candidate_id: str,
+        reviewer_id: str,
+        note: str | None = None,
+    ) -> KnowledgeEntity:
+        return self.database.approve_entity_candidate(
+            context,
+            candidate_id,
+            reviewer_id,
+            note,
+        )
+
+    def reject_entity_candidate(
+        self,
+        context: RequestContext,
+        candidate_id: str,
+        reviewer_id: str,
+        note: str | None = None,
+    ) -> EntityCandidate:
+        return self.database.reject_entity_candidate(
+            context,
+            candidate_id,
+            reviewer_id,
+            note,
+        )
 
     def get_candidate_by_fingerprint(
         self,

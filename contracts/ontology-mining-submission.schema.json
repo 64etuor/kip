@@ -1,0 +1,19 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "unit_ids": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 500,
+      "minItems": 1,
+      "title": "Unit Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "unit_ids"
+  ],
+  "title": "OntologyMiningSubmission",
+  "type": "object"
+}

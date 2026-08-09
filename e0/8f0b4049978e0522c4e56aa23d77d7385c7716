@@ -1,0 +1,83 @@
+src/kip/adapters/repository/memory/lexical.py
+  s_41856199ee83ad::t_09f5d92458ba38 1-203
+src/kip/adapters/repository/memory/state.py
+  s_41856199ee83ad::t_5630e2ed85f917 1-29
+src/kip/ports/operations.py
+  s_41856199ee83ad::t_5a79a5d7d98f66 11-12
+src/kip/adapters/repository/postgres/database.py
+  s_41856199ee83ad::t_7ad79cac347ff2 10,12-16,93-96,142-146,1119
+  s_41856199ee83ad::t_5a79a5d7d98f66 635-638,690-693,1115-1118,1381-1386
+  s_41856199ee83ad::t_45d9fb443d087f 11,79
+src/kip/adapters/repository/memory/semantic.py
+  s_41856199ee83ad::t_7ad79cac347ff2 171,179-182,188
+  s_41856199ee83ad::t_b7b034ea455845 1-170,172-178,183-187,189-236
+tests/contract/test_repository_capability_composition.py
+  s_41856199ee83ad::t_0af3df8716a65e 1-68
+tests/test_api.py
+  s_41856199ee83ad::t_045870e5e6bd21 93-96,246-249
+  s_41856199ee83ad::t_3bda9decc7c94a 5
+src/kip/adapters/repository/postgres/operations.py
+  s_41856199ee83ad::t_df849a823f93b7 1-35
+src/kip/ports/repository.py
+  s_41856199ee83ad::t_96bf739fab1bff 13
+  s_41856199ee83ad::t_7ad79cac347ff2 14-33
+src/kip/adapters/repository/postgres/__init__.py
+  s_41856199ee83ad::t_df849a823f93b7 1-35
+src/kip/adapters/repository/memory/ingestion.py
+  s_41856199ee83ad::t_d6f96e25f2fc8c 1-89
+tests/test_worker.py
+  s_41856199ee83ad::t_319dc483a64a1e 10,12,21
+src/kip/adapters/repository/memory/evidence.py
+  s_41856199ee83ad::t_787b5905af86d2 1-62
+src/kip/adapters/repository/memory/retrieval.py
+  s_41856199ee83ad::t_97a283c37d853f 1-110
+src/kip/adapters/repository/memory/knowledge.py
+  s_41856199ee83ad::t_5137d16377877f 5-6,8,21-22,33-35,37,40-43,45,48-50,55-60,63,74,80-82,90,106,116,125-130,133-138,141-172,174-249
+tests/test_hybrid_retrieval.py
+  s_41856199ee83ad::t_319dc483a64a1e 8-9,71-74,77-81,208-210,227,246-247,276-279,289
+tests/test_semantic_repository_contract.py
+  s_41856199ee83ad::t_319dc483a64a1e 22,108,152
+src/kip/adapters/repository/memory/operations.py
+  s_41856199ee83ad::t_96bf739fab1bff 1-104
+tests/test_xlsx_two_stage.py
+  s_41856199ee83ad::t_319dc483a64a1e 31-34
+src/kip/adapters/repository/postgres/ingestion.py
+  s_41856199ee83ad::t_df849a823f93b7 1-26
+src/kip/adapters/repository/postgres/evidence.py
+  s_41856199ee83ad::t_df849a823f93b7 1-41
+src/kip/adapters/repository/postgres/retrieval.py
+  s_41856199ee83ad::t_df849a823f93b7 1-99
+tests/characterization/test_edge_contract_parity.py
+  s_41856199ee83ad::t_045870e5e6bd21 10,20-23
+src/kip/adapters/repository/memory/jobs.py
+  s_41856199ee83ad::t_2745ddfba606bb 1-84
+src/kip/adapters/repository/postgres/jobs.py
+  s_41856199ee83ad::t_df849a823f93b7 1-47
+src/kip/adapters/repository/postgres/knowledge.py
+  s_41856199ee83ad::t_df849a823f93b7 1-90
+tests/integration/test_postgres_repository.py
+  s_41856199ee83ad::t_319dc483a64a1e 64,74-77,91,102-103,114-115,138,143,156-157,161,166
+tests/test_vocabulary_and_assertions.py
+  s_41856199ee83ad::t_319dc483a64a1e 54
+  s_41856199ee83ad::t_045870e5e6bd21 5,32-42
+src/kip/adapters/repository/memory/__init__.py
+  s_41856199ee83ad::t_96bf739fab1bff 1-33
+src/kip/container.py
+  s_41856199ee83ad::t_96bf739fab1bff 117,123-124,136-137,145-149,152-154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "e08f0b4049978e0522c4e56aa23d77d7385c7716",
+  "prompts": {},
+  "sessions": {
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

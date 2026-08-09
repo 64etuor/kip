@@ -1,0 +1,533 @@
+{
+  "$defs": {
+    "AnswerReview": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "minLength": 1,
+          "title": "Case Id",
+          "type": "string"
+        },
+        "claims": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ReviewedClaim"
+          },
+          "title": "Claims",
+          "type": "array"
+        },
+        "expected_claims": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Claims"
+        },
+        "expected_evidence_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Evidence Ids"
+        },
+        "expected_refusal": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Refusal"
+        },
+        "refused": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Refused"
+        },
+        "schema_version": {
+          "default": "kip.answer-review.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "case_id"
+      ],
+      "title": "AnswerReview",
+      "type": "object"
+    },
+    "ExpectedAssertion": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "object_entity_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Object Entity Id"
+        },
+        "object_value": {
+          "default": null,
+          "title": "Object Value"
+        },
+        "predicate": {
+          "minLength": 1,
+          "title": "Predicate",
+          "type": "string"
+        },
+        "subject_id": {
+          "minLength": 1,
+          "title": "Subject Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "subject_id",
+        "predicate"
+      ],
+      "title": "ExpectedAssertion",
+      "type": "object"
+    },
+    "OntologyAssertionObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "assertion_id": {
+          "minLength": 1,
+          "title": "Assertion Id",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "object_entity_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Object Entity Id"
+        },
+        "object_value": {
+          "default": null,
+          "title": "Object Value"
+        },
+        "predicate": {
+          "minLength": 1,
+          "title": "Predicate",
+          "type": "string"
+        },
+        "subject_id": {
+          "minLength": 1,
+          "title": "Subject Id",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "assertion_id",
+        "subject_id",
+        "predicate"
+      ],
+      "title": "OntologyAssertionObservation",
+      "type": "object"
+    },
+    "OntologyContradiction": {
+      "additionalProperties": false,
+      "properties": {
+        "assertion_ids": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Assertion Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "assertion_ids"
+      ],
+      "title": "OntologyContradiction",
+      "type": "object"
+    },
+    "OntologyPathObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "assertion_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Assertion Ids",
+          "type": "array"
+        },
+        "node_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Node Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "node_ids",
+        "assertion_ids"
+      ],
+      "title": "OntologyPathObservation",
+      "type": "object"
+    },
+    "OntologyReview": {
+      "additionalProperties": false,
+      "properties": {
+        "actual_assertions": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/OntologyAssertionObservation"
+          },
+          "title": "Actual Assertions",
+          "type": "array"
+        },
+        "actual_entity_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Actual Entity Ids",
+          "type": "array"
+        },
+        "actual_paths": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/OntologyPathObservation"
+          },
+          "title": "Actual Paths",
+          "type": "array"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Of"
+        },
+        "case_id": {
+          "minLength": 1,
+          "title": "Case Id",
+          "type": "string"
+        },
+        "detected_contradictions": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/OntologyContradiction"
+          },
+          "title": "Detected Contradictions",
+          "type": "array"
+        },
+        "expected_assertions": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ExpectedAssertion"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Assertions"
+        },
+        "expected_contradictions": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/OntologyContradiction"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Contradictions"
+        },
+        "expected_entity_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Entity Ids"
+        },
+        "expected_paths": {
+          "anyOf": [
+            {
+              "items": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Paths"
+        },
+        "forbidden_assertion_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Forbidden Assertion Ids",
+          "type": "array"
+        },
+        "forbidden_entity_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Forbidden Entity Ids",
+          "type": "array"
+        },
+        "forbidden_evidence_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Forbidden Evidence Ids",
+          "type": "array"
+        },
+        "schema_version": {
+          "default": "kip.ontology-review.v1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "case_id"
+      ],
+      "title": "OntologyReview",
+      "type": "object"
+    },
+    "ReviewedClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "citation_locator_correct": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Citation Locator Correct"
+        },
+        "cited_evidence_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Cited Evidence Ids",
+          "type": "array"
+        },
+        "expected_claim": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Claim"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "supported_by_evidence": {
+          "title": "Supported By Evidence",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "supported_by_evidence"
+      ],
+      "title": "ReviewedClaim",
+      "type": "object"
+    },
+    "VariantReviews": {
+      "additionalProperties": false,
+      "properties": {
+        "answer": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/AnswerReview"
+          },
+          "title": "Answer",
+          "type": "array"
+        },
+        "ontology": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/OntologyReview"
+          },
+          "title": "Ontology",
+          "type": "array"
+        }
+      },
+      "title": "VariantReviews",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "dataset_name": {
+      "minLength": 1,
+      "title": "Dataset Name",
+      "type": "string"
+    },
+    "dataset_source_revision": {
+      "minLength": 1,
+      "title": "Dataset Source Revision",
+      "type": "string"
+    },
+    "dataset_version": {
+      "minLength": 1,
+      "title": "Dataset Version",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "kip.evaluation-review-bundle.v1",
+      "default": "kip.evaluation-review-bundle.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "variants": {
+      "additionalProperties": {
+        "$ref": "#/$defs/VariantReviews"
+      },
+      "minProperties": 1,
+      "propertyNames": {
+        "enum": [
+          "lexical",
+          "vector",
+          "hybrid",
+          "reranked"
+        ]
+      },
+      "title": "Variants",
+      "type": "object"
+    }
+  },
+  "required": [
+    "dataset_name",
+    "dataset_version",
+    "dataset_source_revision",
+    "variants"
+  ],
+  "title": "EvaluationReviewBundle",
+  "type": "object"
+}

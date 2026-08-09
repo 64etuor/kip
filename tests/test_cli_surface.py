@@ -138,6 +138,39 @@ cases:
     assert (output / "latest.json").is_file()
 
 
+def test_evaluate_run_scores_version_bound_answer_and_ontology_reviews(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "rag-reports"
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "evaluate",
+            "run",
+            "--dataset",
+            str(ROOT / "evaluation/golden/ontology-starter.yaml"),
+            "--reviews",
+            str(ROOT / "evaluation/reviews/ontology-starter.yaml"),
+            "--variants",
+            "hybrid",
+            "--warmup-passes",
+            "0",
+            "--output-dir",
+            str(output),
+        ],
+        env=_env(),
+    )
+
+    assert result.exit_code == 0, result.stdout
+    report = json.loads((output / "latest.json").read_text(encoding="utf-8"))
+    quality = report["variants"]["hybrid"]
+    assert quality["answer_quality"]["metrics"]["claim_precision"] == 1.0
+    assert quality["ontology_quality"]["metrics"]["relation_recall"] == 1.0
+    assert report["run"]["dataset_gate_eligible"] is True
+    assert "role:evaluation-owner" not in str(report)
+
+
 def test_quality_commands_validate_and_recommend_without_activation(tmp_path: Path) -> None:
     # Given a pinned experiment and matching evaluation report
     manifest = ROOT / "evaluation/experiments/example.yaml"

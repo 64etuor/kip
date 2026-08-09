@@ -22,6 +22,7 @@ from kip.domain.models import (
 )
 from kip.errors import AuthorizationError, ConflictError, KipError, NotFoundError, ValidationError
 from kip.evaluation.reporting import append_evolution_record, write_report
+from kip.evaluation.reviews import load_review_bundle
 from kip.evaluation.runner import (
     compare_variants,
     load_dataset,
@@ -877,6 +878,10 @@ def evaluate_validate(
             "dataset": loaded.name,
             "case_count": len(loaded.cases),
             "categories": sorted({case.category for case in loaded.cases}),
+            "lifecycle": loaded.lifecycle,
+            "version": loaded.version,
+            "gate_eligible": loaded.gate_eligible,
+            "required_dimensions": loaded.required_dimensions,
         }
 
     _run(ctx, action)
@@ -889,6 +894,14 @@ def evaluate_run(
     variants: str = typer.Option("lexical", "--variants"),
     output_dir: Path = typer.Option(Path("evaluation/reports"), "--output-dir"),
     warmup_passes: int = typer.Option(1, "--warmup-passes", min=0),
+    reviews: Path | None = typer.Option(
+        None,
+        "--reviews",
+        exists=True,
+        dir_okay=False,
+        readable=True,
+        help="Reviewed answer and ontology observations bound to this dataset version",
+    ),
 ) -> None:
     def action(runtime: Runtime):
         loaded = load_dataset(dataset)
@@ -913,6 +926,7 @@ def evaluate_run(
             dataset_bytes=dataset.read_bytes(),
             configuration=runtime.container.settings.raw,
             code_root=runtime.container.settings.project_root,
+            review_bundle=load_review_bundle(reviews) if reviews is not None else None,
             warmup_passes=warmup_passes,
         )
         paths = write_report(report, output_dir)

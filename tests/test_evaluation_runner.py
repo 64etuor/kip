@@ -1,12 +1,23 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+import jsonschema
 import pytest
 
 from kip.domain.models import EvidenceLocator, SearchHit
 from kip.errors import ValidationError
+from kip.evaluation.answers import AnswerReview, ReviewedClaim
+from kip.evaluation.models import ExpectedAssertion, GoldenCase, GoldenDataset
+from kip.evaluation.ontology import (
+    OntologyAssertionObservation,
+    OntologyContradiction,
+    OntologyPathObservation,
+    OntologyReview,
+)
+from kip.evaluation.reviews import EvaluationReviewBundle, VariantReviews
 from kip.evaluation.runner import (
     code_fingerprint,
     compare_variants,
@@ -137,6 +148,10 @@ def test_run_evaluation_excludes_declared_warmup_passes_from_metrics(
 
 def test_compare_variants_applies_activation_gate() -> None:
     report = {
+        "run": {
+            "dataset_gate_eligible": True,
+            "required_dimensions": ["retrieval"],
+        },
         "variants": {
             "lexical": {
                 "metrics": {
@@ -158,7 +173,7 @@ def test_compare_variants_applies_activation_gate() -> None:
                 "latency_ms": {"p95": 500.0},
                 "categories": {"exact_identifier": {"recall_at_k": 1.0}},
             },
-        }
+        },
     }
 
     result = compare_variants(report, "lexical", "reranked")
@@ -238,6 +253,10 @@ def test_run_evaluation_counts_failed_cases_and_blocks_promotion(tmp_path: Path)
 def test_compare_variants_does_not_hide_semantic_category_regression() -> None:
     # Given one semantic category improves while another regresses by the same amount.
     report = {
+        "run": {
+            "dataset_gate_eligible": True,
+            "required_dimensions": ["retrieval"],
+        },
         "variants": {
             "lexical": {
                 "metrics": {
@@ -265,7 +284,7 @@ def test_compare_variants_does_not_hide_semantic_category_regression() -> None:
                     "semantic_hard": {"recall_at_k": 0.50},
                 },
             },
-        }
+        },
     }
 
     # When the activation decision aggregates semantic quality.
@@ -282,7 +301,11 @@ def test_activation_report_must_promote_current_code_and_configuration(tmp_path:
     configuration = {"models": {"embedding": {"revision": "fixture"}}}
     report = {
         "schema_version": "kip.evaluation-report.v1",
-        "run": {"id": "eval_fixture"},
+        "run": {
+            "id": "eval_fixture",
+            "dataset_gate_eligible": True,
+            "required_dimensions": ["retrieval"],
+        },
         "fingerprints": {
             "configuration": configuration_fingerprint(configuration),
             "code": code_fingerprint(tmp_path),
@@ -368,3 +391,241 @@ def test_activation_report_rejects_keep_disabled_decision(tmp_path: Path) -> Non
             configuration=configuration,
             code_root=tmp_path,
         )
+
+
+def test_draft_or_unversioned_dataset_never_promotes() -> None:
+    report = {
+        "run": {
+            "dataset_gate_eligible": False,
+            "required_dimensions": ["retrieval"],
+        },
+        "variants": {
+            "lexical": {
+                "metrics": {
+                    "recall_at_k": 0.5,
+                    "unauthorized_result_count": 0,
+                    "stale_warning_rate": 1.0,
+                    "failed_case_count": 0,
+                },
+                "latency_ms": {"p95": 100.0},
+                "categories": {},
+            },
+            "hybrid": {
+                "metrics": {
+                    "recall_at_k": 0.9,
+                    "unauthorized_result_count": 0,
+                    "stale_warning_rate": 1.0,
+                    "failed_case_count": 0,
+                },
+                "latency_ms": {"p95": 200.0},
+                "categories": {},
+            },
+        },
+    }
+
+    decision = compare_variants(report, "lexical", "hybrid")
+    assert decision["gates"]["reviewed_dataset"]["passed"] is False
+    assert decision["decision"]["status"] == "keep_disabled"
+
+
+def test_reviewed_answer_and_ontology_metrics_gate_promotion(tmp_path: Path) -> None:
+    source_revision = "sha256:" + "a" * 64
+    expected_assertions = [
+        ExpectedAssertion(
+            subject_id="ent_letter",
+            predicate="records_decision",
+            object_entity_id="ent_approved",
+            evidence_ids=["unit_approved"],
+        ),
+        ExpectedAssertion(
+            subject_id="ent_letter",
+            predicate="records_decision",
+            object_entity_id="ent_rejected",
+            evidence_ids=["unit_rejected"],
+        ),
+    ]
+    case = GoldenCase(
+        id="ONTOLOGY-001",
+        question="What decisions does the letter record?",
+        category="exact_ontology_relation",
+        principal="principal_public",
+        acl_scopes=["workspace:default", "public"],
+        expected_documents=["doc_a"],
+        forbidden_documents=["doc_secret"],
+        expected_evidence=[{"type": "text_span", "data": {"line_start": 1}}],
+        expected_latest=True,
+        expected_stale_warning=True,
+        lifecycle="golden",
+        version="2026.08.1",
+        reviewer="role:knowledge-owner",
+        source_revision=source_revision,
+        expected_claims=["claim_decisions"],
+        expected_evidence_ids=["unit_approved", "unit_rejected"],
+        expected_entity_ids=["ent_letter", "ent_approved", "ent_rejected"],
+        expected_assertions=expected_assertions,
+        expected_paths=[["assertion_approved"]],
+        expected_contradictions=[["assertion_approved", "assertion_rejected"]],
+        forbidden_entity_ids=["ent_secret"],
+        forbidden_assertions=["assertion_secret"],
+        forbidden_evidence_ids=["unit_secret"],
+        expected_refusal=False,
+    )
+    dataset = GoldenDataset(
+        name="ontology-starter",
+        corpus_fingerprint="sha256:" + "b" * 64,
+        lifecycle="golden",
+        version="2026.08.1",
+        reviewer="role:evaluation-owner",
+        source_revision=source_revision,
+        required_dimensions=["retrieval", "answer", "ontology"],
+        cases=[case],
+    )
+    actual_assertions = tuple(
+        OntologyAssertionObservation(
+            assertion_id=assertion_id,
+            subject_id=expected.subject_id,
+            predicate=expected.predicate,
+            object_entity_id=expected.object_entity_id,
+            evidence_ids=tuple(expected.evidence_ids),
+            valid_from=datetime(2026, 1, 1, tzinfo=UTC),
+        )
+        for assertion_id, expected in zip(
+            ("assertion_approved", "assertion_rejected"),
+            expected_assertions,
+            strict=True,
+        )
+    )
+    review_bundle = EvaluationReviewBundle(
+        dataset_name=dataset.name,
+        dataset_version=dataset.version,
+        dataset_source_revision=source_revision,
+        variants={
+            "hybrid": VariantReviews(
+                answer=(
+                    AnswerReview(
+                        case_id=case.id,
+                        expected_claims=("claim_decisions",),
+                        expected_evidence_ids=("unit_approved", "unit_rejected"),
+                        claims=(
+                            ReviewedClaim(
+                                id="claim-1",
+                                expected_claim="claim_decisions",
+                                supported_by_evidence=True,
+                                citation_locator_correct=True,
+                                cited_evidence_ids=("unit_approved", "unit_rejected"),
+                            ),
+                        ),
+                        expected_refusal=False,
+                        refused=False,
+                    ),
+                ),
+                ontology=(
+                    OntologyReview(
+                        case_id=case.id,
+                        expected_entity_ids=tuple(case.expected_entity_ids),
+                        actual_entity_ids=tuple(case.expected_entity_ids),
+                        expected_assertions=tuple(expected_assertions),
+                        actual_assertions=actual_assertions,
+                        expected_paths=(("assertion_approved",),),
+                        actual_paths=(
+                            OntologyPathObservation(
+                                node_ids=("ent_letter", "ent_approved"),
+                                assertion_ids=("assertion_approved",),
+                            ),
+                        ),
+                        expected_contradictions=(
+                            OntologyContradiction(
+                                assertion_ids=(
+                                    "assertion_approved",
+                                    "assertion_rejected",
+                                )
+                            ),
+                        ),
+                        detected_contradictions=(
+                            OntologyContradiction(
+                                assertion_ids=(
+                                    "assertion_rejected",
+                                    "assertion_approved",
+                                )
+                            ),
+                        ),
+                        as_of=datetime(2026, 8, 9, tzinfo=UTC),
+                        forbidden_entity_ids=("ent_secret",),
+                        forbidden_assertion_ids=("assertion_secret",),
+                        forbidden_evidence_ids=("unit_secret",),
+                    ),
+                ),
+            )
+        },
+    )
+
+    def search(_case, variant):
+        if variant == "lexical":
+            return []
+        return [
+            _hit("doc_a").model_copy(
+                update={
+                    "metadata": {
+                        "is_latest": True,
+                        "source_changed_since_index": True,
+                    }
+                }
+            )
+        ]
+
+    report = run_evaluation(
+        dataset,
+        variants=["lexical", "hybrid"],
+        search=search,
+        workspace="default",
+        dataset_bytes=b"reviewed fixture",
+        configuration={},
+        code_root=tmp_path,
+        review_bundle=review_bundle,
+        now=lambda: datetime(2026, 8, 9, tzinfo=UTC),
+    )
+    decision = compare_variants(report, "lexical", "hybrid")
+    schema = json.loads(
+        (
+            Path(__file__).resolve().parents[1] / "evaluation/schemas/evaluation-report.schema.json"
+        ).read_text(encoding="utf-8")
+    )
+    jsonschema.validate(report, schema)
+
+    assert report["variants"]["hybrid"]["answer_quality"]["metrics"]["claim_recall"] == 1.0
+    assert report["variants"]["hybrid"]["ontology_quality"]["metrics"]["relation_recall"] == 1.0
+    assert "role:evaluation-owner" not in str(report)
+    assert decision["decision"]["status"] == "promote"
+
+    with pytest.raises(ValueError, match="dataset version"):
+        run_evaluation(
+            dataset,
+            variants=["hybrid"],
+            search=search,
+            workspace="default",
+            dataset_bytes=b"reviewed fixture",
+            configuration={},
+            code_root=tmp_path,
+            review_bundle=review_bundle.model_copy(
+                update={"dataset_version": "2026.08.2"}
+            ),
+        )
+
+    changed_case = case.model_copy(update={"expected_claims": ["claim_changed"]})
+    changed_dataset = dataset.model_copy(update={"cases": [changed_case]})
+    with pytest.raises(ValueError, match="expectations do not match"):
+        run_evaluation(
+            changed_dataset,
+            variants=["hybrid"],
+            search=search,
+            workspace="default",
+            dataset_bytes=b"changed fixture",
+            configuration={},
+            code_root=tmp_path,
+            review_bundle=review_bundle,
+        )
+
+    del report["variants"]["hybrid"]["ontology_quality"]
+    blocked = compare_variants(report, "lexical", "hybrid")
+    assert blocked["gates"]["ontology_relation_recall"]["passed"] is False
+    assert blocked["decision"]["status"] == "keep_disabled"

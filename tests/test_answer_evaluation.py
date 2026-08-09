@@ -14,13 +14,16 @@ def test_answer_metrics_measure_grounding_completeness_and_citations() -> None:
                 expected_claim="approval",
                 supported_by_evidence=True,
                 citation_locator_correct=True,
+                cited_evidence_ids=("unit_approval",),
             ),
             ReviewedClaim(
                 id="claim-2",
                 supported_by_evidence=False,
                 citation_locator_correct=False,
+                cited_evidence_ids=("unit_unrelated",),
             ),
         ),
+        expected_evidence_ids=("unit_approval", "unit_deadline"),
     )
 
     # When deterministic answer quality is evaluated
@@ -31,6 +34,10 @@ def test_answer_metrics_measure_grounding_completeness_and_citations() -> None:
     assert result.completeness == 0.5
     assert result.citation_accuracy == 0.5
     assert result.unsupported_claim_count == 1
+    assert result.claim_precision == 0.5
+    assert result.claim_recall == 0.5
+    assert result.citation_precision == 0.5
+    assert result.citation_recall == 0.5
 
 
 def test_answer_metrics_measure_safe_refusal() -> None:
@@ -46,6 +53,7 @@ def test_answer_metrics_measure_safe_refusal() -> None:
 
     # Then refusal is measured without inventing claim scores
     assert result.refusal_accuracy == 1.0
+    assert result.refusal_appropriateness == 1.0
     assert result.groundedness is None
     assert result.citation_accuracy is None
 
@@ -62,3 +70,7 @@ def test_answer_metrics_remain_unmeasured_without_review_annotations() -> None:
     assert result.completeness is None
     assert result.citation_accuracy is None
     assert result.refusal_accuracy is None
+    assert result.claim_precision is None
+    assert result.claim_recall is None
+    assert result.citation_precision is None
+    assert result.citation_recall is None

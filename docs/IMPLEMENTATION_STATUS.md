@@ -21,9 +21,9 @@
 | Apple Mail connector | Reference adapter | macOS permission and mailbox allowlist required |
 | IMAP connector | Reference adapter | Validate provider-specific UID behavior |
 | Public evaluation corpus | Ready | Six checksum-pinned KOGL Type 1 PDFs; 30 relevance and 6 ACL cases |
-| Evaluation reports | Ready with coverage gaps | Recall, MRR, nDCG, ACL, latency, failure counts, fingerprints, Markdown scorecard, append-only ledger; locator/latest/stale/recovery remain unmeasured in the public set |
+| Evaluation reports | Ready with coverage gaps | Retrieval, answer, and ontology metrics; immutable dataset/review binding; full-case coverage gates; ACL/integrity checks; fingerprints; Markdown scorecards; append-only ledger; public locator/latest/stale/recovery and end-to-end reviews remain incomplete |
 | Quality control plane | Ready for pilot | Version-pinned parser/embedding/reranker/retrieval experiment manifests and fail-closed, read-only promotion recommendations; manifest-driven orchestration is not yet a scheduler |
-| Answer-quality rubric | Contract ready | Deterministic reviewed groundedness, completeness, citation-locator, unsupported-claim, and refusal metrics; current golden datasets still need answer annotations |
+| End-to-end RAG rubric | Ready for pilot | Deterministic claim/citation/refusal and entity/relation/evidence/contradiction/path/temporal/integrity metrics; missing reviews fail closed and the bundled ontology case is synthetic contract evidence only |
 | Query tracing and metrics | Ready for pilot | PostgreSQL/RLS canonical redacted traces, admin-only CLI/REST inspection, bounded retention pruning, non-fatal delivery, and optional OTLP/HTTP spans and metrics without content attributes |
 | Evidence-bounded answer | Ready for pilot | CLI/API/MCP/SDK share search, exact reopen, freshness, XLSX, classification/egress, structured generation, claim-citation validation, typed refusal, explicit extractive fallback, and ACL-filtered current approved-graph context; candidates, expired relations, and stale graph evidence are excluded |
 | Local embedding sidecar | Validated shadow | Infinity 0.0.77, Qwen3 0.6B 1024d, pinned revisions, MPS smoke passed |
@@ -56,7 +56,10 @@
 - The current public pilot is small and lexically distinctive. Its `keep_disabled` decision must not be generalized to a private corpus without adding reviewed internal golden cases. The private OneDrive shadow A/B also showed no gain over lexical retrieval on its small golden set, so semantic projection remains shadow-only.
 - The 2026-08-06 loaded-corpus audit is recorded in `docs/RAG_QUALITY_AUDIT_2026-08-06.md`; lexical remains active and all semantic candidates remain shadow-only.
 - Quality recommendations do not discover, install, or activate libraries. Candidate dependencies remain opt-in adapters; a scheduler may automate shadow runs only after reproducible manifest execution is added.
-- Answer-quality metrics are available, but retrieval-only reports cannot claim end-to-end RAG quality until reviewed claim/citation/refusal annotations are populated.
+- Retrieval-only reports cannot claim end-to-end RAG quality. Promotion requires
+  immutable reviewed claim/citation/refusal and ontology observations for every
+  case in each declared dimension; the bundled ontology starter is synthetic
+  contract evidence, not a private-corpus quality result.
 - Predicate rename, replace, split, merge, and deprecate manifests are validated
   before ACL-filtered source assertions are materialized as target-version
   review candidates. Existing assertions remain active until a separate review

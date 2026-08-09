@@ -63,6 +63,16 @@ from kip.domain.models import (  # noqa: E402
     XlsxRangeRead,
 )
 from kip.domain.telemetry import QueryTrace  # noqa: E402
+from kip.evaluation.answers import (  # noqa: E402
+    AnswerMetrics,
+    AnswerReview,
+)
+from kip.evaluation.models import GoldenDataset  # noqa: E402
+from kip.evaluation.ontology import (  # noqa: E402
+    OntologyMetrics,
+    OntologyReview,
+)
+from kip.evaluation.reviews import EvaluationReviewBundle  # noqa: E402
 from kip.ontology_migration import (  # noqa: E402
     OntologyMigration,
     OntologyMigrationMaterialization,
@@ -123,6 +133,12 @@ MODELS = {
     "setup-plan": SetupPlan,
     "setup-receipt": SetupReceipt,
     "query-trace": QueryTrace,
+    "answer-review": AnswerReview,
+    "answer-metrics": AnswerMetrics,
+    "ontology-review": OntologyReview,
+    "ontology-metrics": OntologyMetrics,
+    "golden-dataset": GoldenDataset,
+    "evaluation-review-bundle": EvaluationReviewBundle,
 }
 
 

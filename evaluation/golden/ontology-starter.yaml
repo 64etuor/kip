@@ -1,0 +1,68 @@
+schema_version: kip.golden-dataset.v1
+name: ontology-starter
+description: Reviewed synthetic starter case for end-to-end answer and ontology gates
+corpus_fingerprint: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+lifecycle: golden
+version: 2026.08.1
+reviewer: role:evaluation-owner
+source_revision: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+required_dimensions:
+  - retrieval
+  - answer
+  - ontology
+cases:
+  - id: ONTOLOGY-STARTER-001
+    question: What decisions does the letter record?
+    category: exact_ontology_relation
+    principal: principal_public
+    acl_scopes:
+      - workspace:default
+      - public
+    expected_documents:
+      - doc_public_approval
+    forbidden_documents:
+      - doc_secret_approval
+    expected_evidence:
+      - type: text_span
+        data:
+          line_start: 1
+    expected_latest: true
+    expected_stale_warning: true
+    lifecycle: golden
+    split: test
+    version: 2026.08.1
+    reviewer: role:knowledge-owner
+    source_revision: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    expected_claims:
+      - claim_decisions
+    expected_evidence_ids:
+      - unit_approved
+      - unit_rejected
+    expected_entity_ids:
+      - ent_letter
+      - ent_approved
+      - ent_rejected
+    expected_assertions:
+      - subject_id: ent_letter
+        predicate: records_decision
+        object_entity_id: ent_approved
+        evidence_ids:
+          - unit_approved
+      - subject_id: ent_letter
+        predicate: records_decision
+        object_entity_id: ent_rejected
+        evidence_ids:
+          - unit_rejected
+    expected_paths:
+      - [assertion_approved]
+    expected_contradictions:
+      - [assertion_approved, assertion_rejected]
+    forbidden_entity_ids:
+      - ent_secret
+    forbidden_assertions:
+      - assertion_secret
+    forbidden_evidence_ids:
+      - unit_secret
+    expected_refusal: false
+    recall_at: 10
+    notes: Synthetic identifiers only; replace with reviewed tenant evidence before promotion.

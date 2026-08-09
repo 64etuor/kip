@@ -152,12 +152,40 @@ fingerprints, category coverage, latency ceiling, and evidence metrics.
 reranker. The operator must run the existing atomic activation surface after
 reviewing the report.
 
-Reviewed answer annotations use `kip.answer-review.v1`. Deterministic metrics
-cover grounded claims, expected-claim completeness, citation locator
-correctness, unsupported claim count, and safe refusal. A dimension without
-review annotations is `null`, not a passing score. LLM-as-judge may be added as
-a shadow adapter, but it cannot create canonical truth or auto-promote a
-candidate.
+Reviewed observations use `kip.evaluation-review-bundle.v1` and are bound to
+the dataset name, immutable version, and source revision. Answer metrics cover
+claim precision/recall, citation precision/recall, groundedness, completeness,
+locator correctness, unsupported claims, and refusal appropriateness.
+Ontology metrics cover entity, relation, and evidence precision/recall,
+contradiction detection, path relevance/recall, temporal correctness,
+duplicates, orphans, and ACL leakage. A missing review or metric is `null`,
+never a pass. LLM-as-judge may run in shadow, but cannot create canonical truth
+or auto-promote a candidate.
+
+Datasets and cases declare `draft`, `reviewed`, `golden`, `challenge`, or
+`canary`, plus split, version, reviewer role, and source revision. Promotion
+requires a non-draft immutable dataset, a reviewed observation for every case
+in every required dimension, perfect evidence/security gates, zero graph
+integrity defects, and an actual retrieval improvement. Historical reports
+without lifecycle metadata therefore fail closed.
+
+The synthetic starter pair demonstrates the contract without claiming tenant
+quality:
+
+```bash
+./scripts/kip evaluate validate \
+  --dataset evaluation/golden/ontology-starter.yaml
+
+./scripts/kip evaluate run \
+  --dataset evaluation/golden/ontology-starter.yaml \
+  --reviews evaluation/reviews/ontology-starter.yaml \
+  --variants lexical,hybrid \
+  --output-dir evaluation/reports/ontology-starter
+```
+
+Replace every synthetic public ID, source revision, expectation, and reviewed
+observation with exact tenant evidence before treating a report as promotion
+evidence. The CLI report deliberately omits reviewer identity.
 
 Production telemetry is not automatically added to the golden set. A failed
 query enters `golden`, `challenge`, or `canary` only after a reviewer records

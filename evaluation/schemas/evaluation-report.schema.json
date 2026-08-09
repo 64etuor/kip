@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://kip.local/schemas/evaluation-report.schema.json",
-  "title": "KIP Retrieval Evaluation Report",
+  "title": "KIP End-to-End RAG Evaluation Report",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -26,6 +26,17 @@
         "completed_at": {"type": "string", "format": "date-time"},
         "workspace": {"type": "string"},
         "dataset": {"type": "string"},
+        "dataset_version": {"type": "string", "minLength": 1},
+        "dataset_lifecycle": {
+          "enum": ["draft", "reviewed", "golden", "challenge", "canary"]
+        },
+        "dataset_source_revision": {"type": ["string", "null"]},
+        "dataset_gate_eligible": {"type": "boolean"},
+        "required_dimensions": {
+          "type": "array",
+          "items": {"enum": ["retrieval", "answer", "ontology"]},
+          "uniqueItems": true
+        },
         "warmup_passes": {"type": "integer", "minimum": 0},
         "hardware": {"type": "object"}
       }
@@ -83,6 +94,11 @@
         "completeness",
         "citation_accuracy",
         "refusal_accuracy",
+        "claim_precision",
+        "claim_recall",
+        "citation_precision",
+        "citation_recall",
+        "refusal_appropriateness",
         "unsupported_claim_count"
       ],
       "properties": {
@@ -92,8 +108,154 @@
         "completeness": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
         "citation_accuracy": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
         "refusal_accuracy": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "claim_precision": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "claim_recall": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "citation_precision": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "citation_recall": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "refusal_appropriateness": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
         "unsupported_claim_count": {"type": "integer", "minimum": 0}
       }
+    },
+    "answerAggregateMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "case_count",
+        "groundedness",
+        "completeness",
+        "citation_accuracy",
+        "refusal_accuracy",
+        "claim_precision",
+        "claim_recall",
+        "citation_precision",
+        "citation_recall",
+        "refusal_appropriateness",
+        "unsupported_claim_count"
+      ],
+      "properties": {
+        "schema_version": {"const": "kip.answer-aggregate-metrics.v1"},
+        "case_count": {"type": "integer", "minimum": 0},
+        "groundedness": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "completeness": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "citation_accuracy": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "refusal_accuracy": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "claim_precision": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "claim_recall": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "citation_precision": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "citation_recall": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "refusal_appropriateness": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "unsupported_claim_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "answerQuality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metrics", "cases"],
+      "properties": {
+        "metrics": {"$ref": "#/$defs/answerAggregateMetrics"},
+        "cases": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/answerMetrics"}
+        }
+      }
+    },
+    "ontologyMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "case_id",
+        "entity_precision",
+        "entity_recall",
+        "relation_precision",
+        "relation_recall",
+        "evidence_precision",
+        "evidence_recall",
+        "contradiction_precision",
+        "contradiction_recall",
+        "path_relevance",
+        "path_recall",
+        "temporal_accuracy",
+        "duplicate_count",
+        "orphan_count",
+        "acl_leakage_count"
+      ],
+      "properties": {
+        "schema_version": {"const": "kip.ontology-metrics.v1"},
+        "case_id": {"type": "string", "minLength": 1},
+        "entity_precision": {"$ref": "#/$defs/nullableScore"},
+        "entity_recall": {"$ref": "#/$defs/nullableScore"},
+        "relation_precision": {"$ref": "#/$defs/nullableScore"},
+        "relation_recall": {"$ref": "#/$defs/nullableScore"},
+        "evidence_precision": {"$ref": "#/$defs/nullableScore"},
+        "evidence_recall": {"$ref": "#/$defs/nullableScore"},
+        "contradiction_precision": {"$ref": "#/$defs/nullableScore"},
+        "contradiction_recall": {"$ref": "#/$defs/nullableScore"},
+        "path_relevance": {"$ref": "#/$defs/nullableScore"},
+        "path_recall": {"$ref": "#/$defs/nullableScore"},
+        "temporal_accuracy": {"$ref": "#/$defs/nullableScore"},
+        "duplicate_count": {"type": "integer", "minimum": 0},
+        "orphan_count": {"type": "integer", "minimum": 0},
+        "acl_leakage_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "ontologyAggregateMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "case_count",
+        "entity_precision",
+        "entity_recall",
+        "relation_precision",
+        "relation_recall",
+        "evidence_precision",
+        "evidence_recall",
+        "contradiction_precision",
+        "contradiction_recall",
+        "path_relevance",
+        "path_recall",
+        "temporal_accuracy",
+        "duplicate_count",
+        "orphan_count",
+        "acl_leakage_count"
+      ],
+      "properties": {
+        "schema_version": {"const": "kip.ontology-aggregate-metrics.v1"},
+        "case_count": {"type": "integer", "minimum": 0},
+        "entity_precision": {"$ref": "#/$defs/nullableScore"},
+        "entity_recall": {"$ref": "#/$defs/nullableScore"},
+        "relation_precision": {"$ref": "#/$defs/nullableScore"},
+        "relation_recall": {"$ref": "#/$defs/nullableScore"},
+        "evidence_precision": {"$ref": "#/$defs/nullableScore"},
+        "evidence_recall": {"$ref": "#/$defs/nullableScore"},
+        "contradiction_precision": {"$ref": "#/$defs/nullableScore"},
+        "contradiction_recall": {"$ref": "#/$defs/nullableScore"},
+        "path_relevance": {"$ref": "#/$defs/nullableScore"},
+        "path_recall": {"$ref": "#/$defs/nullableScore"},
+        "temporal_accuracy": {"$ref": "#/$defs/nullableScore"},
+        "duplicate_count": {"type": "integer", "minimum": 0},
+        "orphan_count": {"type": "integer", "minimum": 0},
+        "acl_leakage_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "ontologyQuality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metrics", "cases"],
+      "properties": {
+        "metrics": {"$ref": "#/$defs/ontologyAggregateMetrics"},
+        "cases": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/ontologyMetrics"}
+        }
+      }
+    },
+    "nullableScore": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1
     },
     "metrics": {
       "type": "object",
@@ -148,6 +310,8 @@
           "type": "array",
           "items": {"type": "object"}
         },
+        "answer_quality": {"$ref": "#/$defs/answerQuality"},
+        "ontology_quality": {"$ref": "#/$defs/ontologyQuality"},
         "error": {"type": "string"}
       }
     }

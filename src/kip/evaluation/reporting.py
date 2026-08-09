@@ -32,10 +32,13 @@ def _percentage(value: object) -> str:
 def render_markdown(report: dict[str, Any]) -> str:
     run = report["run"]
     lines = [
-        "# KIP Retrieval Evaluation",
+        "# KIP RAG Evaluation",
         "",
         f"- Run: `{run['id']}`",
         f"- Dataset: `{run.get('dataset', 'unknown')}`",
+        f"- Dataset version: `{run.get('dataset_version', 'draft')}`",
+        f"- Dataset lifecycle: `{run.get('dataset_lifecycle', 'draft')}`",
+        f"- Promotion eligible: `{run.get('dataset_gate_eligible', False)}`",
         f"- Workspace: `{run.get('workspace', 'unknown')}`",
         f"- Completed: `{run['completed_at']}`",
         f"- Untimed warmup passes: `{run.get('warmup_passes', 0)}`",
@@ -65,6 +68,70 @@ def render_markdown(report: dict[str, Any]) -> str:
             )
             + " |"
         )
+    if any("answer_quality" in result for result in report["variants"].values()):
+        lines.extend(
+            [
+                "",
+                "## Answer quality",
+                "",
+                "| Variant | Reviewed | Claim P | Claim R | Citation P | Citation R | Refusal | Unsupported |",
+                "|---|---:|---:|---:|---:|---:|---:|---:|",
+            ]
+        )
+        for name, result in report["variants"].items():
+            quality = result.get("answer_quality")
+            if quality is None:
+                continue
+            metrics = quality["metrics"]
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        name,
+                        str(metrics["case_count"]),
+                        _percentage(metrics["claim_precision"]),
+                        _percentage(metrics["claim_recall"]),
+                        _percentage(metrics["citation_precision"]),
+                        _percentage(metrics["citation_recall"]),
+                        _percentage(metrics["refusal_appropriateness"]),
+                        str(metrics["unsupported_claim_count"]),
+                    ]
+                )
+                + " |"
+            )
+    if any("ontology_quality" in result for result in report["variants"].values()):
+        lines.extend(
+            [
+                "",
+                "## Ontology quality",
+                "",
+                "| Variant | Reviewed | Entity P/R | Relation P/R | Evidence P/R | Path P/R | Temporal | Duplicates | Orphans | ACL leaks |",
+                "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+            ]
+        )
+        for name, result in report["variants"].items():
+            quality = result.get("ontology_quality")
+            if quality is None:
+                continue
+            metrics = quality["metrics"]
+            lines.append(
+                "| "
+                + " | ".join(
+                    [
+                        name,
+                        str(metrics["case_count"]),
+                        f"{_percentage(metrics['entity_precision'])}/{_percentage(metrics['entity_recall'])}",
+                        f"{_percentage(metrics['relation_precision'])}/{_percentage(metrics['relation_recall'])}",
+                        f"{_percentage(metrics['evidence_precision'])}/{_percentage(metrics['evidence_recall'])}",
+                        f"{_percentage(metrics['path_relevance'])}/{_percentage(metrics['path_recall'])}",
+                        _percentage(metrics["temporal_accuracy"]),
+                        str(metrics["duplicate_count"]),
+                        str(metrics["orphan_count"]),
+                        str(metrics["acl_leakage_count"]),
+                    ]
+                )
+                + " |"
+            )
     decision = report["decision"]
     lines.extend(["", "## Decision", "", f"Status: **{decision['status']}**"])
     reasons = decision.get("reasons") or []
@@ -88,7 +155,10 @@ def render_markdown(report: dict[str, Any]) -> str:
 
 def write_report(report: dict[str, Any], output_dir: Path) -> ReportPaths:
     run_id = str(report["run"]["id"])
-    if not run_id or any(character not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for character in run_id):
+    if not run_id or any(
+        character not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
+        for character in run_id
+    ):
         raise ValueError("run id contains unsafe characters")
     json_data = (json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode()
     markdown_data = render_markdown(report).encode()

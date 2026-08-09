@@ -1,0 +1,136 @@
+{
+  "$defs": {
+    "ReviewedClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "citation_locator_correct": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Citation Locator Correct"
+        },
+        "cited_evidence_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Cited Evidence Ids",
+          "type": "array"
+        },
+        "expected_claim": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Claim"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "supported_by_evidence": {
+          "title": "Supported By Evidence",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "supported_by_evidence"
+      ],
+      "title": "ReviewedClaim",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "case_id": {
+      "minLength": 1,
+      "title": "Case Id",
+      "type": "string"
+    },
+    "claims": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ReviewedClaim"
+      },
+      "title": "Claims",
+      "type": "array"
+    },
+    "expected_claims": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expected Claims"
+    },
+    "expected_evidence_ids": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expected Evidence Ids"
+    },
+    "expected_refusal": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expected Refusal"
+    },
+    "refused": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Refused"
+    },
+    "schema_version": {
+      "default": "kip.answer-review.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "case_id"
+  ],
+  "title": "AnswerReview",
+  "type": "object"
+}

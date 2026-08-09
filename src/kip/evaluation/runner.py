@@ -15,6 +15,7 @@ import yaml
 
 from kip.domain.models import SearchHit
 from kip.errors import ValidationError
+from kip.evaluation.answers import AnswerReview, aggregate_answer_metrics, evaluate_answer
 from kip.evaluation.metrics import (
     deduplicate_ranked_documents,
     forbidden_document_count,
@@ -25,6 +26,13 @@ from kip.evaluation.metrics import (
     reciprocal_rank,
 )
 from kip.evaluation.models import AggregateMetrics, CaseMetrics, GoldenCase, GoldenDataset
+from kip.evaluation.ontology import (
+    OntologyContradiction,
+    OntologyReview,
+    aggregate_ontology_metrics,
+    evaluate_ontology,
+)
+from kip.evaluation.reviews import EvaluationReviewBundle
 
 SearchExecutor = Callable[[GoldenCase, str], list[SearchHit]]
 
@@ -221,6 +229,73 @@ def _warm_variant(
                 continue
 
 
+def _validate_answer_review(case: GoldenCase, review: AnswerReview) -> None:
+    if review.expected_claims != tuple(case.expected_claims):
+        raise ValueError(f"answer review expectations do not match case {case.id}")
+    if review.expected_evidence_ids != tuple(case.expected_evidence_ids):
+        raise ValueError(f"answer review evidence does not match case {case.id}")
+    if review.expected_refusal is not case.expected_refusal:
+        raise ValueError(f"answer review refusal does not match case {case.id}")
+
+
+def _validate_ontology_review(case: GoldenCase, review: OntologyReview) -> None:
+    expected_contradictions = tuple(
+        OntologyContradiction(assertion_ids=(pair[0], pair[1]))
+        for pair in case.expected_contradictions
+    )
+    expected = (
+        review.expected_entity_ids == tuple(case.expected_entity_ids),
+        review.expected_assertions == tuple(case.expected_assertions),
+        review.expected_paths == tuple(tuple(path) for path in case.expected_paths),
+        review.expected_contradictions == expected_contradictions,
+        review.forbidden_entity_ids == tuple(case.forbidden_entity_ids),
+        review.forbidden_assertion_ids == tuple(case.forbidden_assertions),
+        review.forbidden_evidence_ids == tuple(case.forbidden_evidence_ids),
+    )
+    if not all(expected):
+        raise ValueError(f"ontology review expectations do not match case {case.id}")
+
+
+def _attach_reviewed_quality(
+    dataset: GoldenDataset,
+    variant: str,
+    result: dict[str, Any],
+    review_bundle: EvaluationReviewBundle | None,
+) -> None:
+    if review_bundle is None or variant not in review_bundle.variants:
+        return
+    cases = {case.id: case for case in dataset.cases}
+    reviews = review_bundle.variants[variant]
+    answer_metrics = []
+    for answer_review in reviews.answer:
+        case = cases.get(answer_review.case_id)
+        if case is None:
+            raise ValueError(
+                f"answer review references unknown case {answer_review.case_id}"
+            )
+        _validate_answer_review(case, answer_review)
+        answer_metrics.append(evaluate_answer(answer_review))
+    if answer_metrics:
+        result["answer_quality"] = {
+            "metrics": aggregate_answer_metrics(answer_metrics).model_dump(mode="json"),
+            "cases": [metric.model_dump(mode="json") for metric in answer_metrics],
+        }
+    ontology_metrics = []
+    for ontology_review in reviews.ontology:
+        case = cases.get(ontology_review.case_id)
+        if case is None:
+            raise ValueError(
+                f"ontology review references unknown case {ontology_review.case_id}"
+            )
+        _validate_ontology_review(case, ontology_review)
+        ontology_metrics.append(evaluate_ontology(ontology_review))
+    if ontology_metrics:
+        result["ontology_quality"] = {
+            "metrics": aggregate_ontology_metrics(ontology_metrics).model_dump(mode="json"),
+            "cases": [metric.model_dump(mode="json") for metric in ontology_metrics],
+        }
+
+
 def run_evaluation(
     dataset: GoldenDataset,
     *,
@@ -230,6 +305,7 @@ def run_evaluation(
     dataset_bytes: bytes,
     configuration: dict[str, Any],
     code_root: Path,
+    review_bundle: EvaluationReviewBundle | None = None,
     warmup_passes: int = 0,
     now: Callable[[], datetime] | None = None,
 ) -> dict[str, Any]:
@@ -241,6 +317,12 @@ def run_evaluation(
         )
     if warmup_passes < 0:
         raise ValueError("warmup_passes must be non-negative")
+    if review_bundle is not None and (
+        review_bundle.dataset_name != dataset.name
+        or review_bundle.dataset_version != dataset.version
+        or review_bundle.dataset_source_revision != dataset.source_revision
+    ):
+        raise ValueError("review bundle does not match the evaluated dataset version")
     clock = now or (lambda: datetime.now(UTC))
     started = clock()
     run_id = "eval_" + started.strftime("%Y%m%dT%H%M%S%fZ")
@@ -248,6 +330,12 @@ def run_evaluation(
     for variant in selected:
         _warm_variant(dataset, variant, search, warmup_passes)
         evaluated[variant] = _evaluate_variant(dataset, variant, search)
+        _attach_reviewed_quality(
+            dataset,
+            variant,
+            evaluated[variant],
+            review_bundle,
+        )
     completed = clock()
     has_errors = any("error" in result for result in evaluated.values())
     return {
@@ -258,6 +346,11 @@ def run_evaluation(
             "completed_at": completed.isoformat().replace("+00:00", "Z"),
             "workspace": workspace,
             "dataset": dataset.name,
+            "dataset_version": dataset.version,
+            "dataset_lifecycle": dataset.lifecycle,
+            "dataset_source_revision": dataset.source_revision,
+            "dataset_gate_eligible": dataset.gate_eligible,
+            "required_dimensions": dataset.required_dimensions,
             "warmup_passes": warmup_passes,
             "hardware": {
                 "platform": platform.system(),
@@ -313,7 +406,14 @@ def compare_variants(
     ]
     exact_delta = min(exact_deltas, default=0.0)
 
+    run = report.get("run", {})
+    required_dimensions = set(run.get("required_dimensions", ["retrieval"]))
     gates = {
+        "reviewed_dataset": {
+            "value": run.get("dataset_gate_eligible"),
+            "required": True,
+            "passed": run.get("dataset_gate_eligible") is True,
+        },
         "overall_recall_improvement": {
             "value": overall_delta,
             "threshold": 0.03,
@@ -355,6 +455,87 @@ def compare_variants(
             "passed": candidate_metrics.get("failed_case_count", 0) == 0,
         },
     }
+    required_quality_gates: list[str] = []
+    if "answer" in required_dimensions:
+        answer_quality = candidate_result.get("answer_quality", {})
+        answer_metrics = answer_quality.get("metrics", {})
+        answer_cases = answer_quality.get("cases", [])
+        answer_coverage = len(answer_cases)
+        expected_coverage = candidate_metrics.get("case_count")
+        gates["answer_review_coverage"] = {
+            "value": answer_coverage,
+            "minimum": expected_coverage,
+            "passed": answer_coverage == expected_coverage,
+        }
+        required_quality_gates.append("answer_review_coverage")
+        for metric in (
+            "claim_precision",
+            "claim_recall",
+            "citation_precision",
+            "citation_recall",
+            "refusal_appropriateness",
+        ):
+            name = f"answer_{metric}"
+            value = answer_metrics.get(metric)
+            gates[name] = {
+                "value": value,
+                "minimum": 1.0,
+                "passed": value == 1.0
+                and answer_coverage == expected_coverage
+                and all(case.get(metric) == 1.0 for case in answer_cases),
+            }
+            required_quality_gates.append(name)
+        unsupported = answer_metrics.get("unsupported_claim_count")
+        gates["answer_unsupported_claims"] = {
+            "value": unsupported,
+            "maximum": 0,
+            "passed": unsupported == 0,
+        }
+        required_quality_gates.append("answer_unsupported_claims")
+    if "ontology" in required_dimensions:
+        ontology_quality = candidate_result.get("ontology_quality", {})
+        ontology_metrics = ontology_quality.get("metrics", {})
+        ontology_cases = ontology_quality.get("cases", [])
+        ontology_coverage = len(ontology_cases)
+        expected_coverage = candidate_metrics.get("case_count")
+        gates["ontology_review_coverage"] = {
+            "value": ontology_coverage,
+            "minimum": expected_coverage,
+            "passed": ontology_coverage == expected_coverage,
+        }
+        required_quality_gates.append("ontology_review_coverage")
+        for metric in (
+            "entity_precision",
+            "entity_recall",
+            "relation_precision",
+            "relation_recall",
+            "evidence_precision",
+            "evidence_recall",
+            "contradiction_precision",
+            "contradiction_recall",
+            "path_relevance",
+            "path_recall",
+            "temporal_accuracy",
+        ):
+            name = f"ontology_{metric}"
+            value = ontology_metrics.get(metric)
+            gates[name] = {
+                "value": value,
+                "minimum": 1.0,
+                "passed": value == 1.0
+                and ontology_coverage == expected_coverage
+                and all(case.get(metric) == 1.0 for case in ontology_cases),
+            }
+            required_quality_gates.append(name)
+        for metric in ("duplicate_count", "orphan_count", "acl_leakage_count"):
+            name = f"ontology_{metric}"
+            value = ontology_metrics.get(metric)
+            gates[name] = {
+                "value": value,
+                "maximum": 0,
+                "passed": value == 0,
+            }
+            required_quality_gates.append(name)
     quality_improved = (
         gates["overall_recall_improvement"]["passed"]
         or gates["semantic_recall_improvement"]["passed"]
@@ -368,6 +549,8 @@ def compare_variants(
             "latency_p95_ms",
             "stale_warning_rate",
             "failed_cases",
+            "reviewed_dataset",
+            *required_quality_gates,
         )
     )
     promoted = quality_improved and mandatory
@@ -375,9 +558,7 @@ def compare_variants(
     if promoted:
         reasons.append("candidate passed quality, security, and latency activation gates")
     else:
-        reasons.extend(
-            name for name, gate in gates.items() if not gate["passed"]
-        )
+        reasons.extend(name for name, gate in gates.items() if not gate["passed"])
     return {
         "baseline": baseline,
         "candidate": candidate,
@@ -407,7 +588,9 @@ def validate_activation_report(
         raise ValidationError("activation candidate must be vector, hybrid, or reranked")
     fingerprints = report.get("fingerprints", {})
     if fingerprints.get("configuration") != configuration_fingerprint(configuration):
-        raise ValidationError("evaluation configuration fingerprint does not match current settings")
+        raise ValidationError(
+            "evaluation configuration fingerprint does not match current settings"
+        )
     if fingerprints.get("code") != code_fingerprint(code_root):
         raise ValidationError("evaluation code fingerprint does not match current code")
     decision = compare_variants(report, "lexical", candidate)

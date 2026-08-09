@@ -1,0 +1,78 @@
+schema_version: kip.evaluation-review-bundle.v1
+dataset_name: ontology-starter
+dataset_version: 2026.08.1
+dataset_source_revision: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+variants:
+  hybrid: &reviewed_variant
+    answer:
+      - schema_version: kip.answer-review.v1
+        case_id: ONTOLOGY-STARTER-001
+        expected_claims:
+          - claim_decisions
+        expected_evidence_ids:
+          - unit_approved
+          - unit_rejected
+        claims:
+          - id: claim-1
+            expected_claim: claim_decisions
+            supported_by_evidence: true
+            citation_locator_correct: true
+            cited_evidence_ids:
+              - unit_approved
+              - unit_rejected
+        expected_refusal: false
+        refused: false
+    ontology:
+      - schema_version: kip.ontology-review.v1
+        case_id: ONTOLOGY-STARTER-001
+        expected_entity_ids:
+          - ent_letter
+          - ent_approved
+          - ent_rejected
+        actual_entity_ids:
+          - ent_letter
+          - ent_approved
+          - ent_rejected
+        expected_assertions:
+          - subject_id: ent_letter
+            predicate: records_decision
+            object_entity_id: ent_approved
+            evidence_ids:
+              - unit_approved
+          - subject_id: ent_letter
+            predicate: records_decision
+            object_entity_id: ent_rejected
+            evidence_ids:
+              - unit_rejected
+        actual_assertions:
+          - assertion_id: assertion_approved
+            subject_id: ent_letter
+            predicate: records_decision
+            object_entity_id: ent_approved
+            evidence_ids:
+              - unit_approved
+            valid_from: 2026-01-01T00:00:00Z
+          - assertion_id: assertion_rejected
+            subject_id: ent_letter
+            predicate: records_decision
+            object_entity_id: ent_rejected
+            evidence_ids:
+              - unit_rejected
+            valid_from: 2026-01-01T00:00:00Z
+        expected_paths:
+          - [assertion_approved]
+        actual_paths:
+          - node_ids: [ent_letter, ent_approved]
+            assertion_ids: [assertion_approved]
+        expected_contradictions:
+          - assertion_ids: [assertion_approved, assertion_rejected]
+        detected_contradictions:
+          - assertion_ids: [assertion_rejected, assertion_approved]
+        as_of: 2026-08-09T00:00:00Z
+        forbidden_entity_ids:
+          - ent_secret
+        forbidden_assertion_ids:
+          - assertion_secret
+        forbidden_evidence_ids:
+          - unit_secret
+  lexical: *reviewed_variant

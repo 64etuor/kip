@@ -79,6 +79,94 @@
     "expected_stale_warning": {
       "type": "boolean"
     },
+    "lifecycle": {
+      "enum": ["draft", "reviewed", "golden", "challenge", "canary"],
+      "default": "draft"
+    },
+    "split": {
+      "enum": ["train", "validation", "test", "canary"],
+      "default": "test"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "default": "draft"
+    },
+    "reviewer": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "source_revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "expected_claims": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true,
+      "default": []
+    },
+    "expected_evidence_ids": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true,
+      "default": []
+    },
+    "expected_entity_ids": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true,
+      "default": []
+    },
+    "expected_assertions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/expectedAssertion"},
+      "default": []
+    },
+    "expected_paths": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {"type": "string", "minLength": 1},
+        "uniqueItems": true
+      },
+      "default": []
+    },
+    "expected_contradictions": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {"type": "string", "minLength": 1},
+        "minItems": 2,
+        "maxItems": 2,
+        "uniqueItems": true
+      },
+      "default": []
+    },
+    "forbidden_entity_ids": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true,
+      "default": []
+    },
+    "forbidden_assertions": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true,
+      "default": []
+    },
+    "forbidden_evidence_ids": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true,
+      "default": []
+    },
+    "expected_refusal": {
+      "type": "boolean"
+    },
     "recall_at": {
       "type": "integer",
       "minimum": 1,
@@ -87,5 +175,40 @@
     "notes": {
       "type": "string"
     }
-  }
+  },
+  "$defs": {
+    "expectedAssertion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject_id", "predicate"],
+      "properties": {
+        "subject_id": {"type": "string", "minLength": 1},
+        "predicate": {"type": "string", "minLength": 1},
+        "object_entity_id": {"type": "string", "minLength": 1},
+        "object_value": {},
+        "evidence_ids": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true,
+          "default": []
+        }
+      },
+      "oneOf": [
+        {"required": ["object_entity_id"], "not": {"required": ["object_value"]}},
+        {"required": ["object_value"], "not": {"required": ["object_entity_id"]}}
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"lifecycle": {"not": {"const": "draft"}}},
+        "required": ["lifecycle"]
+      },
+      "then": {
+        "required": ["version", "reviewer", "source_revision"],
+        "properties": {"version": {"not": {"const": "draft"}}}
+      }
+    }
+  ]
 }

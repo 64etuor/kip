@@ -52,7 +52,7 @@ def test_write_report_creates_versioned_and_latest_files(tmp_path: Path) -> None
 
     assert json.loads(paths.json_path.read_text(encoding="utf-8"))["run"]["id"] == "eval_fixture"
     assert (tmp_path / "latest.json").read_bytes() == paths.json_path.read_bytes()
-    assert "# KIP Retrieval Evaluation" in paths.markdown_path.read_text(encoding="utf-8")
+    assert "# KIP RAG Evaluation" in paths.markdown_path.read_text(encoding="utf-8")
     assert (tmp_path / "latest.md").read_bytes() == paths.markdown_path.read_bytes()
 
 

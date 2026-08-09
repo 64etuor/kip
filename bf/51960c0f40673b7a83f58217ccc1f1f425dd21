@@ -1,0 +1,19 @@
+docs/plans/2026-08-09-production-rag-starter-kit-design.md
+  s_41856199ee83ad::t_ed5baab8f42c17 1-358
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "bf51960c0f40673b7a83f58217ccc1f1f425dd21",
+  "prompts": {},
+  "sessions": {
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

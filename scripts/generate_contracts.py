@@ -5,7 +5,6 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any
 
 import yaml
 
@@ -20,9 +19,9 @@ from kip.container import build_container  # noqa: E402
 from kip.domain.models import (  # noqa: E402
     ApprovedAssertion,
     Artifact,
+    AssertionCandidate,
     AssertionExplanation,
     Capabilities,
-    AssertionCandidate,
     ConnectorEvent,
     ContentUnit,
     ContextBundle,
@@ -36,14 +35,20 @@ from kip.domain.models import (  # noqa: E402
     IngestResult,
     SearchHit,
     SearchRequest,
-    StatusReport,
-    SyncSummary,
     SourceObject,
     SourceRevision,
+    StatusReport,
+    SyncSummary,
     VocabularyItem,
     XlsxRangeRead,
 )
 from kip.settings import Settings  # noqa: E402
+from kip.setup.models import (  # noqa: E402
+    SetupAnswers,
+    SetupInspection,
+    SetupPlan,
+    SetupReceipt,
+)
 
 MODELS = {
     "envelope": Envelope,
@@ -70,6 +75,10 @@ MODELS = {
     "capabilities": Capabilities,
     "status-report": StatusReport,
     "vocabulary-item": VocabularyItem,
+    "setup-answers": SetupAnswers,
+    "setup-inspection": SetupInspection,
+    "setup-plan": SetupPlan,
+    "setup-receipt": SetupReceipt,
 }
 
 

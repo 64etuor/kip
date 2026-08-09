@@ -1,0 +1,312 @@
+{
+  "$defs": {
+    "MountPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "purpose": {
+          "enum": [
+            "source",
+            "cas",
+            "backup"
+          ],
+          "title": "Purpose",
+          "type": "string"
+        },
+        "read_only": {
+          "title": "Read Only",
+          "type": "boolean"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "target",
+        "read_only",
+        "purpose"
+      ],
+      "title": "MountPlan",
+      "type": "object"
+    },
+    "SecretReference": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "scheme": {
+          "enum": [
+            "env",
+            "keychain",
+            "secret-manager"
+          ],
+          "title": "Scheme",
+          "type": "string"
+        }
+      },
+      "required": [
+        "scheme",
+        "name"
+      ],
+      "title": "SecretReference",
+      "type": "object"
+    },
+    "SourceInventory": {
+      "additionalProperties": false,
+      "properties": {
+        "byte_count": {
+          "default": 0,
+          "title": "Byte Count",
+          "type": "integer"
+        },
+        "excluded_count": {
+          "default": 0,
+          "title": "Excluded Count",
+          "type": "integer"
+        },
+        "extension_counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Extension Counts",
+          "type": "object"
+        },
+        "file_count": {
+          "default": 0,
+          "title": "File Count",
+          "type": "integer"
+        },
+        "root": {
+          "title": "Root",
+          "type": "string"
+        },
+        "symlink_count": {
+          "default": 0,
+          "title": "Symlink Count",
+          "type": "integer"
+        },
+        "unreadable_count": {
+          "default": 0,
+          "title": "Unreadable Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "root"
+      ],
+      "title": "SourceInventory",
+      "type": "object"
+    },
+    "SourcePlan": {
+      "additionalProperties": false,
+      "properties": {
+        "acl_scope": {
+          "title": "Acl Scope",
+          "type": "string"
+        },
+        "classification": {
+          "title": "Classification",
+          "type": "string"
+        },
+        "exclude_globs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Exclude Globs",
+          "type": "array"
+        },
+        "host_root": {
+          "title": "Host Root",
+          "type": "string"
+        },
+        "include_extensions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Include Extensions",
+          "type": "array"
+        },
+        "inventory": {
+          "$ref": "#/$defs/SourceInventory"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "target_root": {
+          "title": "Target Root",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "host_root",
+        "target_root",
+        "classification",
+        "acl_scope",
+        "include_extensions",
+        "exclude_globs",
+        "inventory"
+      ],
+      "title": "SourcePlan",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "answers_fingerprint": {
+      "title": "Answers Fingerprint",
+      "type": "string"
+    },
+    "backup_path": {
+      "title": "Backup Path",
+      "type": "string"
+    },
+    "cas_path": {
+      "title": "Cas Path",
+      "type": "string"
+    },
+    "database_secret_ref": {
+      "$ref": "#/$defs/SecretReference"
+    },
+    "evaluation_dataset": {
+      "title": "Evaluation Dataset",
+      "type": "string"
+    },
+    "generated_files": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Generated Files",
+      "type": "array"
+    },
+    "identity_mode": {
+      "enum": [
+        "proxy_jwt",
+        "api_key"
+      ],
+      "title": "Identity Mode",
+      "type": "string"
+    },
+    "identity_owner": {
+      "title": "Identity Owner",
+      "type": "string"
+    },
+    "model_egress_classifications": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Model Egress Classifications",
+      "type": "array"
+    },
+    "model_provider": {
+      "enum": [
+        "disabled",
+        "openai",
+        "anthropic"
+      ],
+      "title": "Model Provider",
+      "type": "string"
+    },
+    "model_secret_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SecretReference"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "mounts": {
+      "items": {
+        "$ref": "#/$defs/MountPlan"
+      },
+      "title": "Mounts",
+      "type": "array"
+    },
+    "ontology_reviewers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Ontology Reviewers",
+      "type": "array"
+    },
+    "plan_fingerprint": {
+      "title": "Plan Fingerprint",
+      "type": "string"
+    },
+    "retention_days": {
+      "title": "Retention Days",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "kip.setup-plan.v1",
+      "default": "kip.setup-plan.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_ownership": {
+      "enum": [
+        "company",
+        "personal"
+      ],
+      "title": "Source Ownership",
+      "type": "string"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/SourcePlan"
+      },
+      "title": "Sources",
+      "type": "array"
+    },
+    "sync_schedule": {
+      "title": "Sync Schedule",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "workspace": {
+      "title": "Workspace",
+      "type": "string"
+    }
+  },
+  "required": [
+    "plan_fingerprint",
+    "answers_fingerprint",
+    "workspace",
+    "identity_mode",
+    "identity_owner",
+    "source_ownership",
+    "sources",
+    "mounts",
+    "model_provider",
+    "model_egress_classifications",
+    "model_secret_ref",
+    "database_secret_ref",
+    "cas_path",
+    "backup_path",
+    "retention_days",
+    "sync_schedule",
+    "evaluation_dataset",
+    "ontology_reviewers",
+    "generated_files"
+  ],
+  "title": "SetupPlan",
+  "type": "object"
+}

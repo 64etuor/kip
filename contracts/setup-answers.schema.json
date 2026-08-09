@@ -1,0 +1,312 @@
+{
+  "$defs": {
+    "FilesystemSourceAnswer": {
+      "additionalProperties": false,
+      "properties": {
+        "acl_scope": {
+          "minLength": 1,
+          "title": "Acl Scope",
+          "type": "string"
+        },
+        "classification": {
+          "enum": [
+            "public",
+            "internal",
+            "confidential",
+            "restricted"
+          ],
+          "title": "Classification",
+          "type": "string"
+        },
+        "exclude_globs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Exclude Globs",
+          "type": "array"
+        },
+        "follow_symlinks": {
+          "const": false,
+          "default": false,
+          "title": "Follow Symlinks",
+          "type": "boolean"
+        },
+        "include_extensions": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Include Extensions",
+          "type": "array"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "read_only": {
+          "const": true,
+          "default": true,
+          "title": "Read Only",
+          "type": "boolean"
+        },
+        "root": {
+          "title": "Root",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "root",
+        "classification",
+        "acl_scope"
+      ],
+      "title": "FilesystemSourceAnswer",
+      "type": "object"
+    },
+    "SecretReference": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "scheme": {
+          "enum": [
+            "env",
+            "keychain",
+            "secret-manager"
+          ],
+          "title": "Scheme",
+          "type": "string"
+        }
+      },
+      "required": [
+        "scheme",
+        "name"
+      ],
+      "title": "SecretReference",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "backup_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Backup Path"
+    },
+    "cas_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cas Path"
+    },
+    "database_secret_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SecretReference"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "evaluation_dataset": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evaluation Dataset"
+    },
+    "filesystem_sources": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/FilesystemSourceAnswer"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Filesystem Sources"
+    },
+    "identity_mode": {
+      "anyOf": [
+        {
+          "enum": [
+            "proxy_jwt",
+            "api_key"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Identity Mode"
+    },
+    "identity_owner": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Identity Owner"
+    },
+    "model_egress_classifications": {
+      "anyOf": [
+        {
+          "items": {
+            "enum": [
+              "public",
+              "internal",
+              "confidential",
+              "restricted"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Egress Classifications"
+    },
+    "model_provider": {
+      "anyOf": [
+        {
+          "enum": [
+            "disabled",
+            "openai",
+            "anthropic"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Provider"
+    },
+    "model_secret_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SecretReference"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "ontology_reviewers": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ontology Reviewers"
+    },
+    "retention_days": {
+      "anyOf": [
+        {
+          "maximum": 36500,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Retention Days"
+    },
+    "schema_version": {
+      "const": "kip.setup-answers.v1",
+      "default": "kip.setup-answers.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_ownership": {
+      "anyOf": [
+        {
+          "enum": [
+            "company",
+            "personal"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Ownership"
+    },
+    "sync_schedule": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sync Schedule"
+    },
+    "workspace": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Workspace"
+    }
+  },
+  "title": "SetupAnswers",
+  "type": "object"
+}

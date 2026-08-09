@@ -11,6 +11,9 @@ var/
 secrets/*
 !secrets/.gitkeep
 config/kip.toml
+config/kip.generated.toml*
+compose.generated.yaml*
+.kip/
 *.log
 .DS_Store
 .idea/

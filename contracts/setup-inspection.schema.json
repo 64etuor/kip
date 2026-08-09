@@ -1,0 +1,91 @@
+{
+  "$defs": {
+    "SetupQuestion": {
+      "additionalProperties": false,
+      "properties": {
+        "answer_format": {
+          "title": "Answer Format",
+          "type": "string"
+        },
+        "choices": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Choices",
+          "type": "array"
+        },
+        "example": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Example"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "prompt": {
+          "title": "Prompt",
+          "type": "string"
+        },
+        "why": {
+          "title": "Why",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "prompt",
+        "answer_format",
+        "why"
+      ],
+      "title": "SetupQuestion",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "answers_fingerprint": {
+      "title": "Answers Fingerprint",
+      "type": "string"
+    },
+    "complete": {
+      "title": "Complete",
+      "type": "boolean"
+    },
+    "questions": {
+      "items": {
+        "$ref": "#/$defs/SetupQuestion"
+      },
+      "maxItems": 1,
+      "title": "Questions",
+      "type": "array"
+    },
+    "risks": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Risks",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "kip.setup-inspection.v1",
+      "default": "kip.setup-inspection.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "complete",
+    "answers_fingerprint",
+    "questions"
+  ],
+  "title": "SetupInspection",
+  "type": "object"
+}

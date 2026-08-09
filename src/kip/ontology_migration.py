@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from enum import StrEnum
 from pathlib import Path
 from typing import Literal, Self
@@ -50,8 +52,31 @@ class MigrationOperation(OntologyModel):
 
     @model_validator(mode="after")
     def targets_match_operation(self) -> Self:
-        if self.operation != "deprecate" and not self.targets:
-            raise ValueError("migration operation requires a target")
+        if len(self.sources) != len(set(self.sources)):
+            raise ValueError("migration operation sources must be unique")
+        if len(self.targets) != len(set(self.targets)):
+            raise ValueError("migration operation targets must be unique")
+        source_count = len(self.sources)
+        target_count = len(self.targets)
+        match self.operation:
+            case "rename" | "replace":
+                if source_count != 1 or target_count != 1:
+                    raise ValueError(
+                        f"{self.operation} requires exactly one source and one target"
+                    )
+            case "split":
+                if source_count != 1 or target_count < 2:
+                    raise ValueError(
+                        "split requires exactly one source and at least two targets"
+                    )
+            case "merge":
+                if source_count < 2 or target_count != 1:
+                    raise ValueError(
+                        "merge requires at least two sources and exactly one target"
+                    )
+            case "deprecate":
+                if target_count:
+                    raise ValueError("deprecate does not accept targets")
         return self
 
 
@@ -60,6 +85,26 @@ class OntologyMigration(OntologyModel):
     from_version: str
     to_version: str
     operations: tuple[MigrationOperation, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def versions_must_advance(self) -> Self:
+        if self.from_version == self.to_version:
+            raise ValueError("ontology migration versions must differ")
+        return self
+
+
+class OntologyMigrationMaterialization(OntologyModel):
+    schema_version: Literal["kip.ontology-migration-materialization.v1"] = (
+        "kip.ontology-migration-materialization.v1"
+    )
+    from_version: str
+    to_version: str
+    migration_sha256: str
+    source_assertion_count: int = Field(ge=0)
+    created_candidate_count: int = Field(ge=0)
+    existing_candidate_count: int = Field(ge=0)
+    deprecated_assertion_count: int = Field(ge=0)
+    candidate_ids: list[str] = Field(default_factory=list)
 
 
 _CLASSIFICATION_RANK = {
@@ -221,6 +266,16 @@ def load_migration(path: Path) -> OntologyMigration:
     return OntologyMigration.model_validate(payload)
 
 
+def ontology_migration_sha256(migration: OntologyMigration) -> str:
+    payload = json.dumps(
+        migration.model_dump(mode="json"),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+
 def validate_migration_coverage(
     diff: OntologyDiff,
     migration: OntologyMigration | None,
@@ -228,10 +283,12 @@ def validate_migration_coverage(
     breaking = [
         change for change in diff.changes if change.classification is ChangeClassification.BREAKING
     ]
-    if not breaking:
-        return []
     if migration is None:
-        return ["breaking ontology changes require a migration manifest"]
+        return (
+            ["breaking ontology changes require a migration manifest"]
+            if breaking
+            else []
+        )
     errors: list[str] = []
     if migration.from_version != diff.from_version or migration.to_version != diff.to_version:
         errors.append("migration versions do not match ontology diff")
@@ -240,6 +297,15 @@ def validate_migration_coverage(
         for operation in migration.operations
         for source in operation.sources
     }
+    seen_sources: set[tuple[SymbolKind, str]] = set()
+    for operation in migration.operations:
+        for source in operation.sources:
+            key = (operation.symbol_kind, source)
+            if key in seen_sources:
+                errors.append(
+                    f"duplicate migration source {operation.symbol_kind.value} {source}"
+                )
+            seen_sources.add(key)
     for change in breaking:
         if (change.symbol_kind, change.symbol) not in covered:
             errors.append(f"uncovered breaking {change.symbol_kind.value} {change.symbol}")

@@ -62,6 +62,10 @@ from kip.domain.models import (  # noqa: E402
     VocabularyItem,
     XlsxRangeRead,
 )
+from kip.ontology_migration import (  # noqa: E402
+    OntologyMigration,
+    OntologyMigrationMaterialization,
+)
 from kip.settings import Settings  # noqa: E402
 from kip.setup.models import (  # noqa: E402
     SetupAnswers,
@@ -110,6 +114,8 @@ MODELS = {
     "ontology-mining-submission": OntologyMiningSubmission,
     "ontology-mining-summary": OntologyMiningSummary,
     "ontology-answer-context": OntologyAnswerContext,
+    "ontology-migration": OntologyMigration,
+    "ontology-migration-materialization": OntologyMigrationMaterialization,
     "relation-proposal": RelationProposal,
     "setup-answers": SetupAnswers,
     "setup-inspection": SetupInspection,

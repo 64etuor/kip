@@ -74,6 +74,11 @@
   roles, and ACL snapshot. Workers reject malformed or expired snapshots before
   reading evidence; candidates remain no more visible than every supporting
   evidence unit.
+- Ontology migration scans apply workspace, assertion ACL, and evidence-snapshot
+  freshness in the repository query before exposing a source assertion. Every
+  visible source is then reopened through the exact-evidence boundary; stale or
+  source-changed evidence aborts materialization instead of producing a target
+  candidate.
 
 ## File safety
 

@@ -256,7 +256,8 @@ ACL outcomes pass independently.
    with `--migration`. Every removed or changed symbol must be covered and all
    targets must exist in the proposed release.
 5. Materialize migrated assertions as target-version candidates, preserve
-   evidence/provenance, and queue required reviews. Do not update approved
-   assertions in place.
+   evidence/provenance with `kip ontology migrate-materialize`, and queue
+   required reviews. Repeating the command must report existing candidate IDs.
+   Do not update approved assertions in place.
 6. Re-run affected retrieval, graph, answer-quality, ACL, and rollback canaries
    before making the target ontology version active.

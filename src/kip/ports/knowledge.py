@@ -97,6 +97,15 @@ class KnowledgeStore(Protocol):
         predicate: str,
     ) -> list[ApprovedAssertion]: ...
 
+    def list_assertions(
+        self,
+        context: RequestContext,
+        *,
+        ontology_version: str,
+        predicates: tuple[str, ...],
+        limit: int = 10_000,
+    ) -> list[ApprovedAssertion]: ...
+
     def save_candidate(
         self,
         context: RequestContext,
@@ -142,10 +151,14 @@ class KnowledgeStore(Protocol):
         self,
         context: RequestContext,
         request: GraphNeighborsRequest,
+        *,
+        ontology_version: str | None = None,
     ) -> list[GraphEdge]: ...
 
     def graph_path(
         self,
         context: RequestContext,
         request: GraphPathRequest,
+        *,
+        ontology_version: str | None = None,
     ) -> list[GraphPath]: ...

@@ -1232,7 +1232,13 @@ class PostgresDatabase:
                 raise NotFoundError(f"document not found: {document_id}")
         return {"document": dict(document), "artifacts": [dict(row) for row in artifacts]}
 
-    def graph_neighbors(self, context: RequestContext, request: GraphNeighborsRequest) -> list[GraphEdge]:
+    def graph_neighbors(
+        self,
+        context: RequestContext,
+        request: GraphNeighborsRequest,
+        *,
+        ontology_version: str | None = None,
+    ) -> list[GraphEdge]:
         conditions = [
             "a.workspace_id=%s",
             "(a.valid_from IS NULL OR a.valid_from <= statement_timestamp())",
@@ -1242,6 +1248,9 @@ class PostgresDatabase:
             "WHERE NOT kip.acl_snapshot_is_fresh(snapshot_id))",
         ]
         params: list[Any] = [context.workspace, context.acl_scopes]
+        if ontology_version is not None:
+            conditions.append("a.ontology_version=%s")
+            params.append(ontology_version)
         if request.approved_only:
             conditions.append("a.status='active'")
         if request.predicates:
@@ -1271,7 +1280,18 @@ class PostgresDatabase:
             rows = cursor.fetchall()
         return [self._graph_edge(row) for row in rows]
 
-    def graph_path(self, context: RequestContext, request: GraphPathRequest) -> list[GraphPath]:
+    def graph_path(
+        self,
+        context: RequestContext,
+        request: GraphPathRequest,
+        *,
+        ontology_version: str | None = None,
+    ) -> list[GraphPath]:
+        ontology_clause = ""
+        ontology_params: list[Any] = []
+        if ontology_version is not None:
+            ontology_clause = "AND a.ontology_version=%s"
+            ontology_params.append(ontology_version)
         predicate_clause = ""
         predicate_params: list[Any] = []
         if request.predicates:
@@ -1293,6 +1313,7 @@ class PostgresDatabase:
                   ON (a.subject_id=w.current_node OR a.object_entity_id=w.current_node)
                 WHERE a.workspace_id=%s
                   {status_clause}
+                  {ontology_clause}
                   {predicate_clause}
                   AND (a.valid_from IS NULL OR a.valid_from <= statement_timestamp())
                   AND (a.valid_to IS NULL OR a.valid_to > statement_timestamp())
@@ -1313,6 +1334,7 @@ class PostgresDatabase:
             LIMIT 20
         """
         params: list[Any] = [request.from_node_id, request.from_node_id, context.workspace]
+        params.extend(ontology_params)
         params.extend(predicate_params)
         params.extend([context.acl_scopes, request.max_depth, request.to_node_id])
         with self._connection(context) as connection, connection.cursor() as cursor:
@@ -2142,6 +2164,58 @@ class PostgresDatabase:
             rows = cursor.fetchall()
         return [self._approved_assertion(row) for row in rows]
 
+    def list_assertions(
+        self,
+        context: RequestContext,
+        *,
+        ontology_version: str,
+        predicates: tuple[str, ...],
+        limit: int = 10_000,
+    ) -> list[ApprovedAssertion]:
+        if not predicates:
+            return []
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    assertion.*,
+                    coalesce(
+                        array_agg(evidence.content_unit_id ORDER BY evidence.content_unit_id)
+                            FILTER (WHERE evidence.content_unit_id IS NOT NULL),
+                        ARRAY[]::text[]
+                    ) AS evidence_unit_ids
+                FROM knowledge.assertions assertion
+                LEFT JOIN knowledge.assertion_evidence evidence
+                  ON evidence.workspace_id=assertion.workspace_id
+                 AND evidence.assertion_id=assertion.id
+                WHERE assertion.workspace_id=%s
+                  AND assertion.ontology_version=%s
+                  AND assertion.predicate = ANY(%s::text[])
+                  AND assertion.status='active'
+                  AND (
+                      cardinality(assertion.acl_scopes)=0
+                      OR assertion.acl_scopes <@ %s::text[]
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM unnest(assertion.evidence_acl_snapshot_ids) snapshot_id
+                      WHERE NOT kip.acl_snapshot_is_fresh(snapshot_id)
+                  )
+                GROUP BY assertion.id
+                ORDER BY assertion.id
+                LIMIT %s
+                """,
+                (
+                    context.workspace,
+                    ontology_version,
+                    list(predicates),
+                    context.acl_scopes,
+                    limit,
+                ),
+            )
+            rows = cursor.fetchall()
+        return [self._approved_assertion(row) for row in rows]
+
     def save_candidate(self, context: RequestContext, candidate: AssertionCandidate) -> AssertionCandidate:
         fingerprint = candidate.fingerprint
         if fingerprint is None:
@@ -2183,10 +2257,10 @@ class PostgresDatabase:
                         id,workspace_id,subject_id,predicate,object_entity_id,object_value,
                         status,origin,confidence,ontology_version,evidence,review_note,
                         fingerprint,valid_from,valid_to,derivation,review_risk,
-                        contradicts_assertion_ids
+                        contradicts_assertion_ids,migrates_assertion_ids
                     ) VALUES (
                         %s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,%s::jsonb,%s,
-                        %s,%s,%s,%s::jsonb,%s,%s
+                        %s,%s,%s,%s::jsonb,%s,%s,%s
                     )
                     ON CONFLICT (id) DO UPDATE SET
                         status=EXCLUDED.status,
@@ -2198,7 +2272,8 @@ class PostgresDatabase:
                         valid_to=EXCLUDED.valid_to,
                         derivation=EXCLUDED.derivation,
                         review_risk=EXCLUDED.review_risk,
-                        contradicts_assertion_ids=EXCLUDED.contradicts_assertion_ids
+                        contradicts_assertion_ids=EXCLUDED.contradicts_assertion_ids,
+                        migrates_assertion_ids=EXCLUDED.migrates_assertion_ids
                     """,
                     (
                         candidate.id, context.workspace, candidate.subject_id, candidate.predicate, candidate.object_entity_id,
@@ -2207,6 +2282,7 @@ class PostgresDatabase:
                         candidate.fingerprint, candidate.valid_from, candidate.valid_to,
                         _json(candidate.derivation) if candidate.derivation is not None else None,
                         candidate.review_risk, candidate.contradicts_assertion_ids,
+                        candidate.migrates_assertion_ids,
                     ),
                 )
                 for evidence in candidate.evidence:
@@ -2347,6 +2423,7 @@ class PostgresDatabase:
             ),
             review_risk=row.get("review_risk") or "medium",
             contradicts_assertion_ids=list(row.get("contradicts_assertion_ids") or []),
+            migrates_assertion_ids=list(row.get("migrates_assertion_ids") or []),
         )
 
     def approve_candidate(self, context: RequestContext, candidate_id: str, reviewer_id: str, note: str | None = None) -> ApprovedAssertion:

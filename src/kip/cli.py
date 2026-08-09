@@ -1126,6 +1126,42 @@ def ontology_diff(
     _run(ctx, action)
 
 
+@ontology_app.command("migrate-materialize")
+def ontology_migrate_materialize(
+    ctx: typer.Context,
+    before: Path = typer.Option(
+        ...,
+        "--before",
+        exists=True,
+        file_okay=False,
+        readable=True,
+    ),
+    after: Path = typer.Option(
+        ...,
+        "--after",
+        exists=True,
+        file_okay=False,
+        readable=True,
+    ),
+    migration: Path = typer.Option(
+        ...,
+        "--migration",
+        exists=True,
+        dir_okay=False,
+        readable=True,
+    ),
+) -> None:
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.ontology_migrations.materialize(
+            runtime.context,
+            before,
+            after,
+            load_migration(migration),
+        ),
+    )
+
+
 @export_app.command("canonical")
 def export_canonical(
     ctx: typer.Context,

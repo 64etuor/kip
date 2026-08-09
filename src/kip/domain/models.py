@@ -378,6 +378,7 @@ class AssertionCandidate(StrictModel):
     derivation: RelationDerivation | None = None
     review_risk: Literal["low", "medium", "high"] = "medium"
     contradicts_assertion_ids: list[str] = Field(default_factory=list)
+    migrates_assertion_ids: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def exactly_one_object(self) -> AssertionCandidate:

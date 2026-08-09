@@ -134,6 +134,21 @@ class PostgresKnowledgeStore:
             predicate=predicate,
         )
 
+    def list_assertions(
+        self,
+        context: RequestContext,
+        *,
+        ontology_version: str,
+        predicates: tuple[str, ...],
+        limit: int = 10_000,
+    ) -> list[ApprovedAssertion]:
+        return self.database.list_assertions(
+            context,
+            ontology_version=ontology_version,
+            predicates=predicates,
+            limit=limit,
+        )
+
     def save_candidate(
         self,
         context: RequestContext,
@@ -195,12 +210,24 @@ class PostgresKnowledgeStore:
         self,
         context: RequestContext,
         request: GraphNeighborsRequest,
+        *,
+        ontology_version: str | None = None,
     ) -> list[GraphEdge]:
-        return self.database.graph_neighbors(context, request)
+        return self.database.graph_neighbors(
+            context,
+            request,
+            ontology_version=ontology_version,
+        )
 
     def graph_path(
         self,
         context: RequestContext,
         request: GraphPathRequest,
+        *,
+        ontology_version: str | None = None,
     ) -> list[GraphPath]:
-        return self.database.graph_path(context, request)
+        return self.database.graph_path(
+            context,
+            request,
+            ontology_version=ontology_version,
+        )

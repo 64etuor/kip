@@ -259,6 +259,27 @@ class MemoryKnowledgeStore:
             and assertion_is_visible(self.state, assertion, context)
         ]
 
+    def list_assertions(
+        self,
+        context: RequestContext,
+        *,
+        ontology_version: str,
+        predicates: tuple[str, ...],
+        limit: int = 10_000,
+    ) -> list[ApprovedAssertion]:
+        selected = set(predicates)
+        return [
+            assertion.model_copy(deep=True)
+            for assertion in sorted(
+                self.state.assertions.values(),
+                key=lambda item: item.id,
+            )
+            if assertion.status == "active"
+            and assertion.ontology_version == ontology_version
+            and assertion.predicate in selected
+            and assertion_is_visible(self.state, assertion, context)
+        ][:limit]
+
     def save_candidate(
         self,
         context: RequestContext,
@@ -391,11 +412,18 @@ class MemoryKnowledgeStore:
         self,
         context: RequestContext,
         request: GraphNeighborsRequest,
+        *,
+        ontology_version: str | None = None,
     ) -> list[GraphEdge]:
         edges: list[GraphEdge] = []
         now = datetime.now(UTC)
         for assertion in self.state.assertions.values():
             if request.approved_only and assertion.status != "active":
+                continue
+            if (
+                ontology_version is not None
+                and assertion.ontology_version != ontology_version
+            ):
                 continue
             if not _assertion_is_current(assertion, now):
                 continue
@@ -425,11 +453,18 @@ class MemoryKnowledgeStore:
         self,
         context: RequestContext,
         request: GraphPathRequest,
+        *,
+        ontology_version: str | None = None,
     ) -> list[GraphPath]:
         adjacency: dict[str, list[tuple[str, ApprovedAssertion]]] = {}
         now = datetime.now(UTC)
         for assertion in self.state.assertions.values():
             if request.approved_only and assertion.status != "active":
+                continue
+            if (
+                ontology_version is not None
+                and assertion.ontology_version != ontology_version
+            ):
                 continue
             if not _assertion_is_current(assertion, now):
                 continue

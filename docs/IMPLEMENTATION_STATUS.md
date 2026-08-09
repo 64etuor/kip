@@ -29,7 +29,7 @@
 | Local reranker | Validated shadow | BGE reranker v2 M3 plus opt-in pinned Jina Hugging Face adapter; Jina trial measured 613.31 ms P95 but failed quality gates, so remains shadow-only |
 | pgvector | Complete shadow, disabled | PostgreSQL 18/pgvector 0.8.2, 74/74 vectors, RLS and source-hash filtering; public pilot did not beat lexical |
 | Hybrid retrieval | Complete shadow | ACL-prefiltered exact vector search, RRF, bounded reranking, explicit activation command |
-| Ontology contract | Ready for pilot | YAML entity inheritance and predicate contracts; explicit ACL-bound mining jobs; strict structured-output validation; separate entity/relation candidates; exact revision-bound evidence; deterministic fingerprints; transactional human approval; memory/PostgreSQL, CLI, REST, MCP, and SDK parity; assertion migration execution remains review-queue work |
+| Ontology contract | Ready for pilot | YAML entity inheritance and predicate contracts; ACL-bound mining jobs; strict structured-output validation; reviewed entities/relations; exact evidence; deterministic fingerprints; current approved-graph answers; and idempotent predicate migration materialization with source-assertion lineage |
 | Neo4j | Port only | Do not deploy before adoption gate |
 | Review UI | Not included | CLI/API review workflow only |
 | Starter-kit adoption guide | Ready | Environment decisions, AI change contract, real-corpus acceptance evidence, upgrade and handoff rules |
@@ -56,7 +56,11 @@
 - The 2026-08-06 loaded-corpus audit is recorded in `docs/RAG_QUALITY_AUDIT_2026-08-06.md`; lexical remains active and all semantic candidates remain shadow-only.
 - Quality recommendations do not discover, install, or activate libraries. Candidate dependencies remain opt-in adapters; a scheduler may automate shadow runs only after reproducible manifest execution is added.
 - Answer-quality metrics are available, but retrieval-only reports cannot claim end-to-end RAG quality until reviewed claim/citation/refusal annotations are populated.
-- Ontology diff validates migration coverage but does not yet materialize target-version assertion candidates in PostgreSQL. Existing approved assertions are never rewritten in place.
+- Predicate rename, replace, split, merge, and deprecate manifests are validated
+  before ACL-filtered source assertions are materialized as target-version
+  review candidates. Existing assertions remain active until a separate review
+  decision. Entity-type migrations with live entities fail closed until an
+  identity-history workflow can preserve merge and split semantics.
 - Relation mining is opt-in and reuses the configured generation adapter and
   central egress policy. Jobs pin the submitter access snapshot, fail if it
   expires before processing, and never auto-promote entity or relation output.

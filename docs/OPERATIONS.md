@@ -63,6 +63,34 @@ assertions. Inspect the same context independently with:
 ./scripts/kip ontology context "A과제 변경 승인"
 ```
 
+## Ontology release migration
+
+Validate both immutable release roots and the reviewed manifest before creating
+any target-version candidate:
+
+```bash
+./scripts/kip ontology validate --root releases/ontology-1.0.0
+./scripts/kip ontology validate --root releases/ontology-2.0.0
+./scripts/kip ontology diff \
+  --before releases/ontology-1.0.0 \
+  --after releases/ontology-2.0.0 \
+  --migration ontology/migrations/1.0.0-to-2.0.0.yaml
+./scripts/kip ontology migrate-materialize \
+  --before releases/ontology-1.0.0 \
+  --after releases/ontology-2.0.0 \
+  --migration ontology/migrations/1.0.0-to-2.0.0.yaml
+./scripts/kip review list --status proposed
+```
+
+`[ontology.migrations].max_assertions` bounds each run. Materialization first
+validates every target relation and reopens every evidence unit, then creates
+deterministic candidates. Rerunning is safe. Source assertions remain active;
+candidate approval and any later source supersession are separate audited
+decisions. Approval remains blocked until the target ontology is the active
+application contract, and normal graph traversal reads only that active
+version. Use a dedicated entity identity migration workflow if a release changes
+a type that already has live entities.
+
 ### Local semantic shadow
 
 ```bash

@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import os
+import shutil
 import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+import yaml
 
 from kip.adapters.repository.postgres import PostgresRepository
 from kip.container import build_container
@@ -30,12 +32,41 @@ from kip.domain.models import (
     RequestContext,
     SearchRequest,
 )
-from kip.errors import NotFoundError
+from kip.errors import NotFoundError, ValidationError
 from kip.ids import new_id, stable_id
+from kip.ontology_migration import OntologyMigration
 from kip.settings import Settings
 
 URL = os.environ.get("KIP_TEST_POSTGRES_URL") or os.environ.get("KIP_DATABASE_URL")
 pytestmark = pytest.mark.skipif(not URL, reason="PostgreSQL integration URL not configured")
+
+
+def _predicate_rename_release(tmp_path: Path) -> tuple[Path, Path]:
+    root = Path(__file__).resolve().parents[2]
+    before = tmp_path / "ontology-before"
+    after = tmp_path / "ontology-after"
+    shutil.copytree(root / "ontology", before)
+    shutil.copytree(root / "ontology", after)
+    predicate_path = after / "core/predicates.yaml"
+    predicate_payload = yaml.safe_load(predicate_path.read_text(encoding="utf-8"))
+    definition = predicate_payload["predicates"].pop("amends")
+    predicate_payload["predicates"]["revises"] = definition
+    predicate_payload["version"] = "2.0.0"
+    predicate_path.write_text(
+        yaml.safe_dump(predicate_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+    policy_path = after / "policies/review-policy.yaml"
+    policy_payload = yaml.safe_load(policy_path.read_text(encoding="utf-8"))
+    required = policy_payload["human_review_required"]["predicates"]
+    policy_payload["human_review_required"]["predicates"] = [
+        "revises" if item == "amends" else item for item in required
+    ]
+    policy_path.write_text(
+        yaml.safe_dump(policy_payload, sort_keys=False),
+        encoding="utf-8",
+    )
+    return before, after
 
 
 def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
@@ -184,16 +215,75 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
         explanation = container.application.knowledge.explain_assertion(context, assertion.id)
         assert explanation.assertion.id == assertion.id
         assert explanation.evidence[0].unit.id == hits[0].unit_id
+        before_release, after_release = _predicate_rename_release(tmp_path)
+        ontology_migration = OntologyMigration.model_validate(
+            {
+                "schema_version": "kip.ontology-migration.v1",
+                "from_version": "core/1.0.0",
+                "to_version": "core/2.0.0",
+                "operations": [
+                    {
+                        "operation": "rename",
+                        "symbol_kind": "predicate",
+                        "sources": ["amends"],
+                        "targets": ["revises"],
+                        "review_required": True,
+                    }
+                ],
+            }
+        )
+        materialized = container.application.ontology_migrations.materialize(
+            context,
+            before_release,
+            after_release,
+            ontology_migration,
+        )
+        repeated_materialization = (
+            container.application.ontology_migrations.materialize(
+                context,
+                before_release,
+                after_release,
+                ontology_migration,
+            )
+        )
+        assert materialized.created_candidate_count == 1
+        assert repeated_materialization.created_candidate_count == 0
+        assert repeated_materialization.existing_candidate_count == 1
+        migration_candidate = repository.knowledge.get_candidate(
+            context,
+            materialized.candidate_ids[0],
+        )
+        assert migration_candidate.predicate == "revises"
+        assert migration_candidate.migrates_assertion_ids == [assertion.id]
+        with pytest.raises(
+            ValidationError,
+            match=r"ontology version must be core/1\.0\.0",
+        ):
+            container.application.knowledge.review_approve(
+                context,
+                migration_candidate.id,
+            )
+        assert repository.knowledge.get_assertion(context, assertion.id).status == "active"
         edges = repository.knowledge.graph_neighbors(
             context,
             GraphNeighborsRequest(node_id="doc_new", direction="out"),
         )
         assert [edge.assertion_id for edge in edges] == [assertion.id]
+        assert repository.knowledge.graph_neighbors(
+            context,
+            GraphNeighborsRequest(node_id="doc_new", direction="out"),
+            ontology_version="core/2.0.0",
+        ) == []
         paths = repository.knowledge.graph_path(
             context,
             GraphPathRequest(from_node_id="doc_new", to_node_id="doc_old"),
         )
         assert [path.assertion_ids for path in paths] == [[assertion.id]]
+        assert repository.knowledge.graph_path(
+            context,
+            GraphPathRequest(from_node_id="doc_new", to_node_id="doc_old"),
+            ontology_version="core/2.0.0",
+        ) == []
         container.application.ontology_rag.create_entity(
             context,
             KnowledgeEntity(

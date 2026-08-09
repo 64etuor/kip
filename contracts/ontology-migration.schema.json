@@ -1,0 +1,91 @@
+{
+  "$defs": {
+    "MigrationOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "enum": [
+            "rename",
+            "deprecate",
+            "replace",
+            "split",
+            "merge"
+          ],
+          "title": "Operation",
+          "type": "string"
+        },
+        "review_required": {
+          "title": "Review Required",
+          "type": "boolean"
+        },
+        "sources": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "symbol_kind": {
+          "$ref": "#/$defs/SymbolKind"
+        },
+        "targets": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Targets",
+          "type": "array"
+        }
+      },
+      "required": [
+        "operation",
+        "symbol_kind",
+        "sources",
+        "review_required"
+      ],
+      "title": "MigrationOperation",
+      "type": "object"
+    },
+    "SymbolKind": {
+      "enum": [
+        "entity",
+        "predicate"
+      ],
+      "title": "SymbolKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "from_version": {
+      "title": "From Version",
+      "type": "string"
+    },
+    "operations": {
+      "items": {
+        "$ref": "#/$defs/MigrationOperation"
+      },
+      "minItems": 1,
+      "title": "Operations",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "kip.ontology-migration.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "to_version": {
+      "title": "To Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "from_version",
+    "to_version",
+    "operations"
+  ],
+  "title": "OntologyMigration",
+  "type": "object"
+}

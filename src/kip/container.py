@@ -35,6 +35,7 @@ from kip.application.evidence import EvidenceUseCases
 from kip.application.ingestion import IngestionUseCases
 from kip.application.knowledge import KnowledgeUseCases
 from kip.application.ontology_context import OntologyContextUseCases
+from kip.application.ontology_migrations import OntologyMigrationUseCases
 from kip.application.ontology_rag import OntologyRagUseCases
 from kip.application.operations import OperationsUseCases
 from kip.application.runtime import Application
@@ -272,6 +273,21 @@ def build_container(
             maximum=8,
         ),
     )
+    ontology_migration_config = selected.get("ontology.migrations", {}) or {}
+    if not isinstance(ontology_migration_config, dict):
+        raise ConfigurationError("ontology.migrations must be a table")
+    ontology_migrations = OntologyMigrationUseCases(
+        selected_repository.knowledge,
+        evidence,
+        max_assertions=_bounded_integer(
+            ontology_migration_config,
+            "ontology.migrations",
+            "max_assertions",
+            default=10_000,
+            minimum=1,
+            maximum=1_000_000,
+        ),
+    )
     application = Application(
         ingestion=IngestionUseCases(
             selected_repository.ingestion,
@@ -304,6 +320,7 @@ def build_container(
         ),
         ontology_rag=ontology_rag,
         ontology_context=ontology_context,
+        ontology_migrations=ontology_migrations,
     )
     return Container(
         settings=selected,

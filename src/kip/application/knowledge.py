@@ -61,6 +61,27 @@ class KnowledgeUseCases:
         candidate_id: str,
         note: str | None = None,
     ) -> ApprovedAssertion:
+        if self._ontology is not None:
+            candidate = self._store.get_candidate(context, candidate_id)
+            self._ontology.validate_candidate(
+                candidate.predicate,
+                candidate.ontology_version,
+            )
+            subject = self._store.get_entity(context, candidate.subject_id)
+            object_entity = (
+                self._store.get_entity(context, candidate.object_entity_id)
+                if candidate.object_entity_id is not None
+                else None
+            )
+            self._ontology.validate_relation(
+                subject_type=subject.entity_type,
+                predicate=candidate.predicate,
+                object_type=(
+                    object_entity.entity_type
+                    if object_entity is not None
+                    else None
+                ),
+            )
         return self._store.approve_candidate(
             context,
             candidate_id,
@@ -118,11 +139,23 @@ class KnowledgeUseCases:
         context: RequestContext,
         request: GraphNeighborsRequest,
     ) -> list[GraphEdge]:
-        return self._store.graph_neighbors(context, request)
+        return self._store.graph_neighbors(
+            context,
+            request,
+            ontology_version=(
+                self._ontology.version if self._ontology is not None else None
+            ),
+        )
 
     def graph_path(
         self,
         context: RequestContext,
         request: GraphPathRequest,
     ) -> list[GraphPath]:
-        return self._store.graph_path(context, request)
+        return self._store.graph_path(
+            context,
+            request,
+            ontology_version=(
+                self._ontology.version if self._ontology is not None else None
+            ),
+        )

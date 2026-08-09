@@ -170,6 +170,13 @@
           "title": "Id",
           "type": "string"
         },
+        "migrates_assertion_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Migrates Assertion Ids",
+          "type": "array"
+        },
         "object_entity_id": {
           "anyOf": [
             {

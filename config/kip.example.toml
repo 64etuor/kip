@@ -116,6 +116,9 @@ entity_limit = 8
 edge_limit = 50
 max_depth = 4
 
+[ontology.migrations]
+max_assertions = 10000
+
 [graph]
 backend = "postgres"
 max_depth_default = 4

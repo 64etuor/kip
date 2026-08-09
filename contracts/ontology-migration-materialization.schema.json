@@ -1,0 +1,61 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "candidate_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Candidate Ids",
+      "type": "array"
+    },
+    "created_candidate_count": {
+      "minimum": 0,
+      "title": "Created Candidate Count",
+      "type": "integer"
+    },
+    "deprecated_assertion_count": {
+      "minimum": 0,
+      "title": "Deprecated Assertion Count",
+      "type": "integer"
+    },
+    "existing_candidate_count": {
+      "minimum": 0,
+      "title": "Existing Candidate Count",
+      "type": "integer"
+    },
+    "from_version": {
+      "title": "From Version",
+      "type": "string"
+    },
+    "migration_sha256": {
+      "title": "Migration Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "kip.ontology-migration-materialization.v1",
+      "default": "kip.ontology-migration-materialization.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_assertion_count": {
+      "minimum": 0,
+      "title": "Source Assertion Count",
+      "type": "integer"
+    },
+    "to_version": {
+      "title": "To Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "from_version",
+    "to_version",
+    "migration_sha256",
+    "source_assertion_count",
+    "created_candidate_count",
+    "existing_candidate_count",
+    "deprecated_assertion_count"
+  ],
+  "title": "OntologyMigrationMaterialization",
+  "type": "object"
+}

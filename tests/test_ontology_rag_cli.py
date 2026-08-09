@@ -23,7 +23,13 @@ def test_ontology_cli_exposes_entity_mining_and_candidate_surfaces() -> None:
     result = CliRunner().invoke(app, ["ontology", "--help"], env=_env())
 
     assert result.exit_code == 0, result.stdout
-    for command in ("entities", "entity-create", "mine", "candidates"):
+    for command in (
+        "entities",
+        "entity-create",
+        "mine",
+        "candidates",
+        "migrate-materialize",
+    ):
         assert command in result.stdout
 
 

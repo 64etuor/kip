@@ -105,6 +105,25 @@ all included graph evidence.
 guard for its reviewed evidence. It is rebuilt from canonical evidence and does
 not replace `AssertionEvidence` or its exact locator.
 
+## Ontology migration boundary
+
+`OntologyMigration` maps source-release symbols to target-release symbols with
+strict rename, replace, split, merge, or deprecate arity. Materialization scans
+only ACL-visible active assertions at the declared source version. Every target
+candidate preserves exact evidence, validity, a manifest SHA-256, and explicit
+`migrates_assertion_ids` lineage. Repeating the same manifest returns the same
+candidate IDs and never rewrites or supersedes the approved source assertion.
+Target-version approval is rejected until that ontology release is the active
+application contract. Normal graph traversal is likewise pinned to the active
+catalog version, preventing reviewed future-release assertions from leaking
+into current answers.
+
+`OntologyMigrationMaterialization` reports source, created, existing, and
+deprecated counts in `kip.ontology-migration-materialization.v1`. A manifest
+affecting existing assertions must require review. Live entity-type migrations
+fail closed because changing an entity identity or type without merge/split
+history would make target assertions semantically invalid.
+
 ## Identity boundary
 
 `RequestContext` contains a verified principal, workspace, scopes, roles, and

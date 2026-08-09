@@ -1,0 +1,19 @@
+tests/test_release_bundle.py
+  s_41856199ee83ad::t_d4d5b606e33e5f 12,19-20,23,29,57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "fc1bbb384ab1599b2b0447d99ff9a58ddcae04ab",
+  "prompts": {},
+  "sessions": {
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

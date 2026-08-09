@@ -1,0 +1,113 @@
+src/kip/container.py
+  s_41856199ee83ad::t_e4f7a81679b1a2 38
+  s_41856199ee83ad::t_f41e2c446ecf5f 276-290,323
+contracts/assertion-explanation.schema.json
+  s_41856199ee83ad::t_ee3dfef5d0e34e 173-179
+docs/IMPLEMENTATION_STATUS.md
+  s_41856199ee83ad::t_c73c504d7be4b2 32,59-63
+docs/adr/ADR-027-reviewed-ontology-migration-materialization.md
+  s_41856199ee83ad::t_c73c504d7be4b2 1-28,35-47
+  s_41856199ee83ad::t_4d6b9ba1776d5a 29-34
+contracts/ontology-mining-summary.schema.json
+  s_41856199ee83ad::t_ee3dfef5d0e34e 59-65
+docs/AI_OPERATOR_RUNBOOK.md
+  s_41856199ee83ad::t_c73c504d7be4b2 259-261
+config/kip.example.toml
+  s_41856199ee83ad::t_8a368559389f50 119-121
+ontology/migrations/README.md
+  s_41856199ee83ad::t_c73c504d7be4b2 6-12
+src/kip/adapters/repository/memory/knowledge.py
+  s_41856199ee83ad::t_50b312b4d687e9 415-416,423-427,456-457,464-468
+  s_41856199ee83ad::t_0075d32cc574cb 262-282
+contracts/ontology-migration-materialization.schema.json
+  s_41856199ee83ad::t_ee3dfef5d0e34e 1-61
+contracts/assertion-candidate.schema.json
+  s_41856199ee83ad::t_ee3dfef5d0e34e 159-165
+src/kip/domain/models.py
+  s_41856199ee83ad::t_cd4d56050beeb3 381
+src/kip/adapters/repository/postgres/knowledge.py
+  s_41856199ee83ad::t_50b312b4d687e9 213-214,216-220,226-227,229-233
+  s_41856199ee83ad::t_0075d32cc574cb 137-151
+docs/OPERATIONS.md
+  s_41856199ee83ad::t_c73c504d7be4b2 66-88,93
+  s_41856199ee83ad::t_4d6b9ba1776d5a 89-92
+docs/SECURITY.md
+  s_41856199ee83ad::t_f4c38eb3b49c33 77-81
+migrations/0011_ontology_migration_lineage.sql
+  s_41856199ee83ad::t_fba5b4eae4f98d 1-10
+src/kip/ports/knowledge.py
+  s_41856199ee83ad::t_0075d32cc574cb 100-108
+  s_41856199ee83ad::t_50b312b4d687e9 154-155,162-163
+tests/test_ontology_migration_materialization.py
+  s_41856199ee83ad::t_4e7b1cca1a5bf0 1-3,5-12,14-204,225-228,243-324
+  s_41856199ee83ad::t_bf19e63c276d58 4,13,209-224,229-242
+  s_41856199ee83ad::t_3c6c46e26a49f6 205-208
+  s_41856199ee83ad::t_c4e9d43b2f1e13 325-357
+src/kip/cli.py
+  s_41856199ee83ad::t_2b95735abc5daf 1129-1164
+src/kip/application/ontology_migrations.py
+  s_41856199ee83ad::t_10921f4351dec0 1-288,290-301
+  s_41856199ee83ad::t_2521291337a4f4 289
+scripts/generate_contracts.py
+  s_41856199ee83ad::t_dec0441fdc8b55 65-68,117-118
+tests/test_ontology_rag_cli.py
+  s_41856199ee83ad::t_913861624877a2 26-32
+contracts/ontology-migration.schema.json
+  s_41856199ee83ad::t_ee3dfef5d0e34e 1-91
+src/kip/adapters/repository/postgres/database.py
+  s_41856199ee83ad::t_fba5b4eae4f98d 2260,2263,2275-2276,2285,2426
+  s_41856199ee83ad::t_0075d32cc574cb 2167-2218
+  s_41856199ee83ad::t_80592e1d38ca33 1235-1241,1251-1253,1283-1294,1316,1337
+src/kip/ontology_migration.py
+  s_41856199ee83ad::t_709dabd68a8afe 287-291
+  s_41856199ee83ad::t_cd4d56050beeb3 3-4,59-79,89-108,269-276
+  s_41856199ee83ad::t_2714ab90eebe17 300-308
+  s_41856199ee83ad::t_e6d6d7caef2ace 55-58
+  s_03506c0be5fcc9::t_108750287a0820 277-278
+tests/integration/test_postgres_repository.py
+  s_41856199ee83ad::t_481df1fa6ae6c6 218-257,266
+  s_41856199ee83ad::t_3c6c46e26a49f6 260
+  s_41856199ee83ad::t_913861624877a2 5,11,37,44-69
+  s_41856199ee83ad::t_ef2690cd1bc233 35,259
+  s_41856199ee83ad::t_6a10cae2bd987e 258,261-265,272-276,282-286
+  s_41856199ee83ad::t_410cfa47454771 70-71
+src/kip/application/knowledge.py
+  s_41856199ee83ad::t_50b312b4d687e9 64-84,142-148,155-161
+docs/DATA_CONTRACTS.md
+  s_41856199ee83ad::t_4d6b9ba1776d5a 116-119
+  s_41856199ee83ad::t_c73c504d7be4b2 108-115,120-126
+src/kip/application/runtime.py
+  s_80cdafa7f5ecd2::t_acede344df7e12 11,28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "8c5be71472f7184b6a4fe6ebc5cdd9217ea51ed5",
+  "prompts": {},
+  "sessions": {
+    "s_03506c0be5fcc9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe45d-d747-77b2-a41f-9b77d2b510d0",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_80cdafa7f5ecd2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe564-ad79-7650-a2dc-053afe41b9ca",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

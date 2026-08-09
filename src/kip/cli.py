@@ -36,6 +36,7 @@ from kip.ontology_migration import (
 )
 from kip.quality import load_experiment, load_quality_report, recommend
 from kip.settings import Settings
+from kip.setup_cli import setup_app
 
 app = typer.Typer(no_args_is_help=True, add_completion=False, help="KIP knowledge fabric CLI")
 sync_app = typer.Typer(no_args_is_help=True, help="Synchronize configured sources")
@@ -65,6 +66,7 @@ app.add_typer(export_app, name="export")
 app.add_typer(evaluate_app, name="evaluate")
 app.add_typer(quality_app, name="quality")
 app.add_typer(ontology_app, name="ontology")
+app.add_typer(setup_app, name="setup")
 
 
 class Runtime:
@@ -87,6 +89,9 @@ def root(
         help="Comma-separated access scopes",
     ),
 ) -> None:
+    if ctx.invoked_subcommand == "setup":
+        ctx.obj = None
+        return
     settings = Settings.load(config)
     container = build_container(
         settings,

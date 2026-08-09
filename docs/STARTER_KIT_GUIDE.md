@@ -19,13 +19,20 @@
 
 ## 2. 복제 후 60분 인수 경로
 
-1. `AGENTS.md`, `docs/PRD.md`, `docs/TRD.md`, `docs/DATA_CONTRACTS.md`, 이 문서를 읽는다.
-2. `.env.example`과 `config/kip.example.toml`을 로컬 ignored 파일로 복사한다.
-3. `./scripts/bootstrap.sh`, `./scripts/dev-up.sh`, `./scripts/migrate.sh`, `./scripts/doctor.sh`를 실행한다.
-4. sample source로 `sync -> search -> context -> read -> xlsx-read`를 완료한다.
-5. 실제 source는 read-only로 추가하고 먼저 `sync run --dry-run`으로 범위와 건수를 확인한다.
-6. `docs/AI_OPERATOR_RUNBOOK.md`의 real-corpus cycle을 수행하고 결과를 새 audit 문서로 보존한다.
-7. `./scripts/verify.sh`가 통과한 뒤에만 파일럿 사용자에게 연다.
+1. AI agent에게 “KIP을 셋업해줘”라고 요청해 `kip-setup` Skill을 시작한다.
+2. `setup inspect`가 반환한 질문에 매번 하나씩 답한다. credential은 값이 아니라 secret reference만 제공한다.
+3. `setup preview`의 파일 수, 용량, 확장자, 제외 건수와 symlink 건수를 확인한다.
+4. `setup plan`의 source scope, read-only mount, egress, reviewer, warning과 fingerprint를 승인한다.
+5. agent가 `setup apply`와 `setup verify`를 마치고 redacted receipt를 제시하게 한다.
+6. `./scripts/bootstrap.sh`, `./scripts/dev-up.sh`, `./scripts/migrate.sh`, `./scripts/doctor.sh`를 실행한다.
+7. sample source로 `sync -> search -> context -> read -> xlsx-read`를 완료한다.
+8. 실제 source는 `sync run --dry-run`으로 다시 범위와 건수를 확인한다.
+9. `docs/AI_OPERATOR_RUNBOOK.md`의 real-corpus cycle을 수행하고 결과를 새 audit 문서로 보존한다.
+10. `./scripts/verify.sh`가 통과한 뒤에만 파일럿 사용자에게 연다.
+
+셋업 state와 plan은 versioned JSON contract이며 중단 후 재개할 수 있다. Agent는
+TOML이나 Compose를 직접 편집하지 않는다. 기존 generated file은 apply 때
+`.previous`로 한 세대 보존되고, answer가 바뀐 stale plan은 쓰기 전에 거부된다.
 
 복사 직후 성공 기준은 서버가 뜨는 것이 아니다. 허용된 principal로 검색한 근거를 exact read할 수 있고, 허용되지 않은 principal에게 동일 문서와 graph path가 보이지 않으며, 원본 해시가 변하지 않아야 한다.
 

@@ -4,6 +4,25 @@
 [`STARTER_KIT_GUIDE.md`](STARTER_KIT_GUIDE.md)의 데이터 경계, ACL, 외부
 전송, 품질 기준 결정을 먼저 완료한다.
 
+가장 안전한 진입점은 AI agent에게 “KIP을 셋업해줘”라고 요청하는 것이다.
+agent는 `kip-setup` Skill에 따라 매번 하나의 누락된 결정만 질문하고, CLI가
+수집 범위를 미리 계산한 뒤 승인된 plan만 원자적으로 적용한다.
+
+```bash
+./scripts/kip setup inspect
+./scripts/kip setup answer --question workspace --value acme-rnd
+# inspect와 answer를 complete=true까지 반복
+./scripts/kip setup preview
+./scripts/kip setup plan --output .kip/setup-plan.json
+# plan의 scope, read-only mounts, egress, warnings를 사람이 승인
+./scripts/kip setup apply --plan .kip/setup-plan.json
+./scripts/kip setup verify --plan .kip/setup-plan.json
+```
+
+실제 credential 대신 `env:KIP_DATABASE_URL` 같은 secret reference만 답한다.
+`/`, 홈 디렉터리, 프로젝트 루트 또는 그 상위 디렉터리는 source root로
+거부된다. 생성된 config와 Compose override는 로컬 전용이며 Git에서 제외된다.
+
 ## Local CLI profile
 
 ```bash

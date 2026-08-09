@@ -30,20 +30,27 @@ def main() -> int:
     require((ROOT / ".claude/skills/knowledge-fabric/SKILL.md").is_file(), "Claude project Skill is missing", errors)
     errors.extend(validate_ontology(ROOT / "ontology"))
 
-    claude_skill_root = ROOT / ".claude/skills/knowledge-fabric"
-    project_skill_root = ROOT / "skills/knowledge-fabric"
-    if claude_skill_root.exists() and project_skill_root.exists():
-        project_files = {
-            path.relative_to(project_skill_root): path.read_bytes()
-            for path in project_skill_root.rglob("*")
-            if path.is_file()
-        }
-        claude_files = {
-            path.relative_to(claude_skill_root): path.read_bytes()
-            for path in claude_skill_root.rglob("*")
-            if path.is_file()
-        }
-        require(project_files == claude_files, "Claude and portable Skill trees diverged", errors)
+    for skill_name in ("knowledge-fabric", "kip-setup"):
+        claude_skill_root = ROOT / f".claude/skills/{skill_name}"
+        project_skill_root = ROOT / f"skills/{skill_name}"
+        require(project_skill_root.is_dir(), f"portable {skill_name} Skill is missing", errors)
+        require(claude_skill_root.is_dir(), f"Claude {skill_name} Skill is missing", errors)
+        if claude_skill_root.exists() and project_skill_root.exists():
+            project_files = {
+                path.relative_to(project_skill_root): path.read_bytes()
+                for path in project_skill_root.rglob("*")
+                if path.is_file()
+            }
+            claude_files = {
+                path.relative_to(claude_skill_root): path.read_bytes()
+                for path in claude_skill_root.rglob("*")
+                if path.is_file()
+            }
+            require(
+                project_files == claude_files,
+                f"Claude and portable {skill_name} Skill trees diverged",
+                errors,
+            )
 
     mcp_config = ROOT / ".mcp.json"
     if mcp_config.exists():

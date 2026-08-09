@@ -1,0 +1,4 @@
+interface:
+  display_name: "KIP Guided Setup"
+  short_description: "Configure KIP safely, one decision at a time"
+  default_prompt: "Use $kip-setup to configure this KIP deployment safely."

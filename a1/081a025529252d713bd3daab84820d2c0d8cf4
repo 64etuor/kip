@@ -1,0 +1,42 @@
+.claude/skills/kip-setup/SKILL.md
+  s_41856199ee83ad::t_fdd45cc94faecf 15,19
+src/kip/setup/planner.py
+  s_41856199ee83ad::t_fdd45cc94faecf 152
+tests/test_setup_writer.py
+  s_41856199ee83ad::t_45158e272d4c21 64-81
+src/kip/setup/writer.py
+  s_41856199ee83ad::t_fdd45cc94faecf 3,72,80-86,239-249
+  s_80cdafa7f5ecd2::t_84a23ead81436b 250-253
+tests/test_setup_planner.py
+  s_41856199ee83ad::t_45158e272d4c21 87
+tests/test_setup_cli.py
+  s_41856199ee83ad::t_45158e272d4c21 125-126
+src/kip/setup/service.py
+  s_41856199ee83ad::t_fdd45cc94faecf 105,109-110,284,286,293,299-300,303,315-319,363-381
+skills/kip-setup/SKILL.md
+  s_41856199ee83ad::t_fdd45cc94faecf 15,19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "a1081a025529252d713bd3daab84820d2c0d8cf4",
+  "prompts": {},
+  "sessions": {
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_80cdafa7f5ecd2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe564-ad79-7650-a2dc-053afe41b9ca",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

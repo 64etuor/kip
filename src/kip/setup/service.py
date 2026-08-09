@@ -160,12 +160,18 @@ class SetupService:
         if question_id in {
             "model_egress_classifications",
             "ontology_reviewers",
+            "jwt_admin_groups",
         }:
             values = _STRINGS.validate_python(_load_json(value))
             if question_id == "ontology_reviewers" and not values:
                 raise ValidationError("at least one ontology reviewer is required")
             return cast(JsonValue, values)
-        if question_id in {"model_secret_ref", "database_secret_ref"}:
+        if question_id in {
+            "model_secret_ref",
+            "database_secret_ref",
+            "identity_api_key_secret_ref",
+            "identity_admin_key_secret_ref",
+        }:
             try:
                 return SecretReference.parse(value)
             except ValueError as exc:
@@ -209,9 +215,14 @@ class SetupService:
             return value
         if question_id == "workspace":
             return value
-        if question_id == "identity_owner":
+        if question_id in {
+            "identity_owner",
+            "jwt_issuer",
+            "jwt_audience",
+            "jwt_jwks_url",
+        }:
             if not value.strip():
-                raise ValidationError("identity_owner cannot be blank")
+                raise ValidationError(f"{question_id} cannot be blank")
             return value.strip()
         if question_id in {"identity_mode", "source_ownership", "model_provider"}:
             return value

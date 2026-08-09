@@ -108,6 +108,44 @@ def _config_payload(plan: SetupPlan) -> dict[str, object]:
         }
         for source in plan.sources
     ]
+    identity: dict[str, object] = {
+        "mode": plan.identity_mode,
+        "owner": plan.identity_owner,
+    }
+    if plan.identity_mode == "proxy_jwt":
+        identity["jwt"] = {
+            "issuer": plan.jwt_issuer,
+            "audience": plan.jwt_audience,
+            "jwks_url": plan.jwt_jwks_url,
+            "algorithms": ["RS256"],
+            "principal_claim": "sub",
+            "workspace_claim": "workspace",
+            "group_claim": "groups",
+            "scope_claim": "acl_scopes",
+            "group_scope_prefix": "group:",
+            "admin_groups": plan.jwt_admin_groups,
+            "snapshot_id_claim": "acl_snapshot_id",
+            "snapshot_version_claim": "acl_snapshot_version",
+            "snapshot_captured_at_claim": "acl_snapshot_captured_at",
+            "snapshot_expires_at_claim": "acl_snapshot_expires_at",
+            "jwks_cache_seconds": 300,
+            "jwks_timeout_seconds": 5,
+            "clock_skew_seconds": 30,
+        }
+    else:
+        api_key: dict[str, object] = {
+            "principal_id": "bootstrap-operator",
+            "acl_scopes": [f"workspace:{plan.workspace}"],
+        }
+        if plan.identity_api_key_secret_ref is not None:
+            api_key["secret_ref"] = plan.identity_api_key_secret_ref.display()
+            if plan.identity_api_key_secret_ref.scheme == "env":
+                api_key["api_key_env"] = plan.identity_api_key_secret_ref.name
+        if plan.identity_admin_key_secret_ref is not None:
+            api_key["admin_secret_ref"] = plan.identity_admin_key_secret_ref.display()
+            if plan.identity_admin_key_secret_ref.scheme == "env":
+                api_key["admin_key_env"] = plan.identity_admin_key_secret_ref.name
+        identity["api_key"] = api_key
     return {
         "app": {
             "environment": "production",
@@ -126,10 +164,7 @@ def _config_payload(plan: SetupPlan) -> dict[str, object]:
             "require_api_key_outside_development": True,
             "max_request_bytes": 10 * 1024 * 1024,
         },
-        "identity": {
-            "mode": plan.identity_mode,
-            "owner": plan.identity_owner,
-        },
+        "identity": identity,
         "security": {
             "allow_remote_model_egress": plan.model_provider != "disabled",
             "follow_symlinks": False,
@@ -166,6 +201,12 @@ def _compose_payload(plan: SetupPlan) -> dict[str, object]:
         environment[plan.model_secret_ref.name] = (
             f"${{{plan.model_secret_ref.name}:?required}}"
         )
+    for secret_ref in (
+        plan.identity_api_key_secret_ref,
+        plan.identity_admin_key_secret_ref,
+    ):
+        if secret_ref is not None and secret_ref.scheme == "env":
+            environment[secret_ref.name] = f"${{{secret_ref.name}:?required}}"
     return {
         "services": {
             "api": _compose_service(plan, environment),

@@ -6,6 +6,7 @@ from pathlib import Path
 from kip.application.analyzer import KoreanNgramAnalyzer
 from kip.application.ingestion_events import EventIngestionWorkflow
 from kip.application.ingestion_files import FileIngestionWorkflow
+from kip.domain.identity import AclSnapshot
 from kip.domain.models import ConnectorEvent, IngestResult, RequestContext, SyncSummary
 from kip.errors import KipError, ValidationError
 from kip.ports.ingestion import (
@@ -41,6 +42,7 @@ class IngestionUseCases:
         source_root: Path,
         record: DiscoveredFile,
         acl_scopes: list[str],
+        acl_snapshot: AclSnapshot,
     ) -> IngestResult:
         return self._files.ingest(
             context,
@@ -48,6 +50,7 @@ class IngestionUseCases:
             source_root=source_root,
             record=record,
             acl_scopes=acl_scopes,
+            acl_snapshot=acl_snapshot,
         )
 
     def sync_filesystem(
@@ -72,6 +75,7 @@ class IngestionUseCases:
                     source_root=source.root,
                     record=record,
                     acl_scopes=[scope],
+                    acl_snapshot=source.acl_snapshot,
                 )
             except (KipError, OSError) as exc:
                 summary.failed += 1
@@ -129,7 +133,10 @@ class IngestionUseCases:
         context: RequestContext,
         event: ConnectorEvent,
     ) -> IngestResult:
-        return self._events.ingest(context, event)
+        selected = event.model_copy(
+            update={"acl_snapshot": self._sources.event_acl_snapshot(event)}
+        )
+        return self._events.ingest(context, selected)
 
     @staticmethod
     def _record_result(summary: SyncSummary, result: IngestResult) -> None:

@@ -18,6 +18,7 @@ from kip.domain.models import (
     SourceObject,
     SourceRevision,
 )
+from kip.errors import ValidationError
 from kip.ids import new_id, sha256_bytes, stable_id
 from kip.ports.ingestion import ContentAddressedStorePort, IngestionStore
 
@@ -68,7 +69,18 @@ class EventIngestionWorkflow:
             context.workspace,
             f"{event.connector_name}:{event.external_id}",
         )
-        if self._store.has_revision(context, object_id, revision_hash):
+        snapshot = event.acl_snapshot
+        if snapshot is None:
+            raise ValidationError("connector event requires an ACL snapshot")
+        ingest_context = context.model_copy(
+            update={
+                "acl_scopes": sorted(
+                    set(context.acl_scopes).union(event.acl_scopes)
+                )
+            }
+        )
+        self._store.upsert_acl_snapshot(ingest_context, object_id, snapshot)
+        if self._store.has_revision(ingest_context, object_id, revision_hash):
             return IngestResult(
                 status="unchanged",
                 source_object_id=object_id,
@@ -89,6 +101,7 @@ class EventIngestionWorkflow:
             title=title,
             body=body,
             locator=locator,
+            acl_snapshot_id=snapshot.id,
         )
         packet = DocumentPacket(
             workspace_id=context.workspace,
@@ -101,6 +114,7 @@ class EventIngestionWorkflow:
                 object_type="message",
                 canonical_uri=_event_uri(event, family),
                 acl_scopes=list(event.acl_scopes),
+                acl_snapshot=snapshot,
                 metadata={"connector_event_id": event.event_id},
             ),
             revision=SourceRevision(
@@ -145,13 +159,6 @@ class EventIngestionWorkflow:
             ),
             units=units,
         )
-        ingest_context = context.model_copy(
-            update={
-                "acl_scopes": sorted(
-                    set(context.acl_scopes).union(event.acl_scopes)
-                )
-            }
-        )
         return self._store.ingest_packet(ingest_context, packet)
 
     def _content_units(
@@ -165,6 +172,7 @@ class EventIngestionWorkflow:
         title: str,
         body: str,
         locator: EvidenceLocator,
+        acl_snapshot_id: str,
     ) -> list[ContentUnit]:
         if event.operation == "delete":
             return []
@@ -187,6 +195,7 @@ class EventIngestionWorkflow:
                 ),
                 locator=locator,
                 acl_scopes=list(event.acl_scopes),
+                acl_snapshot_id=acl_snapshot_id,
                 metadata={"connector": event.connector_name},
             )
         ]

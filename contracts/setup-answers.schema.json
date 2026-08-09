@@ -154,6 +154,28 @@
       "default": null,
       "title": "Filesystem Sources"
     },
+    "identity_admin_key_secret_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SecretReference"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "identity_api_key_secret_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SecretReference"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "identity_mode": {
       "anyOf": [
         {
@@ -181,6 +203,57 @@
       ],
       "default": null,
       "title": "Identity Owner"
+    },
+    "jwt_admin_groups": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Jwt Admin Groups"
+    },
+    "jwt_audience": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Jwt Audience"
+    },
+    "jwt_issuer": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Jwt Issuer"
+    },
+    "jwt_jwks_url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Jwt Jwks Url"
     },
     "model_egress_classifications": {
       "anyOf": [

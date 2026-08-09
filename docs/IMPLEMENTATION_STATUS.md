@@ -5,10 +5,11 @@
 | Root agent files | Ready | `AGENTS.md`, `CLAUDE.md`, `.mcp.json` included |
 | Canonical contracts | Ready | Pydantic models and generated JSON Schema |
 | Memory repository | Ready | Used for tests and offline smoke checks |
-| PostgreSQL migrations | Ready for pilot | Workspace and required-scope RLS included; test with non-owner production roles |
-| PostgreSQL repository | Pilot reference | Core ingest, search, exact read, ACL, job, assertion, export, and rebuild methods implemented; assertion reads are ACL-prefiltered |
+| PostgreSQL migrations | Ready for pilot | Workspace, required-scope, and ACL-snapshot freshness RLS included; test with non-owner production roles |
+| PostgreSQL repository | Pilot reference | Core ingest, search, exact read, ACL, job, assertion, export, and rebuild methods implemented; evidence and graph reads are ACL- and freshness-prefiltered |
 | CLI | Ready for pilot | JSON-first commands; source-neutral `sync run`, top-level `xlsx-read`, projection and canonical export aliases |
-| REST API | Ready for pilot | Read, exact evidence, assertion explain, connector event, sync, and review endpoints; API/admin key baseline |
+| REST API | Ready for pilot | Read, exact evidence, assertion explain, connector event, sync, and review endpoints; trusted API-key or verified JWT identity |
+| Identity and ACL snapshots | Ready for pilot | JWT issuer/audience/JWKS verification, configured API-key principal, stale dynamic snapshot exclusion, and legacy identity-header rejection |
 | MCP | Reference adapter | Requires optional dependency and client validation |
 | Filesystem connector | Ready for pilot | Read-only traversal, hash, settle-time checks |
 | XLSX shallow/deep | Ready for pilot | Shared-string shallow index and exact `.xlsx`/`.xlsm` range reader; formula/cached values, formats, dates, and hidden dimensions are explicit |
@@ -36,7 +37,10 @@
 
 - The default sync mode is incremental. Forced full re-extraction and destructive source reconciliation are intentionally not exposed as one-step starter commands.
 - The PostgreSQL integration test is gated by `KIP_TEST_POSTGRES_URL`; CI or a local PostgreSQL service must run it before deployment.
-- The API trusts identity and ACL headers only inside the starter security boundary. Production requires an identity-aware proxy or service gateway that sets these headers.
+- Multi-user production requires an identity-aware proxy that issues the
+  configured JWT claims. KIP verifies those claims directly and rejects legacy
+  caller identity/ACL headers; target-provider revocation latency is bounded by
+  the shorter of token and ACL-snapshot expiry.
 - Optional HWP parser commands, Slack scopes, Apple Mail Automation permissions, and IMAP provider behavior must be validated against the target environment.
 - Neo4j remains an adoption-gate adapter stub; canonical assertions are queried from PostgreSQL.
 - The current public pilot is small and lexically distinctive. Its `keep_disabled` decision must not be generalized to a private corpus without adding reviewed internal golden cases. The private OneDrive shadow A/B also showed no gain over lexical retrieval on its small golden set, so semantic projection remains shadow-only.

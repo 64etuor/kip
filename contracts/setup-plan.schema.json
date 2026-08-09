@@ -189,6 +189,26 @@
       "title": "Generated Files",
       "type": "array"
     },
+    "identity_admin_key_secret_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SecretReference"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "identity_api_key_secret_ref": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SecretReference"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "identity_mode": {
       "enum": [
         "proxy_jwt",
@@ -200,6 +220,46 @@
     "identity_owner": {
       "title": "Identity Owner",
       "type": "string"
+    },
+    "jwt_admin_groups": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Jwt Admin Groups",
+      "type": "array"
+    },
+    "jwt_audience": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Jwt Audience"
+    },
+    "jwt_issuer": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Jwt Issuer"
+    },
+    "jwt_jwks_url": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Jwt Jwks Url"
     },
     "model_egress_classifications": {
       "items": {
@@ -291,6 +351,12 @@
     "answers_fingerprint",
     "workspace",
     "identity_mode",
+    "jwt_issuer",
+    "jwt_audience",
+    "jwt_jwks_url",
+    "jwt_admin_groups",
+    "identity_api_key_secret_ref",
+    "identity_admin_key_secret_ref",
     "identity_owner",
     "source_ownership",
     "sources",

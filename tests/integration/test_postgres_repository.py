@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import os
 import uuid
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 
 from kip.adapters.repository.postgres import PostgresRepository
 from kip.container import build_container
+from kip.domain.identity import AclSnapshot
 from kip.domain.models import (
     AssertionCandidate,
     EmbeddingRecord,
@@ -145,6 +147,60 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
             GraphPathRequest(from_node_id="doc_new", to_node_id="doc_old"),
         )
         assert [path.assertion_ids for path in paths] == [[assertion.id]]
+
+        source_object = repository.evidence.get_artifact(
+            context,
+            hits[0].artifact_id,
+        ).source_object
+        assert source_object is not None
+        now = datetime.now(UTC)
+        stale_snapshot = AclSnapshot(
+            id=new_id("aclsnap"),
+            version="directory-stale",
+            provider="integration-directory",
+            scopes=[f"workspace:{workspace}"],
+            captured_at=now - timedelta(hours=2),
+            expires_at=now - timedelta(minutes=1),
+        )
+        repository.ingestion.upsert_acl_snapshot(
+            context,
+            source_object.id,
+            stale_snapshot,
+        )
+        assert container.application.retrieval.search(
+            context,
+            SearchRequest(query="참여율 변경 승인", limit=10),
+        ) == []
+        with pytest.raises(NotFoundError):
+            repository.evidence.get_content_unit(context, hits[0].unit_id)
+        with pytest.raises(NotFoundError):
+            repository.knowledge.get_assertion(context, assertion.id)
+        assert repository.knowledge.graph_neighbors(
+            context,
+            GraphNeighborsRequest(node_id="doc_new"),
+        ) == []
+
+        fresh_snapshot = AclSnapshot(
+            id=new_id("aclsnap"),
+            version="directory-fresh",
+            provider="integration-directory",
+            scopes=[f"workspace:{workspace}"],
+            captured_at=now,
+            expires_at=now + timedelta(minutes=15),
+        )
+        repository.ingestion.upsert_acl_snapshot(
+            context,
+            source_object.id,
+            fresh_snapshot,
+        )
+        assert container.application.retrieval.search(
+            context,
+            SearchRequest(query="참여율 변경 승인", limit=10),
+        )
+        assert repository.knowledge.graph_neighbors(
+            context,
+            GraphNeighborsRequest(node_id="doc_new"),
+        )
 
         restricted_context = RequestContext(
             workspace=workspace,

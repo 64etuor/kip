@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import hmac
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from kip.container import Container, build_container
+from kip.domain.identity import IdentityCredential
 from kip.domain.models import (
     AnswerRequest,
     ConnectorEvent,
@@ -34,14 +37,17 @@ def create_app(container: Container | None = None) -> FastAPI:
     app.state.container = selected
 
     @app.middleware("http")
-    async def request_size_guard(request: Request, call_next):
+    async def request_size_guard(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         length = request.headers.get("content-length")
         if length and int(length) > selected.settings.max_request_bytes:
             return JSONResponse(status_code=413, content={"detail": "request body exceeds configured limit"})
         return await call_next(request)
 
     def error_envelope(request: Request, code: str, message: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
-        context = _context_from_headers(selected, request)
+        context = _error_context(selected, request)
         return Envelope(
             ok=False,
             error=ErrorInfo(code=code, message=message, details=details or {}),
@@ -49,22 +55,34 @@ def create_app(container: Container | None = None) -> FastAPI:
         ).model_dump(mode="json")
 
     @app.exception_handler(HTTPException)
-    async def http_error_handler(request: Request, exc: HTTPException):
+    async def http_error_handler(
+        request: Request,
+        exc: HTTPException,
+    ) -> JSONResponse:
+        detail: object = exc.detail
+        code = "http_error"
+        message = str(detail)
+        if isinstance(detail, dict):
+            code = str(detail.get("code") or code)
+            message = str(detail.get("message") or "request failed")
         return JSONResponse(
             status_code=exc.status_code,
-            content=error_envelope(request, "http_error", str(exc.detail)),
+            content=error_envelope(request, code, message),
             headers=exc.headers,
         )
 
     @app.exception_handler(RequestValidationError)
-    async def request_validation_handler(request: Request, exc: RequestValidationError):
+    async def request_validation_handler(
+        request: Request,
+        exc: RequestValidationError,
+    ) -> JSONResponse:
         return JSONResponse(
             status_code=422,
             content=error_envelope(request, "request_validation_error", "request validation failed", {"errors": exc.errors()}),
         )
 
     @app.exception_handler(KipError)
-    async def kip_error_handler(request: Request, exc: KipError):
+    async def kip_error_handler(request: Request, exc: KipError) -> JSONResponse:
         status = 500
         code = "internal_error"
         if isinstance(exc, NotFoundError):
@@ -75,7 +93,7 @@ def create_app(container: Container | None = None) -> FastAPI:
             status, code = 409, "conflict"
         elif isinstance(exc, AuthorizationError):
             status, code = 403, "forbidden"
-        context = _context_from_headers(selected, request)
+        context = _error_context(selected, request)
         envelope = Envelope(
             ok=False,
             error=ErrorInfo(code=code, message=str(exc)),
@@ -87,11 +105,48 @@ def create_app(container: Container | None = None) -> FastAPI:
         request: Request,
         x_kip_api_key: str | None = Header(None),
     ) -> RequestContext:
-        expected = selected.settings.api_key
-        require = selected.settings.environment not in {"development", "test"} or bool(expected)
-        if require and (not expected or x_kip_api_key != expected):
-            raise HTTPException(status_code=401, detail="invalid API key")
-        return _context_from_headers(selected, request)
+        legacy_headers = (
+            "X-KIP-Workspace",
+            "X-KIP-Principal",
+            "X-KIP-ACL-Scopes",
+        )
+        if selected.settings.environment not in {"development", "test"} and any(
+            request.headers.get(name) is not None for name in legacy_headers
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "untrusted_identity_headers",
+                    "message": (
+                        "workspace, principal, and ACL scopes must come from the "
+                        "configured identity provider"
+                    ),
+                },
+            )
+        authorization = request.headers.get("Authorization")
+        bearer_token: str | None = None
+        if authorization is not None:
+            scheme, separator, value = authorization.partition(" ")
+            if separator != " " or scheme.lower() != "bearer" or not value.strip():
+                raise HTTPException(status_code=401, detail="invalid bearer authorization")
+            bearer_token = value.strip()
+        scopes_value = request.headers.get("X-KIP-ACL-Scopes")
+        asserted_scopes = tuple(
+            item.strip() for item in (scopes_value or "").split(",") if item.strip()
+        )
+        try:
+            return selected.identity.resolve(
+                IdentityCredential(
+                    api_key=x_kip_api_key,
+                    bearer_token=bearer_token,
+                    asserted_workspace=request.headers.get("X-KIP-Workspace"),
+                    asserted_principal_id=request.headers.get("X-KIP-Principal"),
+                    asserted_acl_scopes=asserted_scopes,
+                ),
+                request_id=request.headers.get("X-Request-ID") or new_id("req"),
+            )
+        except AuthorizationError as exc:
+            raise HTTPException(status_code=401, detail=str(exc)) from exc
 
     async def admin_context(
         request: Request,
@@ -99,8 +154,12 @@ def create_app(container: Container | None = None) -> FastAPI:
         x_kip_admin_key: str | None = Header(None),
     ) -> RequestContext:
         context = await authenticated_context(request, x_kip_api_key)
+        if selected.settings.identity_mode == "proxy_jwt":
+            if "admin" not in context.roles:
+                raise HTTPException(status_code=403, detail="admin role is required")
+            return context
         expected = selected.settings.admin_key
-        if not expected or x_kip_admin_key != expected:
+        if not expected or not hmac.compare_digest(x_kip_admin_key or "", expected):
             raise HTTPException(status_code=403, detail="invalid admin key")
         return context
 
@@ -112,51 +171,83 @@ def create_app(container: Container | None = None) -> FastAPI:
         )
 
     @app.get("/healthz")
-    async def healthz():
+    async def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
     @app.get("/v1/capabilities", response_model=Envelope)
-    async def capabilities(context: RequestContext = Depends(authenticated_context)):
+    async def capabilities(
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
         return ok(selected.application.operations.capabilities(), context)
 
     @app.get("/v1/status", response_model=Envelope)
-    async def status(context: RequestContext = Depends(authenticated_context)):
+    async def status(
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
         return ok(selected.application.operations.status(context), context)
 
     @app.post("/v1/search", response_model=Envelope)
-    async def search(payload: SearchRequest, context: RequestContext = Depends(authenticated_context)):
+    async def search(
+        payload: SearchRequest,
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
         return ok(selected.application.retrieval.search(context, payload), context)
 
     @app.post("/v1/context", response_model=Envelope)
-    async def context_bundle(payload: ContextRequest, context: RequestContext = Depends(authenticated_context)):
+    async def context_bundle(
+        payload: ContextRequest,
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
         return ok(selected.application.retrieval.context_bundle(context, payload), context)
 
     @app.post("/v1/answer", response_model=Envelope)
-    async def answer(payload: AnswerRequest, context: RequestContext = Depends(authenticated_context)):
+    async def answer(
+        payload: AnswerRequest,
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
         return ok(selected.application.retrieval.answer(context, payload), context)
 
     @app.get("/v1/vocabulary", response_model=Envelope)
-    async def vocabulary(prefix: str, limit: int = 20, context: RequestContext = Depends(authenticated_context)):
+    async def vocabulary(
+        prefix: str,
+        limit: int = 20,
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
         return ok(selected.application.retrieval.vocabulary(context, prefix, limit), context)
 
     @app.get("/v1/units/{unit_id}", response_model=Envelope)
-    async def read_unit(unit_id: str, context: RequestContext = Depends(authenticated_context)):
+    async def read_unit(
+        unit_id: str,
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
         return ok(selected.application.evidence.read_unit(context, unit_id), context)
 
     @app.get("/v1/artifacts/{artifact_id}", response_model=Envelope)
-    async def get_artifact(artifact_id: str, context: RequestContext = Depends(authenticated_context)):
+    async def get_artifact(
+        artifact_id: str,
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
         return ok(selected.application.evidence.get_artifact(context, artifact_id), context)
 
     @app.get("/v1/documents/{document_id}", response_model=Envelope)
-    async def get_document(document_id: str, context: RequestContext = Depends(authenticated_context)):
+    async def get_document(
+        document_id: str,
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
         return ok(selected.application.evidence.get_document(context, document_id), context)
 
     @app.get("/v1/assertions/{assertion_id}", response_model=Envelope)
-    async def get_assertion(assertion_id: str, context: RequestContext = Depends(authenticated_context)):
+    async def get_assertion(
+        assertion_id: str,
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
         return ok(selected.application.knowledge.get_assertion(context, assertion_id), context)
 
     @app.get("/v1/assertions/{assertion_id}/explain", response_model=Envelope)
-    async def explain_assertion(assertion_id: str, context: RequestContext = Depends(authenticated_context)):
+    async def explain_assertion(
+        assertion_id: str,
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
         return ok(selected.application.knowledge.explain_assertion(context, assertion_id), context)
 
     @app.get("/v1/xlsx/{artifact_id}/range", response_model=Envelope)
@@ -166,7 +257,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         cell_range: str,
         allow_stale: bool = False,
         context: RequestContext = Depends(authenticated_context),
-    ):
+    ) -> Envelope:
         return ok(
             selected.application.evidence.read_xlsx(
                 context,
@@ -179,11 +270,17 @@ def create_app(container: Container | None = None) -> FastAPI:
         )
 
     @app.post("/v1/graph/neighbors", response_model=Envelope)
-    async def graph_neighbors(payload: GraphNeighborsRequest, context: RequestContext = Depends(authenticated_context)):
+    async def graph_neighbors(
+        payload: GraphNeighborsRequest,
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
         return ok(selected.application.knowledge.graph_neighbors(context, payload), context)
 
     @app.post("/v1/graph/path", response_model=Envelope)
-    async def graph_path(payload: GraphPathRequest, context: RequestContext = Depends(authenticated_context)):
+    async def graph_path(
+        payload: GraphPathRequest,
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
         return ok(selected.application.knowledge.graph_path(context, payload), context)
 
     @app.post("/v1/sync/filesystem/{source_name}", response_model=Envelope)
@@ -192,7 +289,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         enqueue: bool = True,
         dry_run: bool = False,
         context: RequestContext = Depends(admin_context),
-    ):
+    ) -> Envelope:
         data = (
             {"job_id": selected.application.ingestion.enqueue_sync(context, source_name)}
             if enqueue
@@ -204,7 +301,7 @@ def create_app(container: Container | None = None) -> FastAPI:
     async def enqueue_source_sync(
         source_name: str,
         context: RequestContext = Depends(admin_context),
-    ):
+    ) -> Envelope:
         return ok({"source": source_name, "job_id": selected.application.ingestion.enqueue_sync(context, source_name)}, context)
 
     @app.get("/v1/jobs", response_model=Envelope)
@@ -212,11 +309,14 @@ def create_app(container: Container | None = None) -> FastAPI:
         status: str | None = None,
         limit: int = 100,
         context: RequestContext = Depends(admin_context),
-    ):
+    ) -> Envelope:
         return ok(selected.application.operations.list_jobs(context, status, limit), context)
 
     @app.post("/v1/connectors/events", response_model=Envelope)
-    async def connector_event(payload: ConnectorEvent, context: RequestContext = Depends(admin_context)):
+    async def connector_event(
+        payload: ConnectorEvent,
+        context: RequestContext = Depends(admin_context),
+    ) -> Envelope:
         return ok(selected.application.ingestion.ingest_connector_event(context, payload), context)
 
     @app.get("/v1/review/candidates", response_model=Envelope)
@@ -224,33 +324,40 @@ def create_app(container: Container | None = None) -> FastAPI:
         status: str = "proposed",
         limit: int = 100,
         context: RequestContext = Depends(admin_context),
-    ):
+    ) -> Envelope:
         return ok(selected.application.knowledge.list_candidates(context, status, limit), context)
 
     @app.get("/v1/review/candidates/{candidate_id}", response_model=Envelope)
-    async def candidate(candidate_id: str, context: RequestContext = Depends(admin_context)):
+    async def candidate(
+        candidate_id: str,
+        context: RequestContext = Depends(admin_context),
+    ) -> Envelope:
         return ok(selected.application.knowledge.get_candidate(context, candidate_id), context)
 
     @app.post("/v1/review/candidates/{candidate_id}/approve", response_model=Envelope)
-    async def approve(candidate_id: str, note: str | None = None, context: RequestContext = Depends(admin_context)):
+    async def approve(
+        candidate_id: str,
+        note: str | None = None,
+        context: RequestContext = Depends(admin_context),
+    ) -> Envelope:
         return ok(selected.application.knowledge.review_approve(context, candidate_id, note), context)
 
     @app.post("/v1/review/candidates/{candidate_id}/reject", response_model=Envelope)
-    async def reject(candidate_id: str, note: str | None = None, context: RequestContext = Depends(admin_context)):
+    async def reject(
+        candidate_id: str,
+        note: str | None = None,
+        context: RequestContext = Depends(admin_context),
+    ) -> Envelope:
         return ok(selected.application.knowledge.review_reject(context, candidate_id, note), context)
 
     return app
 
 
-def _context_from_headers(container: Container, request: Request) -> RequestContext:
-    workspace = request.headers.get("X-KIP-Workspace") or container.settings.workspace
-    principal = request.headers.get("X-KIP-Principal") or "principal_api"
-    scopes_value = request.headers.get("X-KIP-ACL-Scopes")
-    scopes = [item.strip() for item in scopes_value.split(",") if item.strip()] if scopes_value else [f"workspace:{workspace}"]
-    return container.application.operations.request_context(
-        workspace=workspace,
-        principal_id=principal,
-        acl_scopes=scopes,
+def _error_context(container: Container, request: Request) -> RequestContext:
+    return RequestContext(
+        workspace=container.settings.workspace,
+        principal_id="unauthenticated",
+        acl_scopes=[],
         request_id=request.headers.get("X-Request-ID") or new_id("req"),
     )
 

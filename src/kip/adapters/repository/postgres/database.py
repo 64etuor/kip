@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from psycopg import Connection
     from psycopg.rows import DictRow
 
+from kip.domain.identity import AclSnapshot
 from kip.domain.models import (
     ApprovedAssertion,
     Artifact,
@@ -158,6 +159,134 @@ class PostgresDatabase:
                 (context.principal_id, context.workspace, context.principal_id, context.principal_id),
             )
 
+    @staticmethod
+    def _write_acl_snapshot(
+        cursor: Any,
+        workspace: str,
+        snapshot: AclSnapshot,
+    ) -> None:
+        cursor.execute(
+            """
+            INSERT INTO source.acl_snapshots(
+                id, workspace_id, provider, snapshot_version, captured_at,
+                expires_at, configuration_owned, scopes, scope_mapping
+            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb)
+            ON CONFLICT (id) DO NOTHING
+            """,
+            (
+                snapshot.id,
+                workspace,
+                snapshot.provider,
+                snapshot.version,
+                snapshot.captured_at,
+                snapshot.expires_at,
+                snapshot.configuration_owned,
+                snapshot.scopes,
+                _json({}),
+            ),
+        )
+        cursor.execute(
+            """
+            SELECT workspace_id, provider, snapshot_version, captured_at,
+                   expires_at, configuration_owned, scopes
+            FROM source.acl_snapshots
+            WHERE id=%s
+            """,
+            (snapshot.id,),
+        )
+        stored = cursor.fetchone()
+        if not stored or (
+            stored["workspace_id"] != workspace
+            or stored["provider"] != snapshot.provider
+            or stored["snapshot_version"] != snapshot.version
+            or stored["captured_at"] != snapshot.captured_at
+            or stored["expires_at"] != snapshot.expires_at
+            or stored["configuration_owned"] != snapshot.configuration_owned
+            or list(stored["scopes"] or []) != snapshot.scopes
+        ):
+            raise ConflictError("ACL snapshot ID was reused with different contents")
+
+    def upsert_acl_snapshot(
+        self,
+        context: RequestContext,
+        source_object_id: str,
+        snapshot: AclSnapshot,
+    ) -> None:
+        with self._connection(context) as connection:
+            self._ensure_workspace_and_principal(connection, context)
+            with connection.cursor() as cursor:
+                self._write_acl_snapshot(cursor, context.workspace, snapshot)
+                cursor.execute(
+                    """
+                    UPDATE source.objects
+                    SET acl_snapshot_id=%s, acl_scopes=%s, last_seen_at=now()
+                    WHERE workspace_id=%s AND id=%s
+                    """,
+                    (
+                        snapshot.id,
+                        snapshot.scopes,
+                        context.workspace,
+                        source_object_id,
+                    ),
+                )
+                cursor.execute(
+                    """
+                    UPDATE content.units unit
+                    SET acl_snapshot_id=%s, acl_scopes=%s
+                    FROM content.artifacts artifact
+                    JOIN source.revisions revision ON revision.id=artifact.revision_id
+                    WHERE unit.workspace_id=%s
+                      AND unit.artifact_id=artifact.id
+                      AND revision.object_id=%s
+                    """,
+                    (
+                        snapshot.id,
+                        snapshot.scopes,
+                        context.workspace,
+                        source_object_id,
+                    ),
+                )
+                self._refresh_assertion_acl_snapshots(
+                    cursor,
+                    context.workspace,
+                    source_object_id,
+                )
+            connection.commit()
+
+    @staticmethod
+    def _refresh_assertion_acl_snapshots(
+        cursor: Any,
+        workspace: str,
+        source_object_id: str,
+    ) -> None:
+        cursor.execute(
+            """
+            UPDATE knowledge.assertions assertion
+            SET evidence_acl_snapshot_ids = (
+                SELECT coalesce(
+                    array_agg(DISTINCT unit.acl_snapshot_id ORDER BY unit.acl_snapshot_id),
+                    ARRAY[]::text[]
+                )
+                FROM knowledge.assertion_evidence evidence
+                JOIN content.units unit ON unit.id=evidence.content_unit_id
+                WHERE evidence.workspace_id=assertion.workspace_id
+                  AND evidence.assertion_id=assertion.id
+            )
+            WHERE assertion.workspace_id=%s
+              AND EXISTS (
+                  SELECT 1
+                  FROM knowledge.assertion_evidence evidence
+                  JOIN content.units unit ON unit.id=evidence.content_unit_id
+                  JOIN content.artifacts artifact ON artifact.id=unit.artifact_id
+                  JOIN source.revisions revision ON revision.id=artifact.revision_id
+                  WHERE evidence.workspace_id=assertion.workspace_id
+                    AND evidence.assertion_id=assertion.id
+                    AND revision.object_id=%s
+              )
+            """,
+            (workspace, source_object_id),
+        )
+
     def has_revision(self, context: RequestContext, source_object_id: str, sha256: str) -> bool:
         with self._connection(context) as connection, connection.cursor() as cursor:
             cursor.execute(
@@ -174,10 +303,20 @@ class PostgresDatabase:
     def ingest_packet(self, context: RequestContext, packet: DocumentPacket) -> IngestResult:
         if packet.workspace_id != context.workspace:
             raise ValidationError("packet workspace does not match request context")
+        snapshot = packet.source_object.acl_snapshot
+        if snapshot is None:
+            raise ValidationError("source ACL snapshot is required")
+        if snapshot.scopes != packet.source_object.acl_scopes:
+            raise ValidationError("source ACL scopes must match the ACL snapshot")
+        if any(unit.acl_snapshot_id != snapshot.id for unit in packet.units):
+            raise ValidationError(
+                "every content unit must reference the source ACL snapshot"
+            )
 
         with self._connection(context) as connection:
             self._ensure_workspace_and_principal(connection, context)
             with connection.cursor() as cursor:
+                self._write_acl_snapshot(cursor, context.workspace, snapshot)
                 cursor.execute(
                     "SELECT current_revision_id FROM source.objects WHERE workspace_id=%s AND id=%s FOR UPDATE",
                     (context.workspace, packet.source_object.id),
@@ -191,6 +330,41 @@ class PostgresDatabase:
                     )
                     old_revision = cursor.fetchone()
                     if old_revision and old_revision["sha256"] == packet.revision.sha256:
+                        cursor.execute(
+                            """
+                            UPDATE source.objects
+                            SET acl_snapshot_id=%s, acl_scopes=%s, last_seen_at=now()
+                            WHERE workspace_id=%s AND id=%s
+                            """,
+                            (
+                                snapshot.id,
+                                snapshot.scopes,
+                                context.workspace,
+                                packet.source_object.id,
+                            ),
+                        )
+                        cursor.execute(
+                            """
+                            UPDATE content.units unit
+                            SET acl_snapshot_id=%s, acl_scopes=%s
+                            FROM content.artifacts artifact
+                            WHERE unit.workspace_id=%s
+                              AND unit.artifact_id=artifact.id
+                              AND artifact.revision_id=%s
+                            """,
+                            (
+                                snapshot.id,
+                                snapshot.scopes,
+                                context.workspace,
+                                old_revision_id,
+                            ),
+                        )
+                        self._refresh_assertion_acl_snapshots(
+                            cursor,
+                            context.workspace,
+                            packet.source_object.id,
+                        )
+                        connection.commit()
                         return IngestResult(
                             status="unchanged",
                             source_object_id=packet.source_object.id,
@@ -221,11 +395,12 @@ class PostgresDatabase:
                     """
                     INSERT INTO source.objects(
                         id, workspace_id, system_id, external_id, object_type, canonical_uri,
-                        acl_scopes, metadata, last_seen_at
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s::jsonb,now())
+                        acl_scopes, acl_snapshot_id, metadata, last_seen_at
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,now())
                     ON CONFLICT (id) DO UPDATE SET
                         canonical_uri=EXCLUDED.canonical_uri,
                         acl_scopes=EXCLUDED.acl_scopes,
+                        acl_snapshot_id=EXCLUDED.acl_snapshot_id,
                         metadata=EXCLUDED.metadata,
                         last_seen_at=now(),
                         deleted_at=NULL
@@ -238,6 +413,7 @@ class PostgresDatabase:
                         packet.source_object.object_type,
                         packet.source_object.canonical_uri,
                         packet.source_object.acl_scopes,
+                        snapshot.id,
                         _json(packet.source_object.metadata),
                     ),
                 )
@@ -351,8 +527,9 @@ class PostgresDatabase:
                         """
                         INSERT INTO content.units(
                             id, workspace_id, extraction_id, document_id, artifact_id, ordinal, unit_type,
-                            title, body, body_normalized, locator, acl_scopes, char_count, metadata
-                        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s::jsonb)
+                            title, body, body_normalized, locator, acl_scopes, acl_snapshot_id,
+                            char_count, metadata
+                        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s::jsonb)
                         ON CONFLICT (id) DO NOTHING
                         """,
                         (
@@ -368,6 +545,7 @@ class PostgresDatabase:
                             unit.body_normalized,
                             _json(unit.locator.model_dump(mode="json")),
                             unit.acl_scopes,
+                            unit.acl_snapshot_id,
                             len(unit.body),
                             _json(unit.metadata),
                         ),
@@ -469,7 +647,11 @@ class PostgresDatabase:
 
     def search(self, context: RequestContext, request: SearchRequest, lexemes: str) -> list[SearchHit]:
         websearch_query = _websearch_or_query(lexemes)
-        conditions = ["l.workspace_id=%s", "(cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])"]
+        conditions = [
+            "l.workspace_id=%s",
+            "(cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])",
+            "kip.acl_snapshot_is_fresh(u.acl_snapshot_id)",
+        ]
         condition_params: list[Any] = [context.workspace, context.acl_scopes]
         if request.source_kinds:
             conditions.append("l.source_kind = ANY(%s::text[])")
@@ -568,6 +750,7 @@ class PostgresDatabase:
                 LEFT JOIN content.logical_documents d ON d.id=u.document_id
                 WHERE u.workspace_id=%s
                   AND (cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])
+                  AND kip.acl_snapshot_is_fresh(u.acl_snapshot_id)
                 ORDER BY u.id
                 """,
                 (context.workspace, context.acl_scopes),
@@ -762,6 +945,7 @@ class PostgresDatabase:
             "v.space_id=%s",
             "v.source_hash=r.sha256",
             "(cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])",
+            "kip.acl_snapshot_is_fresh(u.acl_snapshot_id)",
         ]
         condition_params: list[Any] = [
             context.workspace,
@@ -853,15 +1037,18 @@ class PostgresDatabase:
                 """
                 SELECT token AS term, count(DISTINCT unit_id)::int AS document_frequency, count(*)::int AS corpus_frequency
                 FROM search.lexical_units l
+                JOIN content.units u ON u.id=l.unit_id
                 CROSS JOIN LATERAL unnest(string_to_array(l.lexemes, ' ')) AS token
                 WHERE l.workspace_id=%s
+                  AND (cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])
+                  AND kip.acl_snapshot_is_fresh(u.acl_snapshot_id)
                   AND token <> ''
                   AND (token ILIKE '%%' || %s || '%%')
                 GROUP BY token
                 ORDER BY document_frequency DESC, corpus_frequency DESC, token
                 LIMIT %s
                 """,
-                (context.workspace, prefix, limit),
+                (context.workspace, context.acl_scopes, prefix, limit),
             )
             rows = cursor.fetchall()
         return [VocabularyItem(**dict(row)) for row in rows]
@@ -877,6 +1064,7 @@ class PostgresDatabase:
                 LEFT JOIN search.lexical_units l ON l.unit_id=u.id
                 WHERE u.workspace_id=%s AND u.id = ANY(%s::text[])
                   AND (cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])
+                  AND kip.acl_snapshot_is_fresh(u.acl_snapshot_id)
                 """,
                 (context.workspace, list(unit_ids), context.acl_scopes),
             )
@@ -895,6 +1083,7 @@ class PostgresDatabase:
                 lexical_text=row["lexemes"] or row["body_normalized"],
                 locator=EvidenceLocator.model_validate(row["locator"]),
                 acl_scopes=list(row["acl_scopes"] or []),
+                acl_snapshot_id=row["acl_snapshot_id"],
                 metadata=row["metadata"] or {},
             )
             for row in rows
@@ -917,17 +1106,26 @@ class PostgresDatabase:
                     r.is_tombstone, r.metadata AS revision_metadata,
                     o.system_id, o.external_id, o.object_type, o.canonical_uri,
                     o.acl_scopes AS object_acl_scopes, o.metadata AS object_metadata,
+                    snapshot.id AS acl_snapshot_id,
+                    snapshot.provider AS acl_snapshot_provider,
+                    snapshot.snapshot_version AS acl_snapshot_version,
+                    snapshot.captured_at AS acl_snapshot_captured_at,
+                    snapshot.expires_at AS acl_snapshot_expires_at,
+                    snapshot.configuration_owned AS acl_snapshot_configuration_owned,
+                    snapshot.scopes AS acl_snapshot_scopes,
                     s.name AS system_name, s.kind AS system_kind,
                     d.id AS document_id, d.stable_key, d.title AS document_title,
                     d.document_type, d.family_key, d.lifecycle, d.metadata AS document_metadata
                 FROM content.artifacts a
                 JOIN source.revisions r ON r.id=a.revision_id
                 JOIN source.objects o ON o.id=r.object_id AND o.current_revision_id=r.id
+                JOIN source.acl_snapshots snapshot ON snapshot.id=o.acl_snapshot_id
                 JOIN source.systems s ON s.id=o.system_id
                 LEFT JOIN content.document_artifacts da ON da.artifact_id=a.id
                 LEFT JOIN content.logical_documents d ON d.id=da.document_id
                 WHERE a.workspace_id=%s AND a.id=%s
                   AND (cardinality(o.acl_scopes)=0 OR o.acl_scopes <@ %s::text[])
+                  AND kip.acl_snapshot_is_fresh(o.acl_snapshot_id)
                 """,
                 (context.workspace, artifact_id, context.acl_scopes),
             )
@@ -951,6 +1149,15 @@ class PostgresDatabase:
             id=row["object_id"], system_id=row["system_id"], system_name=row["system_name"],
             system_kind=row["system_kind"], external_id=row["external_id"], object_type=row["object_type"],
             canonical_uri=row["canonical_uri"], acl_scopes=list(row["object_acl_scopes"] or []),
+            acl_snapshot=AclSnapshot(
+                id=row["acl_snapshot_id"],
+                version=row["acl_snapshot_version"],
+                provider=row["acl_snapshot_provider"],
+                scopes=list(row["acl_snapshot_scopes"] or []),
+                captured_at=row["acl_snapshot_captured_at"],
+                expires_at=row["acl_snapshot_expires_at"],
+                configuration_owned=row["acl_snapshot_configuration_owned"],
+            ),
             metadata=row["object_metadata"] or {},
         )
         revision = SourceRevision(
@@ -980,15 +1187,23 @@ class PostgresDatabase:
                 JOIN source.objects o ON o.id=r.object_id AND o.current_revision_id=r.id
                 WHERE da.workspace_id=%s AND da.document_id=%s
                   AND (cardinality(o.acl_scopes)=0 OR o.acl_scopes <@ %s::text[])
+                  AND kip.acl_snapshot_is_fresh(o.acl_snapshot_id)
                 ORDER BY da.is_primary DESC, a.file_name
                 """,
                 (context.workspace, document_id, context.acl_scopes),
             )
             artifacts = cursor.fetchall()
+            if not artifacts:
+                raise NotFoundError(f"document not found: {document_id}")
         return {"document": dict(document), "artifacts": [dict(row) for row in artifacts]}
 
     def graph_neighbors(self, context: RequestContext, request: GraphNeighborsRequest) -> list[GraphEdge]:
-        conditions = ["a.workspace_id=%s", "(cardinality(a.acl_scopes)=0 OR a.acl_scopes <@ %s::text[])"]
+        conditions = [
+            "a.workspace_id=%s",
+            "(cardinality(a.acl_scopes)=0 OR a.acl_scopes <@ %s::text[])",
+            "NOT EXISTS (SELECT 1 FROM unnest(a.evidence_acl_snapshot_ids) snapshot_id "
+            "WHERE NOT kip.acl_snapshot_is_fresh(snapshot_id))",
+        ]
         params: list[Any] = [context.workspace, context.acl_scopes]
         if request.approved_only:
             conditions.append("a.status='active'")
@@ -1044,6 +1259,11 @@ class PostgresDatabase:
                   {predicate_clause}
                   AND a.object_entity_id IS NOT NULL
                   AND (cardinality(a.acl_scopes)=0 OR a.acl_scopes <@ %s::text[])
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM unnest(a.evidence_acl_snapshot_ids) snapshot_id
+                      WHERE NOT kip.acl_snapshot_is_fresh(snapshot_id)
+                  )
                   AND w.depth < %s
                   AND NOT (CASE WHEN a.subject_id=w.current_node THEN a.object_entity_id ELSE a.subject_id END = ANY(w.node_ids))
             )
@@ -1250,9 +1470,16 @@ class PostgresDatabase:
                     if isinstance(evidence, dict) and evidence.get("content_unit_id")
                 ]
                 derived_scopes: set[str] = set()
+                evidence_rows: list[dict[str, Any]] = []
                 if evidence_unit_ids:
                     cursor.execute(
-                        "SELECT id, acl_scopes FROM content.units WHERE workspace_id=%s AND id = ANY(%s::text[])",
+                        """
+                        SELECT id, acl_scopes, acl_snapshot_id
+                        FROM content.units
+                        WHERE workspace_id=%s
+                          AND id = ANY(%s::text[])
+                          AND kip.acl_snapshot_is_fresh(acl_snapshot_id)
+                        """,
                         (context.workspace, evidence_unit_ids),
                     )
                     evidence_rows = cursor.fetchall()
@@ -1261,6 +1488,12 @@ class PostgresDatabase:
                     for evidence_row in evidence_rows:
                         derived_scopes.update(evidence_row["acl_scopes"] or [])
                 assertion_scopes = sorted(derived_scopes) or list(context.acl_scopes)
+                assertion_snapshot_ids = sorted(
+                    {
+                        str(evidence_row["acl_snapshot_id"])
+                        for evidence_row in evidence_rows
+                    }
+                )
                 if not set(assertion_scopes).issubset(set(context.acl_scopes)):
                     raise AuthorizationError("reviewer lacks one or more evidence scopes")
 
@@ -1269,13 +1502,15 @@ class PostgresDatabase:
                     """
                     INSERT INTO knowledge.assertions(
                         id,workspace_id,subject_id,predicate,object_entity_id,object_value,status,
-                        ontology_version,source_candidate_id,acl_scopes,created_by
-                    ) VALUES (%s,%s,%s,%s,%s,%s::jsonb,'active',%s,%s,%s,%s)
+                        ontology_version,source_candidate_id,acl_scopes,
+                        evidence_acl_snapshot_ids,created_by
+                    ) VALUES (%s,%s,%s,%s,%s,%s::jsonb,'active',%s,%s,%s,%s,%s)
                     """,
                     (
                         assertion_id, context.workspace, candidate.subject_id, candidate.predicate,
                         candidate.object_entity_id, _json(candidate.object_value) if candidate.object_value is not None else None,
-                        candidate.ontology_version, candidate.id, assertion_scopes, reviewer_id,
+                        candidate.ontology_version, candidate.id, assertion_scopes,
+                        assertion_snapshot_ids, reviewer_id,
                     ),
                 )
                 for evidence in candidate.evidence:
@@ -1303,6 +1538,7 @@ class PostgresDatabase:
             object_entity_id=candidate.object_entity_id, object_value=candidate.object_value,
             ontology_version=candidate.ontology_version, source_candidate_id=candidate.id,
             acl_scopes=assertion_scopes, evidence_unit_ids=evidence_unit_ids,
+            evidence_acl_snapshot_ids=assertion_snapshot_ids,
         )
 
     def reject_candidate(self, context: RequestContext, candidate_id: str, reviewer_id: str, note: str | None = None) -> AssertionCandidate:
@@ -1339,6 +1575,11 @@ class PostgresDatabase:
                 WHERE a.workspace_id=%s
                   AND a.id=%s
                   AND (cardinality(a.acl_scopes)=0 OR a.acl_scopes <@ %s::text[])
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM unnest(a.evidence_acl_snapshot_ids) snapshot_id
+                      WHERE NOT kip.acl_snapshot_is_fresh(snapshot_id)
+                  )
                 GROUP BY a.id
                 """,
                 (context.workspace, assertion_id, context.acl_scopes),
@@ -1359,6 +1600,7 @@ class PostgresDatabase:
             source_candidate_id=row["source_candidate_id"],
             acl_scopes=row["acl_scopes"] or [],
             evidence_unit_ids=row["evidence_unit_ids"] or [],
+            evidence_acl_snapshot_ids=row["evidence_acl_snapshot_ids"] or [],
         )
 
     def status(self, context: RequestContext) -> StatusReport:

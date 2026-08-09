@@ -9,7 +9,7 @@
 | 결정 | 반드시 명시할 내용 |
 |---|---|
 | 데이터 경계 | workspace, source root, 개인/회사 자료 분리, 보존 기간 |
-| 신원과 ACL | principal을 누가 발급하고 source ACL을 어떤 scope로 변환하는지 |
+| 신원과 ACL | JWT issuer/audience/JWKS, admin group, principal 발급자, source ACL을 어떤 scope와 만료 정책으로 변환하는지 |
 | 허용 소스 | 파일 확장자, Slack 채널, 메일 계정·mailbox allowlist |
 | 외부 전송 | embedding/OCR/LLM이 로컬인지 원격인지, 전송 가능한 데이터 등급 |
 | 품질 기준 | 실제 내부 문서 기반 golden query, parser 표본, 지연시간과 실패 허용치 |
@@ -20,7 +20,10 @@
 ## 2. 복제 후 60분 인수 경로
 
 1. AI agent에게 “KIP을 셋업해줘”라고 요청해 `kip-setup` Skill을 시작한다.
-2. `setup inspect`가 반환한 질문에 매번 하나씩 답한다. credential은 값이 아니라 secret reference만 제공한다.
+2. `setup inspect`가 반환한 질문에 매번 하나씩 답한다. Agent가 먼저
+   identity mode를 묻고, `proxy_jwt`이면 issuer/audience/JWKS/admin group을,
+   `api_key`이면 API/admin key secret reference를 이어서 묻는다. credential은
+   값이 아니라 secret reference만 제공한다.
 3. `setup preview`의 파일 수, 용량, 확장자, 제외 건수와 symlink 건수를 확인한다.
 4. `setup plan`의 source scope, read-only mount, egress, reviewer, warning과 fingerprint를 승인한다.
 5. agent가 `setup apply`와 `setup verify`를 마치고 redacted receipt를 제시하게 한다.
@@ -35,6 +38,11 @@ TOML이나 Compose를 직접 편집하지 않는다. 기존 generated file은 ap
 `.previous`로 한 세대 보존되고, answer가 바뀐 stale plan은 쓰기 전에 거부된다.
 
 복사 직후 성공 기준은 서버가 뜨는 것이 아니다. 허용된 principal로 검색한 근거를 exact read할 수 있고, 허용되지 않은 principal에게 동일 문서와 graph path가 보이지 않으며, 원본 해시가 변하지 않아야 한다.
+
+운영 API 호출은 임의의 workspace/principal/ACL header를 보내지 않는다.
+`proxy_jwt` 배포는 검증 가능한 Bearer JWT를, 단일 principal API-key 배포는
+`X-KIP-API-Key`만 사용한다. Dynamic connector는 ACL snapshot TTL 안에
+재동기화해야 하며 만료된 문서는 검색과 graph traversal에서 자동 제외된다.
 
 자동화가 CLI JSON을 읽을 때는 `contracts/`의 현재 schema를 사용한다. 명령마다 `data`가 배열인지 객체인지 추정해 임의의 `jq` 경로를 만들지 말고, versioned envelope와 command contract를 기준으로 파싱한다.
 

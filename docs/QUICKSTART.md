@@ -54,10 +54,14 @@ curl -sS http://127.0.0.1:8080/v1/connectors/events \
   -H "Content-Type: application/json" \
   -H "X-KIP-API-Key: $KIP_API_KEY" \
   -H "X-KIP-Admin-Key: $KIP_ADMIN_KEY" \
-  -H "X-KIP-Workspace: default" \
-  -H "X-KIP-ACL-Scopes: workspace:default,project:A" \
   --data-binary @examples/connector/event.json
 ```
+
+API-key mode always uses the principal, workspace, and scopes from approved
+configuration. Do not send identity or ACL headers. In multi-user production,
+set `identity.mode = "proxy_jwt"`, install `.[identity]`, and use
+`Authorization: Bearer ...`; the proxy JWT must include the configured identity
+and fresh ACL-snapshot claims.
 
 ## Licensed public RAG evaluation
 

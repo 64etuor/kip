@@ -52,6 +52,13 @@ def test_setup_cli_answers_previews_plans_applies_and_verifies(
     answers = [
         ("workspace", "acme-rnd"),
         ("identity_mode", "proxy_jwt"),
+        ("jwt_issuer", "https://identity.example.test/"),
+        ("jwt_audience", "kip-api"),
+        (
+            "jwt_jwks_url",
+            "https://identity.example.test/.well-known/jwks.json",
+        ),
+        ("jwt_admin_groups", '["kip-admins"]'),
         ("identity_owner", "platform-security"),
         ("source_ownership", "company"),
         (
@@ -174,6 +181,12 @@ def _write_complete_state(
         "schema_version": "kip.setup-answers.v1",
         "workspace": "acme-rnd",
         "identity_mode": "proxy_jwt",
+        "jwt_issuer": "https://identity.example.test/",
+        "jwt_audience": "kip-api",
+        "jwt_jwks_url": "https://identity.example.test/.well-known/jwks.json",
+        "jwt_admin_groups": ["kip-admins"],
+        "identity_api_key_secret_ref": None,
+        "identity_admin_key_secret_ref": None,
         "identity_owner": "platform-security",
         "source_ownership": "company",
         "filesystem_sources": [

@@ -130,6 +130,10 @@ def _complete_answers(tmp_path: Path) -> SetupAnswers:
     return SetupAnswers(
         workspace="acme-rnd",
         identity_mode="proxy_jwt",
+        jwt_issuer="https://identity.example.test/",
+        jwt_audience="kip-api",
+        jwt_jwks_url="https://identity.example.test/.well-known/jwks.json",
+        jwt_admin_groups=["kip-admins"],
         identity_owner="platform-security",
         source_ownership="company",
         filesystem_sources=[

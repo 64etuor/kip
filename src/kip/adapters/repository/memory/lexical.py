@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from kip.adapters.repository.memory.acl import unit_is_visible
 from kip.adapters.repository.memory.state import MemoryState
 from kip.domain.models import (
     ArtifactView,
@@ -29,9 +30,7 @@ class MemoryLexicalStore:
         unique_terms = list(dict.fromkeys([*raw_terms, *lexical_terms]))
         scored: list[tuple[float, ContentUnit, ArtifactView]] = []
         for unit in self.state.units.values():
-            if unit.acl_scopes and not set(unit.acl_scopes).issubset(
-                set(context.acl_scopes)
-            ):
+            if not unit_is_visible(self.state, unit, context):
                 continue
             view = self.state.artifacts.get(unit.artifact_id)
             if not view or not view.source_object or not view.revision:
@@ -77,9 +76,7 @@ class MemoryLexicalStore:
     ) -> list[EmbeddableUnit]:
         result: list[EmbeddableUnit] = []
         for unit in self.state.units.values():
-            if unit.acl_scopes and not set(unit.acl_scopes).issubset(
-                context.acl_scopes
-            ):
+            if not unit_is_visible(self.state, unit, context):
                 continue
             view = self.state.artifacts.get(unit.artifact_id)
             if not view or not view.revision:
@@ -108,9 +105,7 @@ class MemoryLexicalStore:
         needle = prefix.strip().lower()
         counts: dict[str, tuple[int, int]] = {}
         for unit in self.state.units.values():
-            if unit.acl_scopes and not set(unit.acl_scopes).issubset(
-                set(context.acl_scopes)
-            ):
+            if not unit_is_visible(self.state, unit, context):
                 continue
             per_document: set[str] = set()
             for token in unit.lexical_text.lower().split():

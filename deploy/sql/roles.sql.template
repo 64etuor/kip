@@ -20,7 +20,7 @@ GRANT CONNECT ON DATABASE kip TO kip_agent, kip_worker, kip_reviewer, kip_backup
 GRANT USAGE ON SCHEMA kip, source, content, knowledge, search, jobs, audit TO kip_agent, kip_worker, kip_reviewer, kip_backup;
 
 GRANT SELECT ON ALL TABLES IN SCHEMA kip, source, content, knowledge, search TO kip_agent;
-GRANT SELECT, INSERT, UPDATE ON source.systems, source.containers, source.objects, source.revisions, source.sync_cursors TO kip_worker;
+GRANT SELECT, INSERT, UPDATE ON source.systems, source.containers, source.objects, source.revisions, source.sync_cursors, source.acl_snapshots TO kip_worker;
 GRANT SELECT, INSERT, UPDATE ON content.logical_documents, content.artifacts, content.document_artifacts, content.extractions, content.units TO kip_worker;
 GRANT SELECT, INSERT, UPDATE, DELETE ON search.lexical_units, search.aliases, search.embedding_spaces TO kip_worker;
 GRANT SELECT, INSERT, UPDATE ON jobs.queue, audit.events TO kip_worker;
@@ -33,3 +33,22 @@ GRANT INSERT, UPDATE ON knowledge.assertions, knowledge.assertion_evidence TO ki
 GRANT SELECT ON ALL TABLES IN SCHEMA kip, source, content, knowledge, search, jobs, audit TO kip_backup;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA source, content, knowledge, search GRANT SELECT ON TABLES TO kip_agent;
+
+DROP POLICY IF EXISTS worker_workspace_access ON source.objects;
+CREATE POLICY worker_workspace_access ON source.objects
+    FOR SELECT TO kip_worker
+    USING (workspace_id = kip.current_workspace_id());
+DROP POLICY IF EXISTS worker_workspace_update ON source.objects;
+CREATE POLICY worker_workspace_update ON source.objects
+    FOR UPDATE TO kip_worker
+    USING (workspace_id = kip.current_workspace_id())
+    WITH CHECK (workspace_id = kip.current_workspace_id());
+DROP POLICY IF EXISTS worker_workspace_access ON content.units;
+CREATE POLICY worker_workspace_access ON content.units
+    FOR SELECT TO kip_worker
+    USING (workspace_id = kip.current_workspace_id());
+DROP POLICY IF EXISTS worker_workspace_update ON content.units;
+CREATE POLICY worker_workspace_update ON content.units
+    FOR UPDATE TO kip_worker
+    USING (workspace_id = kip.current_workspace_id())
+    WITH CHECK (workspace_id = kip.current_workspace_id());

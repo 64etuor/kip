@@ -6,6 +6,11 @@ from typing import assert_never
 from kip.adapters.connectors.registry import ConfiguredSourceCatalog
 from kip.adapters.embeddings.http import HttpEmbeddingAdapter
 from kip.adapters.embeddings.noop import DisabledEmbeddingAdapter
+from kip.adapters.identity import (
+    ApiKeyIdentityAdapter,
+    JwtIdentityAdapter,
+    JwtIdentityConfig,
+)
 from kip.adapters.parsers.registry import ParserRegistry
 from kip.adapters.repository.memory import MemoryRepository
 from kip.adapters.repository.postgres import PostgresRepository
@@ -29,6 +34,7 @@ from kip.application.runtime import Application
 from kip.application.search import RetrievalUseCases
 from kip.ontology import OntologyCatalog
 from kip.ports.embedding import EmbeddingPort
+from kip.ports.identity import IdentityResolverPort
 from kip.ports.repository import RepositoryPort
 from kip.ports.reranker import RerankerPort
 from kip.settings import Settings
@@ -41,6 +47,7 @@ class Container:
     application: Application
     embedding: EmbeddingPort
     reranker: RerankerPort | None
+    identity: IdentityResolverPort
 
 
 def build_container(
@@ -52,6 +59,7 @@ def build_container(
     load_models: bool = True,
 ) -> Container:
     selected = settings or Settings.load()
+    selected_identity = _build_identity(selected)
     if repository is not None:
         selected_repository = repository
     elif selected.is_memory:
@@ -163,4 +171,84 @@ def build_container(
         application=application,
         embedding=selected_embedding,
         reranker=selected_reranker,
+        identity=selected_identity,
     )
+
+
+def _build_identity(settings: Settings) -> IdentityResolverPort:
+    mode = settings.identity_mode
+    if mode == "api_key":
+        scopes = settings.identity_api_key_acl_scopes or (
+            f"workspace:{settings.workspace}",
+        )
+        return ApiKeyIdentityAdapter(
+            expected_api_key=settings.api_key,
+            workspace=settings.workspace,
+            principal_id=settings.identity_api_key_principal_id,
+            acl_scopes=scopes,
+            allow_anonymous=settings.environment in {"development", "test"}
+            and not settings.api_key,
+        )
+    if mode == "proxy_jwt":
+        algorithms = settings.get("identity.jwt.algorithms", ["RS256"])
+        if not isinstance(algorithms, list):
+            raise ValueError("identity.jwt.algorithms must be a list")
+        return JwtIdentityAdapter(
+            JwtIdentityConfig(
+                issuer=settings.jwt_issuer,
+                audience=settings.jwt_audience,
+                jwks_url=settings.jwt_jwks_url,
+                algorithms=tuple(str(item) for item in algorithms),
+                principal_claim=str(
+                    settings.get("identity.jwt.principal_claim", "sub")
+                ),
+                workspace_claim=str(
+                    settings.get("identity.jwt.workspace_claim", "workspace")
+                ),
+                group_claim=str(settings.get("identity.jwt.group_claim", "groups")),
+                scope_claim=str(
+                    settings.get("identity.jwt.scope_claim", "acl_scopes")
+                ),
+                group_scope_prefix=str(
+                    settings.get("identity.jwt.group_scope_prefix", "group:")
+                ),
+                admin_groups=tuple(
+                    str(item)
+                    for item in settings.get("identity.jwt.admin_groups", []) or []
+                ),
+                snapshot_id_claim=str(
+                    settings.get(
+                        "identity.jwt.snapshot_id_claim",
+                        "acl_snapshot_id",
+                    )
+                ),
+                snapshot_version_claim=str(
+                    settings.get(
+                        "identity.jwt.snapshot_version_claim",
+                        "acl_snapshot_version",
+                    )
+                ),
+                snapshot_captured_at_claim=str(
+                    settings.get(
+                        "identity.jwt.snapshot_captured_at_claim",
+                        "acl_snapshot_captured_at",
+                    )
+                ),
+                snapshot_expires_at_claim=str(
+                    settings.get(
+                        "identity.jwt.snapshot_expires_at_claim",
+                        "acl_snapshot_expires_at",
+                    )
+                ),
+                jwks_cache_seconds=float(
+                    settings.get("identity.jwt.jwks_cache_seconds", 300)
+                ),
+                jwks_timeout_seconds=float(
+                    settings.get("identity.jwt.jwks_timeout_seconds", 5)
+                ),
+                clock_skew_seconds=float(
+                    settings.get("identity.jwt.clock_skew_seconds", 30)
+                ),
+            )
+        )
+    raise ValueError(f"unsupported identity mode: {mode}")

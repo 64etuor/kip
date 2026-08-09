@@ -5,6 +5,7 @@ import json
 import re
 from pathlib import Path
 from typing import Literal, Self
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -116,6 +117,12 @@ class SetupAnswers(StrictModel):
     schema_version: Literal["kip.setup-answers.v1"] = "kip.setup-answers.v1"
     workspace: str | None = None
     identity_mode: Literal["proxy_jwt", "api_key"] | None = None
+    jwt_issuer: str | None = None
+    jwt_audience: str | None = None
+    jwt_jwks_url: str | None = None
+    jwt_admin_groups: list[str] | None = None
+    identity_api_key_secret_ref: SecretReference | None = None
+    identity_admin_key_secret_ref: SecretReference | None = None
     identity_owner: str | None = None
     source_ownership: Literal["company", "personal"] | None = None
     filesystem_sources: list[FilesystemSourceAnswer] | None = None
@@ -137,6 +144,30 @@ class SetupAnswers(StrictModel):
     def validate_workspace(cls, value: str | None) -> str | None:
         if value is not None and not _SLUG_PATTERN.fullmatch(value):
             raise ValueError("workspace must be a lowercase kebab-case slug")
+        return value
+
+    @field_validator("jwt_issuer", "jwt_jwks_url")
+    @classmethod
+    def validate_identity_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        parsed = urlsplit(value)
+        is_loopback = parsed.hostname in {"127.0.0.1", "localhost", "::1"}
+        if (
+            not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.fragment
+            or (parsed.scheme != "https" and not (parsed.scheme == "http" and is_loopback))
+        ):
+            raise ValueError("identity URL must use HTTPS or loopback HTTP")
+        return value
+
+    @field_validator("jwt_audience")
+    @classmethod
+    def validate_jwt_audience(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("JWT audience cannot be blank")
         return value
 
     def fingerprint(self) -> str:
@@ -197,6 +228,12 @@ class SetupPlan(StrictModel):
     answers_fingerprint: str
     workspace: str
     identity_mode: Literal["proxy_jwt", "api_key"]
+    jwt_issuer: str | None
+    jwt_audience: str | None
+    jwt_jwks_url: str | None
+    jwt_admin_groups: list[str]
+    identity_api_key_secret_ref: SecretReference | None
+    identity_admin_key_secret_ref: SecretReference | None
     identity_owner: str
     source_ownership: Literal["company", "personal"]
     sources: list[SourcePlan]

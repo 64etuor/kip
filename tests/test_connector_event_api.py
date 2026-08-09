@@ -1,16 +1,24 @@
+from dataclasses import replace
+
 from fastapi.testclient import TestClient
 
+from kip.adapters.identity.api_key import ApiKeyIdentityAdapter
 from kip.api import create_app
 
 
 def test_application_connector_event_ingests_through_same_service(test_container):
-    client = TestClient(create_app(test_container))
+    connector_identity = ApiKeyIdentityAdapter(
+        expected_api_key="test-key",
+        workspace="default",
+        principal_id="connector-app",
+        acl_scopes=("workspace:default", "project:A"),
+    )
+    client = TestClient(
+        create_app(replace(test_container, identity=connector_identity))
+    )
     headers = {
         "X-KIP-API-Key": "test-key",
         "X-KIP-Admin-Key": "test-admin",
-        "X-KIP-Workspace": "default",
-        "X-KIP-Principal": "connector-app",
-        "X-KIP-ACL-Scopes": "workspace:default,project:A",
     }
     event = {
         "schema_version": "kip.connector-event.v1",

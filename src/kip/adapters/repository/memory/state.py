@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from kip.domain.identity import AclSnapshot
 from kip.domain.json_types import JsonObject
 from kip.domain.models import (
     ApprovedAssertion,
@@ -27,3 +28,4 @@ class MemoryState:
         self.job_errors: dict[str, str] = {}
         self.embedding_spaces: dict[str, EmbeddingSpace] = {}
         self.embeddings: dict[tuple[str, str], EmbeddingRecord] = {}
+        self.acl_snapshots: dict[str, AclSnapshot] = {}

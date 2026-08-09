@@ -23,6 +23,12 @@ All edge adapters exchange canonical Pydantic models and versioned JSON envelope
 SourceObject -> SourceRevision -> Artifact -> ExtractionRun -> ContentUnit
 ```
 
+`SourceObject.acl_snapshot` records the source ACL provider, version, captured
+time, expiry, and canonical scopes. `ContentUnit.acl_snapshot_id` pins each
+projection row to that snapshot. Configuration-owned snapshots may be
+non-expiring; connector-derived snapshots must expire. Repository queries deny
+rows whose dynamic snapshot is stale.
+
 ## Knowledge sequence
 
 ```text
@@ -30,6 +36,18 @@ Entity -> AssertionCandidate -> ApprovedAssertion -> AssertionEvidence
 ```
 
 `AssertionExplanation` is a read model that combines one approved assertion with the exact `EvidenceRead` units supporting it. It is not stored as a second source of truth.
+
+`ApprovedAssertion.evidence_acl_snapshot_ids` is the denormalized freshness
+guard for its reviewed evidence. It is rebuilt from canonical evidence and does
+not replace `AssertionEvidence` or its exact locator.
+
+## Identity boundary
+
+`RequestContext` contains a verified principal, workspace, scopes, roles, and
+the principal ACL snapshot when applicable. It is application-internal request
+state, not caller-authoritative JSON. API adapters construct it through the
+configured identity port after cryptographic or constant-time credential
+verification.
 
 ## Connector boundary
 

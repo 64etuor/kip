@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from kip.application.analyzer import KoreanNgramAnalyzer
+from kip.domain.identity import AclSnapshot
 from kip.domain.models import (
     Artifact,
     DocumentPacket,
@@ -72,6 +73,7 @@ class FileIngestionWorkflow:
         source_root: Path,
         record: DiscoveredFile,
         acl_scopes: list[str],
+        acl_snapshot: AclSnapshot,
     ) -> IngestResult:
         path = _safe_source_path(record.path, source_root)
         system_id = stable_id("srcsys", context.workspace, source_name)
@@ -80,7 +82,13 @@ class FileIngestionWorkflow:
         stable_key = _logical_key(record.relative_path)
         document_id = stable_id("ldoc", context.workspace, stable_key)
         artifact_id = stable_id("art", revision_id, path.name)
-        if self._store.has_revision(context, object_id, record.sha256):
+        ingest_context = context.model_copy(
+            update={
+                "acl_scopes": sorted(set(context.acl_scopes).union(acl_scopes))
+            }
+        )
+        self._store.upsert_acl_snapshot(ingest_context, object_id, acl_snapshot)
+        if self._store.has_revision(ingest_context, object_id, record.sha256):
             return IngestResult(
                 status="unchanged",
                 source_object_id=object_id,
@@ -102,6 +110,7 @@ class FileIngestionWorkflow:
             acl_scopes=acl_scopes,
         )
         for unit in units:
+            unit.acl_snapshot_id = acl_snapshot.id
             unit.lexical_text = self._analyzer.analyze(
                 "\n".join(
                     (
@@ -123,6 +132,7 @@ class FileIngestionWorkflow:
                 object_type="file",
                 canonical_uri=path.as_uri(),
                 acl_scopes=acl_scopes,
+                acl_snapshot=acl_snapshot,
                 metadata={"relative_path": record.relative_path},
             ),
             revision=SourceRevision(
@@ -159,10 +169,5 @@ class FileIngestionWorkflow:
             ),
             extraction=extraction,
             units=units,
-        )
-        ingest_context = context.model_copy(
-            update={
-                "acl_scopes": sorted(set(context.acl_scopes).union(acl_scopes))
-            }
         )
         return self._store.ingest_packet(ingest_context, packet)

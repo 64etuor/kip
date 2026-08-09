@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from kip.domain.identity import AclSnapshot
+
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=False)
@@ -15,6 +17,8 @@ class RequestContext(StrictModel):
     principal_id: str = "principal_local"
     acl_scopes: list[str] = Field(default_factory=lambda: ["workspace:default"])
     request_id: str | None = None
+    acl_snapshot: AclSnapshot | None = None
+    roles: list[str] = Field(default_factory=list)
 
 
 class EnvelopeMeta(StrictModel):
@@ -48,6 +52,7 @@ class SourceObject(StrictModel):
     canonical_uri: str
     container_external_id: str | None = None
     acl_scopes: list[str] = Field(default_factory=list)
+    acl_snapshot: AclSnapshot | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -117,6 +122,7 @@ class ContentUnit(StrictModel):
     lexical_text: str
     locator: EvidenceLocator
     acl_scopes: list[str] = Field(default_factory=list)
+    acl_snapshot_id: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -291,6 +297,7 @@ class ConnectorEvent(StrictModel):
     occurred_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     payload: dict[str, Any] = Field(default_factory=dict)
     acl_scopes: list[str] = Field(default_factory=list)
+    acl_snapshot: AclSnapshot | None = None
 
 
 class AssertionCandidate(StrictModel):
@@ -326,6 +333,7 @@ class ApprovedAssertion(StrictModel):
     source_candidate_id: str | None = None
     acl_scopes: list[str] = Field(default_factory=list)
     evidence_unit_ids: list[str] = Field(default_factory=list)
+    evidence_acl_snapshot_ids: list[str] = Field(default_factory=list)
 
 
 class AssertionExplanation(StrictModel):

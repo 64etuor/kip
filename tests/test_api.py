@@ -1,6 +1,9 @@
+from dataclasses import replace
+
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
 
+from kip.adapters.identity.api_key import ApiKeyIdentityAdapter
 from kip.api import create_app
 from kip.domain.models import AssertionCandidate, SearchRequest
 from kip.ids import new_id
@@ -136,11 +139,18 @@ def test_rest_answer_refuses_without_authorized_evidence(test_container):
     path.write_text("비공개 승인 금액은 900만원이다.", encoding="utf-8")
     owner = test_container.application.operations.request_context()
     test_container.application.ingestion.sync_filesystem(owner, "fixture")
-    client = TestClient(create_app(test_container))
+    restricted = replace(
+        test_container,
+        identity=ApiKeyIdentityAdapter(
+            expected_api_key="test-key",
+            workspace="default",
+            principal_id="restricted-user",
+            acl_scopes=("project:other",),
+        ),
+    )
+    client = TestClient(create_app(restricted))
     headers = {
         "X-KIP-API-Key": "test-key",
-        "X-KIP-Workspace": "default",
-        "X-KIP-ACL-Scopes": "project:other",
     }
 
     response = client.post(

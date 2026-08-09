@@ -1,5 +1,63 @@
 {
   "$defs": {
+    "AclSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "captured_at": {
+          "format": "date-time",
+          "title": "Captured At",
+          "type": "string"
+        },
+        "configuration_owned": {
+          "default": false,
+          "title": "Configuration Owned",
+          "type": "boolean"
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires At"
+        },
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "provider": {
+          "minLength": 1,
+          "title": "Provider",
+          "type": "string"
+        },
+        "scopes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Scopes",
+          "type": "array"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "provider",
+        "captured_at"
+      ],
+      "title": "AclSnapshot",
+      "type": "object"
+    },
     "Artifact": {
       "additionalProperties": false,
       "properties": {
@@ -115,6 +173,18 @@
           },
           "title": "Acl Scopes",
           "type": "array"
+        },
+        "acl_snapshot_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Acl Snapshot Id"
         },
         "artifact_id": {
           "title": "Artifact Id",
@@ -364,6 +434,17 @@
           },
           "title": "Acl Scopes",
           "type": "array"
+        },
+        "acl_snapshot": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AclSnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "canonical_uri": {
           "title": "Canonical Uri",

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from kip.adapters.repository.memory.state import MemoryState
+from kip.domain.identity import AclSnapshot
 from kip.domain.models import (
     ArtifactView,
     DocumentPacket,
@@ -15,6 +16,25 @@ from kip.errors import ValidationError
 @dataclass(frozen=True, slots=True)
 class MemoryIngestionStore:
     state: MemoryState
+
+    def upsert_acl_snapshot(
+        self,
+        context: RequestContext,
+        source_object_id: str,
+        snapshot: AclSnapshot,
+    ) -> None:
+        self.state.acl_snapshots[snapshot.id] = snapshot.model_copy(deep=True)
+        revision_id = self.state.current_revision_by_object.get(source_object_id)
+        packet = self.state.packets_by_revision.get(revision_id or "")
+        if packet is None or packet.workspace_id != context.workspace:
+            return
+        packet.source_object.acl_snapshot = snapshot.model_copy(deep=True)
+        for unit in packet.units:
+            unit.acl_snapshot_id = snapshot.id
+            self.state.units[unit.id] = unit
+        view = self.state.artifacts.get(packet.artifact.id)
+        if view is not None:
+            view.source_object = packet.source_object.model_copy(deep=True)
 
     def has_revision(
         self,
@@ -39,11 +59,30 @@ class MemoryIngestionStore:
     ) -> IngestResult:
         if packet.workspace_id != context.workspace:
             raise ValidationError("packet workspace does not match request context")
+        snapshot = packet.source_object.acl_snapshot
+        if snapshot is not None:
+            mismatched = [
+                unit.id
+                for unit in packet.units
+                if unit.acl_snapshot_id != snapshot.id
+            ]
+            if mismatched:
+                raise ValidationError(
+                    "every content unit must reference the source ACL snapshot"
+                )
+            self.state.acl_snapshots[snapshot.id] = snapshot.model_copy(deep=True)
         old_revision_id = self.state.current_revision_by_object.get(
             packet.source_object.id
         )
         old_packet = self.state.packets_by_revision.get(old_revision_id or "")
         if old_packet and old_packet.revision.sha256 == packet.revision.sha256:
+            if snapshot is not None:
+                old_packet.source_object = packet.source_object.model_copy(deep=True)
+                for unit in old_packet.units:
+                    unit.acl_snapshot_id = snapshot.id
+                view = self.state.artifacts.get(old_packet.artifact.id)
+                if view is not None:
+                    view.source_object = packet.source_object.model_copy(deep=True)
             return IngestResult(
                 status="unchanged",
                 source_object_id=packet.source_object.id,

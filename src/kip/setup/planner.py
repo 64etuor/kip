@@ -56,6 +56,22 @@ def build_setup_plan(
         or answers.sync_schedule is None
         or answers.evaluation_dataset is None
         or answers.ontology_reviewers is None
+        or (
+            answers.identity_mode == "proxy_jwt"
+            and (
+                answers.jwt_issuer is None
+                or answers.jwt_audience is None
+                or answers.jwt_jwks_url is None
+                or answers.jwt_admin_groups is None
+            )
+        )
+        or (
+            answers.identity_mode == "api_key"
+            and (
+                answers.identity_api_key_secret_ref is None
+                or answers.identity_admin_key_secret_ref is None
+            )
+        )
     ):
         raise ValidationError("setup answers are incomplete")
 
@@ -107,6 +123,12 @@ def build_setup_plan(
         answers_fingerprint=answers.fingerprint(),
         workspace=answers.workspace,
         identity_mode=answers.identity_mode,
+        jwt_issuer=answers.jwt_issuer,
+        jwt_audience=answers.jwt_audience,
+        jwt_jwks_url=answers.jwt_jwks_url,
+        jwt_admin_groups=list(answers.jwt_admin_groups or []),
+        identity_api_key_secret_ref=answers.identity_api_key_secret_ref,
+        identity_admin_key_secret_ref=answers.identity_admin_key_secret_ref,
         identity_owner=answers.identity_owner,
         source_ownership=answers.source_ownership,
         sources=sources,
@@ -135,9 +157,32 @@ def build_setup_plan(
 
 
 def _first_missing_question(answers: SetupAnswers) -> SetupQuestion | None:
-    ordered = [
+    ordered: list[tuple[str, object | None]] = [
         ("workspace", answers.workspace),
         ("identity_mode", answers.identity_mode),
+    ]
+    for question_id, value in ordered:
+        if value is None:
+            return _question(question_id)
+    if answers.identity_mode == "proxy_jwt":
+        jwt_questions: list[tuple[str, object | None]] = [
+            ("jwt_issuer", answers.jwt_issuer),
+            ("jwt_audience", answers.jwt_audience),
+            ("jwt_jwks_url", answers.jwt_jwks_url),
+            ("jwt_admin_groups", answers.jwt_admin_groups),
+        ]
+        for question_id, value in jwt_questions:
+            if value is None:
+                return _question(question_id)
+    if answers.identity_mode == "api_key":
+        key_questions: list[tuple[str, object | None]] = [
+            ("identity_api_key_secret_ref", answers.identity_api_key_secret_ref),
+            ("identity_admin_key_secret_ref", answers.identity_admin_key_secret_ref),
+        ]
+        for question_id, value in key_questions:
+            if value is None:
+                return _question(question_id)
+    ordered = [
         ("identity_owner", answers.identity_owner),
         ("source_ownership", answers.source_ownership),
         ("filesystem_sources", answers.filesystem_sources),
@@ -151,7 +196,7 @@ def _first_missing_question(answers: SetupAnswers) -> SetupQuestion | None:
             return _question("model_egress_classifications")
         if answers.model_secret_ref is None:
             return _question("model_secret_ref")
-    trailing = [
+    trailing: list[tuple[str, object | None]] = [
         ("database_secret_ref", answers.database_secret_ref),
         ("cas_path", answers.cas_path),
         ("backup_path", answers.backup_path),
@@ -191,6 +236,48 @@ _QUESTIONS = {
         answer_format="non-empty string",
         example="platform-security",
         why="ACL freshness와 접근 사고의 운영 책임자를 지정합니다.",
+    ),
+    "jwt_issuer": SetupQuestion(
+        id="jwt_issuer",
+        prompt="신뢰할 JWT issuer의 정확한 URL은 무엇인가요?",
+        answer_format="HTTPS URL",
+        example="https://identity.example.com/",
+        why="토큰 서명만이 아니라 발급 주체도 고정합니다.",
+    ),
+    "jwt_audience": SetupQuestion(
+        id="jwt_audience",
+        prompt="KIP API가 요구할 JWT audience 값은 무엇인가요?",
+        answer_format="non-empty string",
+        example="kip-api",
+        why="다른 서비스용 토큰의 재사용을 차단합니다.",
+    ),
+    "jwt_jwks_url": SetupQuestion(
+        id="jwt_jwks_url",
+        prompt="JWT 서명 키를 가져올 JWKS URL은 무엇인가요?",
+        answer_format="HTTPS URL",
+        example="https://identity.example.com/.well-known/jwks.json",
+        why="검증 키 회전과 캐시 만료를 명시적으로 관리합니다.",
+    ),
+    "jwt_admin_groups": SetupQuestion(
+        id="jwt_admin_groups",
+        prompt="동기화와 assertion review 권한을 가질 identity group 목록은 무엇인가요?",
+        answer_format="JSON array of group names",
+        example='["kip-admins"]',
+        why="관리 API 권한을 별도 공유 비밀이 아니라 검증된 신원 claim에서 파생합니다.",
+    ),
+    "identity_api_key_secret_ref": SetupQuestion(
+        id="identity_api_key_secret_ref",
+        prompt="bootstrap API key의 비밀 참조는 무엇인가요? 실제 값은 입력하지 마세요.",
+        answer_format="env:, keychain:, or secret-manager: reference",
+        example="env:KIP_API_KEY",
+        why="bootstrap credential 원문을 셋업 상태와 생성 파일에서 분리합니다.",
+    ),
+    "identity_admin_key_secret_ref": SetupQuestion(
+        id="identity_admin_key_secret_ref",
+        prompt="bootstrap 관리 key의 별도 비밀 참조는 무엇인가요? 실제 값은 입력하지 마세요.",
+        answer_format="env:, keychain:, or secret-manager: reference",
+        example="env:KIP_ADMIN_KEY",
+        why="일반 검색 credential과 관리 작업 credential을 분리합니다.",
     ),
     "source_ownership": SetupQuestion(
         id="source_ownership",

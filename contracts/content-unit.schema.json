@@ -30,6 +30,18 @@
       "title": "Acl Scopes",
       "type": "array"
     },
+    "acl_snapshot_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Acl Snapshot Id"
+    },
     "artifact_id": {
       "title": "Artifact Id",
       "type": "string"

@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from kip.adapters.repository.memory.acl import unit_is_visible
 from kip.adapters.repository.memory.lexical import snippet
 from kip.adapters.repository.memory.state import MemoryState
 from kip.domain.json_types import JsonObject
@@ -122,10 +123,7 @@ class MemorySemanticStore:
             if record_space_id != space_id:
                 continue
             unit = self.state.units.get(unit_id)
-            if not unit or (
-                unit.acl_scopes
-                and not set(unit.acl_scopes).issubset(context.acl_scopes)
-            ):
+            if not unit or not unit_is_visible(self.state, unit, context):
                 continue
             view = self.state.artifacts.get(unit.artifact_id)
             if not view or not view.source_object or not view.revision:

@@ -31,6 +31,31 @@ def test_setup_inspection_resumes_with_dynamic_provider_questions(
     ]
 
 
+def test_proxy_jwt_setup_collects_verification_metadata_one_question_at_a_time(
+    tmp_path: Path,
+) -> None:
+    answers = SetupAnswers(workspace="acme-rnd", identity_mode="proxy_jwt")
+
+    issuer = inspect_setup(answers, project_root=tmp_path)
+    audience = inspect_setup(
+        answers.model_copy(update={"jwt_issuer": "https://identity.example.test/"}),
+        project_root=tmp_path,
+    )
+    jwks = inspect_setup(
+        answers.model_copy(
+            update={
+                "jwt_issuer": "https://identity.example.test/",
+                "jwt_audience": "kip-api",
+            }
+        ),
+        project_root=tmp_path,
+    )
+
+    assert [question.id for question in issuer.questions] == ["jwt_issuer"]
+    assert [question.id for question in audience.questions] == ["jwt_audience"]
+    assert [question.id for question in jwks.questions] == ["jwt_jwks_url"]
+
+
 def test_setup_plan_is_deterministic_and_contains_read_only_mounts(
     tmp_path: Path,
 ) -> None:
@@ -66,6 +91,10 @@ def _complete_answers(tmp_path: Path) -> SetupAnswers:
     return SetupAnswers(
         workspace="acme-rnd",
         identity_mode="proxy_jwt",
+        jwt_issuer="https://identity.example.test/",
+        jwt_audience="kip-api",
+        jwt_jwks_url="https://identity.example.test/.well-known/jwks.json",
+        jwt_admin_groups=["kip-admins"],
         identity_owner="platform-security",
         source_ownership="company",
         filesystem_sources=[

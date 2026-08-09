@@ -3,12 +3,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from kip.adapters.repository.postgres.database import PostgresDatabase
+from kip.domain.identity import AclSnapshot
 from kip.domain.models import DocumentPacket, IngestResult, RequestContext
 
 
 @dataclass(frozen=True, slots=True)
 class PostgresIngestionStore:
     database: PostgresDatabase
+
+    def upsert_acl_snapshot(
+        self,
+        context: RequestContext,
+        source_object_id: str,
+        snapshot: AclSnapshot,
+    ) -> None:
+        self.database.upsert_acl_snapshot(context, source_object_id, snapshot)
 
     def has_revision(
         self,

@@ -20,6 +20,32 @@ port = 8080
 require_api_key_outside_development = true
 max_request_bytes = 10485760
 
+[identity]
+mode = "api_key"
+
+[identity.api_key]
+principal_id = "bootstrap-operator"
+acl_scopes = ["workspace:default"]
+
+[identity.jwt]
+issuer = "https://identity.example.com/"
+audience = "kip-api"
+jwks_url = "https://identity.example.com/.well-known/jwks.json"
+algorithms = ["RS256"]
+principal_claim = "sub"
+workspace_claim = "workspace"
+group_claim = "groups"
+scope_claim = "acl_scopes"
+group_scope_prefix = "group:"
+admin_groups = ["kip-admins"]
+snapshot_id_claim = "acl_snapshot_id"
+snapshot_version_claim = "acl_snapshot_version"
+snapshot_captured_at_claim = "acl_snapshot_captured_at"
+snapshot_expires_at_claim = "acl_snapshot_expires_at"
+jwks_cache_seconds = 300
+jwks_timeout_seconds = 5
+clock_skew_seconds = 30
+
 [security]
 allow_remote_model_egress = false
 follow_symlinks = false
@@ -97,6 +123,7 @@ settle_seconds = 2
 include_extensions = [".md", ".txt", ".pdf", ".xlsx", ".xlsm", ".hwp", ".hwpx", ".docx", ".csv"]
 exclude_globs = ["**/.DS_Store", "**/~$*", "**/.~lock.*"]
 acl_scope = "workspace:default"
+classification = "internal"
 
 [[sources.filesystem]]
 name = "public-government"
@@ -113,6 +140,7 @@ enabled = false
 workspace_id = ""
 allowed_conversation_ids = []
 download_files = false
+acl_snapshot_ttl_seconds = 900
 token_env = "KIP_SLACK_BOT_TOKEN"
 
 [sources.apple_mail]
@@ -121,6 +149,7 @@ allowed_accounts = []
 allowed_mailboxes = ["INBOX", "Sent", "Archive"]
 excluded_mailboxes = ["Junk", "Trash"]
 lookback_days = 30
+acl_snapshot_ttl_seconds = 900
 
 [sources.imap]
 enabled = false
@@ -130,3 +159,4 @@ username_env = "KIP_IMAP_USERNAME"
 password_env = "KIP_IMAP_PASSWORD"
 mailboxes = ["INBOX", "Sent", "Archive"]
 use_ssl = true
+acl_snapshot_ttl_seconds = 900

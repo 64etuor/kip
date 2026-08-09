@@ -5,6 +5,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Final, assert_never
 
+from kip.adapters.repository.memory.acl import assertion_is_visible, unit_is_visible
 from kip.adapters.repository.memory.state import MemoryState
 from kip.domain.models import (
     ApprovedAssertion,
@@ -15,9 +16,8 @@ from kip.domain.models import (
     GraphPathRequest,
     RequestContext,
 )
-from kip.errors import AuthorizationError, ConflictError, NotFoundError, ValidationError
+from kip.errors import ConflictError, NotFoundError, ValidationError
 from kip.ids import new_id
-
 
 _HIGH_RISK_PREDICATES: Final = {
     "amends",
@@ -86,10 +86,14 @@ class MemoryKnowledgeStore:
             if isinstance(item, dict) and item.get("content_unit_id")
         ]
         derived_scopes: set[str] = set()
+        evidence_snapshot_ids: set[str] = set()
         for unit_id in evidence_unit_ids:
             unit = self.state.units.get(unit_id)
-            if unit:
-                derived_scopes.update(unit.acl_scopes)
+            if unit is None or not unit_is_visible(self.state, unit, context):
+                raise NotFoundError("one or more evidence units are unavailable")
+            derived_scopes.update(unit.acl_scopes)
+            if unit.acl_snapshot_id:
+                evidence_snapshot_ids.add(unit.acl_snapshot_id)
         assertion = ApprovedAssertion(
             id=new_id("ast"),
             subject_id=candidate.subject_id,
@@ -100,6 +104,7 @@ class MemoryKnowledgeStore:
             source_candidate_id=candidate.id,
             acl_scopes=sorted(derived_scopes) or list(context.acl_scopes),
             evidence_unit_ids=evidence_unit_ids,
+            evidence_acl_snapshot_ids=sorted(evidence_snapshot_ids),
         )
         candidate.status = "approved"
         candidate.review_note = note or f"approved by {reviewer_id}"
@@ -130,12 +135,8 @@ class MemoryKnowledgeStore:
         assertion = self.state.assertions.get(assertion_id)
         if not assertion:
             raise NotFoundError(f"assertion not found: {assertion_id}")
-        if assertion.acl_scopes and not set(assertion.acl_scopes).issubset(
-            set(context.acl_scopes)
-        ):
-            raise AuthorizationError(
-                "assertion is outside the caller access scopes"
-            )
+        if not assertion_is_visible(self.state, assertion, context):
+            raise NotFoundError(f"assertion not found: {assertion_id}")
         return assertion.model_copy(deep=True)
 
     def graph_neighbors(
@@ -147,9 +148,7 @@ class MemoryKnowledgeStore:
         for assertion in self.state.assertions.values():
             if request.approved_only and assertion.status != "active":
                 continue
-            if assertion.acl_scopes and not set(assertion.acl_scopes).issubset(
-                set(context.acl_scopes)
-            ):
+            if not assertion_is_visible(self.state, assertion, context):
                 continue
             if request.predicates and assertion.predicate not in request.predicates:
                 continue
@@ -182,9 +181,7 @@ class MemoryKnowledgeStore:
                 continue
             if assertion.object_entity_id is None:
                 continue
-            if assertion.acl_scopes and not set(assertion.acl_scopes).issubset(
-                set(context.acl_scopes)
-            ):
+            if not assertion_is_visible(self.state, assertion, context):
                 continue
             if request.predicates and assertion.predicate not in request.predicates:
                 continue

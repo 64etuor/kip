@@ -1,6 +1,63 @@
 {
   "components": {
     "schemas": {
+      "AclSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "captured_at": {
+            "format": "date-time",
+            "title": "Captured At",
+            "type": "string"
+          },
+          "configuration_owned": {
+            "default": false,
+            "title": "Configuration Owned",
+            "type": "boolean"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "id": {
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "provider": {
+            "minLength": 1,
+            "title": "Provider",
+            "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes",
+            "type": "array"
+          },
+          "version": {
+            "minLength": 1,
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "provider",
+          "captured_at"
+        ],
+        "title": "AclSnapshot",
+        "type": "object"
+      },
       "AnswerRequest": {
         "additionalProperties": false,
         "properties": {
@@ -65,6 +122,16 @@
             },
             "title": "Acl Scopes",
             "type": "array"
+          },
+          "acl_snapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AclSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "connector_name": {
             "title": "Connector Name",
@@ -458,7 +525,13 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Healthz Healthz Get",
+                  "type": "object"
+                }
               }
             },
             "description": "Successful Response"

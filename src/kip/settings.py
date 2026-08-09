@@ -31,13 +31,22 @@ class Settings:
     api_port: int = 8080
     api_key: str = ""
     admin_key: str = ""
+    identity_mode: str = "api_key"
+    identity_api_key_principal_id: str = "principal_api"
+    identity_api_key_acl_scopes: tuple[str, ...] = ()
+    jwt_issuer: str = ""
+    jwt_audience: str = ""
+    jwt_jwks_url: str = ""
     max_request_bytes: int = 10 * 1024 * 1024
     log_level: str = "INFO"
 
     @classmethod
-    def load(cls, config_path: str | Path | None = None) -> "Settings":
-        root = Path(os.environ.get("KIP_PROJECT_ROOT", Path.cwd())).resolve()
-        path = Path(config_path or os.environ.get("KIP_CONFIG", root / "config/kip.toml"))
+    def load(cls, config_path: str | Path | None = None) -> Settings:
+        configured_root = os.environ.get("KIP_PROJECT_ROOT")
+        root = Path(configured_root) if configured_root else Path.cwd()
+        root = root.resolve()
+        configured_path = config_path or os.environ.get("KIP_CONFIG")
+        path = Path(configured_path) if configured_path else root / "config/kip.toml"
         if not path.is_absolute():
             path = (root / path).resolve()
         raw: dict[str, Any] = {}
@@ -57,6 +66,13 @@ class Settings:
         if not cas_path.is_absolute():
             cas_path = (root / cas_path).resolve()
 
+        api_key_env = str(
+            _deep_get(raw, "identity.api_key.api_key_env", "KIP_API_KEY")
+        )
+        admin_key_env = str(
+            _deep_get(raw, "identity.api_key.admin_key_env", "KIP_ADMIN_KEY")
+        )
+
         return cls(
             project_root=root,
             config_path=path,
@@ -67,8 +83,49 @@ class Settings:
             cas_path=cas_path,
             api_host=os.environ.get("KIP_API_HOST", str(_deep_get(raw, "api.host", "127.0.0.1"))),
             api_port=int(os.environ.get("KIP_API_PORT", _deep_get(raw, "api.port", 8080))),
-            api_key=os.environ.get("KIP_API_KEY", ""),
-            admin_key=os.environ.get("KIP_ADMIN_KEY", ""),
+            api_key=os.environ.get("KIP_API_KEY")
+            or os.environ.get(api_key_env, ""),
+            admin_key=os.environ.get("KIP_ADMIN_KEY")
+            or os.environ.get(admin_key_env, ""),
+            identity_mode=os.environ.get(
+                "KIP_IDENTITY_MODE",
+                str(_deep_get(raw, "identity.mode", "api_key")),
+            ),
+            identity_api_key_principal_id=os.environ.get(
+                "KIP_API_PRINCIPAL_ID",
+                str(
+                    _deep_get(
+                        raw,
+                        "identity.api_key.principal_id",
+                        "principal_api",
+                    )
+                ),
+            ),
+            identity_api_key_acl_scopes=tuple(
+                item.strip()
+                for item in os.environ.get(
+                    "KIP_API_ACL_SCOPES",
+                    ",".join(
+                        str(item)
+                        for item in (
+                            _deep_get(raw, "identity.api_key.acl_scopes", []) or []
+                        )
+                    ),
+                ).split(",")
+                if item.strip()
+            ),
+            jwt_issuer=os.environ.get(
+                "KIP_JWT_ISSUER",
+                str(_deep_get(raw, "identity.jwt.issuer", "")),
+            ),
+            jwt_audience=os.environ.get(
+                "KIP_JWT_AUDIENCE",
+                str(_deep_get(raw, "identity.jwt.audience", "")),
+            ),
+            jwt_jwks_url=os.environ.get(
+                "KIP_JWT_JWKS_URL",
+                str(_deep_get(raw, "identity.jwt.jwks_url", "")),
+            ),
             max_request_bytes=int(
                 os.environ.get("KIP_MAX_REQUEST_BYTES", _deep_get(raw, "api.max_request_bytes", 10 * 1024 * 1024))
             ),
@@ -76,7 +133,7 @@ class Settings:
         )
 
     @classmethod
-    def for_test(cls) -> "Settings":
+    def for_test(cls) -> Settings:
         root = Path.cwd().resolve()
         return cls(
             project_root=root,
@@ -91,6 +148,9 @@ class Settings:
             cas_path=root / "var/test-cas",
             api_key="test-key",
             admin_key="test-admin-key",
+            identity_mode="api_key",
+            identity_api_key_principal_id="principal_api",
+            identity_api_key_acl_scopes=("workspace:default",),
         )
 
     def get(self, path: str, default: Any = None) -> Any:

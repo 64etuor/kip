@@ -75,6 +75,10 @@ class Runtime:
         self.context = context
 
 
+def command_loads_models(subcommand: str | None) -> bool:
+    return subcommand not in {"migrate", "quality", "ontology"}
+
+
 @app.callback()
 def root(
     ctx: typer.Context,
@@ -95,7 +99,7 @@ def root(
     settings = Settings.load(config)
     container = build_container(
         settings,
-        load_models=ctx.invoked_subcommand not in {"quality", "ontology"},
+        load_models=command_loads_models(ctx.invoked_subcommand),
     )
     selected_scopes = list(acl_scope or [])
     if acl_scopes:

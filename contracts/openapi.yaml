@@ -14,7 +14,11 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema: {}
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response Healthz Healthz Get
   /v1/capabilities:
     get:
       summary: Capabilities
@@ -846,6 +850,47 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
 components:
   schemas:
+    AclSnapshot:
+      properties:
+        id:
+          type: string
+          minLength: 1
+          title: Id
+        version:
+          type: string
+          minLength: 1
+          title: Version
+        provider:
+          type: string
+          minLength: 1
+          title: Provider
+        scopes:
+          items:
+            type: string
+          type: array
+          title: Scopes
+        captured_at:
+          type: string
+          format: date-time
+          title: Captured At
+        expires_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Expires At
+        configuration_owned:
+          type: boolean
+          title: Configuration Owned
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - version
+      - provider
+      - captured_at
+      title: AclSnapshot
     AnswerRequest:
       properties:
         query:
@@ -924,6 +969,10 @@ components:
             type: string
           type: array
           title: Acl Scopes
+        acl_snapshot:
+          anyOf:
+          - $ref: '#/components/schemas/AclSnapshot'
+          - type: 'null'
       additionalProperties: false
       type: object
       required:

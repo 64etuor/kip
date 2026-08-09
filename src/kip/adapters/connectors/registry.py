@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum, unique
 from pathlib import Path
 from typing import assert_never
@@ -12,8 +14,10 @@ from kip.adapters.connectors.apple_mail import AppleMailConnector
 from kip.adapters.connectors.filesystem import FileSystemConnector
 from kip.adapters.connectors.imap import ImapConnector
 from kip.adapters.connectors.slack import SlackConnector
+from kip.domain.identity import AclSnapshot
 from kip.domain.models import ConnectorEvent
 from kip.errors import ConfigurationError
+from kip.ids import new_id, sha256_bytes, stable_id
 from kip.ports.ingestion import DiscoveredFile, FilesystemSourcePort
 from kip.settings import Settings
 
@@ -61,6 +65,7 @@ class ConfiguredFilesystemSource:
     name: str
     root: Path
     acl_scope: str | None
+    acl_snapshot: AclSnapshot
     connector: FileSystemConnector
 
     def scan(self) -> Iterable[DiscoveredFile]:
@@ -129,11 +134,106 @@ class ConfiguredSourceCatalog:
                 self.settings.get("security.max_file_bytes", 500 * 1024 * 1024)
             ),
         )
+        scope = str(source["acl_scope"]) if source.get("acl_scope") else f"workspace:{self.settings.workspace}"
+        policy_bytes = json.dumps(
+            {
+                "name": source_name,
+                "root": str(root.resolve()),
+                "acl_scope": scope,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        ).encode("utf-8")
+        policy_version = sha256_bytes(policy_bytes)
         return ConfiguredFilesystemSource(
             name=source_name,
             root=root,
-            acl_scope=str(source["acl_scope"]) if source.get("acl_scope") else None,
+            acl_scope=scope,
+            acl_snapshot=AclSnapshot.configuration(
+                snapshot_id=stable_id(
+                    "aclsnap",
+                    self.settings.workspace,
+                    f"filesystem:{source_name}:{policy_version}",
+                ),
+                version=policy_version,
+                provider=f"filesystem:{source_name}",
+                scopes=[scope],
+            ),
             connector=connector,
+        )
+
+    def event_acl_snapshot(self, event: ConnectorEvent) -> AclSnapshot:
+        if event.acl_snapshot is not None:
+            return event.acl_snapshot
+        configured = self.settings.get(
+            f"sources.{event.connector_name}.acl_snapshot_ttl_seconds",
+            None,
+        )
+        if event.connector_name in {item.value for item in RemoteSourceName}:
+            ttl_seconds = int(configured or 900)
+            captured_at = datetime.now(UTC)
+            return AclSnapshot(
+                id=new_id("aclsnap"),
+                version=event.event_id,
+                provider=event.connector_name,
+                scopes=list(event.acl_scopes),
+                captured_at=captured_at,
+                expires_at=captured_at + timedelta(seconds=ttl_seconds),
+            )
+        policies = self.settings.get("sources.connector_policies", []) or []
+        policy = next(
+            (
+                item
+                for item in policies
+                if isinstance(item, dict) and item.get("name") == event.connector_name
+            ),
+            None,
+        )
+        if policy is None:
+            if self.settings.environment not in {"development", "test"}:
+                raise ConfigurationError(
+                    f"connector ACL policy is not configured: {event.connector_name}"
+                )
+            return AclSnapshot.configuration(
+                snapshot_id=stable_id(
+                    "aclsnap",
+                    self.settings.workspace,
+                    f"development:{event.connector_name}",
+                ),
+                version="development-configuration-v1",
+                provider=f"connector:{event.connector_name}",
+                scopes=list(event.acl_scopes),
+            )
+        mode = str(policy.get("acl_mode", "dynamic"))
+        if mode == "static":
+            version = sha256_bytes(
+                json.dumps(policy, sort_keys=True, default=str).encode("utf-8")
+            )
+            return AclSnapshot.configuration(
+                snapshot_id=stable_id(
+                    "aclsnap",
+                    self.settings.workspace,
+                    f"connector:{event.connector_name}:{version}",
+                ),
+                version=version,
+                provider=f"connector:{event.connector_name}",
+                scopes=list(event.acl_scopes),
+            )
+        if mode != "dynamic":
+            raise ConfigurationError(
+                f"unsupported connector ACL mode for {event.connector_name}: {mode}"
+            )
+        ttl_seconds = int(policy.get("acl_snapshot_ttl_seconds", 900))
+        if ttl_seconds <= 0:
+            raise ConfigurationError("connector ACL snapshot TTL must be positive")
+        captured_at = datetime.now(UTC)
+        return AclSnapshot(
+            id=new_id("aclsnap"),
+            version=event.event_id,
+            provider=f"connector:{event.connector_name}",
+            scopes=list(event.acl_scopes),
+            captured_at=captured_at,
+            expires_at=captured_at + timedelta(seconds=ttl_seconds),
         )
 
     def events(

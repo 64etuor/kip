@@ -1,0 +1,62 @@
+scripts/release-bundle.sh
+  s_41856199ee83ad::t_b7e7de6d9b2877 1-42
+  s_41856199ee83ad::t_49085994cb50b7 43
+tests/test_settings_secrets.py
+  s_41856199ee83ad::t_fe0982b48ccca8 1-63
+scripts/verify-release.sh
+  s_41856199ee83ad::t_b7e7de6d9b2877 1-14
+compose.production.yaml
+  s_41856199ee83ad::t_480e5ae6b25837 1-62,64-86,93-101,105-136,140-158
+  s_41856199ee83ad::t_b6af597227ca34 102-104,137-139
+  s_41856199ee83ad::t_b6d0a14c7c4b3c 87-92
+  s_41856199ee83ad::t_ebd34fbadaa7b2 63
+scripts/release_artifacts.py
+  s_41856199ee83ad::t_b6d0a14c7c4b3c 17,64-66,80,85,90-91,219-230,232,234,236-238,260-264,266-267,286-287,413,421-422,424-428,486,504-505
+  s_41856199ee83ad::t_b7e7de6d9b2877 1-11,13-16,18-39,45-55,57-63,67-79,81-84,86-89,92-117,119-218,231,233,235,239-259,268-285,288-394,396-412,414-420,423,429-485,487-503,525-625,627-633
+  s_41856199ee83ad::t_643b635f2da940 12,626
+  s_41856199ee83ad::t_96eab5a86a78be 506-524
+  s_41856199ee83ad::t_c7c031c4222739 40-44
+  s_41856199ee83ad::t_18161a7d6b583e 56
+  s_41856199ee83ad::t_c815ad8d019a02 395
+  s_41856199ee83ad::t_fd7749f3115409 265
+  s_41856199ee83ad::t_ed94e8ff45cbdd 118
+requirements/build.in
+  s_41856199ee83ad::t_e150ec82ee98e8 1-2
+requirements/runtime.txt
+  s_41856199ee83ad::t_39f1bd9f1b19f6 1-1014
+deploy/sql/roles.sql.template
+  s_41856199ee83ad::t_21c23f6cff444e 1-2,5-6,9,12,15,19-21,23-27,30-33,35,37-41,45-47
+requirements/build.txt
+  s_41856199ee83ad::t_8e7020791003f1 1-10
+tests/test_release_bundle.py
+  s_41856199ee83ad::t_b6d0a14c7c4b3c 61-63,90-99,142
+  s_41856199ee83ad::t_ed94e8ff45cbdd 65
+  s_41856199ee83ad::t_8e2bda0659c271 1-60,64,66-89,100-106,109,111-141,143-153
+  s_41856199ee83ad::t_2e3fc69f229b76 107-108,110
+.dockerignore
+  s_41856199ee83ad::t_6d906e112dd2e5 2,6-12
+  s_41856199ee83ad::t_b6d0a14c7c4b3c 13-16
+src/kip/settings.py
+  s_41856199ee83ad::t_b6d0a14c7c4b3c 4,28-32,34,36-37,39-51,53-56,58-59
+  s_41856199ee83ad::t_dbd2f16f3a69ce 12-13,24-27,33,35,38,52,57,60-76,115,118-124,148-159,242-243,248-249
+Dockerfile
+  s_41856199ee83ad::t_e527bd1eb0d39a 1-6,9-13,15,17-31,34-35,41-46
+compose.yaml
+  s_41856199ee83ad::t_6d906e112dd2e5 39-42,72-75,102-105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "3f4e8693d353ff95ef83bc3dbcb10e5cb0d12e85",
+  "prompts": {},
+  "sessions": {
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

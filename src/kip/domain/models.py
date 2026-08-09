@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from kip.domain.egress import DataClassification, EgressDecision
 from kip.domain.generation import GeneratedClaim, GenerationUsage, ModelRevision
 from kip.domain.identity import AclSnapshot
+from kip.domain.knowledge import CandidateEvidence, RelationDerivation
 
 
 class StrictModel(BaseModel):
@@ -330,13 +331,25 @@ class AssertionCandidate(StrictModel):
     origin: str
     confidence: float | None = None
     ontology_version: str
-    evidence: list[dict[str, Any]] = Field(default_factory=list)
+    evidence: list[CandidateEvidence] = Field(default_factory=list)
     review_note: str | None = None
+    fingerprint: str | None = None
+    valid_from: datetime | None = None
+    valid_to: datetime | None = None
+    derivation: RelationDerivation | None = None
+    review_risk: Literal["low", "medium", "high"] = "medium"
+    contradicts_assertion_ids: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def exactly_one_object(self) -> AssertionCandidate:
         if (self.object_entity_id is None) == (self.object_value is None):
             raise ValueError("exactly one of object_entity_id or object_value is required")
+        if (
+            self.valid_from is not None
+            and self.valid_to is not None
+            and self.valid_to <= self.valid_from
+        ):
+            raise ValueError("valid_to must be later than valid_from")
         return self
 
 

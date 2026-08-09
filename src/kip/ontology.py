@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 
@@ -123,19 +123,64 @@ def validate_ontology(root: Path) -> list[str]:
 
 
 @dataclass(frozen=True, slots=True)
+class PredicateSpec:
+    name: str
+    domain: tuple[str, ...]
+    range: tuple[str, ...]
+    risk: Literal["low", "medium", "high"]
+    review: Literal["not_required", "conditional", "required"]
+    extraction: str
+
+
+@dataclass(frozen=True, slots=True)
 class OntologyCatalog:
     version: str
     predicates: frozenset[str]
+    entity_parents: dict[str, str | None]
+    predicate_specs: dict[str, PredicateSpec]
 
     @classmethod
     def load(cls, root: Path) -> OntologyCatalog:
         errors = validate_ontology(root)
         if errors:
             raise ValidationError("invalid ontology contract: " + "; ".join(errors))
-        payload = yaml.safe_load((root / "core/predicates.yaml").read_text(encoding="utf-8"))
+        predicate_payload = yaml.safe_load(
+            (root / "core/predicates.yaml").read_text(encoding="utf-8")
+        )
+        entity_payload = yaml.safe_load(
+            (root / "core/entity-types.yaml").read_text(encoding="utf-8")
+        )
+        domain_payload = yaml.safe_load(
+            (root / "domains/research-project.yaml").read_text(encoding="utf-8")
+        )
+        entity_definitions = {
+            **entity_payload["entity_types"],
+            **domain_payload["entity_types"],
+        }
+        parents = {
+            str(name): (
+                str(definition["parent"])
+                if isinstance(definition, dict) and definition.get("parent") is not None
+                else None
+            )
+            for name, definition in entity_definitions.items()
+        }
+        predicate_specs = {
+            str(name): PredicateSpec(
+                name=str(name),
+                domain=tuple(str(item) for item in definition["domain"]),
+                range=tuple(str(item) for item in definition["range"]),
+                risk=definition["risk"],
+                review=definition["review"],
+                extraction=str(definition["extraction"]),
+            )
+            for name, definition in predicate_payload["predicates"].items()
+        }
         return cls(
-            version=f"core/{payload['version']}",
-            predicates=frozenset(payload["predicates"]),
+            version=f"core/{predicate_payload['version']}",
+            predicates=frozenset(predicate_payload["predicates"]),
+            entity_parents=parents,
+            predicate_specs=predicate_specs,
         )
 
     def validate_candidate(self, predicate: str, ontology_version: str) -> None:
@@ -145,3 +190,43 @@ class OntologyCatalog:
             )
         if predicate not in self.predicates:
             raise ValidationError(f"unknown ontology predicate: {predicate}")
+
+    def validate_entity_type(self, entity_type: str) -> None:
+        if entity_type not in self.entity_parents:
+            raise ValidationError(f"unknown ontology entity type: {entity_type}")
+
+    def is_a(self, entity_type: str, expected_type: str) -> bool:
+        self.validate_entity_type(entity_type)
+        current: str | None = entity_type
+        visited: set[str] = set()
+        while current is not None and current not in visited:
+            if current == expected_type:
+                return True
+            visited.add(current)
+            current = self.entity_parents.get(current)
+        return False
+
+    def validate_relation(
+        self,
+        *,
+        subject_type: str,
+        predicate: str,
+        object_type: str | None,
+    ) -> PredicateSpec:
+        self.validate_candidate(predicate, self.version)
+        self.validate_entity_type(subject_type)
+        spec = self.predicate_specs[predicate]
+        if not any(self.is_a(subject_type, allowed) for allowed in spec.domain):
+            raise ValidationError(
+                f"entity type {subject_type} is outside predicate {predicate} domain"
+            )
+        if object_type is None:
+            raise ValidationError(
+                f"predicate {predicate} requires an ontology entity in its range"
+            )
+        self.validate_entity_type(object_type)
+        if not any(self.is_a(object_type, allowed) for allowed in spec.range):
+            raise ValidationError(
+                f"entity type {object_type} is outside predicate {predicate} range"
+            )
+        return spec

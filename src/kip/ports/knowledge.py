@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from kip.domain.knowledge import KnowledgeEntity
 from kip.domain.models import (
     ApprovedAssertion,
     AssertionCandidate,
@@ -14,6 +15,39 @@ from kip.domain.models import (
 
 
 class KnowledgeStore(Protocol):
+    def save_entity(
+        self,
+        context: RequestContext,
+        entity: KnowledgeEntity,
+    ) -> KnowledgeEntity: ...
+
+    def get_entity(
+        self,
+        context: RequestContext,
+        entity_id: str,
+    ) -> KnowledgeEntity: ...
+
+    def list_entities(
+        self,
+        context: RequestContext,
+        *,
+        limit: int = 100,
+    ) -> list[KnowledgeEntity]: ...
+
+    def get_candidate_by_fingerprint(
+        self,
+        context: RequestContext,
+        fingerprint: str,
+    ) -> AssertionCandidate | None: ...
+
+    def find_assertions(
+        self,
+        context: RequestContext,
+        *,
+        subject_id: str,
+        predicate: str,
+    ) -> list[ApprovedAssertion]: ...
+
     def save_candidate(
         self,
         context: RequestContext,

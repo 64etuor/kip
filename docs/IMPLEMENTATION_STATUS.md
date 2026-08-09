@@ -29,7 +29,7 @@
 | Local reranker | Validated shadow | BGE reranker v2 M3 plus opt-in pinned Jina Hugging Face adapter; Jina trial measured 613.31 ms P95 but failed quality gates, so remains shadow-only |
 | pgvector | Complete shadow, disabled | PostgreSQL 18/pgvector 0.8.2, 74/74 vectors, RLS and source-hash filtering; public pilot did not beat lexical |
 | Hybrid retrieval | Complete shadow | ACL-prefiltered exact vector search, RRF, bounded reranking, explicit activation command |
-| Ontology contract | Ready for pilot | YAML consistency and candidate checks plus compatible/review/breaking release diff and explicit migration coverage; assertion migration execution remains review-queue work |
+| Ontology contract | Ready for pilot | YAML entity inheritance, predicate domain/range/risk/review validation, normalized entities and aliases, exact typed candidate evidence, stable revision-bound fingerprints, temporal bounds, contradiction flags, and memory/PostgreSQL parity; assertion migration execution remains review-queue work |
 | Neo4j | Port only | Do not deploy before adoption gate |
 | Review UI | Not included | CLI/API review workflow only |
 | Starter-kit adoption guide | Ready | Environment decisions, AI change contract, real-corpus acceptance evidence, upgrade and handoff rules |

@@ -1,49 +1,5 @@
 {
   "$defs": {
-    "CandidateEvidence": {
-      "additionalProperties": false,
-      "properties": {
-        "content_unit_id": {
-          "minLength": 1,
-          "title": "Content Unit Id",
-          "type": "string"
-        },
-        "locator": {
-          "additionalProperties": true,
-          "title": "Locator",
-          "type": "object"
-        },
-        "quote_hash": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Quote Hash"
-        },
-        "source_revision_sha256": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Source Revision Sha256"
-        }
-      },
-      "required": [
-        "content_unit_id"
-      ],
-      "title": "CandidateEvidence",
-      "type": "object"
-    },
     "RelationDerivation": {
       "additionalProperties": false,
       "properties": {
@@ -106,6 +62,8 @@
     "confidence": {
       "anyOf": [
         {
+          "maximum": 1.0,
+          "minimum": 0.0,
           "type": "number"
         },
         {
@@ -115,46 +73,16 @@
       "default": null,
       "title": "Confidence"
     },
-    "contradicts_assertion_ids": {
+    "derivation": {
+      "$ref": "#/$defs/RelationDerivation"
+    },
+    "evidence_unit_ids": {
       "items": {
         "type": "string"
       },
-      "title": "Contradicts Assertion Ids",
+      "minItems": 1,
+      "title": "Evidence Unit Ids",
       "type": "array"
-    },
-    "derivation": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/RelationDerivation"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null
-    },
-    "evidence": {
-      "items": {
-        "$ref": "#/$defs/CandidateEvidence"
-      },
-      "title": "Evidence",
-      "type": "array"
-    },
-    "fingerprint": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Fingerprint"
-    },
-    "id": {
-      "title": "Id",
-      "type": "string"
     },
     "object_entity_id": {
       "anyOf": [
@@ -173,51 +101,17 @@
       "title": "Object Value"
     },
     "ontology_version": {
+      "minLength": 1,
       "title": "Ontology Version",
       "type": "string"
     },
-    "origin": {
-      "title": "Origin",
-      "type": "string"
-    },
     "predicate": {
+      "minLength": 1,
       "title": "Predicate",
       "type": "string"
     },
-    "review_note": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Review Note"
-    },
-    "review_risk": {
-      "default": "medium",
-      "enum": [
-        "low",
-        "medium",
-        "high"
-      ],
-      "title": "Review Risk",
-      "type": "string"
-    },
-    "status": {
-      "default": "proposed",
-      "enum": [
-        "proposed",
-        "approved",
-        "rejected",
-        "superseded"
-      ],
-      "title": "Status",
-      "type": "string"
-    },
     "subject_id": {
+      "minLength": 1,
       "title": "Subject Id",
       "type": "string"
     },
@@ -249,12 +143,12 @@
     }
   },
   "required": [
-    "id",
     "subject_id",
     "predicate",
-    "origin",
-    "ontology_version"
+    "ontology_version",
+    "evidence_unit_ids",
+    "derivation"
   ],
-  "title": "AssertionCandidate",
+  "title": "RelationProposal",
   "type": "object"
 }

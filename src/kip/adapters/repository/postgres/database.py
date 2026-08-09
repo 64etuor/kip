@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
+from kip.domain.knowledge import KnowledgeEntity, RelationDerivation, normalize_entity_name
 from kip.domain.models import (
     ApprovedAssertion,
     Artifact,
@@ -50,7 +51,7 @@ from kip.errors import (
     NotFoundError,
     ValidationError,
 )
-from kip.ids import new_id
+from kip.ids import new_id, stable_id
 
 _HIGH_RISK_PREDICATES = {
     "amends",
@@ -64,7 +65,12 @@ _HIGH_RISK_PREDICATES = {
 
 
 def _json(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, default=str)
+    def encode(item: Any) -> Any:
+        if hasattr(item, "model_dump"):
+            return item.model_dump(mode="json")
+        return str(item)
+
+    return json.dumps(value, ensure_ascii=False, default=encode)
 
 
 def _vector_literal(values: list[float]) -> str:
@@ -1421,24 +1427,285 @@ class PostgresDatabase:
             rows = cursor.fetchall()
         return [JobRecord(id=row["public_id"], job_type=row["job_type"], payload=row["payload"], status=row["status"], attempts=row["attempts"], max_attempts=row["max_attempts"]) for row in rows]
 
+    def save_entity(
+        self,
+        context: RequestContext,
+        entity: KnowledgeEntity,
+    ) -> KnowledgeEntity:
+        if not set(entity.acl_scopes).issubset(context.acl_scopes):
+            raise AuthorizationError("entity ACL scopes exceed the creator's access")
+        normalized_names = [
+            entity.canonical_name_normalized,
+            *(normalize_entity_name(alias) for alias in entity.aliases),
+        ]
+        with self._connection(context) as connection:
+            self._ensure_workspace_and_principal(connection, context)
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT * FROM knowledge.entities WHERE workspace_id=%s AND id=%s FOR UPDATE",
+                    (context.workspace, entity.id),
+                )
+                existing_row = cursor.fetchone()
+                if existing_row is not None:
+                    existing = self._entity(existing_row)
+                    if existing != entity:
+                        raise ConflictError(f"entity already exists: {entity.id}")
+                    return existing
+                cursor.execute(
+                    """
+                    SELECT entity_id, alias_normalized
+                    FROM knowledge.entity_aliases
+                    WHERE workspace_id=%s AND alias_normalized = ANY(%s::text[])
+                    """,
+                    (context.workspace, normalized_names),
+                )
+                collision = cursor.fetchone()
+                if collision is not None:
+                    raise ConflictError(
+                        "entity name or alias already exists: "
+                        + str(collision["alias_normalized"])
+                    )
+                cursor.execute(
+                    """
+                    INSERT INTO knowledge.entities(
+                        id, workspace_id, entity_type, canonical_name,
+                        canonical_name_normalized, aliases, status, acl_scopes, metadata
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb)
+                    """,
+                    (
+                        entity.id,
+                        context.workspace,
+                        entity.entity_type,
+                        entity.canonical_name,
+                        entity.canonical_name_normalized,
+                        entity.aliases,
+                        entity.status,
+                        entity.acl_scopes,
+                        _json(entity.metadata),
+                    ),
+                )
+                for display, normalized in zip(
+                    [entity.canonical_name, *entity.aliases],
+                    normalized_names,
+                    strict=True,
+                ):
+                    cursor.execute(
+                        """
+                        INSERT INTO knowledge.entity_aliases(
+                            id, workspace_id, entity_id, alias_display, alias_normalized
+                        ) VALUES (%s,%s,%s,%s,%s)
+                        """,
+                        (
+                            stable_id(
+                                "alias",
+                                f"{context.workspace}:{entity.id}",
+                                normalized,
+                            ),
+                            context.workspace,
+                            entity.id,
+                            display,
+                            normalized,
+                        ),
+                    )
+            connection.commit()
+        return entity
+
+    def get_entity(
+        self,
+        context: RequestContext,
+        entity_id: str,
+    ) -> KnowledgeEntity:
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT * FROM knowledge.entities WHERE workspace_id=%s AND id=%s",
+                (context.workspace, entity_id),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            raise NotFoundError(f"entity not found: {entity_id}")
+        return self._entity(row)
+
+    def list_entities(
+        self,
+        context: RequestContext,
+        *,
+        limit: int = 100,
+    ) -> list[KnowledgeEntity]:
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT * FROM knowledge.entities
+                WHERE workspace_id=%s AND status='active'
+                ORDER BY canonical_name_normalized, id
+                LIMIT %s
+                """,
+                (context.workspace, limit),
+            )
+            rows = cursor.fetchall()
+        return [self._entity(row) for row in rows]
+
+    @staticmethod
+    def _entity(row: dict[str, Any]) -> KnowledgeEntity:
+        return KnowledgeEntity(
+            id=row["id"],
+            entity_type=row["entity_type"],
+            canonical_name=row["canonical_name"],
+            canonical_name_normalized=row.get("canonical_name_normalized") or "",
+            aliases=list(row.get("aliases") or []),
+            status=row["status"],
+            acl_scopes=list(row.get("acl_scopes") or []),
+            metadata=row.get("metadata") or {},
+        )
+
+    def get_candidate_by_fingerprint(
+        self,
+        context: RequestContext,
+        fingerprint: str,
+    ) -> AssertionCandidate | None:
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT * FROM knowledge.assertion_candidates
+                WHERE workspace_id=%s AND fingerprint=%s
+                """,
+                (context.workspace, fingerprint),
+            )
+            row = cursor.fetchone()
+        return self._candidate(row) if row is not None else None
+
+    def find_assertions(
+        self,
+        context: RequestContext,
+        *,
+        subject_id: str,
+        predicate: str,
+    ) -> list[ApprovedAssertion]:
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    assertion.*,
+                    coalesce(
+                        array_agg(evidence.content_unit_id ORDER BY evidence.content_unit_id)
+                            FILTER (WHERE evidence.content_unit_id IS NOT NULL),
+                        ARRAY[]::text[]
+                    ) AS evidence_unit_ids
+                FROM knowledge.assertions assertion
+                LEFT JOIN knowledge.assertion_evidence evidence
+                  ON evidence.workspace_id=assertion.workspace_id
+                 AND evidence.assertion_id=assertion.id
+                WHERE assertion.workspace_id=%s
+                  AND assertion.subject_id=%s
+                  AND assertion.predicate=%s
+                  AND assertion.status='active'
+                  AND (cardinality(assertion.acl_scopes)=0 OR assertion.acl_scopes <@ %s::text[])
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM unnest(assertion.evidence_acl_snapshot_ids) snapshot_id
+                      WHERE NOT kip.acl_snapshot_is_fresh(snapshot_id)
+                  )
+                GROUP BY assertion.id
+                ORDER BY assertion.created_at, assertion.id
+                """,
+                (context.workspace, subject_id, predicate, context.acl_scopes),
+            )
+            rows = cursor.fetchall()
+        return [self._approved_assertion(row) for row in rows]
+
     def save_candidate(self, context: RequestContext, candidate: AssertionCandidate) -> AssertionCandidate:
+        fingerprint = candidate.fingerprint
+        if fingerprint is None:
+            payload = candidate.model_dump(
+                mode="json",
+                exclude={"fingerprint"},
+            )
+            fingerprint = "legacy:sha256:" + hashlib.sha256(
+                _json(payload).encode()
+            ).hexdigest()
+            candidate = candidate.model_copy(update={"fingerprint": fingerprint})
         with self._connection(context) as connection:
             self._ensure_workspace_and_principal(connection, context)
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
                     INSERT INTO knowledge.assertion_candidates(
-                        id,workspace_id,subject_id,predicate,object_entity_id,object_value,status,origin,confidence,ontology_version,evidence,review_note
-                    ) VALUES (%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,%s::jsonb,%s)
+                        id,workspace_id,subject_id,predicate,object_entity_id,object_value,
+                        status,origin,confidence,ontology_version,evidence,review_note,
+                        fingerprint,valid_from,valid_to,derivation,review_risk,
+                        contradicts_assertion_ids
+                    ) VALUES (
+                        %s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,%s::jsonb,%s,
+                        %s,%s,%s,%s::jsonb,%s,%s
+                    )
                     ON CONFLICT (id) DO UPDATE SET
-                        status=EXCLUDED.status, confidence=EXCLUDED.confidence, evidence=EXCLUDED.evidence, review_note=EXCLUDED.review_note
+                        status=EXCLUDED.status,
+                        confidence=EXCLUDED.confidence,
+                        evidence=EXCLUDED.evidence,
+                        review_note=EXCLUDED.review_note,
+                        fingerprint=EXCLUDED.fingerprint,
+                        valid_from=EXCLUDED.valid_from,
+                        valid_to=EXCLUDED.valid_to,
+                        derivation=EXCLUDED.derivation,
+                        review_risk=EXCLUDED.review_risk,
+                        contradicts_assertion_ids=EXCLUDED.contradicts_assertion_ids
                     """,
                     (
                         candidate.id, context.workspace, candidate.subject_id, candidate.predicate, candidate.object_entity_id,
                         _json(candidate.object_value) if candidate.object_value is not None else None, candidate.status, candidate.origin,
                         candidate.confidence, candidate.ontology_version, _json(candidate.evidence), candidate.review_note,
+                        candidate.fingerprint, candidate.valid_from, candidate.valid_to,
+                        _json(candidate.derivation) if candidate.derivation is not None else None,
+                        candidate.review_risk, candidate.contradicts_assertion_ids,
                     ),
                 )
+                for evidence in candidate.evidence:
+                    source_revision_sha256 = evidence.source_revision_sha256
+                    locator = evidence.locator
+                    if source_revision_sha256 is None or not locator:
+                        cursor.execute(
+                            """
+                            SELECT revision.sha256, unit.locator
+                            FROM content.units unit
+                            JOIN content.artifacts artifact
+                              ON artifact.workspace_id=unit.workspace_id
+                             AND artifact.id=unit.artifact_id
+                            JOIN source.revisions revision
+                              ON revision.workspace_id=artifact.workspace_id
+                             AND revision.id=artifact.revision_id
+                            WHERE unit.workspace_id=%s AND unit.id=%s
+                            """,
+                            (context.workspace, evidence.content_unit_id),
+                        )
+                        evidence_row = cursor.fetchone()
+                        if evidence_row is None:
+                            raise NotFoundError(
+                                "one or more candidate evidence units are unavailable"
+                            )
+                        source_revision_sha256 = (
+                            source_revision_sha256 or evidence_row["sha256"]
+                        )
+                        locator = locator or evidence_row["locator"]
+                    cursor.execute(
+                        """
+                        INSERT INTO knowledge.assertion_candidate_evidence(
+                            workspace_id,candidate_id,content_unit_id,
+                            source_revision_sha256,locator,quote_hash
+                        ) VALUES (%s,%s,%s,%s,%s::jsonb,%s)
+                        ON CONFLICT (workspace_id,candidate_id,content_unit_id)
+                        DO UPDATE SET
+                            source_revision_sha256=EXCLUDED.source_revision_sha256,
+                            locator=EXCLUDED.locator,
+                            quote_hash=EXCLUDED.quote_hash
+                        """,
+                        (
+                            context.workspace,
+                            candidate.id,
+                            evidence.content_unit_id,
+                            source_revision_sha256,
+                            _json(locator),
+                            evidence.quote_hash,
+                        ),
+                    )
             connection.commit()
         return candidate
 
@@ -1469,6 +1736,15 @@ class PostgresDatabase:
             object_entity_id=row["object_entity_id"], object_value=row["object_value"], status=row["status"],
             origin=row["origin"], confidence=row["confidence"], ontology_version=row["ontology_version"],
             evidence=row["evidence"] or [], review_note=row.get("review_note"),
+            fingerprint=row.get("fingerprint"), valid_from=row.get("valid_from"),
+            valid_to=row.get("valid_to"),
+            derivation=(
+                RelationDerivation.model_validate(row["derivation"])
+                if row.get("derivation")
+                else None
+            ),
+            review_risk=row.get("review_risk") or "medium",
+            contradicts_assertion_ids=list(row.get("contradicts_assertion_ids") or []),
         )
 
     def approve_candidate(self, context: RequestContext, candidate_id: str, reviewer_id: str, note: str | None = None) -> ApprovedAssertion:
@@ -1488,9 +1764,7 @@ class PostgresDatabase:
                 if candidate.predicate in _HIGH_RISK_PREDICATES and not candidate.evidence:
                     raise ValidationError(f"predicate {candidate.predicate} requires evidence")
                 evidence_unit_ids = [
-                    str(evidence["content_unit_id"])
-                    for evidence in candidate.evidence
-                    if isinstance(evidence, dict) and evidence.get("content_unit_id")
+                    evidence.content_unit_id for evidence in candidate.evidence
                 ]
                 derived_scopes: set[str] = set()
                 evidence_rows: list[dict[str, Any]] = []
@@ -1526,27 +1800,35 @@ class PostgresDatabase:
                     INSERT INTO knowledge.assertions(
                         id,workspace_id,subject_id,predicate,object_entity_id,object_value,status,
                         ontology_version,source_candidate_id,acl_scopes,
-                        evidence_acl_snapshot_ids,created_by
-                    ) VALUES (%s,%s,%s,%s,%s,%s::jsonb,'active',%s,%s,%s,%s,%s)
+                        evidence_acl_snapshot_ids,created_by,valid_from,valid_to
+                    ) VALUES (%s,%s,%s,%s,%s,%s::jsonb,'active',%s,%s,%s,%s,%s,%s,%s)
                     """,
                     (
                         assertion_id, context.workspace, candidate.subject_id, candidate.predicate,
                         candidate.object_entity_id, _json(candidate.object_value) if candidate.object_value is not None else None,
                         candidate.ontology_version, candidate.id, assertion_scopes,
                         assertion_snapshot_ids, reviewer_id,
+                        candidate.valid_from, candidate.valid_to,
                     ),
                 )
                 for evidence in candidate.evidence:
-                    unit_id = evidence.get("content_unit_id") if isinstance(evidence, dict) else None
-                    if not unit_id:
-                        continue
-                    locator = evidence.get("locator") or {"type": "content_unit", "data": {"unit_id": unit_id}}
+                    unit_id = evidence.content_unit_id
+                    locator = evidence.locator or {
+                        "type": "content_unit",
+                        "data": {"unit_id": unit_id},
+                    }
                     cursor.execute(
                         """
                         INSERT INTO knowledge.assertion_evidence(workspace_id, assertion_id, content_unit_id, locator, quote_hash)
                         VALUES (%s,%s,%s,%s::jsonb,%s)
                         """,
-                        (context.workspace, assertion_id, unit_id, _json(locator), evidence.get("quote_hash")),
+                        (
+                            context.workspace,
+                            assertion_id,
+                            unit_id,
+                            _json(locator),
+                            evidence.quote_hash,
+                        ),
                     )
                 cursor.execute(
                     """
@@ -1562,6 +1844,7 @@ class PostgresDatabase:
             ontology_version=candidate.ontology_version, source_candidate_id=candidate.id,
             acl_scopes=assertion_scopes, evidence_unit_ids=evidence_unit_ids,
             evidence_acl_snapshot_ids=assertion_snapshot_ids,
+            valid_from=candidate.valid_from, valid_to=candidate.valid_to,
         )
 
     def reject_candidate(self, context: RequestContext, candidate_id: str, reviewer_id: str, note: str | None = None) -> AssertionCandidate:
@@ -1610,6 +1893,10 @@ class PostgresDatabase:
             row = cursor.fetchone()
         if not row:
             raise NotFoundError(f"assertion not found: {assertion_id}")
+        return self._approved_assertion(row)
+
+    @staticmethod
+    def _approved_assertion(row: dict[str, Any]) -> ApprovedAssertion:
         return ApprovedAssertion(
             id=row["id"],
             subject_id=row["subject_id"],

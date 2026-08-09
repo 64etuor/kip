@@ -7,6 +7,7 @@ from typing import Final, assert_never
 
 from kip.adapters.repository.memory.acl import assertion_is_visible, unit_is_visible
 from kip.adapters.repository.memory.state import MemoryState
+from kip.domain.knowledge import KnowledgeEntity
 from kip.domain.models import (
     ApprovedAssertion,
     AssertionCandidate,
@@ -34,11 +35,89 @@ _HIGH_RISK_PREDICATES: Final = {
 class MemoryKnowledgeStore:
     state: MemoryState
 
+    def save_entity(
+        self,
+        context: RequestContext,
+        entity: KnowledgeEntity,
+    ) -> KnowledgeEntity:
+        names = [entity.canonical_name_normalized, *(
+            alias.casefold() for alias in entity.aliases
+        )]
+        for name in names:
+            existing_id = self.state.entity_names.get(name)
+            if existing_id is not None and existing_id != entity.id:
+                raise ConflictError(f"entity name or alias already exists: {name}")
+        existing = self.state.entities.get(entity.id)
+        if existing is not None and existing != entity:
+            raise ConflictError(f"entity already exists: {entity.id}")
+        self.state.entities[entity.id] = entity.model_copy(deep=True)
+        for name in names:
+            self.state.entity_names[name] = entity.id
+        return entity.model_copy(deep=True)
+
+    def get_entity(
+        self,
+        context: RequestContext,
+        entity_id: str,
+    ) -> KnowledgeEntity:
+        entity = self.state.entities.get(entity_id)
+        if entity is None or not _entity_is_visible(entity, context):
+            raise NotFoundError(f"entity not found: {entity_id}")
+        return entity.model_copy(deep=True)
+
+    def list_entities(
+        self,
+        context: RequestContext,
+        *,
+        limit: int = 100,
+    ) -> list[KnowledgeEntity]:
+        return [
+            entity.model_copy(deep=True)
+            for entity in sorted(
+                self.state.entities.values(),
+                key=lambda item: (item.canonical_name_normalized, item.id),
+            )
+            if _entity_is_visible(entity, context)
+        ][:limit]
+
+    def get_candidate_by_fingerprint(
+        self,
+        context: RequestContext,
+        fingerprint: str,
+    ) -> AssertionCandidate | None:
+        candidate_id = self.state.candidate_ids_by_fingerprint.get(fingerprint)
+        if candidate_id is None:
+            return None
+        return self.get_candidate(context, candidate_id)
+
+    def find_assertions(
+        self,
+        context: RequestContext,
+        *,
+        subject_id: str,
+        predicate: str,
+    ) -> list[ApprovedAssertion]:
+        return [
+            assertion.model_copy(deep=True)
+            for assertion in self.state.assertions.values()
+            if assertion.status == "active"
+            and assertion.subject_id == subject_id
+            and assertion.predicate == predicate
+            and assertion_is_visible(self.state, assertion, context)
+        ]
+
     def save_candidate(
         self,
         context: RequestContext,
         candidate: AssertionCandidate,
     ) -> AssertionCandidate:
+        if candidate.fingerprint:
+            existing_id = self.state.candidate_ids_by_fingerprint.get(
+                candidate.fingerprint
+            )
+            if existing_id is not None:
+                return self.state.candidates[existing_id].model_copy(deep=True)
+            self.state.candidate_ids_by_fingerprint[candidate.fingerprint] = candidate.id
         self.state.candidates[candidate.id] = candidate.model_copy(deep=True)
         return candidate.model_copy(deep=True)
 
@@ -80,11 +159,7 @@ class MemoryKnowledgeStore:
             raise ValidationError(
                 f"predicate {candidate.predicate} requires evidence"
             )
-        evidence_unit_ids = [
-            str(item["content_unit_id"])
-            for item in candidate.evidence
-            if isinstance(item, dict) and item.get("content_unit_id")
-        ]
+        evidence_unit_ids = [item.content_unit_id for item in candidate.evidence]
         derived_scopes: set[str] = set()
         evidence_snapshot_ids: set[str] = set()
         for unit_id in evidence_unit_ids:
@@ -105,6 +180,8 @@ class MemoryKnowledgeStore:
             acl_scopes=sorted(derived_scopes) or list(context.acl_scopes),
             evidence_unit_ids=evidence_unit_ids,
             evidence_acl_snapshot_ids=sorted(evidence_snapshot_ids),
+            valid_from=candidate.valid_from,
+            valid_to=candidate.valid_to,
         )
         candidate.status = "approved"
         candidate.review_note = note or f"approved by {reviewer_id}"
@@ -244,3 +321,7 @@ def _edge(assertion: ApprovedAssertion) -> GraphEdge:
         ontology_version=assertion.ontology_version,
         evidence_unit_ids=list(assertion.evidence_unit_ids),
     )
+
+
+def _entity_is_visible(entity: KnowledgeEntity, context: RequestContext) -> bool:
+    return not entity.acl_scopes or set(entity.acl_scopes).issubset(context.acl_scopes)

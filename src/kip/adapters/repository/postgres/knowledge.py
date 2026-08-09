@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from kip.adapters.repository.postgres.database import PostgresDatabase
+from kip.domain.knowledge import KnowledgeEntity
 from kip.domain.models import (
     ApprovedAssertion,
     AssertionCandidate,
@@ -17,6 +18,48 @@ from kip.domain.models import (
 @dataclass(frozen=True, slots=True)
 class PostgresKnowledgeStore:
     database: PostgresDatabase
+
+    def save_entity(
+        self,
+        context: RequestContext,
+        entity: KnowledgeEntity,
+    ) -> KnowledgeEntity:
+        return self.database.save_entity(context, entity)
+
+    def get_entity(
+        self,
+        context: RequestContext,
+        entity_id: str,
+    ) -> KnowledgeEntity:
+        return self.database.get_entity(context, entity_id)
+
+    def list_entities(
+        self,
+        context: RequestContext,
+        *,
+        limit: int = 100,
+    ) -> list[KnowledgeEntity]:
+        return self.database.list_entities(context, limit=limit)
+
+    def get_candidate_by_fingerprint(
+        self,
+        context: RequestContext,
+        fingerprint: str,
+    ) -> AssertionCandidate | None:
+        return self.database.get_candidate_by_fingerprint(context, fingerprint)
+
+    def find_assertions(
+        self,
+        context: RequestContext,
+        *,
+        subject_id: str,
+        predicate: str,
+    ) -> list[ApprovedAssertion]:
+        return self.database.find_assertions(
+            context,
+            subject_id=subject_id,
+            predicate=predicate,
+        )
 
     def save_candidate(
         self,

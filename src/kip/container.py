@@ -33,6 +33,7 @@ from kip.application.egress import EgressPolicyUseCases
 from kip.application.evidence import EvidenceUseCases
 from kip.application.ingestion import IngestionUseCases
 from kip.application.knowledge import KnowledgeUseCases
+from kip.application.ontology_rag import OntologyRagUseCases
 from kip.application.operations import OperationsUseCases
 from kip.application.runtime import Application
 from kip.application.search import RetrievalUseCases
@@ -200,6 +201,11 @@ def build_container(
             evidence,
             egress,
             selected_generator,
+        ),
+        ontology_rag=OntologyRagUseCases(
+            selected_repository.knowledge,
+            evidence,
+            ontology,
         ),
     )
     return Container(

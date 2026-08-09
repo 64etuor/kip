@@ -62,6 +62,18 @@ never selected unless configuration explicitly permits it.
 Entity -> AssertionCandidate -> ApprovedAssertion -> AssertionEvidence
 ```
 
+`KnowledgeEntity` stores an ontology type, normalized canonical name, aliases,
+status, and ACL scopes. `RelationProposal` names exact evidence-unit IDs and a
+versioned derivation. The application reopens those units and materializes
+`CandidateEvidence` with source revision hash, locator, and quote hash.
+
+Candidate fingerprints cover ontology version, normalized subject/object
+identity, predicate, validity interval, exact source revision and locator, and
+miner revision. Repeating the same proposal returns the same public candidate
+ID. A changed source or miner revision creates a different review candidate.
+Overlapping active assertions with a different object are recorded as explicit
+contradictions; no candidate is silently promoted or used as a fact.
+
 `AssertionExplanation` is a read model that combines one approved assertion with the exact `EvidenceRead` units supporting it. It is not stored as a second source of truth.
 
 `ApprovedAssertion.evidence_acl_snapshot_ids` is the denormalized freshness

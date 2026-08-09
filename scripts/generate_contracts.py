@@ -21,6 +21,10 @@ from kip.domain.generation import (  # noqa: E402
     GenerationRequest,
     GenerationResult,
 )
+from kip.domain.knowledge import (  # noqa: E402
+    KnowledgeEntity,
+    RelationProposal,
+)
 from kip.domain.models import (  # noqa: E402
     AnswerRequest,
     AnswerResponse,
@@ -87,6 +91,8 @@ MODELS = {
     "egress-decision": EgressDecision,
     "generation-request": GenerationRequest,
     "generation-result": GenerationResult,
+    "knowledge-entity": KnowledgeEntity,
+    "relation-proposal": RelationProposal,
     "setup-answers": SetupAnswers,
     "setup-inspection": SetupInspection,
     "setup-plan": SetupPlan,

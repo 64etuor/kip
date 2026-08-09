@@ -11,8 +11,8 @@ from kip.adapters.repository.postgres import PostgresRepository
 from kip.container import build_container
 from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
+from kip.domain.knowledge import KnowledgeEntity, RelationDerivation, RelationProposal
 from kip.domain.models import (
-    AssertionCandidate,
     EmbeddingRecord,
     EmbeddingSpace,
     GraphNeighborsRequest,
@@ -125,16 +125,44 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
         )
         assert vector_hits[0].unit_id == hits[0].unit_id
 
-        candidate = AssertionCandidate(
-            id=new_id("cand"),
+        for entity in (
+            KnowledgeEntity(
+                id="doc_new",
+                entity_type="Document",
+                canonical_name="변경 공문",
+                acl_scopes=[f"workspace:{workspace}"],
+            ),
+            KnowledgeEntity(
+                id="doc_old",
+                entity_type="Document",
+                canonical_name="원 협약",
+                acl_scopes=[f"workspace:{workspace}"],
+            ),
+        ):
+            container.application.ontology_rag.create_entity(context, entity)
+        proposal = RelationProposal(
             subject_id="doc_new",
             predicate="amends",
             object_entity_id="doc_old",
-            origin="postgres-integration",
             ontology_version="core/1.0.0",
-            evidence=[{"content_unit_id": hits[0].unit_id}],
+            evidence_unit_ids=(hits[0].unit_id,),
+            derivation=RelationDerivation(
+                kind="model",
+                name="postgres-integration",
+                model="fixture",
+                revision="r1",
+            ),
         )
-        container.application.knowledge.create_candidate(context, candidate)
+        candidate = container.application.ontology_rag.propose_relation(
+            context,
+            proposal,
+        )
+        duplicate = container.application.ontology_rag.propose_relation(
+            context,
+            proposal,
+        )
+        assert duplicate.id == candidate.id
+        assert repository.knowledge.get_entity(context, "doc_new").entity_type == "Document"
         assertion = container.application.knowledge.review_approve(context, candidate.id)
         explanation = container.application.knowledge.explain_assertion(context, assertion.id)
         assert explanation.assertion.id == assertion.id

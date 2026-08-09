@@ -129,13 +129,42 @@
           "default": null,
           "title": "Confidence"
         },
+        "contradicts_assertion_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Contradicts Assertion Ids",
+          "type": "array"
+        },
+        "derivation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RelationDerivation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "evidence": {
           "items": {
-            "additionalProperties": true,
-            "type": "object"
+            "$ref": "#/$defs/CandidateEvidence"
           },
           "title": "Evidence",
           "type": "array"
+        },
+        "fingerprint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fingerprint"
         },
         "id": {
           "title": "Id",
@@ -181,6 +210,16 @@
           "default": null,
           "title": "Review Note"
         },
+        "review_risk": {
+          "default": "medium",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Review Risk",
+          "type": "string"
+        },
         "status": {
           "default": "proposed",
           "enum": [
@@ -195,6 +234,32 @@
         "subject_id": {
           "title": "Subject Id",
           "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
         }
       },
       "required": [
@@ -205,6 +270,50 @@
         "ontology_version"
       ],
       "title": "AssertionCandidate",
+      "type": "object"
+    },
+    "CandidateEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "content_unit_id": {
+          "minLength": 1,
+          "title": "Content Unit Id",
+          "type": "string"
+        },
+        "locator": {
+          "additionalProperties": true,
+          "title": "Locator",
+          "type": "object"
+        },
+        "quote_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quote Hash"
+        },
+        "source_revision_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Revision Sha256"
+        }
+      },
+      "required": [
+        "content_unit_id"
+      ],
+      "title": "CandidateEvidence",
       "type": "object"
     },
     "ContentUnit": {
@@ -388,6 +497,62 @@
         "indexed_source_sha256"
       ],
       "title": "EvidenceRead",
+      "type": "object"
+    },
+    "RelationDerivation": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "manual",
+            "deterministic",
+            "model",
+            "ontology_migration"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "revision": {
+          "minLength": 1,
+          "title": "Revision",
+          "type": "string"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "revision"
+      ],
+      "title": "RelationDerivation",
       "type": "object"
     }
   },

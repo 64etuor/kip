@@ -1,0 +1,61 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "acl_scopes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Acl Scopes",
+      "type": "array"
+    },
+    "aliases": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Aliases",
+      "type": "array"
+    },
+    "canonical_name": {
+      "minLength": 1,
+      "title": "Canonical Name",
+      "type": "string"
+    },
+    "canonical_name_normalized": {
+      "default": "",
+      "title": "Canonical Name Normalized",
+      "type": "string"
+    },
+    "entity_type": {
+      "minLength": 1,
+      "title": "Entity Type",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    },
+    "status": {
+      "default": "active",
+      "enum": [
+        "active",
+        "merged",
+        "retired"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "entity_type",
+    "canonical_name"
+  ],
+  "title": "KnowledgeEntity",
+  "type": "object"
+}

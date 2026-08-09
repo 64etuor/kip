@@ -32,6 +32,7 @@ class KnowledgeUseCases:
         context: RequestContext,
         candidate: AssertionCandidate,
     ) -> AssertionCandidate:
+        candidate = AssertionCandidate.model_validate(dict(candidate))
         if self._ontology is not None:
             self._ontology.validate_candidate(
                 candidate.predicate,

@@ -1,0 +1,130 @@
+src/kip/application/knowledge.py
+  s_41856199ee83ad::t_96485c89011bd8 1-127
+src/kip/application/evidence.py
+  s_41856199ee83ad::t_81f7381e9371b3 1-89
+src/kip/ports/jobs.py
+  s_41856199ee83ad::t_107f04f6445b4a 1-29
+src/kip/architecture_rules.py
+  s_41856199ee83ad::t_1db647de04c630 18,21-23,30
+  s_41856199ee83ad::t_03c7d88ed7515b 1-17,19-20,24-29,31-35
+src/kip/ports/evidence.py
+  s_41856199ee83ad::t_107f04f6445b4a 1-29
+src/kip/domain/json_types.py
+  s_41856199ee83ad::t_107f04f6445b4a 1-5
+src/kip/adapters/connectors/registry.py
+  s_41856199ee83ad::t_1db647de04c630 9-10,17,26-44,47-58,106,152,155-156,160-161,164-165,167-168,176,179,182-183,190-191
+  s_41856199ee83ad::t_6b6f61b3b01d95 1-8,11-16,18-25,45-46,59-62,64-105,107-134,136-150,153,162,169-170,175,177,180,192-193
+  s_41856199ee83ad::t_c1fe5acab43325 63,135
+  s_41856199ee83ad::t_f058c4bf3548eb 151,154,157-159,163,166,171-174,178,181,184-189
+tests/characterization/test_application_dependency_rules.py
+  s_41856199ee83ad::t_a48facfade0fe5 7
+  s_41856199ee83ad::t_bcd71bd678869b 1-4,6,8-14,16-18
+  s_41856199ee83ad::t_03c7d88ed7515b 5,15
+src/kip/application/search.py
+  s_41856199ee83ad::t_80905927593b08 1-147
+tests/integration/test_postgres_repository.py
+  s_41856199ee83ad::t_74c3b478a52af7 65,70,72,76,85,130-132
+src/kip/application/search_engine.py
+  s_41856199ee83ad::t_0099e1ac352151 1-162
+tests/test_ontology_contract.py
+  s_41856199ee83ad::t_74c3b478a52af7 86,97
+src/kip/application/semantic.py
+  s_41856199ee83ad::t_f244b6c1efc236 1-198
+src/kip/ports/ingestion.py
+  s_41856199ee83ad::t_107f04f6445b4a 1-21,30-73
+  s_41856199ee83ad::t_1db647de04c630 22-29
+src/kip/adapters/storage/local.py
+  s_41856199ee83ad::t_6b6f61b3b01d95 1-6,8,11-14,18-60
+  s_41856199ee83ad::t_1db647de04c630 7,9-10,15-17,61
+src/kip/cli.py
+  s_41856199ee83ad::t_74c3b478a52af7 98,237,239,243,245,247,254,330,355,371,396,412,430,480,549,574,671,681,690,753,785,817,848,885,890
+  s_41856199ee83ad::t_2d876b8e9487dd 260-265,274,287,289,435-441,446-452,457-463,468-474,594,616,634-641,699-706,714,728,745,754-757,767,840,849-852,1002-1008,1017-1023
+tests/test_api.py
+  s_41856199ee83ad::t_74c3b478a52af7 12-13,40-41,65-66,91-92,96,110-111,134-135,158-159,185-186,218-219,241-242,253-254
+src/kip/mcp_server.py
+  s_41856199ee83ad::t_2711d2acf48b80 32,40,49,54,60,65,69,74,79,84,89,94,99
+src/kip/application/ingestion_files.py
+  s_41856199ee83ad::t_aaaa74ece49819 9,19-21,24-25,56,59-60,63-65,67,73,79-83,87-89,93-96,98,105,107,112,142-145,152-153,164-165,168
+src/kip/application/ingestion_events.py
+  s_41856199ee83ad::t_a3c4c39d6fd858 1-3,5-30,32-199,201-207,222-261
+  s_41856199ee83ad::t_72ad8809cad930 4,208-221
+  s_41856199ee83ad::t_fd1008f7f4a609 31
+  s_41856199ee83ad::t_3272e8faadd26f 200
+src/kip/adapters/connectors/filesystem.py
+  s_41856199ee83ad::t_44ec8e4a950d30 7
+  s_41856199ee83ad::t_6b6f61b3b01d95 11,13
+src/kip/container.py
+  s_41856199ee83ad::t_44ec8e4a950d30 18-22
+  s_41856199ee83ad::t_810a74ae5a66f5 55-65,117,123-124,136-137,145,148-150,158
+  s_41856199ee83ad::t_3a89de421e060b 6,24-30,37,41,67,115-116,118-121,125,130-135,138-144,146-147,151-155,159
+tests/test_semantic_repository_contract.py
+  s_41856199ee83ad::t_74c3b478a52af7 20-21,106-107
+src/kip/worker.py
+  s_41856199ee83ad::t_2711d2acf48b80 8-9,14,31,37,39,46,56-60,62
+  s_41856199ee83ad::t_74c3b478a52af7 15,20,23,26,29,35,45
+tests/characterization/test_edge_contract_parity.py
+  s_41856199ee83ad::t_1919832753037a 1-17,20-29,32-75
+  s_41856199ee83ad::t_74c3b478a52af7 18-19,30-31
+src/kip/adapters/storage/__init__.py
+  s_41856199ee83ad::t_6b6f61b3b01d95 1-11
+scripts/verify_project.py
+  s_41856199ee83ad::t_03c7d88ed7515b 9,86-89
+  s_41856199ee83ad::t_a48facfade0fe5 84-85,90
+  s_03506c0be5fcc9::t_435c59e367edd3 91
+src/kip/ports/retrieval.py
+  s_41856199ee83ad::t_107f04f6445b4a 1-46,48-53,55-73
+  s_41856199ee83ad::t_1db647de04c630 47,54
+src/kip/ports/knowledge.py
+  s_41856199ee83ad::t_107f04f6445b4a 1-68
+src/kip/ports/operations.py
+  s_41856199ee83ad::t_107f04f6445b4a 1-23
+src/kip/api.py
+  s_41856199ee83ad::t_0c676f24b320f7 124,148,152,156,183,187,216,228,232
+  s_41856199ee83ad::t_74c3b478a52af7 120,128,132,136,140,144,160,171,197,199,208,220,236,240,250
+src/kip/ports/repository.py
+  s_41856199ee83ad::t_e22279d92e573c 3,5-10,13-22
+src/kip/application/runtime.py
+  s_41856199ee83ad::t_7dfbfb1ee0ea2c 1-18
+src/kip/application/operations.py
+  s_41856199ee83ad::t_0c676f24b320f7 113-126
+  s_41856199ee83ad::t_7dfbfb1ee0ea2c 1-112,127-138
+tests/test_vocabulary_and_assertions.py
+  s_41856199ee83ad::t_74c3b478a52af7 13-14,16,28,30,36,40
+src/kip/application/ingestion.py
+  s_41856199ee83ad::t_a2162e4ae20f31 1-162
+tests/test_worker.py
+  s_41856199ee83ad::t_74c3b478a52af7 7-8,16-17,19
+tests/test_hybrid_retrieval.py
+  s_41856199ee83ad::t_74c3b478a52af7 214-218
+  s_41856199ee83ad::t_0feacf1edbb18f 119-125,127,136-141,146,150,165-174,176,181,208-213,236-245,247,252,266-279,282
+src/kip/adapters/parsers/registry.py
+  s_41856199ee83ad::t_6b6f61b3b01d95 12,17,56,65
+tests/test_xlsx_two_stage.py
+  s_41856199ee83ad::t_74c3b478a52af7 25-26,29,37,90-91,94,96
+tests/test_filesystem_retrieval.py
+  s_41856199ee83ad::t_74c3b478a52af7 10,12,16,20,28,33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "3e2f9cc7b96a958c7630e13054c8925c9d2e30a0",
+  "prompts": {},
+  "sessions": {
+    "s_03506c0be5fcc9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe45d-d747-77b2-a41f-9b77d2b510d0",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

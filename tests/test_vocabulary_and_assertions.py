@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from kip.domain.models import AssertionCandidate
+from kip.domain.models import AssertionCandidate, SearchRequest
 from kip.errors import ValidationError
 from kip.ids import new_id
 
@@ -29,10 +29,17 @@ def test_vocabulary_and_high_risk_assertion_review(test_container):
     with pytest.raises(ValidationError):
         test_container.application.knowledge.review_approve(context, candidate.id)
 
-    unit_id = next(iter(test_container.repository.units))
-    candidate.evidence = [{"content_unit_id": unit_id}]
-    candidate.status = "proposed"
-    test_container.repository.candidates[candidate.id] = candidate
+    unit_id = test_container.application.retrieval.search(
+        context,
+        SearchRequest(query="참여율 변경 승인"),
+    )[0].unit_id
+    candidate = candidate.model_copy(
+        update={
+            "evidence": [{"content_unit_id": unit_id}],
+            "status": "proposed",
+        }
+    )
+    test_container.application.knowledge.create_candidate(context, candidate)
     assertion = test_container.application.knowledge.review_approve(context, candidate.id)
     assert assertion.predicate == "amends"
     assert assertion.evidence_unit_ids == [unit_id]
@@ -44,7 +51,7 @@ def test_vocabulary_and_high_risk_assertion_review(test_container):
     assert explanation.evidence[0].unit.id == unit_id
     assert "참여율 변경 승인" in explanation.evidence[0].unit.body
 
-    edges = test_container.repository.graph_neighbors(
+    edges = test_container.repository.knowledge.graph_neighbors(
         context,
         __import__("kip.domain.models", fromlist=["GraphNeighborsRequest"]).GraphNeighborsRequest(node_id="doc_new"),
     )

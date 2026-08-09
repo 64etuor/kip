@@ -57,8 +57,6 @@ class ContentAddressedStorePort(Protocol):
 
 
 class IngestionStore(Protocol):
-    name: str
-
     def has_revision(
         self,
         context: RequestContext,

@@ -5,6 +5,8 @@ from pathlib import Path
 import pytest
 
 from kip.adapters.repository.memory import MemoryRepository
+from kip.adapters.repository.memory.retrieval import MemoryRetrievalStore
+from kip.adapters.repository.memory.state import MemoryState
 from kip.application.retrieval import reciprocal_rank_fusion
 from kip.container import build_container
 from kip.domain.models import EvidenceLocator, SearchHit, SearchRequest
@@ -66,18 +68,17 @@ class FixtureReranker:
         return sorted(scores, key=lambda item: (-item.score, item.index))
 
 
-class CountingMemoryRepository(MemoryRepository):
-    def __init__(self) -> None:
-        super().__init__()
-        self.single_lookup_count = 0
-        self.bulk_lookup_count = 0
-
-    def get_content_unit(self, context, unit_id):
-        self.single_lookup_count += 1
-        return super().get_content_unit(context, unit_id)
+class CountingMemoryRetrievalStore(MemoryRetrievalStore):
+    def __init__(self, state: MemoryState) -> None:
+        super().__init__(state)
+        object.__setattr__(self, "bulk_lookup_count", 0)
 
     def get_content_units(self, context, unit_ids):
-        self.bulk_lookup_count += 1
+        object.__setattr__(
+            self,
+            "bulk_lookup_count",
+            self.bulk_lookup_count + 1,
+        )
         return super().get_content_units(context, unit_ids)
 
 
@@ -204,7 +205,9 @@ def test_reranking_fetches_candidate_units_in_one_repository_call(
     source_root = tmp_path / "source"
     (source_root / "승인.txt").write_text("참여율 변경을 승인한다.", encoding="utf-8")
     (source_root / "허가.txt").write_text("계약 조건의 수정을 허가한다.", encoding="utf-8")
-    repository = CountingMemoryRepository()
+    state = MemoryState()
+    counting_retrieval = CountingMemoryRetrievalStore(state)
+    repository = MemoryRepository(state, retrieval=counting_retrieval)
     container = build_container(
         test_container.settings,
         repository=repository,
@@ -221,8 +224,7 @@ def test_reranking_fetches_candidate_units_in_one_repository_call(
         mode="reranked",
     )
 
-    assert repository.bulk_lookup_count == 1
-    assert repository.single_lookup_count == 0
+    assert counting_retrieval.bulk_lookup_count == 1
 
 
 def test_optional_default_mode_falls_back_but_explicit_hybrid_fails(
@@ -241,8 +243,8 @@ def test_optional_default_mode_falls_back_but_explicit_hybrid_fails(
     context = container.application.operations.request_context()
     container.application.ingestion.sync_filesystem(context, "fixture")
     space = container.application.retrieval.embedding_space(context)
-    container.repository.save_embedding_space(context, space)
-    container.repository.activate_embedding_space(context, space.id)
+    container.repository.retrieval.save_embedding_space(context, space)
+    container.repository.retrieval.activate_embedding_space(context, space.id)
 
     fallback = container.application.retrieval.search(context, SearchRequest(query="승인"))
 
@@ -271,7 +273,10 @@ def test_failed_rebuild_does_not_replace_active_space(
     context = container.application.operations.request_context()
     container.application.ingestion.sync_filesystem(context, "fixture")
     built = container.application.retrieval.rebuild_semantic_projection(context)
-    container.repository.activate_embedding_space(context, built["space_id"])
+    container.repository.retrieval.activate_embedding_space(
+        context,
+        built["space_id"],
+    )
     failing_container = build_container(
         test_container.settings,
         repository=test_container.repository,
@@ -281,6 +286,6 @@ def test_failed_rebuild_does_not_replace_active_space(
     with pytest.raises(DependencyUnavailableError):
         failing_container.application.retrieval.rebuild_semantic_projection(context)
 
-    active = test_container.repository.active_embedding_space(context)
+    active = test_container.repository.retrieval.active_embedding_space(context)
     assert active is not None
     assert active.id == built["space_id"]

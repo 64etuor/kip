@@ -114,14 +114,14 @@ def build_container(
                 assert_never(unreachable)
     selected.cas_path.mkdir(parents=True, exist_ok=True)
     evidence = EvidenceUseCases(
-        selected_repository,
+        selected_repository.evidence,
         LocalSourceFileInspector(),
         LocalWorkbookReader(),
     )
     retrieval = RetrievalUseCases(
         selected,
-        selected_repository,
-        selected_repository,
+        selected_repository.retrieval,
+        selected_repository.operations,
         evidence,
         analyzer,
         selected_embedding,
@@ -133,8 +133,8 @@ def build_container(
     )
     application = Application(
         ingestion=IngestionUseCases(
-            selected_repository,
-            selected_repository,
+            selected_repository.ingestion,
+            selected_repository.jobs,
             sources,
             parsers,
             analyzer,
@@ -142,12 +142,16 @@ def build_container(
         ),
         retrieval=retrieval,
         evidence=evidence,
-        knowledge=KnowledgeUseCases(selected_repository, evidence, ontology),
+        knowledge=KnowledgeUseCases(
+            selected_repository.knowledge,
+            evidence,
+            ontology,
+        ),
         operations=OperationsUseCases(
             selected,
-            selected_repository,
-            selected_repository,
-            selected_repository,
+            selected_repository.operations,
+            selected_repository.jobs,
+            selected_repository.retrieval,
             sources,
             parsers,
             selected_embedding,

@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 from openpyxl import Workbook
 
 from kip.api import create_app
-from kip.domain.models import AssertionCandidate
+from kip.domain.models import AssertionCandidate, SearchRequest
 from kip.ids import new_id
 
 
@@ -90,7 +90,10 @@ def test_read_marks_missing_source_as_changed(test_container):
     path.write_text("삭제 전 원본", encoding="utf-8")
     context = test_container.application.operations.request_context()
     test_container.application.ingestion.sync_filesystem(context, "fixture")
-    unit_id = next(iter(test_container.repository.units))
+    unit_id = test_container.application.retrieval.search(
+        context,
+        SearchRequest(query="삭제 전 원본"),
+    )[0].unit_id
     path.unlink()
 
     evidence = test_container.application.evidence.read_unit(context, unit_id)
@@ -240,7 +243,10 @@ def test_rest_explains_approved_assertion_with_evidence(test_container):
     path.write_text("A과제 참여율 변경을 승인한다.", encoding="utf-8")
     context = test_container.application.operations.request_context()
     test_container.application.ingestion.sync_filesystem(context, "fixture")
-    unit_id = next(iter(test_container.repository.units))
+    unit_id = test_container.application.retrieval.search(
+        context,
+        SearchRequest(query="A과제 참여율 변경 승인"),
+    )[0].unit_id
     candidate = AssertionCandidate(
         id=new_id("cand"),
         subject_id="doc_new",

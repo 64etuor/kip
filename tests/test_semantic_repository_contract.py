@@ -19,7 +19,7 @@ def test_embedding_spaces_coexist_and_vector_search_is_acl_safe(
     (source_root / "공개.txt").write_text("참여율 변경을 승인한다.", encoding="utf-8")
     context = test_container.application.operations.request_context()
     test_container.application.ingestion.sync_filesystem(context, "fixture")
-    repository = test_container.repository
+    repository = test_container.repository.retrieval
     units = repository.list_embeddable_units(context)
     assert len(units) == 1
 
@@ -105,7 +105,7 @@ def test_stale_vectors_are_excluded_without_deleting_other_spaces(
     (source_root / "근거.txt").write_text("정산 증빙을 확인한다.", encoding="utf-8")
     context = test_container.application.operations.request_context()
     test_container.application.ingestion.sync_filesystem(context, "fixture")
-    repository = test_container.repository
+    repository = test_container.repository.retrieval
     unit = repository.list_embeddable_units(context)[0]
     first = EmbeddingSpace(
         id=stable_id("espace", "default", "first"),
@@ -149,4 +149,4 @@ def test_stale_vectors_are_excluded_without_deleting_other_spaces(
 
     assert hits == []
     assert repository.semantic_status(context)["vectors"] == 2
-    assert repository.status(context).content_units == 1
+    assert test_container.repository.operations.status(context).content_units == 1

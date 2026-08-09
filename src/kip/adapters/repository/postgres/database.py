@@ -7,7 +7,13 @@ from collections.abc import Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from psycopg import Connection
+    from psycopg.rows import DictRow
 
 from kip.domain.models import (
     ApprovedAssertion,
@@ -70,7 +76,7 @@ def _websearch_or_query(lexemes: str) -> str:
     return " OR ".join(f'"{term}"' for term in terms[:256])
 
 
-class PostgresRepository:
+class PostgresDatabase:
     """PostgreSQL canonical repository and baseline lexical/graph adapter."""
 
     name = "postgresql"
@@ -84,7 +90,10 @@ class PostgresRepository:
             raise DependencyUnavailableError("Install the postgres extra: pip install '.[postgres]'") from exc
 
     @contextmanager
-    def _connection(self, context: RequestContext | None = None):
+    def _connection(
+        self,
+        context: RequestContext | None = None,
+    ) -> Generator[Connection[DictRow], None, None]:
         import psycopg
         from psycopg.rows import dict_row
 
@@ -130,7 +139,11 @@ class PostgresRepository:
                 applied.append(path.name)
         return applied
 
-    def _ensure_workspace_and_principal(self, connection, context: RequestContext) -> None:
+    def _ensure_workspace_and_principal(
+        self,
+        connection: Connection[DictRow],
+        context: RequestContext,
+    ) -> None:
         with connection.cursor() as cursor:
             cursor.execute(
                 "INSERT INTO kip.workspaces(slug, name) VALUES (%s, %s) ON CONFLICT (slug) DO NOTHING",
@@ -619,6 +632,10 @@ class PostgresRepository:
             )
             row = cursor.fetchone()
             connection.commit()
+        if row is None:
+            raise DependencyUnavailableError(
+                "PostgreSQL did not return the saved embedding space"
+            )
         return self._embedding_space(row)
 
     def active_embedding_space(self, context: RequestContext) -> EmbeddingSpace | None:
@@ -670,6 +687,10 @@ class PostgresRepository:
             )
             row = cursor.fetchone()
             connection.commit()
+        if row is None:
+            raise DependencyUnavailableError(
+                "PostgreSQL did not return the activated embedding space"
+            )
         return self._embedding_space(row)
 
     def upsert_embeddings(
@@ -1091,7 +1112,11 @@ class PostgresRepository:
                 )
                 row = cursor.fetchone()
             connection.commit()
-        return row["public_id"]
+        if row is None:
+            raise DependencyUnavailableError(
+                "PostgreSQL did not return the enqueued job"
+            )
+        return str(row["public_id"])
 
     def claim_job(self, context: RequestContext, worker_id: str) -> JobRecord | None:
         with self._connection(context) as connection, connection.cursor() as cursor:
@@ -1353,7 +1378,12 @@ class PostgresRepository:
         with self._connection(context) as connection, connection.cursor() as cursor:
             for name, query in queries.items():
                 cursor.execute(query, (context.workspace,))
-                values[name] = int(cursor.fetchone()["count"])
+                row = cursor.fetchone()
+                if row is None:
+                    raise DependencyUnavailableError(
+                        f"PostgreSQL did not return status counter {name}"
+                    )
+                values[name] = int(row["count"])
         return StatusReport(workspace=context.workspace, repository=self.name, **values)
 
     def rebuild_projection(self, context: RequestContext, projection: str) -> dict[str, Any]:

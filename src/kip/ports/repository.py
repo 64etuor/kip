@@ -10,13 +10,24 @@ from kip.ports.operations import OperationsStore
 from kip.ports.retrieval import RetrievalStore
 
 
-class RepositoryPort(
-    IngestionStore,
-    RetrievalStore,
-    EvidenceStore,
-    KnowledgeStore,
-    JobStore,
-    OperationsStore,
-    Protocol,
-):
-    pass
+class RepositoryPort(Protocol):
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def ingestion(self) -> IngestionStore: ...
+
+    @property
+    def retrieval(self) -> RetrievalStore: ...
+
+    @property
+    def evidence(self) -> EvidenceStore: ...
+
+    @property
+    def knowledge(self) -> KnowledgeStore: ...
+
+    @property
+    def jobs(self) -> JobStore: ...
+
+    @property
+    def operations(self) -> OperationsStore: ...

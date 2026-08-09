@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 
 from kip.api import create_app
 from kip.cli import app
-from kip.domain.models import AssertionCandidate
+from kip.domain.models import AssertionCandidate, SearchRequest
 from kip.ids import new_id
 
 
@@ -17,7 +17,10 @@ def test_cli_and_rest_preserve_stable_edge_semantics(test_container, monkeypatch
     path.write_text("A과제 참여율 변경을 승인한다.", encoding="utf-8")
     context = test_container.application.operations.request_context()
     test_container.application.ingestion.sync_filesystem(context, "fixture")
-    unit_id = next(iter(test_container.repository.units))
+    unit_id = test_container.application.retrieval.search(
+        context,
+        SearchRequest(query="A과제 참여율 변경 승인"),
+    )[0].unit_id
     candidate = AssertionCandidate(
         id=new_id("cand"),
         subject_id="project_a_change",

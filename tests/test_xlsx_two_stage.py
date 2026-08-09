@@ -28,7 +28,10 @@ def test_xlsx_shallow_search_and_deep_range(test_container):
 
     hits = test_container.application.retrieval.search(context, SearchRequest(query="장비비 카메라", limit=10))
     assert hits
-    unit = test_container.repository.get_content_unit(context, hits[0].unit_id)
+    unit = test_container.repository.evidence.get_content_unit(
+        context,
+        hits[0].unit_id,
+    )
     assert unit.unit_type == "xlsx_sheet_shallow"
     assert "장비비" in unit.body
     assert "890000" not in unit.body

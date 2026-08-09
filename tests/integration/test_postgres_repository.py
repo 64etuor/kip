@@ -61,7 +61,7 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
     )
     repository = PostgresRepository(str(URL))
     container = build_container(settings, repository=repository)
-    repository.migrate(settings.project_root / "migrations")
+    repository.operations.migrate(settings.project_root / "migrations")
     context = container.application.operations.request_context(
         workspace=workspace,
         acl_scopes=[f"workspace:{workspace}"],
@@ -71,7 +71,10 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
         assert summary.inserted == 1
         hits = container.application.retrieval.search(context, SearchRequest(query="참여율 변경 승인", limit=10))
         assert hits
-        bulk_units = repository.get_content_units(context, [hit.unit_id for hit in hits])
+        bulk_units = repository.evidence.get_content_units(
+            context,
+            [hit.unit_id for hit in hits],
+        )
         assert [unit.id for unit in bulk_units] == [hit.unit_id for hit in hits]
         natural_hits = container.application.retrieval.search(
             context,
@@ -85,7 +88,7 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
         evidence = container.application.evidence.read_unit(context, hits[0].unit_id)
         assert evidence.source_changed_since_index is False
 
-        embeddable = repository.list_embeddable_units(context)
+        embeddable = repository.retrieval.list_embeddable_units(context)
         space = EmbeddingSpace(
             id=stable_id("espace", workspace, "fixture-1024"),
             name="fixture-1024",
@@ -96,8 +99,8 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
             normalized=True,
             status="shadow",
         )
-        repository.save_embedding_space(context, space)
-        repository.upsert_embeddings(
+        repository.retrieval.save_embedding_space(context, space)
+        repository.retrieval.upsert_embeddings(
             context,
             space.id,
             [
@@ -108,8 +111,8 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
                 )
             ],
         )
-        repository.activate_embedding_space(context, space.id)
-        vector_hits = repository.vector_search(
+        repository.retrieval.activate_embedding_space(context, space.id)
+        vector_hits = repository.retrieval.vector_search(
             context,
             SearchRequest(query="표현이 다른 승인 질의", limit=10),
             [1.0] + [0.0] * 1023,
@@ -132,12 +135,12 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
         explanation = container.application.knowledge.explain_assertion(context, assertion.id)
         assert explanation.assertion.id == assertion.id
         assert explanation.evidence[0].unit.id == hits[0].unit_id
-        edges = repository.graph_neighbors(
+        edges = repository.knowledge.graph_neighbors(
             context,
             GraphNeighborsRequest(node_id="doc_new", direction="out"),
         )
         assert [edge.assertion_id for edge in edges] == [assertion.id]
-        paths = repository.graph_path(
+        paths = repository.knowledge.graph_path(
             context,
             GraphPathRequest(from_node_id="doc_new", to_node_id="doc_old"),
         )
@@ -150,17 +153,17 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
             request_id=new_id("req"),
         )
         with pytest.raises(NotFoundError):
-            repository.get_assertion(restricted_context, assertion.id)
-        assert repository.graph_neighbors(
+            repository.knowledge.get_assertion(restricted_context, assertion.id)
+        assert repository.knowledge.graph_neighbors(
             restricted_context,
             GraphNeighborsRequest(node_id="doc_new"),
         ) == []
-        assert repository.graph_path(
+        assert repository.knowledge.graph_path(
             restricted_context,
             GraphPathRequest(from_node_id="doc_new", to_node_id="doc_old"),
         ) == []
 
-        status = repository.status(context)
+        status = repository.operations.status(context)
         assert status.source_objects == 1
         assert status.content_units == 1
     finally:

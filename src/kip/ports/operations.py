@@ -8,7 +8,8 @@ from kip.domain.models import RequestContext, StatusReport
 
 
 class OperationsStore(Protocol):
-    name: str
+    @property
+    def name(self) -> str: ...
 
     def migrate(self, migrations_dir: Path) -> list[str]: ...
 

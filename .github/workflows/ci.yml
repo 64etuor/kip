@@ -2,14 +2,34 @@ name: ci
 
 on:
   push:
+    branches: ["**"]
+    tags: ["v*"]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_VERSION: "0.8.22"
+  UV_NO_PROGRESS: "1"
 
 jobs:
-  test:
+  quality:
+    name: quality / python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
     services:
       postgres:
-        image: pgvector/pgvector:0.8.2-pg18-trixie
+        image: pgvector/pgvector:0.8.2-pg18-trixie@sha256:b7337db8fe39d12fe8ecb0003c72680f24479813a744b43154eee6f2eab5a5f3
         env:
           POSTGRES_DB: kip
           POSTGRES_USER: kip_owner
@@ -22,17 +42,293 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     env:
+      KIP_CONFIG: config/kip.example.toml
       KIP_DATABASE_URL: postgresql://kip_owner:test-password@127.0.0.1:5432/kip
       KIP_WORKSPACE: default
       KIP_ENV: test
+      KIP_CAS_PATH: ${{ github.workspace }}/var/ci-cas
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install locked test environment
+        run: >-
+          uv sync --frozen
+          --extra postgres
+          --extra api
+          --extra identity
+          --extra extractors
+          --extra mcp
+          --extra neo4j
+          --extra telemetry
+          --extra dev
+
+      - name: Check generated contracts, boundaries, lint, and types
+        run: |
+          mkdir -p var/ci-cas
+          uv run python -m compileall -q src tests scripts sdk
+          while IFS= read -r script; do bash -n "$script"; done < <(find scripts examples -type f -name '*.sh' -print | sort)
+          uv run python scripts/generate_contracts.py --check
+          uv run python scripts/verify_project.py
+          uv run ruff check src tests scripts
+          uv run mypy src/kip
+
+      - name: Audit locked runtime dependencies
+        if: matrix.python-version == '3.12'
+        run: >-
+          uv run pip-audit
+          --requirement requirements/runtime.txt
+          --no-deps
+          --disable-pip
+
+      - name: Migrate and run tests with coverage
+        run: |
+          uv run kip migrate
+          uv run pytest --cov --cov-report=term --cov-report=xml
+
+      - name: Upload coverage evidence
+        if: success() && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-python-3.12
+          path: coverage.xml
+          if-no-files-found: error
+          retention-days: 14
+
+  distribution:
+    name: distribution candidate
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
-      - run: python -m pip install --upgrade pip
-      - run: python -m pip install -e '.[postgres,api,extractors,dev]'
-      - run: kip migrate
-      - run: pytest
-      - run: python scripts/generate_contracts.py --check
-      - run: python scripts/verify_project.py
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Read release version
+        id: version
+        shell: bash
+        run: |
+          {
+            echo "value=$(tr -d '[:space:]' < VERSION)"
+            echo "epoch=$(git show -s --format=%ct HEAD)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install locked build environment
+        run: uv sync --frozen --extra dev
+
+      - name: Build wheel
+        run: uv build --build-constraints requirements/build.txt --wheel --out-dir dist/wheels
+
+      - name: Install wheel in a clean environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          smoke_dir="$(mktemp -d)"
+          trap 'rm -rf "$smoke_dir"' EXIT
+          uv venv "$smoke_dir" --python 3.12
+          uv pip install --python "$smoke_dir/bin/python" dist/wheels/*.whl
+          KIP_CONFIG="$PWD/config/kip.example.toml" \
+          KIP_DATABASE_URL="memory://" \
+          KIP_CAS_PATH="$smoke_dir/cas" \
+            "$smoke_dir/bin/kip" capabilities > "$smoke_dir/capabilities.json"
+          "$smoke_dir/bin/python" -c 'import json,sys; payload=json.load(open(sys.argv[1])); assert payload["ok"] and payload["schema_version"] == "kip.envelope.v1"' "$smoke_dir/capabilities.json"
+
+      - name: Build loadable image with provenance and SBOM
+        id: image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          load: true
+          push: false
+          tags: kip-ci:${{ github.sha }}
+          build-args: |
+            VERSION=${{ steps.version.outputs.value }}
+            VCS_REF=${{ github.sha }}
+            SOURCE_URL=${{ github.server_url }}/${{ github.repository }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run hardened image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --read-only \
+            --tmpfs /tmp:size=64m,noexec,nosuid,nodev \
+            --tmpfs /data:size=64m,noexec,nosuid,nodev,uid=10001,gid=10001,mode=0700 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --user 10001:10001 \
+            -e KIP_CONFIG=/app/config/kip.container.toml \
+            -e KIP_DATABASE_URL=memory:// \
+            -e KIP_CAS_PATH=/data/cas \
+            -e KIP_ENV=test \
+            "kip-ci:${GITHUB_SHA}" capabilities > image-capabilities.json
+          python -c 'import json; payload=json.load(open("image-capabilities.json")); assert payload["ok"] and payload["schema_version"] == "kip.envelope.v1"'
+
+      - name: Build and verify release bundle
+        env:
+          KIP_API_IMAGE: local/kip@${{ steps.image.outputs.digest }}
+          KIP_WORKER_IMAGE: local/kip@${{ steps.image.outputs.digest }}
+          KIP_MIGRATE_IMAGE: local/kip@${{ steps.image.outputs.digest }}
+          KIP_RELEASE_WHEEL: dist/wheels/kip_knowledge_fabric-${{ steps.version.outputs.value }}-py3-none-any.whl
+          SOURCE_DATE_EPOCH: ${{ steps.version.outputs.epoch }}
+        run: |
+          ./scripts/release-bundle.sh dist/release
+          ./scripts/verify-release.sh dist/release
+          ./scripts/verify-release.sh dist/release.tar.gz
+
+      - name: Upload verified distribution candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: kip-${{ steps.version.outputs.value }}-${{ github.sha }}
+          path: |
+            dist/wheels/*.whl
+            dist/release.tar.gz
+            dist/release/artifacts/*.json
+            image-capabilities.json
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: publish immutable release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [quality, distribution]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Validate tag and image name
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < VERSION)"
+          test "${GITHUB_REF_NAME}" = "v${version}"
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          {
+            echo "version=${version}"
+            echo "image=${image}"
+            echo "epoch=$(git show -s --format=%ct HEAD)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build and push immutable image
+        id: image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.release.outputs.image }}:${{ steps.release.outputs.version }}
+            ${{ steps.release.outputs.image }}:${{ github.sha }}
+          build-args: |
+            VERSION=${{ steps.release.outputs.version }}
+            VCS_REF=${{ github.sha }}
+            SOURCE_URL=${{ github.server_url }}/${{ github.repository }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build signed release payload
+        shell: bash
+        env:
+          KIP_RELEASE_WHEEL: dist/wheels/kip_knowledge_fabric-${{ steps.release.outputs.version }}-py3-none-any.whl
+          SOURCE_DATE_EPOCH: ${{ steps.release.outputs.epoch }}
+        run: |
+          set -euo pipefail
+          uv sync --frozen --extra dev
+          uv build --build-constraints requirements/build.txt --wheel --out-dir dist/wheels
+          image_ref="${{ steps.release.outputs.image }}@${{ steps.image.outputs.digest }}"
+          KIP_API_IMAGE="$image_ref" \
+          KIP_WORKER_IMAGE="$image_ref" \
+          KIP_MIGRATE_IMAGE="$image_ref" \
+            ./scripts/release-bundle.sh dist/release
+          ./scripts/verify-release.sh dist/release.tar.gz
+
+      - name: Attest release provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/wheels/*.whl
+            dist/release.tar.gz
+
+      - name: Attest release wheel SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: dist/wheels/*.whl
+          sbom-path: dist/release/artifacts/sbom.spdx.json
+
+      - name: Upload immutable release payload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: kip-release-${{ steps.release.outputs.version }}
+          path: |
+            dist/wheels/*.whl
+            dist/release.tar.gz
+            dist/release/artifacts/*.json
+          if-no-files-found: error
+          retention-days: 90

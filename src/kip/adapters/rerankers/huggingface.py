@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 from enum import StrEnum
+from importlib import import_module
 from typing import Protocol, cast
 
 from kip.errors import ConfigurationError, DependencyUnavailableError
@@ -32,6 +33,10 @@ class JinaSequenceClassifier(Protocol):
     def eval(self) -> JinaSequenceClassifier: ...
 
     def to(self, device: str) -> JinaSequenceClassifier: ...
+
+
+class JinaSequenceClassifierFactory(Protocol):
+    def from_pretrained(self, model: str, **kwargs: object) -> JinaSequenceClassifier: ...
 
 
 class HuggingFaceJinaRerankerAdapter:
@@ -66,21 +71,21 @@ class HuggingFaceJinaRerankerAdapter:
     @staticmethod
     def _load_model(model: str, revision: str) -> JinaSequenceClassifier:
         try:
-            from transformers import AutoModelForSequenceClassification
+            factory = cast(
+                JinaSequenceClassifierFactory,
+                import_module("transformers").AutoModelForSequenceClassification,
+            )
         except ModuleNotFoundError as error:
             raise DependencyUnavailableError(
                 "Hugging Face Jina reranking requires the semantic dependencies"
             ) from error
         try:
-            return cast(
-                JinaSequenceClassifier,
-                AutoModelForSequenceClassification.from_pretrained(
-                    model,
-                    revision=revision,
-                    dtype="auto",
-                    trust_remote_code=True,
-                    use_flash_attn=False,
-                ),
+            return factory.from_pretrained(
+                model,
+                revision=revision,
+                dtype="auto",
+                trust_remote_code=True,
+                use_flash_attn=False,
             )
         except (OSError, RuntimeError) as error:
             raise DependencyUnavailableError(

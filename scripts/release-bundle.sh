@@ -19,7 +19,11 @@ if [[ -z "$WHEEL" ]]; then
   command -v uv >/dev/null
   WHEEL_TMP="$(mktemp -d "${TMPDIR:-/tmp}/kip-release-wheel.XXXXXX")"
   trap 'rm -rf "$WHEEL_TMP"' EXIT
-  uv build --wheel --out-dir "$WHEEL_TMP" "$PROJECT_ROOT"
+  uv build \
+    --build-constraints "$PROJECT_ROOT/requirements/build.txt" \
+    --wheel \
+    --out-dir "$WHEEL_TMP" \
+    "$PROJECT_ROOT"
   WHEELS=("$WHEEL_TMP"/*.whl)
   if [[ ${#WHEELS[@]} -ne 1 || ! -f "${WHEELS[0]}" ]]; then
     printf '%s\n' "release build did not produce exactly one wheel" >&2

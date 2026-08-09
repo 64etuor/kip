@@ -14,4 +14,7 @@ done < <(find scripts examples -type f -name '*.sh' -print | sort)
 if command -v ruff >/dev/null 2>&1; then
   ruff check src tests scripts
 fi
+if command -v mypy >/dev/null 2>&1; then
+  mypy src/kip
+fi
 printf 'Verification passed.\n'

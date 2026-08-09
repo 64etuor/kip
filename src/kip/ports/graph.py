@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from kip.domain.models import GraphEdge, GraphNeighborsRequest, GraphPath, GraphPathRequest, RequestContext
+from kip.domain.models import (
+    GraphEdge,
+    GraphNeighborsRequest,
+    GraphPath,
+    GraphPathRequest,
+    RequestContext,
+)
 
 
 class GraphProjectionPort(Protocol):

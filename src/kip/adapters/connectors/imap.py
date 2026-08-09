@@ -7,7 +7,6 @@ from collections.abc import Iterator
 from datetime import UTC, datetime
 from email import policy
 from email.message import Message
-from typing import Any
 
 from kip.domain.models import ConnectorEvent
 from kip.errors import ConfigurationError, SourceUnavailableError

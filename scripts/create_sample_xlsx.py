@@ -3,8 +3,10 @@ from pathlib import Path
 
 try:
     from openpyxl import Workbook
-except ImportError:
-    raise SystemExit("Install the extractors extra before generating the sample workbook")
+except ImportError as exc:
+    raise SystemExit(
+        "Install the extractors extra before generating the sample workbook"
+    ) from exc
 
 root = Path(__file__).resolve().parents[1]
 out = root / "sample-data" / "A과제_정산.xlsx"

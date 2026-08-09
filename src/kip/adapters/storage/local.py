@@ -13,7 +13,6 @@ from kip.domain.json_types import JsonObject
 from kip.errors import NotFoundError
 from kip.ids import sha256_bytes
 
-
 _CELL_MATRIX: Final = TypeAdapter(list[list[JsonObject]])
 
 

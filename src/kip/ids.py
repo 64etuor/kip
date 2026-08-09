@@ -14,7 +14,7 @@ def new_id(prefix: str) -> str:
 
 def stable_id(prefix: str, namespace: str, value: str) -> str:
     _validate_prefix(prefix)
-    digest = hashlib.sha256(f"{namespace}\0{value}".encode("utf-8")).hexdigest()[:32]
+    digest = hashlib.sha256(f"{namespace}\0{value}".encode()).hexdigest()[:32]
     return f"{prefix}_{digest}"
 
 

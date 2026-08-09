@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import mimetypes
 from pathlib import Path
+from typing import ClassVar
 
 from kip.application.analyzer import normalize_text
 from kip.domain.models import ContentUnit, EvidenceLocator, ExtractionRun
@@ -11,7 +12,15 @@ from kip.ids import new_id, sha256_bytes, stable_id
 class PlainTextParser:
     name = "plain-text"
     version = "1.0"
-    extensions = {".txt", ".md", ".csv", ".json", ".yaml", ".yml", ".log"}
+    extensions: ClassVar[set[str]] = {
+        ".txt",
+        ".md",
+        ".csv",
+        ".json",
+        ".yaml",
+        ".yml",
+        ".log",
+    }
 
     def supports(self, path: Path) -> bool:
         return path.suffix.lower() in self.extensions

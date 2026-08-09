@@ -1,0 +1,118 @@
+docs/IMPLEMENTATION_STATUS.md
+  s_41856199ee83ad::t_066f748f2407c6 13,45-47
+tests/test_setup_planner.py
+  s_41856199ee83ad::t_21e2ca424fd009 33-45
+  s_41856199ee83ad::t_8ab1b1376a0bf7 126
+src/kip/ports/ingestion.py
+  s_41856199ee83ad::t_fc21d90f5057d2 8,36-38,58-59,77
+src/kip/adapters/connectors/registry.py
+  s_41856199ee83ad::t_55902fad227d43 143-145,178-184,194,332-344
+  s_41856199ee83ad::t_6b13e112ee613b 264
+  s_41856199ee83ad::t_08fd64064c6d13 215
+  s_41856199ee83ad::t_fc21d90f5057d2 17,40,51,64,73,146,152,172,176-177,185-193,195-209,229
+  s_41856199ee83ad::t_de8430ba857f8c 210
+src/kip/setup/writer.py
+  s_41856199ee83ad::t_d9c189de4e5367 92,94-95
+migrations/0008_data_classification.sql
+  s_41856199ee83ad::t_2202249230a6f0 1-28
+contracts/evidence-read.schema.json
+  s_41856199ee83ad::t_119c385eef692f 37-40,108-117
+  s_41856199ee83ad::t_966144bd8e3c64 118
+src/kip/setup/planner.py
+  s_41856199ee83ad::t_41f8345f7f0447 140,198-199,301,303,310,314-319
+  s_03506c0be5fcc9::t_8a800625610f19 320
+docs/STARTER_KIT_GUIDE.md
+  s_41856199ee83ad::t_af62d1c016e562 14,27-28,71-72
+contracts/content-unit.schema.json
+  s_41856199ee83ad::t_119c385eef692f 3-13,68-71
+contracts/setup-plan.schema.json
+  s_41856199ee83ad::t_119c385eef692f 274,281-295,382
+src/kip/adapters/repository/postgres/database.py
+  s_41856199ee83ad::t_2202249230a6f0 18,215,224-225,231,239,249,320-326,348-349,355,363-364,373,414-416,421,435,550-551,568,1107,1130,1174
+src/kip/domain/models.py
+  s_41856199ee83ad::t_fc21d90f5057d2 8,54,126
+contracts/assertion-explanation.schema.json
+  s_41856199ee83ad::t_119c385eef692f 244-247,315-324
+  s_41856199ee83ad::t_b4e801c366fb08 325
+contracts/document-packet.schema.json
+  s_41856199ee83ad::t_119c385eef692f 201-204,272-282,468-471
+src/kip/adapters/repository/memory/ingestion.py
+  s_41856199ee83ad::t_2202249230a6f0 6,26,34,37,77-85,96
+tests/integration/test_postgres_repository.py
+  s_41856199ee83ad::t_8ab1b1376a0bf7 12
+  s_41856199ee83ad::t_4dfad6b686061e 53-55,158-162,176,203
+src/kip/application/ingestion.py
+  s_41856199ee83ad::t_fc21d90f5057d2 9,47,56,82,143-147
+src/kip/adapters/repository/postgres/ingestion.py
+  s_41856199ee83ad::t_2202249230a6f0 6,20,22-27
+docs/SECURITY.md
+  s_41856199ee83ad::t_066f748f2407c6 13-33
+contracts/egress-decision.schema.json
+  s_41856199ee83ad::t_ac30c48e9eb695 1-84
+src/kip/setup/models.py
+  s_41856199ee83ad::t_9da7be3d97ea46 72-74,131,133,135,244,246
+src/kip/application/runtime.py
+  s_41856199ee83ad::t_0a9951b781e5ea 5,20
+tests/test_egress_policy.py
+  s_41856199ee83ad::t_9c20f92a227ac9 13,267-304
+  s_41856199ee83ad::t_fc21d90f5057d2 253,259
+  s_41856199ee83ad::t_6b13e112ee613b 8
+  s_41856199ee83ad::t_54e3164cf2fe77 1-7,9-12,14-22,24-192,194-195,210,213-252,254-258,260-266
+  s_41856199ee83ad::t_25355385011823 193
+  s_41856199ee83ad::t_1467ea04866b65 23,196-209,211-212
+src/kip/application/ingestion_files.py
+  s_41856199ee83ad::t_fc21d90f5057d2 10,78,92-97,121,142
+src/kip/setup/service.py
+  s_41856199ee83ad::t_d9c189de4e5367 227-232
+docs/adr/ADR-021-canonical-classification-and-model-egress.md
+  s_41856199ee83ad::t_af62d1c016e562 1-39
+tests/test_setup_writer.py
+  s_41856199ee83ad::t_21e2ca424fd009 39-40
+  s_41856199ee83ad::t_8ab1b1376a0bf7 154
+contracts/source-object.schema.json
+  s_41856199ee83ad::t_119c385eef692f 60-70,97-100
+tests/test_contracts.py
+  s_41856199ee83ad::t_b878ab861f5295 13
+src/kip/application/egress.py
+  s_41856199ee83ad::t_fc21d90f5057d2 1-28
+src/kip/application/ingestion_events.py
+  s_41856199ee83ad::t_fc21d90f5057d2 8,51-52,85-90,113,125,186,208
+config/kip.example.toml
+  s_41856199ee83ad::t_f595375bc78d26 162,173
+  s_41856199ee83ad::t_432c63afaa8769 92-98,144,153
+contracts/setup-answers.schema.json
+  s_41856199ee83ad::t_119c385eef692f 16-17,267-268,286,299-313
+  s_41856199ee83ad::t_a98f6dc72d22e1 314
+docs/DATA_CONTRACTS.md
+  s_41856199ee83ad::t_066f748f2407c6 32-43
+scripts/generate_contracts.py
+  s_41856199ee83ad::t_b878ab861f5295 19,79
+src/kip/container.py
+  s_41856199ee83ad::t_0a9951b781e5ea 29,36-42,175,264-294
+src/kip/domain/egress.py
+  s_41856199ee83ad::t_fc21d90f5057d2 1-240
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "8b1398f59948a00266f9f4b8bca84b2d09e1f2bd",
+  "prompts": {},
+  "sessions": {
+    "s_03506c0be5fcc9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe45d-d747-77b2-a41f-9b77d2b510d0",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

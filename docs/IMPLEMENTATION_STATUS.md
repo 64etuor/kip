@@ -15,7 +15,7 @@
 | Identity and ACL snapshots | Ready for pilot | JWT issuer/audience/JWKS verification, configured API-key principal, stale dynamic snapshot exclusion, and legacy identity-header rejection |
 | Data classification and model egress | Ready for pilot | Canonical source/unit classification, local loopback policy, remote provider/classification/retention/secret gates, and atomic denial decisions |
 | Structured generation adapters | Ready for pilot | Provider-neutral typed contract with bounded HTTP responses, explicit timeouts, pinned model revisions, request IDs, token accounting, citation-ID validation, and OpenAI Responses/Anthropic Messages adapters |
-| MCP | Reference adapter | Requires optional dependency and client validation |
+| MCP | Ready for pilot | Optional stdio adapter shares the application services; guided setup selects the generated config, and real client discovery/search/graph/answer parity has been validated |
 | Filesystem connector | Ready for pilot | Read-only traversal, hash, settle-time checks |
 | XLSX shallow/deep | Ready for pilot | Shared-string shallow index and exact `.xlsx`/`.xlsm` range reader; formula/cached values, formats, dates, and hidden dimensions are explicit |
 | PDF parser | Ready for pilot | PyMuPDF; OCR is routed but not bundled |

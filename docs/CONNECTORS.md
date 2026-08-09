@@ -67,8 +67,9 @@ curl -sS http://127.0.0.1:8080/v1/connectors/events \
   -H 'Content-Type: application/json' \
   -H "X-KIP-API-Key: $KIP_API_KEY" \
   -H "X-KIP-Admin-Key: $KIP_ADMIN_KEY" \
-  -H 'X-KIP-Workspace: default' \
-  -H 'X-KIP-Principal: connector-custom-crm' \
-  -H 'X-KIP-ACL-Scopes: workspace:default,project:A' \
   --data-binary @examples/connector/event.json
 ```
+
+The authenticated server identity authorizes the write. Source ACLs belong in
+the versioned connector event payload and are validated by the connector
+contract; they are not caller identity headers.

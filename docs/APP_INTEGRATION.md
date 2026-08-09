@@ -32,22 +32,28 @@ All four surfaces call the same application services.
 - `POST /v1/review/candidates/{candidate_id}/approve`
 - `POST /v1/review/candidates/{candidate_id}/reject`
 
-## Headers
+## Trusted identity
 
 ```text
-X-KIP-Workspace: default
-X-KIP-API-Key: <service key>
-X-KIP-Principal: <stable caller identity>
-X-KIP-ACL-Scopes: <comma-separated trusted scopes>
+API-key bootstrap: X-KIP-API-Key: <service key>
+JWT deployment:    Authorization: Bearer <verified organization token>
+Optional tracing:  X-Request-ID: <opaque request id>
 ```
 
 Production deployments should place the API behind an organization-approved identity-aware proxy. Do not expose PostgreSQL directly to applications.
 
 The starter API separates ordinary reads from administrative writes:
 
-- Read endpoints require `X-KIP-API-Key` when API authentication is enabled.
-- Connector ingestion, source synchronization, and review operations additionally require `X-KIP-Admin-Key`.
-- `X-KIP-ACL-Scopes` is trusted only after an identity-aware proxy or service gateway has authenticated and mapped the caller. Do not accept caller-supplied scopes on an internet-facing deployment.
+- API-key mode derives the one configured principal, workspace, and ACL scopes
+  from server configuration; callers cannot choose them.
+- JWT mode verifies issuer, audience, signature, expiry, workspace, groups, ACL
+  scopes, and dynamic ACL snapshot claims before application services run.
+- In API-key mode, connector ingestion, source synchronization, and review
+  operations additionally require `X-KIP-Admin-Key`.
+- JWT administration derives the admin role from a configured trusted group and
+  does not use the bootstrap admin key.
+- Production rejects `X-KIP-Workspace`, `X-KIP-Principal`, and
+  `X-KIP-ACL-Scopes`. Never build a proxy that forwards these as caller input.
 
 ## Custom connector event
 

@@ -1,4 +1,4 @@
-# KIP Knowledge Fabric Starter Kit v3.1
+# KIP Knowledge Fabric Starter Kit v3.2
 
 KIP is an agent-first, evidence-first foundation for indexing and retrieving company knowledge from NAS files, HWP/HWPX, PDF, XLSX, Slack, and email. It supports two equal entry paths:
 
@@ -17,7 +17,32 @@ The baseline runtime is PostgreSQL 18 with PostgreSQL-native lexical search. `pg
 - CLI, REST, and MCP use the same application layer.
 - Search, graph, and embeddings are replaceable projections.
 
-## 2. Quick start - local development
+## 2. Agent-guided setup
+
+새 배포에서는 설정 파일을 직접 추측해 편집하지 말고 AI agent에게 다음처럼
+명령한다.
+
+```text
+KIP을 셋업해줘
+```
+
+Agent는 `skills/kip-setup/SKILL.md`를 따라 `kip setup inspect`가 반환한 질문을
+항상 하나씩 묻는다. 조직 workspace, 신원 검증, 수집할 각 폴더의 절대경로와
+확장자·제외 범위·등급·ACL, 모델 전송 정책, secret reference, CAS/backup,
+평가 dataset, 온톨로지 reviewer를 모두 확정한다. 이어서 파일 수·용량·확장자
+분포·제외·symlink를 preview하고, 사용자가 plan fingerprint와 read-only mount를
+승인한 뒤에만 다음 파일을 원자적으로 생성·검증한다.
+
+- `config/kip.generated.toml`
+- `compose.generated.yaml`
+- `.mcp.json` pointing at the generated runtime configuration
+
+Credential 원문은 질문, state, plan, 생성 파일에 넣지 않는다. `env:`,
+`keychain:`, `secret-manager:` reference만 기록한다. 평가 dataset이 없으면
+설치 가능한 상태일 뿐 production 승격이 아님을 receipt에 남긴다. 전체 인수
+절차는 [`docs/STARTER_KIT_GUIDE.md`](docs/STARTER_KIT_GUIDE.md)에 있다.
+
+## 3. Quick start - local development
 
 다른 조직이나 저장소에 적용할 때는 먼저
 [`docs/STARTER_KIT_GUIDE.md`](docs/STARTER_KIT_GUIDE.md)를 따른다. 이 문서는
@@ -47,7 +72,7 @@ Index the bundled sample data:
 ./scripts/kip context "정산 증빙 제출기한" --limit 5
 ```
 
-## 3. Run as an application
+## 4. Run as an application
 
 Start the API locally:
 
@@ -60,7 +85,6 @@ Then call it from another app:
 ```bash
 curl -sS http://127.0.0.1:8080/v1/search \
   -H "Content-Type: application/json" \
-  -H "X-KIP-Workspace: default" \
   -H "X-KIP-API-Key: $KIP_API_KEY" \
   -d '{"query":"협약 변경 승인","limit":5}'
 ```
@@ -74,14 +98,16 @@ curl -sS http://127.0.0.1:8080/v1/connectors/events \
   -H "Content-Type: application/json" \
   -H "X-KIP-API-Key: $KIP_API_KEY" \
   -H "X-KIP-Admin-Key: $KIP_ADMIN_KEY" \
-  -H "X-KIP-Workspace: default" \
-  -H "X-KIP-ACL-Scopes: workspace:default,project:A" \
   --data-binary @examples/connector/event.json
 ```
 
+인터넷 경계에서는 임의 workspace, principal, ACL header를 신뢰하지 않는다.
+API-key bootstrap은 설정에 고정된 단일 principal을 사용하고, 다중 사용자는
+검증된 JWT claim에서 workspace와 scope를 파생한다.
+
 CLI, REST, MCP, and connector events all enter the same application service layer. Applications must not connect directly to PostgreSQL or an optional graph projection.
 
-## 4. Claude Code and MCP
+## 5. Claude Code and MCP
 
 Claude Code loads root `CLAUDE.md`, which imports `AGENTS.md`. The project skill lives at:
 
@@ -89,7 +115,7 @@ Claude Code loads root `CLAUDE.md`, which imports `AGENTS.md`. The project skill
 .claude/skills/knowledge-fabric/SKILL.md
 ```
 
-The root `.mcp.json` starts the optional stdio MCP adapter without embedding secrets in the file. Install the MCP extra first:
+The root `.mcp.json` starts the optional stdio MCP adapter without embedding secrets in the file. Guided setup rewrites it atomically to select `config/kip.generated.toml` and preserves the previous file. Install the MCP extra first:
 
 ```bash
 python -m pip install -e '.[mcp]'
@@ -98,7 +124,7 @@ python -m pip install -e '.[mcp]'
 MCP is optional; the CLI remains the lowest-dependency agent interface.
 Set `KIP_WORKSPACE`, `KIP_PRINCIPAL_ID`, and `KIP_ACL_SCOPES` in the environment used by the MCP client so MCP retrieval receives the same authorization context as CLI and REST calls.
 
-## 5. Connect real sources
+## 6. Connect real sources
 
 Edit `config/kip.toml` and `.env`.
 
@@ -131,7 +157,7 @@ The macOS host adapter uses JXA through `osascript`. It requires explicit Mail A
 
 Use an app password or organization-approved credential. The connector uses UID cursors and stores RFC Message-ID as the stable message identity where available.
 
-## 6. Deployment profiles
+## 7. Deployment profiles
 
 | Profile | Contents |
 |---|---|
@@ -139,7 +165,7 @@ Use an app password or organization-approved credential. The connector uses UID 
 | Standard | Minimal + API, worker, HWP broker, Slack/Mail optional connectors |
 | Expanded | Standard + pgvector activation, relation miner, optional Neo4j projection, review UI |
 
-## 7. Important limitations of this starter
+## 8. Important limitations of this starter
 
 This is an implementation-ready starter, not a claim that every production
 adapter is complete. The filesystem, text, PDF, XLSX shallow/deep path, memory
@@ -157,7 +183,7 @@ Dependency PR과 parser/model upstream 알림은 후보 발견 기능이다. 어
 업데이트도 자동 활성화하지 않으며, shadow 평가와 사람의 승격 승인을
 거쳐야 한다.
 
-## 8. Reproducible RAG scorecard
+## 9. Reproducible RAG scorecard
 
 KIP includes a licensed Korean public pilot, an isolated local model sidecar,
 pgvector shadow spaces, lexical/vector/hybrid/reranked evaluation, and

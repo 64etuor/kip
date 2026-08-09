@@ -171,8 +171,6 @@ curl -fsS http://127.0.0.1:8080/healthz
 curl -fsS -X POST http://127.0.0.1:8080/v1/search \
   -H 'Content-Type: application/json' \
   -H "X-KIP-API-Key: $KIP_API_KEY" \
-  -H 'X-KIP-Workspace: default' \
-  -H 'X-KIP-ACL-Scopes: workspace:default' \
   --data '{"query":"확인된 한국어 내용 질의","limit":10}'
 ```
 

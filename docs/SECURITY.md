@@ -49,6 +49,20 @@
 - Never commit `.env`, Slack tokens, IMAP passwords, API keys, or Neo4j credentials.
 - Do not place secrets in `.mcp.json`, `CLAUDE.md`, `AGENTS.md`, or Skill files.
 
+## Telemetry boundary
+
+- Query traces use a closed schema with no raw query, body, snippet, answer,
+  principal, credential, provider request ID, or provider payload field.
+- Only KIP-generated opaque request IDs are retained. Untrusted correlation
+  headers are not copied into trace storage.
+- Trace inspection and retention pruning require the verified admin role in
+  addition to workspace RLS. Candidate and evidence IDs are never exported as
+  OTel attributes.
+- OTLP endpoints must be explicit HTTP(S) URLs without embedded credentials.
+  Authentication headers belong in the runtime secret environment.
+- Trace/exporter failure never weakens ACL, evidence freshness, refusal, or
+  answer semantics.
+
 ## Retrieval authorization
 
 - Resolve workspace, principal, and ACL scopes only through the configured

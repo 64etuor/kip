@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import UTC, datetime
+from time import perf_counter
 
 from kip.application.egress import EgressPolicyUseCases
 from kip.application.evidence import EvidenceUseCases
+from kip.application.telemetry import TelemetryUseCases
 from kip.domain.generation import GenerationEvidence
 from kip.domain.json_types import JsonObject, JsonValue
 from kip.domain.knowledge import (
@@ -27,6 +30,13 @@ from kip.domain.models import (
     OntologyMiningSummary,
     RequestContext,
 )
+from kip.domain.telemetry import (
+    QueryFilterSummary,
+    QueryTrace,
+    QueryTraceModelRevision,
+    QueryTraceUsage,
+    safe_request_id,
+)
 from kip.errors import ValidationError
 from kip.ontology import OntologyCatalog
 from kip.ports.jobs import JobStore
@@ -43,6 +53,7 @@ class OntologyRagUseCases:
         jobs: JobStore,
         egress: EgressPolicyUseCases,
         relation_miner: RelationMinerPort | None = None,
+        telemetry: TelemetryUseCases | None = None,
         *,
         max_mining_units: int = 50,
         max_mining_characters: int = 120_000,
@@ -55,6 +66,7 @@ class OntologyRagUseCases:
         self._jobs = jobs
         self._egress = egress
         self._relation_miner = relation_miner
+        self._telemetry = telemetry
         self._max_mining_units = max_mining_units
         self._max_mining_characters = max_mining_characters
         self._max_entity_proposals = max_entity_proposals
@@ -207,6 +219,33 @@ class OntologyRagUseCases:
         context: RequestContext,
         unit_ids: list[str],
     ) -> OntologyMiningSummary:
+        started_at = datetime.now(UTC)
+        started = perf_counter()
+        try:
+            summary = self._process_mining(context, unit_ids)
+        except Exception:
+            self._record_mining_trace(
+                context,
+                unit_ids,
+                None,
+                started_at=started_at,
+                duration_ms=(perf_counter() - started) * 1000,
+            )
+            raise
+        self._record_mining_trace(
+            context,
+            unit_ids,
+            summary,
+            started_at=started_at,
+            duration_ms=(perf_counter() - started) * 1000,
+        )
+        return summary
+
+    def _process_mining(
+        self,
+        context: RequestContext,
+        unit_ids: list[str],
+    ) -> OntologyMiningSummary:
         ontology = self._require_ontology()
         miner = self._require_relation_miner()
         selected = _validate_mining_unit_ids(unit_ids, self._max_mining_units)
@@ -347,6 +386,62 @@ class OntologyRagUseCases:
             model=result.model,
             usage=result.usage,
             provider_request_id=result.provider_request_id,
+        )
+
+    def _record_mining_trace(
+        self,
+        context: RequestContext,
+        unit_ids: list[str],
+        summary: OntologyMiningSummary | None,
+        *,
+        started_at: datetime,
+        duration_ms: float,
+    ) -> None:
+        if self._telemetry is None:
+            return
+        models = (
+            [
+                QueryTraceModelRevision(
+                    role="relation_miner",
+                    provider=summary.model.provider,
+                    model=summary.model.model,
+                    revision=summary.model.revision,
+                )
+            ]
+            if summary is not None
+            else []
+        )
+        usage = (
+            QueryTraceUsage.model_validate(summary.usage.model_dump(mode="json"))
+            if summary is not None
+            else None
+        )
+        self._telemetry.record(
+            context,
+            QueryTrace(
+                request_id=safe_request_id(context.request_id),
+                route="ontology_mining",
+                outcome="succeeded" if summary is not None else "failed",
+                started_at=started_at,
+                duration_ms=duration_ms,
+                filters=QueryFilterSummary(limit=min(max(len(unit_ids), 1), 1000)),
+                stages=[
+                    "acl_prefilter",
+                    "exact_evidence_read",
+                    "model_egress_policy",
+                    "structured_generation",
+                    "candidate_persistence",
+                ],
+                selected_evidence_ids=list(dict.fromkeys(unit_ids[:100])),
+                acl_policy_version=(
+                    context.acl_snapshot.version
+                    if context.acl_snapshot is not None
+                    else None
+                ),
+                models=models,
+                warnings=[] if summary is not None else ["ontology_mining_failed"],
+                usage=usage,
+            ),
         )
 
     def propose_relation(

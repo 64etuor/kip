@@ -9,6 +9,7 @@ from kip.adapters.repository.memory.knowledge import MemoryKnowledgeStore
 from kip.adapters.repository.memory.operations import MemoryOperationsStore
 from kip.adapters.repository.memory.retrieval import MemoryRetrievalStore
 from kip.adapters.repository.memory.state import MemoryState
+from kip.adapters.telemetry.memory import MemoryQueryTraceStore
 from kip.ports.retrieval import RetrievalStore
 
 
@@ -28,6 +29,7 @@ class MemoryRepository:
         self.knowledge = MemoryKnowledgeStore(self.state)
         self.jobs = MemoryJobStore(self.state)
         self.operations = MemoryOperationsStore(self.state)
+        self.telemetry = MemoryQueryTraceStore(self.state)
 
 
 __all__ = ["MemoryRepository"]

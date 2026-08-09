@@ -9,6 +9,7 @@ from kip.adapters.repository.postgres.jobs import PostgresJobStore
 from kip.adapters.repository.postgres.knowledge import PostgresKnowledgeStore
 from kip.adapters.repository.postgres.operations import PostgresOperationsStore
 from kip.adapters.repository.postgres.retrieval import PostgresRetrievalStore
+from kip.adapters.telemetry.postgres import PostgresQueryTraceStore
 
 
 class PostgresRepository:
@@ -30,6 +31,7 @@ class PostgresRepository:
         self.knowledge = PostgresKnowledgeStore(self.database)
         self.jobs = PostgresJobStore(self.database)
         self.operations = PostgresOperationsStore(self.database)
+        self.telemetry = PostgresQueryTraceStore(self.database)
 
 
 __all__ = ["PostgresRepository"]

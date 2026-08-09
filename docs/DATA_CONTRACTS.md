@@ -124,6 +124,22 @@ affecting existing assertions must require review. Live entity-type migrations
 fail closed because changing an entity identity or type without merge/split
 history would make target assertions semantically invalid.
 
+## Query trace boundary
+
+`QueryTrace` is `kip.query-trace.v1`, a closed redacted operational contract.
+It records route, outcome, bounded filter counts, retrieval stages, public
+candidate IDs and ranks, selected evidence IDs, ontology assertion IDs, ACL
+policy version, pinned model revisions, token totals, warning codes, refusal
+reason, and latency. It has no fields for query text, source bodies, snippets,
+answers, principals, credentials, provider request IDs, or raw provider
+payloads. Caller-supplied request IDs are omitted unless they match KIP's opaque
+server-generated ID format.
+
+PostgreSQL is canonical for query traces in production. Workspace RLS applies
+on write and read, while the application additionally requires an admin role
+for inspection and retention pruning. OTel spans and metrics receive only
+bounded route/outcome/count/latency attributes, not candidate or evidence IDs.
+
 ## Identity boundary
 
 `RequestContext` contains a verified principal, workspace, scopes, roles, and

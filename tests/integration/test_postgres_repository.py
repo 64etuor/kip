@@ -32,6 +32,7 @@ from kip.domain.models import (
     RequestContext,
     SearchRequest,
 )
+from kip.domain.telemetry import QueryTrace
 from kip.errors import NotFoundError, ValidationError
 from kip.ids import new_id, stable_id
 from kip.ontology_migration import OntologyMigration
@@ -130,6 +131,24 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
         )
         assert natural_hits
         assert natural_hits[0].document_id == hits[0].document_id
+        traces = container.application.telemetry.list_traces(
+            context.model_copy(update={"roles": ["admin"]})
+        )
+        assert traces[0].route == "search"
+        assert traces[0].candidates[0].unit_id == natural_hits[0].unit_id
+        assert "A과제에서 참여 비율" not in traces[0].model_dump_json()
+        repository.telemetry.record(
+            context,
+            QueryTrace(
+                route="search",
+                outcome="succeeded",
+                started_at=datetime.now(UTC) - timedelta(days=31),
+                duration_ms=1,
+            ),
+        )
+        assert container.application.telemetry.prune(
+            context.model_copy(update={"roles": ["admin"]})
+        ) == 1
         evidence = container.application.evidence.read_unit(context, hits[0].unit_id)
         assert evidence.source_changed_since_index is False
 

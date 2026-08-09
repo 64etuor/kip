@@ -26,6 +26,11 @@ extractors = ["openpyxl>=3.1,<4", "PyMuPDF>=1.25,<2", "hwp-hwpx-parser>=1,<2"]
 semantic = ["torch>=2.5,<3", "transformers>=4.57,<5", "einops>=0.8,<1"]
 mcp = ["mcp>=1.0,<2"]
 neo4j = ["neo4j>=5.26,<7"]
+telemetry = [
+  "opentelemetry-api>=1.30,<2",
+  "opentelemetry-sdk>=1.30,<2",
+  "opentelemetry-exporter-otlp-proto-http>=1.30,<2",
+]
 dev = [
   "pytest>=8.3,<10",
   "pytest-cov>=6,<8",
@@ -47,6 +52,9 @@ all = [
   "einops>=0.8,<1",
   "mcp>=1.0,<2",
   "neo4j>=5.26,<7",
+  "opentelemetry-api>=1.30,<2",
+  "opentelemetry-sdk>=1.30,<2",
+  "opentelemetry-exporter-otlp-proto-http>=1.30,<2",
 ]
 
 [project.scripts]

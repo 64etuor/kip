@@ -8,6 +8,7 @@ from kip.ports.jobs import JobStore
 from kip.ports.knowledge import KnowledgeStore
 from kip.ports.operations import OperationsStore
 from kip.ports.retrieval import RetrievalStore
+from kip.ports.telemetry import QueryTraceStore
 
 
 class RepositoryPort(Protocol):
@@ -31,3 +32,6 @@ class RepositoryPort(Protocol):
 
     @property
     def operations(self) -> OperationsStore: ...
+
+    @property
+    def telemetry(self) -> QueryTraceStore: ...

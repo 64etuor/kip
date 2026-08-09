@@ -24,6 +24,7 @@
 | Evaluation reports | Ready with coverage gaps | Recall, MRR, nDCG, ACL, latency, failure counts, fingerprints, Markdown scorecard, append-only ledger; locator/latest/stale/recovery remain unmeasured in the public set |
 | Quality control plane | Ready for pilot | Version-pinned parser/embedding/reranker/retrieval experiment manifests and fail-closed, read-only promotion recommendations; manifest-driven orchestration is not yet a scheduler |
 | Answer-quality rubric | Contract ready | Deterministic reviewed groundedness, completeness, citation-locator, unsupported-claim, and refusal metrics; current golden datasets still need answer annotations |
+| Query tracing and metrics | Ready for pilot | PostgreSQL/RLS canonical redacted traces, admin-only CLI/REST inspection, bounded retention pruning, non-fatal delivery, and optional OTLP/HTTP spans and metrics without content attributes |
 | Evidence-bounded answer | Ready for pilot | CLI/API/MCP/SDK share search, exact reopen, freshness, XLSX, classification/egress, structured generation, claim-citation validation, typed refusal, explicit extractive fallback, and ACL-filtered current approved-graph context; candidates, expired relations, and stale graph evidence are excluded |
 | Local embedding sidecar | Validated shadow | Infinity 0.0.77, Qwen3 0.6B 1024d, pinned revisions, MPS smoke passed |
 | Local reranker | Validated shadow | BGE reranker v2 M3 plus opt-in pinned Jina Hugging Face adapter; Jina trial measured 613.31 ms P95 but failed quality gates, so remains shadow-only |
@@ -68,6 +69,9 @@
   the repository index, traverses bounded current approved paths, and reopens
   every assertion evidence unit. It does not provide historical as-of queries;
   expired and future assertions are intentionally absent from normal answers.
+- Query trace delivery is deliberately non-blocking. Production monitoring must
+  alert on collector gaps and run the retention prune schedule; PostgreSQL
+  remains the incident-review source when OTLP delivery is unavailable.
 
 ## Self-improvement canary: 2026-08-06
 

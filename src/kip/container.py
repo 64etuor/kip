@@ -28,6 +28,7 @@ from kip.adapters.storage import (
     LocalSourceFileInspector,
     LocalWorkbookReader,
 )
+from kip.adapters.telemetry.otel import OpenTelemetryQueryTraceExporter
 from kip.application.analyzer import KoreanNgramAnalyzer
 from kip.application.answering import AnsweringUseCases
 from kip.application.egress import EgressPolicyUseCases
@@ -40,6 +41,7 @@ from kip.application.ontology_rag import OntologyRagUseCases
 from kip.application.operations import OperationsUseCases
 from kip.application.runtime import Application
 from kip.application.search import RetrievalUseCases
+from kip.application.telemetry import TelemetryUseCases
 from kip.domain.egress import (
     DataClassification,
     EgressPolicy,
@@ -54,6 +56,7 @@ from kip.ports.identity import IdentityResolverPort
 from kip.ports.relation_miner import RelationMinerPort
 from kip.ports.repository import RepositoryPort
 from kip.ports.reranker import RerankerPort
+from kip.ports.telemetry import QueryTraceExporter
 from kip.settings import Settings
 
 
@@ -67,6 +70,7 @@ class Container:
     generator: GenerationPort | None
     relation_miner: RelationMinerPort | None
     identity: IdentityResolverPort
+    trace_exporters: tuple[QueryTraceExporter, ...]
 
 
 def build_container(
@@ -76,6 +80,7 @@ def build_container(
     reranker: RerankerPort | None = None,
     generator: GenerationPort | None = None,
     relation_miner: RelationMinerPort | None = None,
+    trace_exporters: tuple[QueryTraceExporter, ...] | None = None,
     *,
     load_models: bool = True,
 ) -> Container:
@@ -156,6 +161,41 @@ def build_container(
             allow_remote_egress=allow_remote_egress,
         )
     selected.cas_path.mkdir(parents=True, exist_ok=True)
+    telemetry_config = selected.get("telemetry", {}) or {}
+    if not isinstance(telemetry_config, dict):
+        raise ConfigurationError("telemetry must be a table")
+    query_traces_enabled = telemetry_config.get("query_traces_enabled", True)
+    if not isinstance(query_traces_enabled, bool):
+        raise ConfigurationError("telemetry.query_traces_enabled must be boolean")
+    otel_config = telemetry_config.get("otel", {}) or {}
+    if not isinstance(otel_config, dict):
+        raise ConfigurationError("telemetry.otel must be a table")
+    selected_trace_exporters: tuple[QueryTraceExporter, ...] = trace_exporters or ()
+    if trace_exporters is None and otel_config.get("enabled", False):
+        otel_endpoint = str(otel_config.get("endpoint", "")).strip()
+        if not otel_endpoint:
+            raise ConfigurationError(
+                "enabled telemetry.otel requires an explicit endpoint"
+            )
+        selected_trace_exporters = (
+            OpenTelemetryQueryTraceExporter(
+                service_name=str(otel_config.get("service_name", "kip")),
+                endpoint=otel_endpoint,
+            ),
+        )
+    telemetry = TelemetryUseCases(
+        selected_repository.telemetry,
+        enabled=query_traces_enabled,
+        retention_days=_bounded_integer(
+            telemetry_config,
+            "telemetry",
+            "retention_days",
+            default=30,
+            minimum=1,
+            maximum=3650,
+        ),
+        exporters=selected_trace_exporters,
+    )
     evidence = EvidenceUseCases(
         selected_repository.evidence,
         LocalSourceFileInspector(),
@@ -169,6 +209,7 @@ def build_container(
         analyzer,
         selected_embedding,
         selected_reranker,
+        telemetry,
     )
     ontology_root = selected.project_root / "ontology"
     ontology = (
@@ -211,6 +252,7 @@ def build_container(
         selected_repository.jobs,
         egress,
         selected_relation_miner,
+        telemetry,
         max_mining_units=_bounded_integer(
             mining_config,
             "models.relation_mining",
@@ -317,10 +359,12 @@ def build_container(
             egress,
             selected_generator,
             ontology_context,
+            telemetry,
         ),
         ontology_rag=ontology_rag,
         ontology_context=ontology_context,
         ontology_migrations=ontology_migrations,
+        telemetry=telemetry,
     )
     return Container(
         settings=selected,
@@ -331,6 +375,7 @@ def build_container(
         generator=selected_generator,
         relation_miner=selected_relation_miner,
         identity=selected_identity,
+        trace_exporters=selected_trace_exporters,
     )
 
 

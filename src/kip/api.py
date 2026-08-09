@@ -314,6 +314,30 @@ def create_app(container: Container | None = None) -> FastAPI:
     ) -> Envelope:
         return ok(selected.application.operations.list_jobs(context, status, limit), context)
 
+    @app.get("/v1/admin/query-traces", response_model=Envelope)
+    async def query_traces(
+        request_id: str | None = None,
+        limit: int = 100,
+        context: RequestContext = Depends(admin_context),
+    ) -> Envelope:
+        return ok(
+            selected.application.telemetry.list_traces(
+                context,
+                request_id=request_id,
+                limit=limit,
+            ),
+            context,
+        )
+
+    @app.delete("/v1/admin/query-traces/expired", response_model=Envelope)
+    async def prune_query_traces(
+        context: RequestContext = Depends(admin_context),
+    ) -> Envelope:
+        return ok(
+            {"deleted": selected.application.telemetry.prune(context)},
+            context,
+        )
+
     @app.post("/v1/connectors/events", response_model=Envelope)
     async def connector_event(
         payload: ConnectorEvent,

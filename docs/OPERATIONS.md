@@ -91,6 +91,31 @@ application contract, and normal graph traversal reads only that active
 version. Use a dedicated entity identity migration workflow if a release changes
 a type that already has live entities.
 
+## Redacted RAG tracing
+
+Query tracing is enabled by default and persists only the versioned redacted
+decision contract. Inspect it through an administrative surface:
+
+```bash
+./scripts/kip telemetry traces --limit 100
+./scripts/kip telemetry traces --request-id req_OPAQUE_ID
+./scripts/kip telemetry prune
+```
+
+`telemetry.retention_days` defaults to 30. Schedule `telemetry prune` daily;
+the command deletes only expired rows in the active workspace. REST operators
+use `GET /v1/admin/query-traces` and
+`DELETE /v1/admin/query-traces/expired`, both behind the normal admin identity
+gate.
+
+Optional OTLP/HTTP export requires the `telemetry` package extra and an explicit
+`telemetry.otel.endpoint`. KIP configures batched spans and periodic metrics to
+the collector's `/v1/traces` and `/v1/metrics` endpoints. Keep collector
+credentials in standard `OTEL_EXPORTER_OTLP_HEADERS` environment configuration,
+never in TOML. Telemetry delivery failure is intentionally non-fatal to search,
+answering, and mining; use the canonical PostgreSQL trace table to diagnose
+collector loss.
+
 ### Local semantic shadow
 
 ```bash

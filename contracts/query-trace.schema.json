@@ -1,0 +1,318 @@
+{
+  "$defs": {
+    "QueryFilterSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "document_type_count": {
+          "default": 0,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Document Type Count",
+          "type": "integer"
+        },
+        "includes_candidate_assertions": {
+          "default": false,
+          "title": "Includes Candidate Assertions",
+          "type": "boolean"
+        },
+        "limit": {
+          "default": 10,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        },
+        "project_id_count": {
+          "default": 0,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Project Id Count",
+          "type": "integer"
+        },
+        "source_kind_count": {
+          "default": 0,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Source Kind Count",
+          "type": "integer"
+        }
+      },
+      "title": "QueryFilterSummary",
+      "type": "object"
+    },
+    "QueryTraceCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "channels": {
+          "default": [],
+          "items": {
+            "enum": [
+              "lexical",
+              "vector"
+            ],
+            "type": "string"
+          },
+          "title": "Channels",
+          "type": "array"
+        },
+        "rank": {
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Rank",
+          "type": "integer"
+        },
+        "score": {
+          "title": "Score",
+          "type": "number"
+        },
+        "unit_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Unit Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "unit_id",
+        "rank",
+        "score"
+      ],
+      "title": "QueryTraceCandidate",
+      "type": "object"
+    },
+    "QueryTraceModelRevision": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "provider": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Provider",
+          "type": "string"
+        },
+        "revision": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Revision",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "embedding",
+            "reranker",
+            "generation",
+            "relation_miner"
+          ],
+          "title": "Role",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "provider",
+        "model",
+        "revision"
+      ],
+      "title": "QueryTraceModelRevision",
+      "type": "object"
+    },
+    "QueryTraceUsage": {
+      "additionalProperties": false,
+      "properties": {
+        "input_tokens": {
+          "minimum": 0,
+          "title": "Input Tokens",
+          "type": "integer"
+        },
+        "output_tokens": {
+          "minimum": 0,
+          "title": "Output Tokens",
+          "type": "integer"
+        },
+        "total_tokens": {
+          "minimum": 0,
+          "title": "Total Tokens",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "input_tokens",
+        "output_tokens",
+        "total_tokens"
+      ],
+      "title": "QueryTraceUsage",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "acl_policy_version": {
+      "anyOf": [
+        {
+          "maxLength": 256,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Acl Policy Version"
+    },
+    "candidates": {
+      "items": {
+        "$ref": "#/$defs/QueryTraceCandidate"
+      },
+      "maxItems": 100,
+      "title": "Candidates",
+      "type": "array"
+    },
+    "duration_ms": {
+      "minimum": 0,
+      "title": "Duration Ms",
+      "type": "number"
+    },
+    "filters": {
+      "$ref": "#/$defs/QueryFilterSummary"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "models": {
+      "items": {
+        "$ref": "#/$defs/QueryTraceModelRevision"
+      },
+      "maxItems": 8,
+      "title": "Models",
+      "type": "array"
+    },
+    "ontology_assertion_ids": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 500,
+      "title": "Ontology Assertion Ids",
+      "type": "array"
+    },
+    "outcome": {
+      "enum": [
+        "succeeded",
+        "refused",
+        "degraded",
+        "failed"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "refusal_reason": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Refusal Reason"
+    },
+    "request_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Request Id"
+    },
+    "route": {
+      "enum": [
+        "search",
+        "context",
+        "answer",
+        "ontology_mining"
+      ],
+      "title": "Route",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "kip.query-trace.v1",
+      "default": "kip.query-trace.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "selected_evidence_ids": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 100,
+      "title": "Selected Evidence Ids",
+      "type": "array"
+    },
+    "stages": {
+      "items": {
+        "enum": [
+          "acl_prefilter",
+          "lexical",
+          "vector",
+          "fusion",
+          "rerank",
+          "exact_evidence_read",
+          "ontology_context",
+          "model_egress_policy",
+          "structured_generation",
+          "citation_validation",
+          "candidate_persistence"
+        ],
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Stages",
+      "type": "array"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "usage": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/QueryTraceUsage"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "warnings": {
+      "items": {
+        "pattern": "^[a-z][a-z0-9_]{0,63}$",
+        "type": "string"
+      },
+      "maxItems": 32,
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "route",
+    "outcome",
+    "duration_ms"
+  ],
+  "title": "QueryTrace",
+  "type": "object"
+}

@@ -62,6 +62,7 @@ from kip.domain.models import (  # noqa: E402
     VocabularyItem,
     XlsxRangeRead,
 )
+from kip.domain.telemetry import QueryTrace  # noqa: E402
 from kip.ontology_migration import (  # noqa: E402
     OntologyMigration,
     OntologyMigrationMaterialization,
@@ -121,6 +122,7 @@ MODELS = {
     "setup-inspection": SetupInspection,
     "setup-plan": SetupPlan,
     "setup-receipt": SetupReceipt,
+    "query-trace": QueryTrace,
 }
 
 

@@ -54,6 +54,15 @@ max_zip_entries = 100000
 max_zip_uncompressed_bytes = 2147483648
 max_zip_ratio = 200
 
+[telemetry]
+query_traces_enabled = true
+retention_days = 30
+
+[telemetry.otel]
+enabled = false
+service_name = "kip"
+endpoint = "http://127.0.0.1:4318"
+
 [search]
 semantic_enabled = false
 default_mode = "reranked"

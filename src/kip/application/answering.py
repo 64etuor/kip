@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import re
+from datetime import UTC, datetime
+from time import perf_counter
 
 from kip.application.answers import (
     assemble_extractive_answer,
@@ -11,6 +14,7 @@ from kip.application.egress import EgressPolicyUseCases
 from kip.application.evidence import EvidenceUseCases
 from kip.application.ontology_context import OntologyContextUseCases
 from kip.application.search import RetrievalUseCases
+from kip.application.telemetry import TelemetryUseCases
 from kip.domain.egress import EgressDecision
 from kip.domain.generation import (
     GenerationEvidence,
@@ -26,6 +30,15 @@ from kip.domain.models import (
     OntologyAnswerContext,
     RequestContext,
 )
+from kip.domain.telemetry import (
+    QueryFilterSummary,
+    QueryTrace,
+    QueryTraceModelRevision,
+    QueryTraceUsage,
+    TraceOutcome,
+    TraceStage,
+    safe_request_id,
+)
 from kip.errors import ConfigurationError, DependencyUnavailableError, ValidationError
 from kip.ports.generation import GenerationPort
 from kip.settings import Settings
@@ -40,6 +53,7 @@ class AnsweringUseCases:
         egress: EgressPolicyUseCases,
         generator: GenerationPort | None,
         ontology_context: OntologyContextUseCases,
+        telemetry: TelemetryUseCases | None = None,
     ) -> None:
         raw = settings.get("models.generation", {}) or {}
         if not isinstance(raw, dict):
@@ -67,6 +81,7 @@ class AnsweringUseCases:
         self._egress = egress
         self._generator = generator
         self._ontology_context = ontology_context
+        self._telemetry = telemetry
         if (
             generator is not None
             and egress.policy.provider is not None
@@ -77,6 +92,33 @@ class AnsweringUseCases:
             )
 
     def answer(
+        self,
+        context: RequestContext,
+        request: AnswerRequest,
+    ) -> AnswerResponse:
+        started_at = datetime.now(UTC)
+        started = perf_counter()
+        try:
+            response = self._answer(context, request)
+        except Exception:
+            self._record_answer_trace(
+                context,
+                request,
+                None,
+                started_at=started_at,
+                duration_ms=(perf_counter() - started) * 1000,
+            )
+            raise
+        self._record_answer_trace(
+            context,
+            request,
+            response,
+            started_at=started_at,
+            duration_ms=(perf_counter() - started) * 1000,
+        )
+        return response
+
+    def _answer(
         self,
         context: RequestContext,
         request: AnswerRequest,
@@ -199,6 +241,92 @@ class AnsweringUseCases:
                 decision=decision,
             )
 
+    def _record_answer_trace(
+        self,
+        context: RequestContext,
+        request: AnswerRequest,
+        response: AnswerResponse | None,
+        *,
+        started_at: datetime,
+        duration_ms: float,
+    ) -> None:
+        if self._telemetry is None:
+            return
+        stages: list[TraceStage] = ["acl_prefilter", "exact_evidence_read"]
+        if response is not None and response.ontology_context is not None:
+            stages.append("ontology_context")
+        if self._enabled:
+            stages.append("model_egress_policy")
+        if response is not None and response.generation is not None:
+            stages.extend(["structured_generation", "citation_validation"])
+        warnings = (
+            [warning for warning in response.warnings if _TRACE_CODE.fullmatch(warning)]
+            if response is not None
+            else ["answer_failed"]
+        )
+        models: list[QueryTraceModelRevision] = []
+        usage: QueryTraceUsage | None = None
+        if response is not None and response.generation is not None:
+            generation = response.generation
+            models.append(
+                QueryTraceModelRevision(
+                    role="generation",
+                    provider=generation.model.provider,
+                    model=generation.model.model,
+                    revision=generation.model.revision,
+                )
+            )
+            usage = QueryTraceUsage.model_validate(
+                generation.usage.model_dump(mode="json")
+            )
+        outcome: TraceOutcome = "failed"
+        if response is not None:
+            outcome = "refused" if response.refused else (
+                "degraded" if warnings else "succeeded"
+            )
+        self._telemetry.record(
+            context,
+            QueryTrace(
+                request_id=safe_request_id(context.request_id),
+                route="answer",
+                outcome=outcome,
+                started_at=started_at,
+                duration_ms=duration_ms,
+                filters=QueryFilterSummary(
+                    source_kind_count=len(request.source_kinds),
+                    document_type_count=len(request.document_types),
+                    project_id_count=len(request.project_ids),
+                    includes_candidate_assertions=request.include_candidate_assertions,
+                    limit=request.limit,
+                ),
+                stages=stages,
+                selected_evidence_ids=(
+                    [citation.unit_id for citation in response.citations]
+                    if response is not None
+                    else []
+                ),
+                ontology_assertion_ids=(
+                    [
+                        edge.assertion_id
+                        for edge in response.ontology_context.edges
+                    ]
+                    if response is not None
+                    and response.ontology_context is not None
+                    else []
+                ),
+                acl_policy_version=(
+                    context.acl_snapshot.version
+                    if context.acl_snapshot is not None
+                    else None
+                ),
+                models=models,
+                warnings=warnings,
+                usage=usage,
+                refusal_reason=(
+                    response.refusal_reason if response is not None else None
+                ),
+            ),
+        )
     def _generation_request(
         self,
         request: AnswerRequest,
@@ -285,3 +413,6 @@ def _context_is_cited(
     return context is not None and set(context.evidence_unit_ids).issubset(
         citation_ids
     )
+
+
+_TRACE_CODE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")

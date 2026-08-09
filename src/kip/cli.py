@@ -53,6 +53,7 @@ export_app = typer.Typer(no_args_is_help=True, help="Export portable canonical b
 evaluate_app = typer.Typer(no_args_is_help=True, help="Measure retrieval quality")
 quality_app = typer.Typer(no_args_is_help=True, help="Evaluate version-pinned candidates")
 ontology_app = typer.Typer(no_args_is_help=True, help="Validate and migrate ontology releases")
+telemetry_app = typer.Typer(no_args_is_help=True, help="Inspect redacted RAG query traces")
 
 app.add_typer(sync_app, name="sync")
 app.add_typer(xlsx_app, name="xlsx")
@@ -67,6 +68,7 @@ app.add_typer(export_app, name="export")
 app.add_typer(evaluate_app, name="evaluate")
 app.add_typer(quality_app, name="quality")
 app.add_typer(ontology_app, name="ontology")
+app.add_typer(telemetry_app, name="telemetry")
 app.add_typer(setup_app, name="setup")
 
 
@@ -77,7 +79,7 @@ class Runtime:
 
 
 def command_loads_models(subcommand: str | None) -> bool:
-    return subcommand not in {"migrate", "quality"}
+    return subcommand not in {"migrate", "quality", "telemetry"}
 
 
 @app.callback()
@@ -1160,6 +1162,36 @@ def ontology_migrate_materialize(
             load_migration(migration),
         ),
     )
+
+
+@telemetry_app.command("traces")
+def telemetry_traces(
+    ctx: typer.Context,
+    request_id: str | None = typer.Option(None, "--request-id"),
+    limit: int = typer.Option(100, "--limit", min=1, max=1000),
+) -> None:
+    def action(runtime: Runtime):
+        roles = list(dict.fromkeys([*runtime.context.roles, "admin"]))
+        context = runtime.context.model_copy(update={"roles": roles})
+        return runtime.container.application.telemetry.list_traces(
+            context,
+            request_id=request_id,
+            limit=limit,
+        )
+
+    _run(ctx, action)
+
+
+@telemetry_app.command("prune")
+def telemetry_prune(ctx: typer.Context) -> None:
+    def action(runtime: Runtime):
+        roles = list(dict.fromkeys([*runtime.context.roles, "admin"]))
+        context = runtime.context.model_copy(update={"roles": roles})
+        return {
+            "deleted": runtime.container.application.telemetry.prune(context)
+        }
+
+    _run(ctx, action)
 
 
 @export_app.command("canonical")

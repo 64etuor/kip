@@ -13,6 +13,7 @@ from kip.domain.models import (
     EmbeddingSpace,
     JobRecord,
 )
+from kip.domain.telemetry import QueryTrace
 
 
 class MemoryState:
@@ -35,3 +36,4 @@ class MemoryState:
         self.embedding_spaces: dict[str, EmbeddingSpace] = {}
         self.embeddings: dict[tuple[str, str], EmbeddingRecord] = {}
         self.acl_snapshots: dict[str, AclSnapshot] = {}
+        self.query_traces: list[tuple[str, QueryTrace]] = []

@@ -172,6 +172,15 @@ def _config_payload(plan: SetupPlan) -> dict[str, object]:
             "allow_remote_model_egress": plan.model_provider != "disabled",
             "follow_symlinks": False,
         },
+        "telemetry": {
+            "query_traces_enabled": True,
+            "retention_days": plan.retention_days,
+            "otel": {
+                "enabled": False,
+                "service_name": "kip",
+                "endpoint": "http://otel-collector:4318",
+            },
+        },
         "search": {
             "semantic_enabled": False,
             "default_mode": "lexical",

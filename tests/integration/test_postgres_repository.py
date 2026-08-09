@@ -131,6 +131,21 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
         )
         assert natural_hits
         assert natural_hits[0].document_id == hits[0].document_id
+        ngram_hits = container.application.retrieval.search(
+            context,
+            SearchRequest(query="참여 비율", limit=10),
+        )
+        assert ngram_hits
+        rebuild = container.application.operations.rebuild_projection(context, "lexical")
+        assert rebuild["changed_units"] == 0
+        assert rebuild["deleted_units"] == 0
+        rebuilt_ngram_hits = container.application.retrieval.search(
+            context,
+            SearchRequest(query="참여 비율", limit=10),
+        )
+        assert [hit.unit_id for hit in rebuilt_ngram_hits] == [
+            hit.unit_id for hit in ngram_hits
+        ]
         traces = container.application.telemetry.list_traces(
             context.model_copy(update={"roles": ["admin"]})
         )

@@ -61,3 +61,15 @@ def test_file_secret_reference_uses_the_same_bounded_reader(tmp_path: Path) -> N
     multiline.write_text("first\nsecond\n", encoding="utf-8")
     with pytest.raises(ConfigurationError, match="single line"):
         settings.resolve_secret_reference(f"file:{multiline}")
+
+
+def test_database_statement_timeout_can_be_raised_for_bounded_operations(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _base_environment(monkeypatch, tmp_path)
+    monkeypatch.setenv("KIP_DATABASE_STATEMENT_TIMEOUT_MS", "300000")
+
+    settings = Settings.load()
+
+    assert settings.database_statement_timeout_ms == 300000

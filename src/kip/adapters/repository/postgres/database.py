@@ -558,9 +558,9 @@ class PostgresDatabase:
                         """
                         INSERT INTO content.units(
                             id, workspace_id, extraction_id, document_id, artifact_id, ordinal, unit_type,
-                            title, body, body_normalized, locator, acl_scopes, acl_snapshot_id,
+                            title, body, body_normalized, lexical_text, locator, acl_scopes, acl_snapshot_id,
                             data_classification, char_count, metadata
-                        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,%s::jsonb)
+                        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,%s::jsonb)
                         ON CONFLICT (id) DO NOTHING
                         """,
                         (
@@ -574,6 +574,7 @@ class PostgresDatabase:
                             unit.title,
                             unit.body,
                             unit.body_normalized,
+                            unit.lexical_text,
                             _json(unit.locator.model_dump(mode="json")),
                             unit.acl_scopes,
                             unit.acl_snapshot_id,
@@ -1112,7 +1113,7 @@ class PostgresDatabase:
                 title=row["title"],
                 body=row["body"],
                 body_normalized=row["body_normalized"],
-                lexical_text=row["lexemes"] or row["body_normalized"],
+                lexical_text=row["lexical_text"] or row["lexemes"] or row["body_normalized"],
                 locator=EvidenceLocator.model_validate(row["locator"]),
                 acl_scopes=list(row["acl_scopes"] or []),
                 acl_snapshot_id=row["acl_snapshot_id"],
@@ -2679,15 +2680,18 @@ class PostgresDatabase:
         result: dict[str, Any] = {"projection": projection, "status": "rebuilt"}
         if projection in {"lexical", "all"}:
             with self._connection(context) as connection, connection.cursor() as cursor:
-                cursor.execute("DELETE FROM search.lexical_units WHERE workspace_id=%s", (context.workspace,))
                 cursor.execute(
                     """
-                    INSERT INTO search.lexical_units(
-                        unit_id,workspace_id,document_id,artifact_id,source_kind,title,body,lexemes,
-                        identifier_text,source_modified_at,source_sha256
-                    )
-                    SELECT u.id,u.workspace_id,u.document_id,u.artifact_id,s.kind,coalesce(u.title,d.title,''),
-                           u.body,u.body_normalized,concat_ws(' ',a.file_name,d.title),r.source_modified_at,r.sha256
+                    CREATE TEMPORARY TABLE rebuilt_lexical_units ON COMMIT DROP AS
+                    SELECT u.id AS unit_id,u.workspace_id,u.document_id,u.artifact_id,
+                           s.kind AS source_kind,
+                           coalesce(nullif(u.title,''),d.title,'') AS title,
+                           u.body,u.lexical_text AS lexemes,
+                           concat_ws(
+                               ' ',a.file_name,d.title,
+                               o.metadata->>'document_number',d.metadata->>'project_id'
+                           ) AS identifier_text,
+                           r.source_modified_at,r.sha256 AS source_sha256
                     FROM content.units u
                     JOIN content.extractions e ON e.id=u.extraction_id AND e.active
                     JOIN content.artifacts a ON a.id=u.artifact_id
@@ -2699,7 +2703,60 @@ class PostgresDatabase:
                     """,
                     (context.workspace,),
                 )
-                result["lexical_units"] = cursor.rowcount
+                cursor.execute(
+                    """
+                    DELETE FROM search.lexical_units AS current
+                    WHERE current.workspace_id=%s
+                      AND NOT EXISTS (
+                          SELECT 1 FROM rebuilt_lexical_units AS rebuilt
+                          WHERE rebuilt.unit_id=current.unit_id
+                      )
+                    """,
+                    (context.workspace,),
+                )
+                deleted_units = cursor.rowcount
+                cursor.execute(
+                    """
+                    INSERT INTO search.lexical_units AS current(
+                        unit_id,workspace_id,document_id,artifact_id,source_kind,title,body,lexemes,
+                        identifier_text,source_modified_at,source_sha256
+                    )
+                    SELECT unit_id,workspace_id,document_id,artifact_id,source_kind,title,body,lexemes,
+                           identifier_text,source_modified_at,source_sha256
+                    FROM rebuilt_lexical_units
+                    ON CONFLICT (unit_id) DO UPDATE SET
+                        workspace_id=EXCLUDED.workspace_id,
+                        document_id=EXCLUDED.document_id,
+                        artifact_id=EXCLUDED.artifact_id,
+                        source_kind=EXCLUDED.source_kind,
+                        title=EXCLUDED.title,
+                        body=EXCLUDED.body,
+                        lexemes=EXCLUDED.lexemes,
+                        identifier_text=EXCLUDED.identifier_text,
+                        source_modified_at=EXCLUDED.source_modified_at,
+                        source_sha256=EXCLUDED.source_sha256,
+                        updated_at=now()
+                    WHERE ROW(
+                        current.workspace_id,current.document_id,current.artifact_id,
+                        current.source_kind,current.title,current.body,current.lexemes,
+                        current.identifier_text,current.source_modified_at,current.source_sha256
+                    ) IS DISTINCT FROM ROW(
+                        EXCLUDED.workspace_id,EXCLUDED.document_id,EXCLUDED.artifact_id,
+                        EXCLUDED.source_kind,EXCLUDED.title,EXCLUDED.body,EXCLUDED.lexemes,
+                        EXCLUDED.identifier_text,EXCLUDED.source_modified_at,EXCLUDED.source_sha256
+                    )
+                    """,
+                )
+                changed_units = cursor.rowcount
+                cursor.execute("SELECT count(*) FROM rebuilt_lexical_units")
+                count = cursor.fetchone()
+                if count is None:
+                    raise DependencyUnavailableError(
+                        "PostgreSQL did not return rebuilt lexical unit count"
+                    )
+                result["lexical_units"] = int(count["count"])
+                result["changed_units"] = changed_units
+                result["deleted_units"] = deleted_units
                 connection.commit()
         if projection in {"graph", "all"}:
             result["graph"] = "canonical assertions are queried directly; optional graph projection unchanged"

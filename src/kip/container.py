@@ -93,9 +93,7 @@ def build_container(
     else:
         selected_repository = PostgresRepository(
             selected.database_url,
-            statement_timeout_ms=int(
-                selected.get("database.statement_timeout_ms", 15000)
-            ),
+            statement_timeout_ms=selected.database_statement_timeout_ms,
         )
     parsers = ParserRegistry.from_settings(selected)
     sources = ConfiguredSourceCatalog(selected)

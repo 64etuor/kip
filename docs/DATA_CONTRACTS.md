@@ -23,6 +23,11 @@ All edge adapters exchange canonical Pydantic models and versioned JSON envelope
 SourceObject -> SourceRevision -> Artifact -> ExtractionRun -> ContentUnit
 ```
 
+`ContentUnit.lexical_text` is the versioned analyzer output used to rebuild the
+lexical projection. It is stored with the extraction because normalized body
+text alone cannot reproduce Korean n-grams, title tokens, and stable source
+identifiers. The `search.lexical_units` row remains a disposable projection.
+
 `SourceObject.acl_snapshot` records the source ACL provider, version, captured
 time, expiry, and canonical scopes. `ContentUnit.acl_snapshot_id` pins each
 projection row to that snapshot. Configuration-owned snapshots may be

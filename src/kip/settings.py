@@ -74,6 +74,16 @@ def _environment_secret(name: str) -> str:
     return os.environ.get(name, "")
 
 
+def _positive_integer(value: object, name: str) -> int:
+    try:
+        parsed = int(str(value))
+    except ValueError as error:
+        raise ConfigurationError(f"{name} must be a positive integer") from error
+    if parsed <= 0:
+        raise ConfigurationError(f"{name} must be a positive integer")
+    return parsed
+
+
 @dataclass(slots=True)
 class Settings:
     project_root: Path
@@ -82,6 +92,7 @@ class Settings:
     environment: str = "development"
     workspace: str = "default"
     database_url: str = "memory://"
+    database_statement_timeout_ms: int = 15000
     cas_path: Path = Path("./var/cas")
     api_host: str = "127.0.0.1"
     api_port: int = 8080
@@ -142,6 +153,13 @@ class Settings:
             environment=os.environ.get("KIP_ENV", str(_deep_get(raw, "app.environment", "development"))),
             workspace=os.environ.get("KIP_WORKSPACE", str(_deep_get(raw, "app.workspace", "default"))),
             database_url=database_url,
+            database_statement_timeout_ms=_positive_integer(
+                os.environ.get(
+                    "KIP_DATABASE_STATEMENT_TIMEOUT_MS",
+                    _deep_get(raw, "database.statement_timeout_ms", 15000),
+                ),
+                "KIP_DATABASE_STATEMENT_TIMEOUT_MS",
+            ),
             cas_path=cas_path,
             api_host=os.environ.get("KIP_API_HOST", str(_deep_get(raw, "api.host", "127.0.0.1"))),
             api_port=int(os.environ.get("KIP_API_PORT", _deep_get(raw, "api.port", 8080))),
@@ -215,6 +233,7 @@ class Settings:
             environment="test",
             workspace="default",
             database_url="memory://",
+            database_statement_timeout_ms=15000,
             cas_path=root / "var/test-cas",
             api_key="test-key",
             admin_key="test-admin-key",

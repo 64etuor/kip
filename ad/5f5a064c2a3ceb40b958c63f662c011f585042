@@ -1,0 +1,20 @@
+docs/plans/2026-08-09-production-rag-starter-kit.md
+  s_41856199ee83ad::t_2fb06f53bf3d80 1-161,163-169,171,174-198,202-363,366-391,396-417,419-424,426-428,436-451,457-461,465-504,510-597,599-641,643-780,782-810,812-978
+  s_41856199ee83ad::t_278a4dd19cb209 162,170,172-173,199-201,364-365,392-395,418,425,429-435,452-456,462-464,505-509,598,642,781,811
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "ad5f5a064c2a3ceb40b958c63f662c011f585042",
+  "prompts": {},
+  "sessions": {
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

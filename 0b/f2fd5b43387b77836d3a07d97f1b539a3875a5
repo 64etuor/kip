@@ -1,0 +1,96 @@
+src/kip/evaluation/runner.py
+  s_41856199ee83ad::t_64976b1dfec018 561,591-593
+  s_41856199ee83ad::t_9df45d3291b781 18,29-35,232-269,272,278-283,286,292-298,308,320-325,333-338,349-353,409-410,412-416,458-459,471-482,486-495,507-524,528-538,552-553
+  s_41856199ee83ad::t_dfe2aba1d97f6a 270-271,273-277,284-285,287-291
+  s_41856199ee83ad::t_77e1a29df560e9 460-470,483-485,496-506,525-527
+src/kip/evaluation/models.py
+  s_41856199ee83ad::t_8b8673c3e40081 3,23-38,50-60,62-64,68-76,78-87,89,91-92,99-102,105,113-117,119,123-138
+  s_41856199ee83ad::t_9df45d3291b781 61,77
+  s_41856199ee83ad::t_64976b1dfec018 88,90,118,120
+  s_41856199ee83ad::t_dfe2aba1d97f6a 7-12,103-104
+  s_41856199ee83ad::t_93e0632a042d7a 139
+evaluation/reviews/ontology-starter.yaml
+  s_41856199ee83ad::t_2f00bdfd339380 6,78
+  s_41856199ee83ad::t_e5c561adf21800 1-5,7-77
+src/kip/evaluation/reporting.py
+  s_41856199ee83ad::t_64976b1dfec018 158-161
+  s_41856199ee83ad::t_460d800ec3e18e 35,39-41,71-134
+docs/IMPLEMENTATION_STATUS.md
+  s_41856199ee83ad::t_9aee7a9d6dd04a 24,26,59-62
+contracts/ontology-metrics.schema.json
+  s_41856199ee83ad::t_3dbc9660433e24 1-191
+docs/RAG_EVALUATION.md
+  s_41856199ee83ad::t_9aee7a9d6dd04a 155-188
+tests/test_evaluation_runner.py
+  s_41856199ee83ad::t_ce2a5ef844b6f4 3,7
+  s_41856199ee83ad::t_1e00751ef3424e 588-589,591-593
+  s_41856199ee83ad::t_7a437f9f45c0b2 12-20,429-587,594,597-599,628-631
+  s_41856199ee83ad::t_8e78c60bcd84ad 151-154,256-259,304-308,394-428
+  s_41856199ee83ad::t_64976b1dfec018 176,287,590,595-596
+  s_41856199ee83ad::t_b94fac2f495060 600-627
+docs/adr/ADR-029-reviewed-end-to-end-rag-gates.md
+  s_41856199ee83ad::t_09c6d0fa7bbf66 1-42
+contracts/golden-dataset.schema.json
+  s_41856199ee83ad::t_3dbc9660433e24 1-424
+scripts/generate_contracts.py
+  s_41856199ee83ad::t_809ca4abf0665e 66-75,136-141
+contracts/answer-review.schema.json
+  s_41856199ee83ad::t_3dbc9660433e24 1-136
+contracts/ontology-review.schema.json
+  s_41856199ee83ad::t_3dbc9660433e24 1-326
+src/kip/evaluation/ontology.py
+  s_41856199ee83ad::t_dfe2aba1d97f6a 56
+  s_41856199ee83ad::t_8b8673c3e40081 1-3,5,7-55,57-94,114-115,117-156,158-184,186-206,229-278
+  s_41856199ee83ad::t_2ba757dccec694 4,6,95-113,207-228,279-283
+  s_41856199ee83ad::t_64976b1dfec018 116,157,185
+evaluation/golden/ontology-starter.yaml
+  s_41856199ee83ad::t_e5c561adf21800 1-68
+src/kip/evaluation/answers.py
+  s_41856199ee83ad::t_2ba757dccec694 3-4,79-90,160-176,178-182
+  s_41856199ee83ad::t_77e1a29df560e9 32-33,43-45,111-117,126,129-141
+  s_41856199ee83ad::t_64976b1dfec018 47-49,55,121,124,127,158
+  s_41856199ee83ad::t_8b8673c3e40081 7,19-26,50,71-75,106-109,118-120,122-123,125,153-157,159
+  s_41856199ee83ad::t_07eed730a4529b 76-78
+contracts/answer-metrics.schema.json
+  s_41856199ee83ad::t_3dbc9660433e24 1-151
+evaluation/schemas/golden-case.schema.json
+  s_41856199ee83ad::t_8e34953cc5016d 82-169,178-213
+tests/test_answer_evaluation.py
+  s_41856199ee83ad::t_043bdc122bc36f 17,23,26,37-40,56,73-76
+src/kip/evaluation/reviews.py
+  s_41856199ee83ad::t_9df45d3291b781 1-2,4-30,32-40
+  s_41856199ee83ad::t_7a437f9f45c0b2 3,41
+  s_41856199ee83ad::t_64976b1dfec018 31,42
+src/kip/cli.py
+  s_41856199ee83ad::t_7a437f9f45c0b2 25,881-884,897-904,929
+evaluation/README.md
+  s_41856199ee83ad::t_f1fe4b5db0d043 1,3-4,10,24,36-40
+  s_41856199ee83ad::t_cd8cf33f0ce11e 41
+tests/test_cli_surface.py
+  s_41856199ee83ad::t_a3cd35be404c2d 141-173
+tests/test_evaluation_reporting.py
+  s_41856199ee83ad::t_460d800ec3e18e 55
+evaluation/schemas/evaluation-report.schema.json
+  s_41856199ee83ad::t_69c3bf62143258 4
+  s_41856199ee83ad::t_744b23dfc5596f 29-39,97-101,111-147,151-259,313-314
+contracts/evaluation-review-bundle.schema.json
+  s_41856199ee83ad::t_3dbc9660433e24 1-533
+tests/test_ontology_evaluation.py
+  s_41856199ee83ad::t_043bdc122bc36f 1-124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "0bf2fd5b43387b77836d3a07d97f1b539a3875a5",
+  "prompts": {},
+  "sessions": {
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

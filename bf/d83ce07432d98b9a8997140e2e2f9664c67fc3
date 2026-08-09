@@ -1,0 +1,68 @@
+src/kip/domain/generation.py
+  s_41856199ee83ad::t_29b08fe53ce872 1-105
+src/kip/adapters/generators/openai_compatible.py
+  s_41856199ee83ad::t_29b08fe53ce872 1-48,53-162
+  s_41856199ee83ad::t_8b9357ae6cd879 49-52
+contracts/generation-request.schema.json
+  s_41856199ee83ad::t_fadd9506693b0f 1-67
+src/kip/adapters/generators/_http.py
+  s_41856199ee83ad::t_29b08fe53ce872 1-7,10-146
+  s_41856199ee83ad::t_57f2b9f84d030b 8-9
+tests/test_generator_http_adapters.py
+  s_41856199ee83ad::t_68f4314fb200e2 1-9,11,14-283
+  s_41856199ee83ad::t_cee4304ef12102 10,12-13,284-324
+src/kip/ports/generation.py
+  s_41856199ee83ad::t_29b08fe53ce872 1-14
+contracts/generation-result.schema.json
+  s_41856199ee83ad::t_fadd9506693b0f 1-126
+src/kip/settings.py
+  s_41856199ee83ad::t_cee4304ef12102 168-180
+config/kip.example.toml
+  s_41856199ee83ad::t_cee4304ef12102 96-97,100-102
+docs/adr/ADR-022-provider-neutral-structured-generation.md
+  s_41856199ee83ad::t_d0f280590fae77 1-39
+tests/test_generation_contract.py
+  s_41856199ee83ad::t_68f4314fb200e2 1-71
+scripts/generate_contracts.py
+  s_41856199ee83ad::t_d0f280590fae77 20-23,84-85
+src/kip/container.py
+  s_41856199ee83ad::t_cee4304ef12102 9-10,47,61,70,136-149,202,207-219,222-238,245
+  s_41856199ee83ad::t_6f6010d01c0ab7 239-244,246-263
+  s_41856199ee83ad::t_b8efa2bbada6aa 220-221
+  s_03506c0be5fcc9::t_d501e4fbe4e9ee 264-265
+src/kip/adapters/generators/__init__.py
+  s_41856199ee83ad::t_29b08fe53ce872 1-4
+.env.example
+  s_41856199ee83ad::t_cee4304ef12102 59-63
+tests/test_egress_policy.py
+  s_41856199ee83ad::t_fbf8ffe079f34d 296
+src/kip/adapters/generators/anthropic.py
+  s_41856199ee83ad::t_29b08fe53ce872 1-47,52-156
+  s_41856199ee83ad::t_8b9357ae6cd879 48-51
+docs/IMPLEMENTATION_STATUS.md
+  s_41856199ee83ad::t_d0f280590fae77 13-14,27,49-52
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "bfd83ce07432d98b9a8997140e2e2f9664c67fc3",
+  "prompts": {},
+  "sessions": {
+    "s_03506c0be5fcc9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe45d-d747-77b2-a41f-9b77d2b510d0",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

@@ -28,6 +28,7 @@ from kip.adapters.storage import (
     LocalWorkbookReader,
 )
 from kip.application.analyzer import KoreanNgramAnalyzer
+from kip.application.answering import AnsweringUseCases
 from kip.application.egress import EgressPolicyUseCases
 from kip.application.evidence import EvidenceUseCases
 from kip.application.ingestion import IngestionUseCases
@@ -166,6 +167,7 @@ def build_container(
     ontology = (
         OntologyCatalog.load(ontology_root) if ontology_root.is_dir() else None
     )
+    egress = EgressPolicyUseCases(_build_egress_policy(selected))
     application = Application(
         ingestion=IngestionUseCases(
             selected_repository.ingestion,
@@ -191,7 +193,14 @@ def build_container(
             parsers,
             selected_embedding,
         ),
-        egress=EgressPolicyUseCases(_build_egress_policy(selected)),
+        egress=egress,
+        answering=AnsweringUseCases(
+            selected,
+            retrieval,
+            evidence,
+            egress,
+            selected_generator,
+        ),
     )
     return Container(
         settings=selected,

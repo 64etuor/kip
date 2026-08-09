@@ -30,6 +30,14 @@
 - `zero_retention` is an operator attestation about the applicable provider
   contract. Setup records the decision but cannot establish the account-level
   provider setting on the operator's behalf.
+- The answer service applies ACL search, exact evidence reopen, source-hash
+  freshness, XLSX/approval gates, and egress admission before generation. It
+  validates every returned citation ID again before constructing public source
+  locators. Search snippets are never sent directly to a generator.
+- Generator clients use explicit connect/read/write/pool timeouts, bounded
+  response bodies, no automatic retries, and no ambient proxy discovery.
+  Provider errors are reduced to status and request ID; response bodies and
+  credentials are not reflected to callers.
 
 ## Secrets
 

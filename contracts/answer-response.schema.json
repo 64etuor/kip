@@ -1,0 +1,373 @@
+{
+  "$defs": {
+    "AnswerCitation": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "current_source_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Source Sha256"
+        },
+        "indexed_source_sha256": {
+          "title": "Indexed Source Sha256",
+          "type": "string"
+        },
+        "locator": {
+          "$ref": "#/$defs/EvidenceLocator"
+        },
+        "source_changed_since_index": {
+          "title": "Source Changed Since Index",
+          "type": "boolean"
+        },
+        "source_uri": {
+          "title": "Source Uri",
+          "type": "string"
+        },
+        "unit_id": {
+          "title": "Unit Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "unit_id",
+        "artifact_id",
+        "source_uri",
+        "locator",
+        "indexed_source_sha256",
+        "source_changed_since_index"
+      ],
+      "title": "AnswerCitation",
+      "type": "object"
+    },
+    "AnswerGeneration": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "$ref": "#/$defs/ModelRevision"
+        },
+        "provider_request_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider Request Id"
+        },
+        "usage": {
+          "$ref": "#/$defs/GenerationUsage"
+        }
+      },
+      "required": [
+        "model",
+        "usage"
+      ],
+      "title": "AnswerGeneration",
+      "type": "object"
+    },
+    "EgressDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed": {
+          "title": "Allowed",
+          "type": "boolean"
+        },
+        "allowed_evidence_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Evidence Ids",
+          "type": "array"
+        },
+        "denial_reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EgressDenialReason"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "denied_evidence_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Denied Evidence Ids",
+          "type": "array"
+        },
+        "policy_fingerprint": {
+          "title": "Policy Fingerprint",
+          "type": "string"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EgressProvider"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "allowed",
+        "provider",
+        "policy_fingerprint"
+      ],
+      "title": "EgressDecision",
+      "type": "object"
+    },
+    "EgressDenialReason": {
+      "enum": [
+        "no_evidence",
+        "policy_disabled",
+        "missing_provider",
+        "missing_classification",
+        "remote_egress_disabled",
+        "missing_retention_policy",
+        "retention_not_allowed",
+        "missing_secret_reference",
+        "invalid_local_endpoint",
+        "classification_not_allowed"
+      ],
+      "title": "EgressDenialReason",
+      "type": "string"
+    },
+    "EgressProvider": {
+      "enum": [
+        "local",
+        "openai",
+        "anthropic"
+      ],
+      "title": "EgressProvider",
+      "type": "string"
+    },
+    "EvidenceLocator": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "title": "EvidenceLocator",
+      "type": "object"
+    },
+    "GeneratedClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "certainty": {
+          "enum": [
+            "supported",
+            "uncertain"
+          ],
+          "title": "Certainty",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "evidence_ids",
+        "certainty"
+      ],
+      "title": "GeneratedClaim",
+      "type": "object"
+    },
+    "GenerationUsage": {
+      "additionalProperties": false,
+      "properties": {
+        "input_tokens": {
+          "minimum": 0,
+          "title": "Input Tokens",
+          "type": "integer"
+        },
+        "output_tokens": {
+          "minimum": 0,
+          "title": "Output Tokens",
+          "type": "integer"
+        },
+        "total_tokens": {
+          "minimum": 0,
+          "title": "Total Tokens",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "input_tokens",
+        "output_tokens",
+        "total_tokens"
+      ],
+      "title": "GenerationUsage",
+      "type": "object"
+    },
+    "ModelRevision": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "provider": {
+          "minLength": 1,
+          "title": "Provider",
+          "type": "string"
+        },
+        "revision": {
+          "minLength": 1,
+          "title": "Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "model",
+        "revision"
+      ],
+      "title": "ModelRevision",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "answer": {
+      "title": "Answer",
+      "type": "string"
+    },
+    "citations": {
+      "items": {
+        "$ref": "#/$defs/AnswerCitation"
+      },
+      "title": "Citations",
+      "type": "array"
+    },
+    "claims": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/GeneratedClaim"
+      },
+      "title": "Claims",
+      "type": "array"
+    },
+    "egress_decision": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EgressDecision"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "generation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AnswerGeneration"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "query": {
+      "title": "Query",
+      "type": "string"
+    },
+    "refusal_reason": {
+      "anyOf": [
+        {
+          "enum": [
+            "no_admissible_evidence",
+            "no_fresh_evidence",
+            "exact_xlsx_read_required",
+            "insufficient_decision_evidence",
+            "model_egress_denied",
+            "generation_unavailable",
+            "generation_invalid"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Refusal Reason"
+    },
+    "refused": {
+      "title": "Refused",
+      "type": "boolean"
+    },
+    "retrieval_mode": {
+      "default": "extractive",
+      "enum": [
+        "extractive",
+        "generated"
+      ],
+      "title": "Retrieval Mode",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "kip.answer.v1",
+      "default": "kip.answer.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "query",
+    "answer",
+    "refused"
+  ],
+  "title": "AnswerResponse",
+  "type": "object"
+}

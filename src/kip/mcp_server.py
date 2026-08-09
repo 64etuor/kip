@@ -66,7 +66,7 @@ def create_server():
 
     @mcp.tool()
     def kip_answer(query: str, limit: int = 5, max_chars: int = 12000) -> str:
-        return _json(application.retrieval.answer(context(), AnswerRequest(query=query, limit=limit, max_chars=max_chars)))
+        return _json(application.answering.answer(context(), AnswerRequest(query=query, limit=limit, max_chars=max_chars)))
 
     @mcp.tool()
     def kip_vocabulary(prefix: str, limit: int = 20) -> str:

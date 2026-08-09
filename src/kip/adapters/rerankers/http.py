@@ -27,7 +27,10 @@ class HttpRerankerAdapter:
         self.base_url = require_allowed_model_url(base_url, allow_remote_egress)
         self.model = model
         self.revision = revision
-        self.client = client or httpx.Client(timeout=timeout_seconds)
+        self.client = client or httpx.Client(
+            timeout=timeout_seconds,
+            trust_env=False,
+        )
 
     def rerank(self, query: str, documents: Sequence[str]) -> list[RerankScore]:
         if not documents:

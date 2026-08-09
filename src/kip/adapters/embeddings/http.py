@@ -51,7 +51,10 @@ class HttpEmbeddingAdapter:
         self.revision = revision
         self.dimensions = dimensions
         self.query_instruction = query_instruction
-        self.client = client or httpx.Client(timeout=timeout_seconds)
+        self.client = client or httpx.Client(
+            timeout=timeout_seconds,
+            trust_env=False,
+        )
 
     def embed_query(self, text: str) -> list[float]:
         return self._embed([self.query_instruction + text])[0]
@@ -87,4 +90,3 @@ class HttpEmbeddingAdapter:
             raise DependencyUnavailableError(
                 f"embedding model service is unavailable: {error}"
             ) from error
-

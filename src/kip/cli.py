@@ -418,7 +418,7 @@ def answer(
         selected_query = query_option or query
         if not selected_query:
             raise ValidationError("provide QUERY or --query")
-        return runtime.container.application.retrieval.answer(
+        return runtime.container.application.answering.answer(
             runtime.context,
             AnswerRequest(query=selected_query, limit=limit, max_chars=max_chars),
         )

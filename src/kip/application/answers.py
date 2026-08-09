@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
-from kip.domain.models import AnswerCitation, AnswerRequest, AnswerResponse, EvidenceRead
+from kip.application.citations import citation_from_evidence
+from kip.domain.models import AnswerRequest, AnswerResponse, EvidenceRead
 
 _WORD_RE = re.compile(r"[0-9A-Za-z가-힣]{2,}")
 _NUMERIC_INTENT = frozenset({"금액", "얼마", "합계", "총액", "수량", "비율", "날짜", "기한"})
@@ -57,31 +59,28 @@ def _requires_exact_xlsx(request: AnswerRequest, evidence: EvidenceRead) -> bool
     )
 
 
-def _citation(item: EvidenceRead) -> AnswerCitation:
-    return AnswerCitation(
-        unit_id=item.unit.id,
-        artifact_id=item.unit.artifact_id,
-        source_uri=item.source_uri,
-        locator=item.unit.locator,
-        indexed_source_sha256=item.indexed_source_sha256,
-        current_source_sha256=item.current_source_sha256,
-        source_changed_since_index=False,
-    )
+@dataclass(frozen=True, slots=True)
+class AnswerPreparation:
+    evidence: tuple[EvidenceRead, ...]
+    refusal: AnswerResponse | None = None
 
 
-def assemble_answer(
+def prepare_answer_evidence(
     request: AnswerRequest,
     evidence: list[EvidenceRead],
     *,
     had_stale_evidence: bool,
-) -> AnswerResponse:
+) -> AnswerPreparation:
     relevant = [item for item in evidence if _is_relevant(request.query, item.unit.body)]
     if any(_requires_exact_xlsx(request, item) for item in relevant):
-        return AnswerResponse(
-            query=request.query,
-            answer="원본 워크북 범위를 지정해 xlsx-read로 확인해야 합니다.",
-            refused=True,
-            refusal_reason="exact_xlsx_read_required",
+        return AnswerPreparation(
+            evidence=(),
+            refusal=AnswerResponse(
+                query=request.query,
+                answer="원본 워크북 범위를 지정해 xlsx-read로 확인해야 합니다.",
+                refused=True,
+                refusal_reason="exact_xlsx_read_required",
+            ),
         )
     if "승인" in request.query and relevant:
         subject_scores = [
@@ -101,38 +100,49 @@ def assemble_answer(
         if decision_evidence and not any(
             _APPROVAL_ASSERTION_RE.search(item.unit.body) for item in decision_evidence
         ):
-            return AnswerResponse(
-                query=request.query,
-                answer="현재 근거는 승인 완료를 명시하지 않으므로 승인 여부를 확정할 수 없습니다.",
-                refused=True,
-                refusal_reason="insufficient_decision_evidence",
-                citations=[_citation(item) for item in decision_evidence],
+            return AnswerPreparation(
+                evidence=(),
+                refusal=AnswerResponse(
+                    query=request.query,
+                    answer="현재 근거는 승인 완료를 명시하지 않으므로 승인 여부를 확정할 수 없습니다.",
+                    refused=True,
+                    refusal_reason="insufficient_decision_evidence",
+                    citations=[
+                        citation_from_evidence(item) for item in decision_evidence
+                    ],
+                ),
             )
         relevant = decision_evidence
     if not relevant:
-        if had_stale_evidence:
-            return AnswerResponse(
+        return AnswerPreparation(
+            evidence=(),
+            refusal=AnswerResponse(
                 query=request.query,
                 answer="현재 접근 가능하고 최신인 근거만으로는 답을 확정할 수 없습니다.",
                 refused=True,
-                refusal_reason="no_fresh_evidence",
-            )
-        return AnswerResponse(
-            query=request.query,
-            answer="현재 접근 가능하고 최신인 근거만으로는 답을 확정할 수 없습니다.",
-            refused=True,
-            refusal_reason="no_admissible_evidence",
+                refusal_reason=(
+                    "no_fresh_evidence"
+                    if had_stale_evidence
+                    else "no_admissible_evidence"
+                ),
+            ),
         )
+    return AnswerPreparation(evidence=tuple(relevant))
 
+
+def assemble_extractive_answer(
+    request: AnswerRequest,
+    evidence: tuple[EvidenceRead, ...],
+) -> AnswerResponse:
     remaining = request.max_chars
     passages: list[str] = []
-    citations: list[AnswerCitation] = []
-    for item in relevant:
+    citations = []
+    for item in evidence:
         passage = item.unit.body[:remaining]
         if not passage:
             break
         passages.append(passage)
-        citations.append(_citation(item))
+        citations.append(citation_from_evidence(item))
         remaining -= len(passage)
         if remaining <= 0:
             break
@@ -142,3 +152,19 @@ def assemble_answer(
         refused=False,
         citations=citations,
     )
+
+
+def assemble_answer(
+    request: AnswerRequest,
+    evidence: list[EvidenceRead],
+    *,
+    had_stale_evidence: bool,
+) -> AnswerResponse:
+    prepared = prepare_answer_evidence(
+        request,
+        evidence,
+        had_stale_evidence=had_stale_evidence,
+    )
+    if prepared.refusal is not None:
+        return prepared.refusal
+    return assemble_extractive_answer(request, prepared.evidence)

@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 from kip.application.analyzer import KoreanNgramAnalyzer
-from kip.application.answers import assemble_answer
 from kip.application.search_engine import SearchEngine
 from kip.application.semantic import SemanticProjectionUseCases
 from kip.domain.json_types import JsonObject
 from kip.domain.models import (
-    AnswerRequest,
-    AnswerResponse,
     ContextBundle,
     ContextItem,
     ContextRequest,
@@ -124,24 +121,4 @@ class RetrievalUseCases:
             items=items,
             total_chars=total_chars,
             truncated=truncated,
-        )
-
-    def answer(
-        self,
-        context: RequestContext,
-        request: AnswerRequest,
-    ) -> AnswerResponse:
-        hits = self.search(context, request)
-        evidence = []
-        had_stale_evidence = False
-        for hit in hits:
-            item = self._evidence.read_unit(context, hit.unit_id)
-            if item.source_changed_since_index:
-                had_stale_evidence = True
-                continue
-            evidence.append(item)
-        return assemble_answer(
-            request,
-            evidence,
-            had_stale_evidence=had_stale_evidence,
         )

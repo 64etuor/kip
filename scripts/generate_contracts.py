@@ -22,6 +22,8 @@ from kip.domain.generation import (  # noqa: E402
     GenerationResult,
 )
 from kip.domain.models import (  # noqa: E402
+    AnswerRequest,
+    AnswerResponse,
     ApprovedAssertion,
     Artifact,
     AssertionCandidate,
@@ -60,6 +62,8 @@ MODELS = {
     "source-object": SourceObject,
     "source-revision": SourceRevision,
     "artifact": Artifact,
+    "answer-request": AnswerRequest,
+    "answer-response": AnswerResponse,
     "content-unit": ContentUnit,
     "evidence-locator": EvidenceLocator,
     "document-packet": DocumentPacket,

@@ -205,7 +205,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         payload: AnswerRequest,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
-        return ok(selected.application.retrieval.answer(context, payload), context)
+        return ok(selected.application.answering.answer(context, payload), context)
 
     @app.get("/v1/vocabulary", response_model=Envelope)
     async def vocabulary(

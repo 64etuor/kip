@@ -41,6 +41,21 @@ admitted evidence IDs, denied evidence IDs, and a typed denial reason.
 `allowed=false` prohibits a generator call even when an admitted subset is
 non-empty.
 
+## Generated answer boundary
+
+`GenerationRequest` contains a query plus bounded exact evidence bodies,
+reproducible locators, and public content-unit IDs. `GenerationResult` contains
+typed claims, the configured provider/model/revision, token usage, and a
+provider request ID. A supported claim must cite evidence, evidence IDs must be
+unique, and all returned IDs must be a subset of the request.
+
+`AnswerResponse` remains `kip.answer.v1` and adds structured claims, generation
+metadata, and the applied `EgressDecision`. A successful generated answer cites
+only fresh evidence reopened by the application service. Typed refusals cover
+egress denial, provider unavailability, and invalid generated citations.
+Extractive fallback is visible through `retrieval_mode` and `warnings`; it is
+never selected unless configuration explicitly permits it.
+
 ## Knowledge sequence
 
 ```text

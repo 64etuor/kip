@@ -121,3 +121,22 @@ def test_remote_model_url_is_rejected_when_egress_is_disabled() -> None:
             dimensions=3,
             allow_remote_egress=False,
         )
+
+
+def test_model_clients_do_not_inherit_ambient_proxy(monkeypatch) -> None:
+    monkeypatch.setenv("ALL_PROXY", "socks5h://127.0.0.1:1")
+
+    embedding = HttpEmbeddingAdapter(
+        base_url="http://127.0.0.1:7997",
+        model="embedder",
+        revision="abc123",
+        dimensions=3,
+    )
+    reranker = HttpRerankerAdapter(
+        base_url="http://127.0.0.1:7997",
+        model="reranker",
+        revision="abc123",
+    )
+
+    assert embedding.client is not None
+    assert reranker.client is not None

@@ -5,7 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from kip.domain.egress import DataClassification
+from kip.domain.egress import DataClassification, EgressDecision
+from kip.domain.generation import GeneratedClaim, GenerationUsage, ModelRevision
 from kip.domain.identity import AclSnapshot
 
 
@@ -233,19 +234,35 @@ class AnswerCitation(StrictModel):
     source_changed_since_index: bool
 
 
+class AnswerGeneration(StrictModel):
+    model: ModelRevision
+    usage: GenerationUsage
+    provider_request_id: str | None = None
+
+
+AnswerRefusalReason = Literal[
+    "no_admissible_evidence",
+    "no_fresh_evidence",
+    "exact_xlsx_read_required",
+    "insufficient_decision_evidence",
+    "model_egress_denied",
+    "generation_unavailable",
+    "generation_invalid",
+]
+
+
 class AnswerResponse(StrictModel):
     schema_version: Literal["kip.answer.v1"] = "kip.answer.v1"
     query: str
     answer: str
     refused: bool
-    refusal_reason: Literal[
-        "no_admissible_evidence",
-        "no_fresh_evidence",
-        "exact_xlsx_read_required",
-        "insufficient_decision_evidence",
-    ] | None = None
+    refusal_reason: AnswerRefusalReason | None = None
     citations: list[AnswerCitation] = Field(default_factory=list)
-    retrieval_mode: str = "extractive"
+    claims: tuple[GeneratedClaim, ...] = ()
+    retrieval_mode: Literal["extractive", "generated"] = "extractive"
+    generation: AnswerGeneration | None = None
+    egress_decision: EgressDecision | None = None
+    warnings: list[str] = Field(default_factory=list)
 
 
 class ArtifactView(StrictModel):

@@ -9,23 +9,24 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
+VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 PINNED_IMAGE = "registry.example/kip@sha256:" + "1" * 64
 
 
 def _test_wheel(path: Path) -> None:
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr(
-            "kip_knowledge_fabric-3.1.0.dist-info/METADATA",
-            "Metadata-Version: 2.4\nName: kip-knowledge-fabric\nVersion: 3.1.0\n",
+            f"kip_knowledge_fabric-{VERSION}.dist-info/METADATA",
+            f"Metadata-Version: 2.4\nName: kip-knowledge-fabric\nVersion: {VERSION}\n",
         )
         archive.writestr(
-            "kip_knowledge_fabric-3.1.0.dist-info/WHEEL",
+            f"kip_knowledge_fabric-{VERSION}.dist-info/WHEEL",
             "Wheel-Version: 1.0\nTag: py3-none-any\n",
         )
 
 
 def _build_bundle(tmp_path: Path) -> Path:
-    wheel = tmp_path / "kip_knowledge_fabric-3.1.0-py3-none-any.whl"
+    wheel = tmp_path / f"kip_knowledge_fabric-{VERSION}-py3-none-any.whl"
     _test_wheel(wheel)
     output = tmp_path / "bundle"
     environment = {
@@ -53,7 +54,7 @@ def test_release_bundle_contains_verified_starter_artifacts(tmp_path: Path) -> N
     bundle = _build_bundle(tmp_path)
 
     required = [
-        "artifacts/wheels/kip_knowledge_fabric-3.1.0-py3-none-any.whl",
+        f"artifacts/wheels/kip_knowledge_fabric-{VERSION}-py3-none-any.whl",
         "artifacts/images.lock.json",
         "artifacts/sbom.spdx.json",
         "artifacts/provenance.intoto.json",

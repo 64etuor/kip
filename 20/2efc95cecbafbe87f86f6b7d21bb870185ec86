@@ -1,0 +1,49 @@
+skills/kip-setup/SKILL.md
+  s_41856199ee83ad::t_d471eb1c1bdd38 3,6,8,10-17,19,21
+  s_41856199ee83ad::t_1acf8328a302d3 1-2,4-5,7,9,18,20
+.claude/skills/kip-setup/agents/openai.yaml
+  s_41856199ee83ad::t_d471eb1c1bdd38 1-4
+docs/STARTER_KIT_GUIDE.md
+  s_41856199ee83ad::t_a648eca1c7e263 22-35
+scripts/verify_project.py
+  s_41856199ee83ad::t_a648eca1c7e263 33-53
+src/kip/cli.py
+  s_41856199ee83ad::t_beac45ed525e83 39,69,92-94
+docs/QUICKSTART.md
+  s_41856199ee83ad::t_a648eca1c7e263 7-25
+.claude/skills/kip-setup/references/questions.md
+  s_41856199ee83ad::t_d471eb1c1bdd38 1-25
+src/kip/setup_cli.py
+  s_41856199ee83ad::t_fe981ff064d17d 50-51,57-63,80-81,86-87,93-99,118-123,139-140,157-158,172-174,178,199-217
+  s_41856199ee83ad::t_d09eead2b0b871 5,37-40,52-56,69-75,88-92,105-112,129-134,147-152
+  s_41856199ee83ad::t_beac45ed525e83 1-4,6-7,10-36,41-49,64-68,76-79,82-85,100-104,113-117,124-128,135-138,141-146,153-156,159-171,175-177,179-198,218-255
+  s_41856199ee83ad::t_4eb01273b97391 8-9
+.claude/skills/kip-setup/SKILL.md
+  s_41856199ee83ad::t_d471eb1c1bdd38 1-21
+tests/test_setup_cli.py
+  s_41856199ee83ad::t_1b809420a5e2b0 82-89,95,99,103,107,129,134-141,145
+  s_41856199ee83ad::t_80f38cc4adb950 1-81,90-94,96-98,100-102,104-106,108-128,130-133,142-144,146-202
+skills/kip-setup/references/questions.md
+  s_41856199ee83ad::t_d471eb1c1bdd38 1-25
+skills/kip-setup/agents/openai.yaml
+  s_41856199ee83ad::t_1acf8328a302d3 1-2,4
+  s_41856199ee83ad::t_d471eb1c1bdd38 3
+tests/test_setup_skill.py
+  s_41856199ee83ad::t_80f38cc4adb950 1-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "202efc95cecbafbe87f86f6b7d21bb870185ec86",
+  "prompts": {},
+  "sessions": {
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

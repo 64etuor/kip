@@ -48,9 +48,11 @@ non-mutating shadow mode first. Activation is a separate operator action:
 ./scripts/kip parser reextract --source company-nas --activate
 ```
 
-Activation rechecks the source hash and current revision, retains extraction
-history, replaces only the rebuildable active lexical projection, and commits
-each document atomically. It never writes to the source file.
+The operation hashes only configured HWP/HWPX candidates. Activation inherits
+and rechecks the current canonical source ACL snapshot and classification,
+retains extraction history, replaces only the rebuildable active lexical
+projection, and commits each document atomically. It never writes to the source
+file or changes source access policy.
 
 Keep production parser versions pinned. Upgrade a pin only after the parser conformance corpus and shadow-extraction comparison pass; do not use `@latest` in scheduled indexing.
 

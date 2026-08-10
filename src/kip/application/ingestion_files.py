@@ -20,7 +20,7 @@ from kip.domain.models import (
 )
 from kip.errors import ConflictError, ValidationError
 from kip.ids import stable_id
-from kip.ports.evidence import SourceFileInspectorPort
+from kip.ports.evidence import EvidenceStore, SourceFileInspectorPort
 from kip.ports.ingestion import DiscoveredFile, IngestionStore, ParserRegistryPort
 from kip.ports.text_analyzer import TextAnalyzerPort
 
@@ -78,11 +78,13 @@ class FileIngestionWorkflow:
     def __init__(
         self,
         store: IngestionStore,
+        evidence: EvidenceStore,
         parsers: ParserRegistryPort,
         analyzer: TextAnalyzerPort,
         source_files: SourceFileInspectorPort,
     ) -> None:
         self._store = store
+        self._evidence = evidence
         self._parsers = parsers
         self._analyzer = analyzer
         self._source_files = source_files
@@ -144,8 +146,6 @@ class FileIngestionWorkflow:
         source_root: Path,
         record: DiscoveredFile,
         acl_scopes: list[str],
-        acl_snapshot: AclSnapshot,
-        classification: DataClassification,
     ) -> PreparedFilePacket:
         identity = self._identity(
             context,
@@ -160,15 +160,30 @@ class FileIngestionWorkflow:
             record.sha256,
         ):
             raise ConflictError("source revision is not currently indexed")
+        current = self._evidence.get_artifact(
+            ingest_context,
+            identity.artifact_id,
+        )
+        current_source = current.source_object
+        current_revision = current.revision
+        if (
+            current_source is None
+            or current_source.acl_snapshot is None
+            or current_revision is None
+            or current_source.id != identity.object_id
+            or current_revision.id != identity.revision_id
+            or current_revision.sha256 != record.sha256
+        ):
+            raise ConflictError("source revision policy is not current")
         return self._prepare(
             ingest_context,
             identity,
             source_name=source_name,
             source_root=source_root,
             record=record,
-            acl_scopes=acl_scopes,
-            acl_snapshot=acl_snapshot,
-            classification=classification,
+            acl_scopes=current_source.acl_scopes,
+            acl_snapshot=current_source.acl_snapshot,
+            classification=current_source.classification,
         )
 
     def activate_reextraction(

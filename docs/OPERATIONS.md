@@ -297,13 +297,17 @@ separate mutation command:
 ./scripts/kip parser reextract --source company-nas --activate
 ```
 
-The activation path checks the current artifact revision, source hash, ACL
-snapshot, classification, and minimum parser quality immediately before the
-transaction. It inserts a new extraction and its units, swaps the active
-lexical rows, and deactivates the previous extraction in one PostgreSQL
-transaction. The previous extraction remains recoverable history. A rejected,
-failed, changed, or stale candidate leaves the old active extraction intact.
-Normal search and incremental sync never trigger this workflow.
+The operation scans and hashes only configured HWP/HWPX files. Each candidate
+inherits the current canonical source ACL snapshot, scopes, and classification;
+parser re-extraction never applies a configuration policy change. Use normal
+source synchronization to change ACL policy. Activation then checks the
+current artifact revision, source hash, canonical access controls, and minimum
+parser quality immediately before the transaction. It inserts a new extraction
+and its units, swaps the active lexical rows, and deactivates the previous
+extraction in one PostgreSQL transaction. The previous extraction remains
+recoverable history. A rejected, failed, changed, stale, or unauthorized
+candidate leaves the old active extraction intact. Normal search and
+incremental sync never trigger this workflow.
 
 ## Local lexical reranking
 

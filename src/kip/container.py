@@ -357,6 +357,7 @@ def build_container(
             analyzer,
             LocalContentAddressedStore(selected.cas_path),
             source_files,
+            selected_repository.evidence,
             minimum_quality_score=_bounded_float(
                 selected.get("parsers", {}) or {},
                 "parsers",

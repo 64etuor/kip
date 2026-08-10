@@ -73,8 +73,12 @@ class ConfiguredFilesystemSource:
     classification: DataClassification
     connector: FileSystemConnector
 
-    def scan(self) -> Iterable[DiscoveredFile]:
-        return self.connector.scan()
+    def scan(
+        self,
+        *,
+        include_extensions: set[str] | None = None,
+    ) -> Iterable[DiscoveredFile]:
+        return self.connector.scan(include_extensions=include_extensions)
 
 
 @dataclass(frozen=True, slots=True)

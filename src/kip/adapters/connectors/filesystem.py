@@ -34,18 +34,32 @@ class FileSystemConnector:
         self.follow_symlinks = follow_symlinks
         self.max_file_bytes = max_file_bytes
 
-    def scan(self) -> Iterator[FileRecord]:
+    def scan(
+        self,
+        *,
+        include_extensions: set[str] | None = None,
+    ) -> Iterator[FileRecord]:
         if not self.root.exists() or not self.root.is_dir():
             raise SourceUnavailableError(f"filesystem source unavailable: {self.root}")
+        target_extensions = self.include_extensions
+        restrict_extensions = bool(target_extensions)
+        if include_extensions is not None:
+            requested = {value.lower() for value in include_extensions}
+            target_extensions = (
+                target_extensions.intersection(requested)
+                if target_extensions
+                else requested
+            )
+            restrict_extensions = True
         for dirpath, dirnames, filenames in os.walk(self.root, followlinks=self.follow_symlinks):
             if not self.follow_symlinks:
                 dirnames[:] = [name for name in dirnames if not (Path(dirpath) / name).is_symlink()]
             for name in filenames:
                 path = Path(dirpath) / name
+                if restrict_extensions and path.suffix.lower() not in target_extensions:
+                    continue
                 relative = path.relative_to(self.root).as_posix()
                 if any(fnmatch.fnmatch(relative, pattern) for pattern in self.exclude_globs):
-                    continue
-                if self.include_extensions and path.suffix.lower() not in self.include_extensions:
                     continue
                 if path.is_symlink() and not self.follow_symlinks:
                     continue

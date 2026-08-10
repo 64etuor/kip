@@ -15,7 +15,7 @@ from kip.domain.models import (
     SyncSummary,
 )
 from kip.errors import KipError, ValidationError
-from kip.ports.evidence import SourceFileInspectorPort
+from kip.ports.evidence import EvidenceStore, SourceFileInspectorPort
 from kip.ports.ingestion import (
     ContentAddressedStorePort,
     DiscoveredFile,
@@ -37,12 +37,19 @@ class IngestionUseCases:
         analyzer: TextAnalyzerPort,
         content_store: ContentAddressedStorePort,
         source_files: SourceFileInspectorPort,
+        evidence: EvidenceStore,
         *,
         minimum_quality_score: float,
     ) -> None:
         self._jobs = jobs
         self._sources = sources
-        self._files = FileIngestionWorkflow(store, parsers, analyzer, source_files)
+        self._files = FileIngestionWorkflow(
+            store,
+            evidence,
+            parsers,
+            analyzer,
+            source_files,
+        )
         self._events = EventIngestionWorkflow(store, analyzer, content_store)
         self._minimum_quality_score = minimum_quality_score
 
@@ -111,7 +118,7 @@ class IngestionUseCases:
         source = self._sources.filesystem(source_name)
         scope = source.acl_scope or f"workspace:{context.workspace}"
         summary = ReextractionSummary(source=source_name, activate=activate)
-        for record in source.scan():
+        for record in source.scan(include_extensions={".hwp", ".hwpx"}):
             summary.scanned += 1
             if record.path.suffix.lower() not in {".hwp", ".hwpx"}:
                 summary.skipped += 1
@@ -124,8 +131,6 @@ class IngestionUseCases:
                     source_root=source.root,
                     record=record,
                     acl_scopes=[scope],
-                    acl_snapshot=source.acl_snapshot,
-                    classification=source.classification,
                 )
             except (KipError, OSError) as exc:
                 summary.failed += 1

@@ -6,8 +6,11 @@ from types import SimpleNamespace
 
 import pytest
 
+from kip.adapters.connectors.filesystem import FileSystemConnector
 from kip.adapters.repository.memory import MemoryRepository
 from kip.container import build_container
+from kip.domain.egress import DataClassification
+from kip.domain.identity import AclSnapshot
 from kip.domain.models import DocumentPacket, SearchRequest
 from kip.errors import ConflictError
 from kip.ids import new_id, stable_id
@@ -64,7 +67,7 @@ def _native_hwp_container(
                         "enabled": True,
                         "read_only": True,
                         "settle_seconds": 0,
-                        "include_extensions": [".hwp"],
+                        "include_extensions": [".hwp", ".pdf"],
                         "acl_scope": "workspace:default",
                     }
                 ]
@@ -227,6 +230,92 @@ def test_hwp_reextraction_is_shadow_only_until_explicit_activation(
         context,
         SearchRequest(query="기존계약"),
     ) == []
+
+
+def test_hwp_reextraction_does_not_hash_other_configured_formats(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    # Given an indexed HWP and a non-HWP file in the same configured source.
+    monkeypatch.setitem(
+        sys.modules,
+        "hwp_hwpx_parser",
+        SimpleNamespace(Reader=_FakeReader),
+    )
+    _FakeReader.text = "기존계약문구"
+    container = _native_hwp_container(tmp_path)
+    context = container.application.operations.request_context()
+    container.application.ingestion.sync_filesystem(context, "fixture")
+    source_root = tmp_path / "source"
+    (source_root / "unrelated.pdf").write_bytes(b"%PDF-1.7 unrelated")
+    hashed_suffixes: list[str] = []
+    original_hash = FileSystemConnector._hash
+
+    def tracked_hash(path: Path) -> str:
+        hashed_suffixes.append(path.suffix.lower())
+        return original_hash(path)
+
+    monkeypatch.setattr(
+        FileSystemConnector,
+        "_hash",
+        staticmethod(tracked_hash),
+    )
+
+    # When the operator prepares an HWP-only re-extraction.
+    summary = container.application.ingestion.reextract_filesystem(
+        context,
+        "fixture",
+        activate=False,
+    )
+
+    # Then the connector never reads or hashes unrelated configured formats.
+    assert summary.parsed == 1
+    assert hashed_suffixes == [".hwp"]
+
+
+def test_hwp_reextraction_preserves_the_canonical_source_access_snapshot(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setitem(
+        sys.modules,
+        "hwp_hwpx_parser",
+        SimpleNamespace(Reader=_FakeReader),
+    )
+    _FakeReader.text = "기존계약문구"
+    container = _native_hwp_container(tmp_path)
+    context = container.application.operations.request_context()
+    container.application.ingestion.sync_filesystem(context, "fixture")
+    repository = container.repository
+    assert isinstance(repository, MemoryRepository)
+    current = next(iter(repository.state.packets_by_revision.values()))
+    canonical_snapshot = AclSnapshot.configuration(
+        snapshot_id=new_id("aclsnap"),
+        version="legacy-canonical",
+        provider="legacy-migration",
+        scopes=["workspace:default"],
+    )
+    repository.ingestion.upsert_acl_snapshot(
+        context,
+        current.source_object.id,
+        canonical_snapshot,
+        DataClassification.RESTRICTED,
+    )
+    _FakeReader.text = "교체된계약문구"
+
+    summary = container.application.ingestion.reextract_filesystem(
+        context,
+        "fixture",
+        activate=True,
+    )
+
+    active = next(iter(repository.state.packets_by_revision.values()))
+    assert summary.activated == 1
+    assert summary.failed == 0
+    assert active.source_object.acl_snapshot == canonical_snapshot
+    assert all(
+        unit.acl_snapshot_id == canonical_snapshot.id for unit in active.units
+    )
 
 
 def test_hwp_reextraction_rejects_candidates_below_the_quality_gate(

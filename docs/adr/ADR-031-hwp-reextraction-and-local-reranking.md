@@ -15,14 +15,17 @@ ParadeDB, and PGroonga were considered at their proper adapter boundaries.
 
 ## Decision
 
-1. `parser reextract --source SOURCE` prepares HWP/HWPX candidates in shadow
-   mode. `--activate` is a separate operator action.
-2. PostgreSQL activation verifies the current revision, source hash, artifact,
-   document, ACL snapshot, classification, and quality gate. One transaction
-   inserts the new extraction and units, replaces only active lexical rows,
-   deactivates the previous extraction, and records an audit event. A partial
-   unique index permits one active extraction per artifact. Historical
-   extraction packets remain canonical and recoverable.
+1. `parser reextract --source SOURCE` asks the filesystem port to scan and hash
+   only HWP/HWPX candidates, then prepares them in shadow mode. `--activate` is
+   a separate operator action.
+2. Candidates inherit the current canonical source ACL snapshot, scopes, and
+   classification through `EvidenceStore`; parser-only work never applies a
+   configuration policy change. PostgreSQL activation verifies that policy
+   together with the current revision, source hash, artifact, document, and
+   quality gate. One transaction inserts the new extraction and units, replaces
+   only active lexical rows, deactivates the previous extraction, and records an
+   audit event. A partial unique index permits one active extraction per
+   artifact. Historical extraction packets remain canonical and recoverable.
 3. `hwp-hwpx-parser` remains the reference primary. Kordoc stays an optional,
    preinstalled command adapter and is disabled by default. Runtime package
    download is not an indexing strategy.

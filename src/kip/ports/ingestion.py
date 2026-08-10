@@ -36,7 +36,11 @@ class FilesystemSourcePort(Protocol):
     @property
     def classification(self) -> DataClassification: ...
 
-    def scan(self) -> Iterable[DiscoveredFile]: ...
+    def scan(
+        self,
+        *,
+        include_extensions: set[str] | None = None,
+    ) -> Iterable[DiscoveredFile]: ...
 
 
 class SourceCatalogPort(Protocol):

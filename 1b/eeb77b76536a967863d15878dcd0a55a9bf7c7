@@ -1,0 +1,23 @@
+docs/plans/2026-08-10-adaptive-ontology-memory-design.md
+  s_41856199ee83ad::t_7efe55a52190a8 1-2,4-150
+  s_41856199ee83ad::t_e3beb6ce828fa3 3
+docs/plans/2026-08-10-adaptive-ontology-memory.md
+  s_41856199ee83ad::t_e3beb6ce828fa3 36,47
+  s_41856199ee83ad::t_7efe55a52190a8 1-35,37-46,48-218
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "1beeb77b76536a967863d15878dcd0a55a9bf7c7",
+  "prompts": {},
+  "sessions": {
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

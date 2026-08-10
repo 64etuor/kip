@@ -1,0 +1,56 @@
+src/kip/adapters/parsers/hwp_broker.py
+  s_41856199ee83ad::t_212545e36a2e45 12
+src/kip/adapters/parsers/xlsx.py
+  s_41856199ee83ad::t_212545e36a2e45 10
+src/kip/adapters/analyzers/korean_ngram.py
+  s_41856199ee83ad::t_212545e36a2e45 4-5,7,9-10,13,15-16
+src/kip/domain/text.py
+  s_41856199ee83ad::t_212545e36a2e45 1-9
+src/kip/application/search.py
+  s_41856199ee83ad::t_212545e36a2e45 34,45
+src/kip/container.py
+  s_41856199ee83ad::t_212545e36a2e45 6
+src/kip/application/ingestion_events.py
+  s_41856199ee83ad::t_a851e8217a4c3f 21
+  s_41856199ee83ad::t_212545e36a2e45 25,41
+src/kip/application/ingestion.py
+  s_41856199ee83ad::t_212545e36a2e45 20,30
+src/kip/adapters/parsers/docx.py
+  s_41856199ee83ad::t_a851e8217a4c3f 8
+tests/test_analyzer.py
+  s_41856199ee83ad::t_aef3d35c56cbe0 3-4,16-26
+src/kip/ports/text_analyzer.py
+  s_41856199ee83ad::t_212545e36a2e45 1-7
+src/kip/application/search_engine.py
+  s_41856199ee83ad::t_212545e36a2e45 12,29
+tests/test_dependency_boundaries.py
+  s_41856199ee83ad::t_aef3d35c56cbe0 19-40
+src/kip/adapters/parsers/plain.py
+  s_41856199ee83ad::t_212545e36a2e45 8
+src/kip/adapters/analyzers/__init__.py
+  s_41856199ee83ad::t_212545e36a2e45 1-3
+src/kip/adapters/parsers/pdf.py
+  s_41856199ee83ad::t_212545e36a2e45 7
+src/kip/adapters/parsers/hwp_native.py
+  s_41856199ee83ad::t_212545e36a2e45 9
+tests/test_egress_policy.py
+  s_41856199ee83ad::t_aef3d35c56cbe0 7
+src/kip/application/ingestion_files.py
+  s_41856199ee83ad::t_212545e36a2e45 23,63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "e2d4e7a66610fc4ecd79ce901eb82ef07fb6c94f",
+  "prompts": {},
+  "sessions": {
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+tests/test_hwp_parser.py
+  s_41856199ee83ad::t_4f7c7e8430b718 110-127
+config/kip.container.toml
+  s_41856199ee83ad::t_d7d8801aa49afe 49-53,57
+config/kip.example.toml
+  s_41856199ee83ad::t_d7d8801aa49afe 149-150
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "6ee89d9260a60504ace0fcb428648226c8387e7a",
+  "prompts": {},
+  "sessions": {
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

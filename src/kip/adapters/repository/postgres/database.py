@@ -678,6 +678,245 @@ class PostgresDatabase:
             warnings=list(packet.extraction.warnings),
         )
 
+    def replace_extraction(
+        self,
+        context: RequestContext,
+        packet: DocumentPacket,
+    ) -> IngestResult:
+        if packet.workspace_id != context.workspace:
+            raise ValidationError("packet workspace does not match request context")
+        snapshot = packet.source_object.acl_snapshot
+        if snapshot is None:
+            raise ValidationError("source ACL snapshot is required")
+        if packet.extraction.status == "failed" or not packet.units:
+            raise ValidationError("only a usable extraction can be activated")
+        if packet.revision.object_id != packet.source_object.id:
+            raise ValidationError("revision does not reference the source object")
+        if packet.artifact.revision_id != packet.revision.id:
+            raise ValidationError("artifact does not reference the source revision")
+        if packet.extraction.artifact_id != packet.artifact.id:
+            raise ValidationError("extraction does not reference the artifact")
+        if any(
+            unit.extraction_id != packet.extraction.id
+            or unit.artifact_id != packet.artifact.id
+            or unit.document_id != packet.logical_document.id
+            for unit in packet.units
+        ):
+            raise ValidationError("candidate units do not reference the candidate extraction")
+        if len({unit.ordinal for unit in packet.units}) != len(packet.units):
+            raise ValidationError("candidate unit ordinals must be unique")
+        if any(
+            unit.acl_snapshot_id != snapshot.id
+            or unit.acl_scopes != snapshot.scopes
+            or unit.classification != packet.source_object.classification
+            for unit in packet.units
+        ):
+            raise ValidationError("candidate units do not preserve source access controls")
+
+        with self._connection(context) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        object.current_revision_id,
+                        object.acl_snapshot_id,
+                        object.acl_scopes,
+                        object.data_classification,
+                        system.kind AS system_kind,
+                        revision.sha256 AS revision_sha256,
+                        artifact.revision_id AS artifact_revision_id,
+                        artifact.sha256 AS artifact_sha256,
+                        document_artifact.document_id
+                    FROM source.objects object
+                    JOIN source.systems system ON system.id=object.system_id
+                    JOIN source.revisions revision
+                      ON revision.id=object.current_revision_id
+                     AND revision.workspace_id=object.workspace_id
+                    JOIN content.artifacts artifact
+                      ON artifact.workspace_id=object.workspace_id
+                     AND artifact.revision_id=revision.id
+                     AND artifact.id=%s
+                    LEFT JOIN content.document_artifacts document_artifact
+                      ON document_artifact.workspace_id=artifact.workspace_id
+                     AND document_artifact.artifact_id=artifact.id
+                     AND document_artifact.is_primary
+                    WHERE object.workspace_id=%s AND object.id=%s
+                    FOR UPDATE OF object
+                    """,
+                    (
+                        packet.artifact.id,
+                        context.workspace,
+                        packet.source_object.id,
+                    ),
+                )
+                current = cursor.fetchone()
+                if current is None or (
+                    current["current_revision_id"] != packet.revision.id
+                    or current["revision_sha256"] != packet.revision.sha256
+                    or current["artifact_revision_id"] != packet.revision.id
+                    or current["artifact_sha256"] != packet.artifact.sha256
+                    or current["document_id"] != packet.logical_document.id
+                ):
+                    raise ConflictError("candidate does not match the current source revision")
+                if (
+                    current["acl_snapshot_id"] != snapshot.id
+                    or list(current["acl_scopes"] or []) != snapshot.scopes
+                    or current["data_classification"] != packet.source_object.classification
+                ):
+                    raise ConflictError("candidate access controls do not match the current source")
+
+                cursor.execute(
+                    """
+                    INSERT INTO content.extractions(
+                        id, workspace_id, artifact_id, parser_name, parser_version,
+                        status, active, quality_score, output_hash, warnings,
+                        completed_at, metadata
+                    ) VALUES (%s,%s,%s,%s,%s,%s,false,%s,%s,%s::jsonb,now(),%s::jsonb)
+                    """,
+                    (
+                        packet.extraction.id,
+                        context.workspace,
+                        packet.artifact.id,
+                        packet.extraction.parser_name,
+                        packet.extraction.parser_version,
+                        packet.extraction.status,
+                        packet.extraction.quality_score,
+                        packet.extraction.output_hash,
+                        _json(packet.extraction.warnings),
+                        _json(packet.extraction.metadata),
+                    ),
+                )
+                for unit in packet.units:
+                    cursor.execute(
+                        """
+                        INSERT INTO content.units(
+                            id, workspace_id, extraction_id, document_id, artifact_id,
+                            ordinal, unit_type, title, body, body_normalized,
+                            lexical_text, locator, acl_scopes, acl_snapshot_id,
+                            data_classification, char_count, metadata
+                        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,%s::jsonb)
+                        """,
+                        (
+                            unit.id,
+                            context.workspace,
+                            unit.extraction_id,
+                            unit.document_id,
+                            unit.artifact_id,
+                            unit.ordinal,
+                            unit.unit_type,
+                            unit.title,
+                            unit.body,
+                            unit.body_normalized,
+                            unit.lexical_text,
+                            _json(unit.locator.model_dump(mode="json")),
+                            unit.acl_scopes,
+                            unit.acl_snapshot_id,
+                            unit.classification,
+                            len(unit.body),
+                            _json(unit.metadata),
+                        ),
+                    )
+
+                cursor.execute(
+                    """
+                    DELETE FROM search.lexical_units lexical
+                    USING content.units unit, content.extractions extraction
+                    WHERE lexical.unit_id=unit.id
+                      AND unit.extraction_id=extraction.id
+                      AND extraction.workspace_id=%s
+                      AND extraction.artifact_id=%s
+                      AND extraction.active
+                    """,
+                    (context.workspace, packet.artifact.id),
+                )
+                cursor.execute(
+                    """
+                    UPDATE content.extractions
+                    SET active=false
+                    WHERE workspace_id=%s AND artifact_id=%s AND active
+                    """,
+                    (context.workspace, packet.artifact.id),
+                )
+                identifier_text = " ".join(
+                    filter(
+                        None,
+                        [
+                            packet.artifact.file_name,
+                            packet.logical_document.title,
+                            str(packet.source_object.metadata.get("document_number", "")),
+                            str(packet.logical_document.metadata.get("project_id", "")),
+                        ],
+                    )
+                )
+                for unit in packet.units:
+                    cursor.execute(
+                        """
+                        INSERT INTO search.lexical_units(
+                            unit_id, workspace_id, document_id, artifact_id,
+                            source_kind, title, body, lexemes, identifier_text,
+                            source_modified_at, source_sha256
+                        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        """,
+                        (
+                            unit.id,
+                            context.workspace,
+                            unit.document_id,
+                            unit.artifact_id,
+                            current["system_kind"],
+                            unit.title or packet.logical_document.title,
+                            unit.body,
+                            unit.lexical_text,
+                            identifier_text,
+                            packet.revision.source_modified_at,
+                            packet.revision.sha256,
+                        ),
+                    )
+                cursor.execute(
+                    """
+                    UPDATE content.extractions
+                    SET active=true
+                    WHERE workspace_id=%s AND id=%s
+                    """,
+                    (context.workspace, packet.extraction.id),
+                )
+                cursor.execute(
+                    """
+                    INSERT INTO audit.events(
+                        public_id, workspace_id, actor_id, action, object_type,
+                        object_id, request_id, details
+                    ) VALUES (
+                        %s,%s,%s,'extraction.activate','artifact',%s,%s,%s::jsonb
+                    )
+                    """,
+                    (
+                        new_id("audit"),
+                        context.workspace,
+                        context.principal_id,
+                        packet.artifact.id,
+                        context.request_id,
+                        _json(
+                            {
+                                "extraction_id": packet.extraction.id,
+                                "parser_name": packet.extraction.parser_name,
+                                "quality_score": packet.extraction.quality_score,
+                                "unit_count": len(packet.units),
+                            }
+                        ),
+                    ),
+                )
+            connection.commit()
+
+        return IngestResult(
+            status="replaced",
+            source_object_id=packet.source_object.id,
+            revision_id=packet.revision.id,
+            artifact_id=packet.artifact.id,
+            document_id=packet.logical_document.id,
+            extraction_id=packet.extraction.id,
+            unit_count=len(packet.units),
+            warnings=list(packet.extraction.warnings),
+        )
+
     def search(self, context: RequestContext, request: SearchRequest, lexemes: str) -> list[SearchHit]:
         websearch_query = _websearch_or_query(lexemes)
         conditions = [

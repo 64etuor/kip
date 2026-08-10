@@ -19,6 +19,7 @@ from kip.domain.telemetry import QueryTrace
 class MemoryState:
     def __init__(self) -> None:
         self.packets_by_revision: dict[str, DocumentPacket] = {}
+        self.extraction_packets: dict[str, DocumentPacket] = {}
         self.current_revision_by_object: dict[str, str] = {}
         self.units: dict[str, ContentUnit] = {}
         self.artifacts: dict[str, ArtifactView] = {}

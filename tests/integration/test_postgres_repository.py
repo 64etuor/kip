@@ -25,8 +25,11 @@ from kip.domain.knowledge import (
     stable_entity_candidate_id,
 )
 from kip.domain.models import (
+    ContentUnit,
+    DocumentPacket,
     EmbeddingRecord,
     EmbeddingSpace,
+    ExtractionRun,
     GraphNeighborsRequest,
     GraphPathRequest,
     RequestContext,
@@ -40,6 +43,132 @@ from kip.settings import Settings
 
 URL = os.environ.get("KIP_TEST_POSTGRES_URL") or os.environ.get("KIP_DATABASE_URL")
 pytestmark = pytest.mark.skipif(not URL, reason="PostgreSQL integration URL not configured")
+
+
+def test_postgres_replacing_extraction_swaps_lexical_projection(
+    tmp_path: Path,
+) -> None:
+    # Given one active extraction for a current source revision.
+    pytest.importorskip("psycopg")
+    workspace = "test_" + uuid.uuid4().hex[:12]
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    (source_root / "evidence.txt").write_text("기존 검색 근거", encoding="utf-8")
+    settings = Settings(
+        project_root=Path(__file__).resolve().parents[2],
+        config_path=tmp_path / "kip.toml",
+        raw={
+            "database": {"statement_timeout_ms": 15000},
+            "search": {"korean_ngram_min": 2, "korean_ngram_max": 4},
+            "sources": {
+                "filesystem": [
+                    {
+                        "name": "fixture",
+                        "root": str(source_root),
+                        "enabled": True,
+                        "settle_seconds": 0,
+                        "include_extensions": [".txt"],
+                        "acl_scope": f"workspace:{workspace}",
+                    }
+                ]
+            },
+            "parsers": {"hwp": {"order": ["paired_pdf"]}},
+        },
+        environment="test",
+        workspace=workspace,
+        database_url=str(URL),
+        cas_path=tmp_path / "cas",
+    )
+    repository = PostgresRepository(str(URL))
+    container = build_container(settings, repository=repository)
+    repository.operations.migrate(settings.project_root / "migrations")
+    context = container.application.operations.request_context(
+        workspace=workspace,
+        acl_scopes=[f"workspace:{workspace}"],
+    )
+
+    try:
+        container.application.ingestion.sync_filesystem(context, "fixture")
+        original_hit = container.application.retrieval.search(
+            context,
+            SearchRequest(query="기존"),
+        )[0]
+        original_unit = repository.evidence.get_content_unit(
+            context,
+            original_hit.unit_id,
+        )
+        view = repository.evidence.get_artifact(context, original_hit.artifact_id)
+        assert view.source_object is not None
+        assert view.revision is not None
+        assert view.document is not None
+        extraction_id = new_id("ext")
+        candidate_unit = ContentUnit(
+            id=stable_id("unit", extraction_id, "0"),
+            extraction_id=extraction_id,
+            document_id=original_unit.document_id,
+            artifact_id=original_unit.artifact_id,
+            ordinal=0,
+            unit_type="replacement",
+            title=original_unit.title,
+            body="교체된 검색 근거",
+            body_normalized="교체된 검색 근거",
+            lexical_text="교체된 검색 근거 교체 검색 근거",
+            locator=original_unit.locator,
+            classification=original_unit.classification,
+            acl_scopes=original_unit.acl_scopes,
+            acl_snapshot_id=original_unit.acl_snapshot_id,
+        )
+        candidate = DocumentPacket(
+            workspace_id=workspace,
+            source_object=view.source_object,
+            revision=view.revision,
+            logical_document=view.document,
+            artifact=view.artifact,
+            extraction=ExtractionRun(
+                id=extraction_id,
+                artifact_id=view.artifact.id,
+                parser_name="replacement-parser",
+                parser_version="2.0",
+                status="succeeded",
+                quality_score=0.95,
+                output_hash="d" * 64,
+            ),
+            units=[candidate_unit],
+        )
+
+        # When the candidate is activated through the repository port.
+        result = repository.ingestion.replace_extraction(context, candidate)
+
+        # Then search uses only the new unit while the old unit remains auditable.
+        replacement_hits = container.application.retrieval.search(
+            context,
+            SearchRequest(query="교체된"),
+        )
+        assert result.status == "replaced"
+        assert replacement_hits[0].unit_id == candidate_unit.id
+        assert (
+            container.application.retrieval.search(
+                context,
+                SearchRequest(query="기존"),
+            )
+            == []
+        )
+        assert (
+            repository.evidence.get_content_unit(
+                context,
+                original_unit.id,
+            ).body
+            == "기존 검색 근거"
+        )
+        assert repository.operations.status(context).active_extractions == 1
+    finally:
+        import psycopg
+
+        with (
+            psycopg.connect(str(URL), autocommit=True) as connection,
+            connection.cursor() as cursor,
+        ):
+            cursor.execute("DELETE FROM kip.workspaces WHERE slug=%s", (workspace,))
 
 
 def _predicate_rename_release(tmp_path: Path) -> tuple[Path, Path]:

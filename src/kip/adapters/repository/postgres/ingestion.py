@@ -40,3 +40,10 @@ class PostgresIngestionStore:
         packet: DocumentPacket,
     ) -> IngestResult:
         return self.database.ingest_packet(context, packet)
+
+    def replace_extraction(
+        self,
+        context: RequestContext,
+        packet: DocumentPacket,
+    ) -> IngestResult:
+        return self.database.replace_extraction(context, packet)

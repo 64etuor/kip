@@ -89,3 +89,9 @@ class IngestionStore(Protocol):
         context: RequestContext,
         packet: DocumentPacket,
     ) -> IngestResult: ...
+
+    def replace_extraction(
+        self,
+        context: RequestContext,
+        packet: DocumentPacket,
+    ) -> IngestResult: ...

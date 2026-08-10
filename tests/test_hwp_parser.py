@@ -107,3 +107,21 @@ def test_native_parser_supports_only_matching_hwp_signatures(tmp_path: Path) -> 
     assert parser.supports(valid_hwp) is True
     assert parser.supports(invalid_hwpx) is False
     assert parser.supports(valid_hwpx) is True
+
+
+def test_container_config_selects_native_hwp_primary(tmp_path: Path) -> None:
+    # Given the exact configuration copied into the production container.
+    root = Path(__file__).resolve().parents[1]
+    settings = Settings.load(root / "config/kip.container.toml")
+    path = tmp_path / "fixture.hwp"
+    path.write_bytes(bytes.fromhex("D0CF11E0A1B11AE1") + b"fixture")
+
+    # When the runtime composes the parser chain.
+    parser = ParserRegistry.from_settings(settings).find(path)
+    kordoc = settings.get("parsers.hwp.kordoc", {}) or {}
+
+    # Then the bundled native parser is primary and Kordoc is explicit opt-in.
+    assert parser.native is not None
+    assert parser.version == "2.0-native-primary"
+    assert kordoc["enabled"] is False
+    assert kordoc["argv"][0] == "kordoc"

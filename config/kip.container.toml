@@ -46,11 +46,15 @@ minimum_quality_score = 0.70
 shadow_parse_critical_documents = true
 
 [parsers.hwp]
-order = ["kordoc", "unhwp", "paired_pdf"]
+order = ["hwp-hwpx-parser", "kordoc", "unhwp", "paired_pdf"]
+
+[parsers.hwp.hwp-hwpx-parser]
+enabled = true
+max_chars_per_unit = 4000
 
 [parsers.hwp.kordoc]
 enabled = false
-argv = ["npx", "-y", "kordoc@4.2.7", "{input}", "--format", "json"]
+argv = ["kordoc", "{input}", "--format", "json"]
 
 [parsers.hwp.unhwp]
 enabled = false

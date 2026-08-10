@@ -146,8 +146,8 @@ enabled = true
 max_chars_per_unit = 4000
 
 [parsers.hwp.kordoc]
-enabled = true
-argv = ["npx", "-y", "kordoc@4.2.7", "{input}", "--format", "json"]
+enabled = false
+argv = ["kordoc", "{input}", "--format", "json"]
 
 [parsers.hwp.unhwp]
 enabled = false

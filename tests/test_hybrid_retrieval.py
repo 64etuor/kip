@@ -237,6 +237,38 @@ def test_explicit_hybrid_search_and_reranking_use_shadow_space(
     assert reranker.document_counts == [2]
 
 
+def test_reranked_mode_appends_unreranked_tail_up_to_request_limit(
+    test_container,
+    tmp_path: Path,
+) -> None:
+    source_root = tmp_path / "source"
+    (source_root / "승인.txt").write_text("참여율 변경을 승인한다.", encoding="utf-8")
+    (source_root / "허가.txt").write_text("계약 조건의 수정을 허가한다.", encoding="utf-8")
+    reranker = FixtureReranker()
+    test_container.settings.raw["search"]["rerank_candidate_limit"] = 1
+    container = build_container(
+        test_container.settings,
+        repository=test_container.repository,
+        embedding=FixtureEmbedding(),
+        reranker=reranker,
+    )
+    context = container.application.operations.request_context()
+    container.application.ingestion.sync_filesystem(context, "fixture")
+    container.application.retrieval.rebuild_semantic_projection(context)
+
+    hits = container.application.retrieval.search(
+        context,
+        SearchRequest(query="승인", limit=10),
+        mode="reranked",
+    )
+
+    # The rerank depth bounds rerank cost, not the number of returned results.
+    assert len(hits) == 2
+    assert hits[0].metadata["rerank_rank"] == 1
+    assert "rerank_rank" not in hits[1].metadata
+    assert reranker.document_counts == [1]
+
+
 def test_reranking_fetches_candidate_units_in_one_repository_call(
     test_container,
     tmp_path: Path,

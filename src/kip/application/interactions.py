@@ -24,7 +24,6 @@ from kip.errors import AuthorizationError, ValidationError
 from kip.ids import stable_id
 from kip.ports.interactions import InteractionStore
 
-_DISCOVERY_STATUSES = frozenset({"proposed", "accepted_for_release", "rejected"})
 
 
 class InteractionUseCases:

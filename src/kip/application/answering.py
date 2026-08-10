@@ -131,7 +131,11 @@ class AnsweringUseCases:
         for hit in hits:
             if hit.unit_id in seen_ids:
                 continue
-            item = self._evidence.read_unit(context, hit.unit_id)
+            item = self._evidence.read_unit(
+                context,
+                hit.unit_id,
+                verify_hash=False,
+            )
             if item.source_changed_since_index:
                 had_stale_evidence = True
                 continue
@@ -148,6 +152,9 @@ class AnsweringUseCases:
                 ontology_bundle.context.evidence_unit_ids
                 if ontology_bundle.context is not None
                 else []
+            ),
+            apply_lexical_gate=not (
+                self._enabled and self._generator is not None
             ),
         )
         if prepared.refusal is not None:

@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-postgres = ["psycopg[binary]>=3.2,<4"]
+postgres = ["psycopg[binary]>=3.2,<4", "psycopg-pool>=3.2,<4"]
 api = ["fastapi>=0.115,<1", "uvicorn[standard]>=0.34,<1"]
 identity = ["PyJWT[crypto]>=2.13,<3"]
 extractors = ["openpyxl>=3.1,<4", "PyMuPDF>=1.25,<2", "hwp-hwpx-parser>=1,<2"]
@@ -44,6 +44,7 @@ dev = [
 ]
 all = [
   "psycopg[binary]>=3.2,<4",
+  "psycopg-pool>=3.2,<4",
   "fastapi>=0.115,<1",
   "uvicorn[standard]>=0.34,<1",
   "PyJWT[crypto]>=2.13,<3",

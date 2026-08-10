@@ -96,6 +96,7 @@ def build_container(
         selected_repository = PostgresRepository(
             selected.database_url,
             statement_timeout_ms=selected.database_statement_timeout_ms,
+            pool_max_size=selected.database_pool_max_size,
         )
     parsers = ParserRegistry.from_settings(selected)
     sources = ConfiguredSourceCatalog(selected)

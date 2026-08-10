@@ -113,6 +113,68 @@ def test_run_evaluation_returns_required_metrics_and_redacted_cases(tmp_path: Pa
     assert "참여율 변경을 승인한다" not in str(report)
 
 
+def test_enrichment_makes_stale_and_latest_metrics_measurable(tmp_path: Path) -> None:
+    dataset_path = tmp_path / "golden.yaml"
+    dataset_path.write_text(
+        """
+schema_version: kip.golden-dataset.v1
+name: fixture
+corpus_fingerprint: sha256:fixture
+cases:
+  - id: GQ-001
+    question: 참여율 변경 승인
+    category: stale_source
+    principal: principal_public
+    acl_scopes: [workspace:default, public]
+    expected_documents: [doc_a]
+    expected_latest: true
+    expected_stale_warning: true
+    recall_at: 10
+""".strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    def search(case, variant):
+        hit = _hit("doc_a")
+        return [
+            hit.model_copy(
+                update={"metadata": {**hit.metadata, "is_latest": True}},
+                deep=True,
+            )
+        ]
+
+    def enrich(case, hits):
+        return [
+            hit.model_copy(
+                update={
+                    "metadata": {
+                        **hit.metadata,
+                        "source_changed_since_index": True,
+                    }
+                },
+                deep=True,
+            )
+            for hit in hits
+        ]
+
+    report = run_evaluation(
+        load_dataset(dataset_path),
+        variants=["lexical"],
+        search=search,
+        workspace="default",
+        dataset_bytes=dataset_path.read_bytes(),
+        configuration={"search": {"semantic_enabled": False}},
+        code_root=tmp_path,
+        now=lambda: datetime(2026, 8, 10, tzinfo=UTC),
+        enrich=enrich,
+    )
+
+    metrics = report["variants"]["lexical"]["metrics"]
+    assert metrics["stale_warning_rate"] == 1.0
+    assert metrics["latest_version_accuracy"] == 1.0
+
+
 def test_run_evaluation_excludes_declared_warmup_passes_from_metrics(
     tmp_path: Path,
 ) -> None:

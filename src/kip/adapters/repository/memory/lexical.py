@@ -66,7 +66,13 @@ class MemoryLexicalStore:
 
         scored.sort(key=lambda item: (-item[0], item[1].id))
         return [
-            _search_hit(score, unit, view, raw_terms or unique_terms)
+            _search_hit(
+                score,
+                unit,
+                view,
+                raw_terms or unique_terms,
+                is_latest=revision_is_latest(self.state, view),
+            )
             for score, unit, view in scored[: request.limit]
         ]
 
@@ -168,11 +174,24 @@ def snippet(body: str, terms: list[str], width: int = 360) -> str:
     return text
 
 
+def revision_is_latest(state: MemoryState, view: ArtifactView) -> bool:
+    if (
+        view.document is None
+        or view.revision is None
+        or view.revision.source_modified_at is None
+    ):
+        return True
+    latest = state.document_latest_modified(view.document.id)
+    return latest is None or view.revision.source_modified_at >= latest
+
+
 def _search_hit(
     score: float,
     unit: ContentUnit,
     view: ArtifactView,
     terms: list[str],
+    *,
+    is_latest: bool,
 ) -> SearchHit:
     source_object = view.source_object
     revision = view.revision
@@ -194,5 +213,6 @@ def _search_hit(
         metadata={
             "file_name": view.artifact.file_name,
             "document_type": view.document.document_type if view.document else None,
+            "is_latest": is_latest,
         },
     )

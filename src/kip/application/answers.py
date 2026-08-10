@@ -76,14 +76,22 @@ def prepare_answer_evidence(
     *,
     had_stale_evidence: bool,
     ontology_evidence_ids: set[str] | None = None,
+    apply_lexical_gate: bool = True,
 ) -> AnswerPreparation:
+    # The lexical gate protects the extractive fallback, which quotes evidence
+    # verbatim without any claim validation. The structured-generation path
+    # validates claim-citation pairs itself, so gating it would only discard
+    # paraphrase evidence surfaced by semantic retrieval.
     ontology_ids = ontology_evidence_ids or set()
-    relevant = [
-        item
-        for item in evidence
-        if item.unit.id in ontology_ids
-        or _is_relevant(request.query, item.unit.body)
-    ]
+    if apply_lexical_gate:
+        relevant = [
+            item
+            for item in evidence
+            if item.unit.id in ontology_ids
+            or _is_relevant(request.query, item.unit.body)
+        ]
+    else:
+        relevant = list(evidence)
     if any(_requires_exact_xlsx(request, item) for item in relevant):
         return AnswerPreparation(
             evidence=(),
@@ -94,7 +102,7 @@ def prepare_answer_evidence(
                 refusal_reason="exact_xlsx_read_required",
             ),
         )
-    if "승인" in request.query and relevant:
+    if apply_lexical_gate and "승인" in request.query and relevant:
         subject_scores = [
             _decision_subject_score(request.query, item.unit.body)
             for item in relevant

@@ -100,18 +100,42 @@ class FileIngestionWorkflow:
         acl_snapshot: AclSnapshot,
         classification: DataClassification,
     ) -> IngestResult:
+        ingest_context = self._ingest_context(context, acl_scopes)
+        system_id = stable_id("srcsys", context.workspace, source_name)
+        object_id = stable_id("srcobj", system_id, record.relative_path)
+        self._store.upsert_acl_snapshot(
+            ingest_context,
+            object_id,
+            acl_snapshot,
+            classification,
+        )
+        # Fast path: if the stored current revision matches the file's
+        # size/mtime, skip hashing (and therefore reading) the file entirely.
+        current_revision_id = self._store.current_revision_by_stat(
+            ingest_context,
+            object_id,
+            size=record.size,
+            mtime_ns=record.mtime_ns,
+        )
+        if current_revision_id is not None:
+            path = _safe_source_path(record.path, source_root)
+            return IngestResult(
+                status="unchanged",
+                source_object_id=object_id,
+                revision_id=current_revision_id,
+                artifact_id=stable_id("art", current_revision_id, path.name),
+                document_id=stable_id(
+                    "ldoc",
+                    context.workspace,
+                    _logical_key(record.relative_path),
+                ),
+                unit_count=0,
+            )
         identity = self._identity(
             context,
             source_name=source_name,
             source_root=source_root,
             record=record,
-        )
-        ingest_context = self._ingest_context(context, acl_scopes)
-        self._store.upsert_acl_snapshot(
-            ingest_context,
-            identity.object_id,
-            acl_snapshot,
-            classification,
         )
         if self._store.has_revision(
             ingest_context,

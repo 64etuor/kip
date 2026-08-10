@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Iterable
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
@@ -11,13 +11,38 @@ from kip.domain.models import ConnectorEvent, DocumentPacket, IngestResult, Requ
 from kip.ports.parser import ParserPort
 
 
-@dataclass(frozen=True, slots=True)
 class DiscoveredFile:
-    path: Path
-    relative_path: str
-    size: int
-    mtime_ns: int
-    sha256: str
+    """A scanned source file whose content hash is computed on first use.
+
+    Deferring the hash lets sync skip unchanged files by size/mtime without
+    reading their bytes.
+    """
+
+    __slots__ = ("_sha256", "mtime_ns", "path", "relative_path", "size")
+
+    def __init__(
+        self,
+        path: Path,
+        relative_path: str,
+        size: int,
+        mtime_ns: int,
+        sha256: str | None = None,
+    ) -> None:
+        self.path = path
+        self.relative_path = relative_path
+        self.size = size
+        self.mtime_ns = mtime_ns
+        self._sha256 = sha256
+
+    @property
+    def sha256(self) -> str:
+        if self._sha256 is None:
+            digest = hashlib.sha256()
+            with self.path.open("rb") as handle:
+                for block in iter(lambda: handle.read(1024 * 1024), b""):
+                    digest.update(block)
+            self._sha256 = digest.hexdigest()
+        return self._sha256
 
 
 class FilesystemSourcePort(Protocol):
@@ -87,6 +112,15 @@ class IngestionStore(Protocol):
         source_object_id: str,
         sha256: str,
     ) -> bool: ...
+
+    def current_revision_by_stat(
+        self,
+        context: RequestContext,
+        source_object_id: str,
+        *,
+        size: int,
+        mtime_ns: int,
+    ) -> str | None: ...
 
     def ingest_packet(
         self,

@@ -47,6 +47,7 @@ class RetrievalUseCases:
         reranker: RerankerPort | None = None,
         telemetry: TelemetryUseCases | None = None,
     ) -> None:
+        self._settings = settings
         self._store = store
         self._evidence = evidence
         self._semantic = SemanticProjectionUseCases(
@@ -154,15 +155,26 @@ class RetrievalUseCases:
         items: list[ContextItem] = []
         total_chars = 0
         truncated = False
+        # Cap each item's contribution so one oversized unit (for example a
+        # flattened XLSX sheet) cannot consume the whole bundle budget and
+        # leave the remaining slots empty.
+        item_cap = int(
+            self._settings.get("search.context_item_max_chars", 8000)
+        )
         for hit in hits:
-            evidence = self._evidence.read_unit(context, hit.unit_id)
+            evidence = self._evidence.read_unit(
+                context,
+                hit.unit_id,
+                verify_hash=False,
+            )
             remaining = request.max_chars - total_chars
             if remaining <= 0:
                 truncated = True
                 break
             body = evidence.unit.body
-            if len(body) > remaining:
-                body = body[:remaining]
+            allowed = min(remaining, item_cap)
+            if len(body) > allowed:
+                body = body[:allowed]
                 truncated = True
             items.append(
                 ContextItem(

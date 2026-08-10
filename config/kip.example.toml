@@ -6,6 +6,7 @@ log_level = "INFO"
 [database]
 url_env = "KIP_DATABASE_URL"
 statement_timeout_ms = 15000
+pool_max_size = 10
 pool_min = 1
 pool_max = 10
 
@@ -68,10 +69,11 @@ semantic_enabled = false
 default_mode = "reranked"
 lexical_limit_default = 10
 context_max_chars = 40000
+context_item_max_chars = 8000
 korean_ngram_min = 2
 korean_ngram_max = 4
 hybrid_candidate_limit = 40
-rerank_candidate_limit = 6
+rerank_candidate_limit = 40
 lexical_rerank_enabled = true
 lexical_rerank_candidate_limit = 40
 rrf_rank_constant = 60

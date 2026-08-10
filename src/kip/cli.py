@@ -127,6 +127,17 @@ def root(
         envvar="KIP_ACL_SCOPES",
         help="Comma-separated access scopes",
     ),
+    role: list[str] | None = typer.Option(
+        None,
+        "--role",
+        help="Repeatable operator role (admin commands fail without an explicit role)",
+    ),
+    roles: str | None = typer.Option(
+        None,
+        "--roles",
+        envvar="KIP_ROLES",
+        help="Comma-separated operator roles",
+    ),
 ) -> None:
     if ctx.invoked_subcommand == "setup":
         ctx.obj = None
@@ -139,10 +150,14 @@ def root(
     selected_scopes = list(acl_scope or [])
     if acl_scopes:
         selected_scopes.extend(item.strip() for item in acl_scopes.split(",") if item.strip())
+    selected_roles = list(role or [])
+    if roles:
+        selected_roles.extend(item.strip() for item in roles.split(",") if item.strip())
     request_context = container.application.operations.request_context(
         workspace=workspace,
         principal_id=principal,
         acl_scopes=list(dict.fromkeys(selected_scopes)) or None,
+        roles=selected_roles or None,
     )
     ctx.obj = Runtime(container, request_context)
 
@@ -979,6 +994,37 @@ def evaluate_run(
                 mode=variant,
             )
 
+        def enrich_case(case: GoldenCase, hits: list[SearchHit]) -> list[SearchHit]:
+            context = runtime.container.application.operations.request_context(
+                workspace=runtime.context.workspace,
+                principal_id=case.principal,
+                acl_scopes=case.acl_scopes,
+            )
+            enriched: list[SearchHit] = []
+            for hit in hits:
+                try:
+                    evidence = runtime.container.application.evidence.read_unit(
+                        context,
+                        hit.unit_id,
+                    )
+                except KipError:
+                    enriched.append(hit)
+                    continue
+                enriched.append(
+                    hit.model_copy(
+                        update={
+                            "metadata": {
+                                **hit.metadata,
+                                "source_changed_since_index": (
+                                    evidence.source_changed_since_index
+                                ),
+                            }
+                        },
+                        deep=True,
+                    )
+                )
+            return enriched
+
         report = run_evaluation(
             loaded,
             variants=_split_csv(variants),
@@ -989,6 +1035,7 @@ def evaluate_run(
             code_root=runtime.container.settings.project_root,
             review_bundle=load_review_bundle(reviews) if reviews is not None else None,
             warmup_passes=warmup_passes,
+            enrich=enrich_case,
         )
         paths = write_report(report, output_dir)
         for variant, result in report["variants"].items():
@@ -1264,10 +1311,8 @@ def telemetry_traces(
     limit: int = typer.Option(100, "--limit", min=1, max=1000),
 ) -> None:
     def action(runtime: Runtime) -> Any:
-        roles = list(dict.fromkeys([*runtime.context.roles, "admin"]))
-        context = runtime.context.model_copy(update={"roles": roles})
         return runtime.container.application.telemetry.list_traces(
-            context,
+            runtime.context,
             request_id=request_id,
             limit=limit,
         )
@@ -1278,10 +1323,10 @@ def telemetry_traces(
 @telemetry_app.command("prune")
 def telemetry_prune(ctx: typer.Context) -> None:
     def action(runtime: Runtime) -> Any:
-        roles = list(dict.fromkeys([*runtime.context.roles, "admin"]))
-        context = runtime.context.model_copy(update={"roles": roles})
         return {
-            "deleted": runtime.container.application.telemetry.prune(context)
+            "deleted": runtime.container.application.telemetry.prune(
+                runtime.context
+            )
         }
 
     _run(ctx, action)
@@ -1305,11 +1350,6 @@ def _validated_interaction_input[InteractionInputModel: BaseModel](
         return model.model_validate(payload)
     except PydanticValidationError as exc:
         raise ValidationError(str(exc)) from exc
-
-
-def _admin_runtime_context(runtime: Runtime) -> RequestContext:
-    roles = list(dict.fromkeys([*runtime.context.roles, "admin"]))
-    return runtime.context.model_copy(update={"roles": roles})
 
 
 @interaction_app.command("clarify")
@@ -1448,7 +1488,7 @@ def interaction_prune(ctx: typer.Context) -> None:
     def action(runtime: Runtime) -> Any:
         return {
             "deleted": runtime.container.application.interactions.prune_expired_clarifications(
-                _admin_runtime_context(runtime)
+                runtime.context
             )
         }
 
@@ -1495,7 +1535,7 @@ def ontology_discovery_list(
     _run(
         ctx,
         lambda runtime: runtime.container.application.interactions.list_ontology_discovery_candidates(
-            _admin_runtime_context(runtime),
+            runtime.context,
             status=status,
             limit=limit,
         ),
@@ -1512,7 +1552,7 @@ def ontology_discovery_review(
     _run(
         ctx,
         lambda runtime: runtime.container.application.interactions.review_ontology_discovery_candidate(
-            _admin_runtime_context(runtime),
+            runtime.context,
             candidate_id,
             _validated_interaction_input(
                 OntologyDiscoveryReview,

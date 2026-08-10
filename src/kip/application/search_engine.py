@@ -193,7 +193,12 @@ class SearchEngine:
             for hit in rerank_hits
         ]
         scores = self._reranker.rerank(request.query, documents)
-        return apply_rerank(rerank_hits, scores, limit=request.limit)
+        reranked = apply_rerank(rerank_hits, scores, limit=request.limit)
+        if len(reranked) < request.limit:
+            reranked.extend(
+                fused[rerank_depth : rerank_depth + request.limit - len(reranked)]
+            )
+        return reranked
 
     @staticmethod
     def _annotate_lexical(hits: list[SearchHit]) -> list[SearchHit]:

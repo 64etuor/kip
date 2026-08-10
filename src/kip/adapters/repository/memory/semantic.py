@@ -4,7 +4,7 @@ import math
 from dataclasses import dataclass
 
 from kip.adapters.repository.memory.acl import unit_is_visible
-from kip.adapters.repository.memory.lexical import snippet
+from kip.adapters.repository.memory.lexical import revision_is_latest, snippet
 from kip.adapters.repository.memory.state import MemoryState
 from kip.domain.json_types import JsonObject
 from kip.domain.models import (
@@ -157,7 +157,14 @@ class MemorySemanticStore:
             )
         scored.sort(key=lambda item: (-item[0], item[1].id))
         return [
-            _vector_hit(rank, score, unit, view, request)
+            _vector_hit(
+                rank,
+                score,
+                unit,
+                view,
+                request,
+                is_latest=revision_is_latest(self.state, view),
+            )
             for rank, (score, unit, view) in enumerate(
                 scored[:limit],
                 start=1,
@@ -207,6 +214,8 @@ def _vector_hit(
     unit: ContentUnit,
     view: ArtifactView,
     request: SearchRequest,
+    *,
+    is_latest: bool,
 ) -> SearchHit:
     source_object = view.source_object
     revision = view.revision
@@ -230,5 +239,6 @@ def _vector_hit(
             "document_type": view.document.document_type if view.document else None,
             "retrieval_channels": ["vector"],
             "vector_rank": rank,
+            "is_latest": is_latest,
         },
     )

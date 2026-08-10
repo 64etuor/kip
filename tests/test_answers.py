@@ -1,4 +1,4 @@
-from kip.application.answers import assemble_answer
+from kip.application.answers import assemble_answer, prepare_answer_evidence
 from kip.domain.models import AnswerRequest, ContentUnit, EvidenceLocator, EvidenceRead
 
 
@@ -40,3 +40,32 @@ def test_approval_refusal_cites_only_evidence_about_the_named_subject() -> None:
     )
 
     assert [citation.unit_id for citation in response.citations] == ["subject"]
+
+
+def test_generation_path_admits_paraphrase_evidence_without_lexical_overlap() -> None:
+    request = AnswerRequest(query="회계 서류 마감일 알려줘", limit=10)
+    paraphrase = _evidence("p", "정산 증빙 제출기한은 2026년 8월 15일이다.")
+
+    prepared = prepare_answer_evidence(
+        request,
+        [paraphrase],
+        had_stale_evidence=False,
+        apply_lexical_gate=False,
+    )
+
+    assert prepared.refusal is None
+    assert [item.unit.id for item in prepared.evidence] == ["p"]
+
+
+def test_extractive_fallback_keeps_the_lexical_gate() -> None:
+    request = AnswerRequest(query="회계 서류 마감일 알려줘", limit=10)
+    paraphrase = _evidence("p", "정산 증빙 제출기한은 2026년 8월 15일이다.")
+
+    prepared = prepare_answer_evidence(
+        request,
+        [paraphrase],
+        had_stale_evidence=False,
+    )
+
+    assert prepared.refusal is not None
+    assert prepared.refusal.refusal_reason == "no_admissible_evidence"

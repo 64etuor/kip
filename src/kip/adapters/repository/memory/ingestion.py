@@ -56,6 +56,28 @@ class MemoryIngestionStore:
             and packet.workspace_id == context.workspace
         )
 
+    def current_revision_by_stat(
+        self,
+        context: RequestContext,
+        source_object_id: str,
+        *,
+        size: int,
+        mtime_ns: int,
+    ) -> str | None:
+        revision_id = self.state.current_revision_by_object.get(source_object_id)
+        if not revision_id:
+            return None
+        packet = self.state.packets_by_revision.get(revision_id)
+        if (
+            packet is None
+            or packet.workspace_id != context.workspace
+            or packet.revision.is_tombstone
+            or packet.revision.size_bytes != size
+            or packet.revision.metadata.get("mtime_ns") != mtime_ns
+        ):
+            return None
+        return packet.revision.id
+
     def ingest_packet(
         self,
         context: RequestContext,

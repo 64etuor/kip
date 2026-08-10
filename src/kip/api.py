@@ -181,44 +181,44 @@ def create_app(container: Container | None = None) -> FastAPI:
         )
 
     @app.get("/healthz")
-    async def healthz() -> dict[str, str]:
+    def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
     @app.get("/v1/capabilities", response_model=Envelope)
-    async def capabilities(
+    def capabilities(
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
         return ok(selected.application.operations.capabilities(), context)
 
     @app.get("/v1/status", response_model=Envelope)
-    async def status(
+    def status(
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
         return ok(selected.application.operations.status(context), context)
 
     @app.post("/v1/search", response_model=Envelope)
-    async def search(
+    def search(
         payload: SearchRequest,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
         return ok(selected.application.retrieval.search(context, payload), context)
 
     @app.post("/v1/context", response_model=Envelope)
-    async def context_bundle(
+    def context_bundle(
         payload: ContextRequest,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
         return ok(selected.application.retrieval.context_bundle(context, payload), context)
 
     @app.post("/v1/answer", response_model=Envelope)
-    async def answer(
+    def answer(
         payload: AnswerRequest,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
         return ok(selected.application.answering.answer(context, payload), context)
 
     @app.get("/v1/vocabulary", response_model=Envelope)
-    async def vocabulary(
+    def vocabulary(
         prefix: str,
         limit: int = 20,
         context: RequestContext = Depends(authenticated_context),
@@ -226,42 +226,42 @@ def create_app(container: Container | None = None) -> FastAPI:
         return ok(selected.application.retrieval.vocabulary(context, prefix, limit), context)
 
     @app.get("/v1/units/{unit_id}", response_model=Envelope)
-    async def read_unit(
+    def read_unit(
         unit_id: str,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
         return ok(selected.application.evidence.read_unit(context, unit_id), context)
 
     @app.get("/v1/artifacts/{artifact_id}", response_model=Envelope)
-    async def get_artifact(
+    def get_artifact(
         artifact_id: str,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
         return ok(selected.application.evidence.get_artifact(context, artifact_id), context)
 
     @app.get("/v1/documents/{document_id}", response_model=Envelope)
-    async def get_document(
+    def get_document(
         document_id: str,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
         return ok(selected.application.evidence.get_document(context, document_id), context)
 
     @app.get("/v1/assertions/{assertion_id}", response_model=Envelope)
-    async def get_assertion(
+    def get_assertion(
         assertion_id: str,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
         return ok(selected.application.knowledge.get_assertion(context, assertion_id), context)
 
     @app.get("/v1/assertions/{assertion_id}/explain", response_model=Envelope)
-    async def explain_assertion(
+    def explain_assertion(
         assertion_id: str,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
         return ok(selected.application.knowledge.explain_assertion(context, assertion_id), context)
 
     @app.get("/v1/xlsx/{artifact_id}/range", response_model=Envelope)
-    async def xlsx_range(
+    def xlsx_range(
         artifact_id: str,
         sheet: str,
         cell_range: str,
@@ -280,21 +280,21 @@ def create_app(container: Container | None = None) -> FastAPI:
         )
 
     @app.post("/v1/graph/neighbors", response_model=Envelope)
-    async def graph_neighbors(
+    def graph_neighbors(
         payload: GraphNeighborsRequest,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
         return ok(selected.application.knowledge.graph_neighbors(context, payload), context)
 
     @app.post("/v1/graph/path", response_model=Envelope)
-    async def graph_path(
+    def graph_path(
         payload: GraphPathRequest,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
         return ok(selected.application.knowledge.graph_path(context, payload), context)
 
     @app.post("/v1/sync/filesystem/{source_name}", response_model=Envelope)
-    async def sync_filesystem(
+    def sync_filesystem(
         source_name: str,
         enqueue: bool = True,
         dry_run: bool = False,
@@ -308,14 +308,14 @@ def create_app(container: Container | None = None) -> FastAPI:
         return ok(data, context)
 
     @app.post("/v1/sync/{source_name}", response_model=Envelope)
-    async def enqueue_source_sync(
+    def enqueue_source_sync(
         source_name: str,
         context: RequestContext = Depends(admin_context),
     ) -> Envelope:
         return ok({"source": source_name, "job_id": selected.application.ingestion.enqueue_sync(context, source_name)}, context)
 
     @app.get("/v1/jobs", response_model=Envelope)
-    async def jobs(
+    def jobs(
         status: str | None = None,
         limit: int = 100,
         context: RequestContext = Depends(admin_context),
@@ -323,7 +323,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         return ok(selected.application.operations.list_jobs(context, status, limit), context)
 
     @app.get("/v1/admin/query-traces", response_model=Envelope)
-    async def query_traces(
+    def query_traces(
         request_id: str | None = None,
         limit: int = 100,
         context: RequestContext = Depends(admin_context),
@@ -338,7 +338,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         )
 
     @app.delete("/v1/admin/query-traces/expired", response_model=Envelope)
-    async def prune_query_traces(
+    def prune_query_traces(
         context: RequestContext = Depends(admin_context),
     ) -> Envelope:
         return ok(
@@ -347,7 +347,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         )
 
     @app.post("/v1/interactions/clarifications", response_model=Envelope)
-    async def create_clarification(
+    def create_clarification(
         payload: ClarificationRequest,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
@@ -357,7 +357,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         )
 
     @app.get("/v1/interactions/clarifications/{question_id}", response_model=Envelope)
-    async def get_clarification(
+    def get_clarification(
         question_id: str,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
@@ -370,7 +370,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         "/v1/interactions/clarifications/{question_id}/answers",
         response_model=Envelope,
     )
-    async def answer_clarification(
+    def answer_clarification(
         question_id: str,
         payload: ClarificationAnswer,
         context: RequestContext = Depends(authenticated_context),
@@ -383,13 +383,13 @@ def create_app(container: Container | None = None) -> FastAPI:
         )
 
     @app.get("/v1/interactions/preferences", response_model=Envelope)
-    async def list_preferences(
+    def list_preferences(
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
         return ok(selected.application.interactions.list_preferences(context), context)
 
     @app.put("/v1/interactions/preferences", response_model=Envelope)
-    async def save_preference(
+    def save_preference(
         payload: UserPreferenceWrite,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
@@ -399,7 +399,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         )
 
     @app.delete("/v1/interactions/preferences/{key}", response_model=Envelope)
-    async def delete_preference(
+    def delete_preference(
         key: str,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
@@ -409,7 +409,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         )
 
     @app.post("/v1/interactions/feedback", response_model=Envelope)
-    async def submit_feedback(
+    def submit_feedback(
         payload: FeedbackSubmission,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
@@ -422,7 +422,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         "/v1/admin/interactions/clarifications/expired",
         response_model=Envelope,
     )
-    async def prune_expired_clarifications(
+    def prune_expired_clarifications(
         context: RequestContext = Depends(admin_context),
     ) -> Envelope:
         return ok(
@@ -431,14 +431,14 @@ def create_app(container: Container | None = None) -> FastAPI:
         )
 
     @app.post("/v1/connectors/events", response_model=Envelope)
-    async def connector_event(
+    def connector_event(
         payload: ConnectorEvent,
         context: RequestContext = Depends(admin_context),
     ) -> Envelope:
         return ok(selected.application.ingestion.ingest_connector_event(context, payload), context)
 
     @app.get("/v1/ontology/entities", response_model=Envelope)
-    async def ontology_entities(
+    def ontology_entities(
         limit: int = 100,
         context: RequestContext = Depends(admin_context),
     ) -> Envelope:
@@ -448,7 +448,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         )
 
     @app.post("/v1/ontology/context", response_model=Envelope)
-    async def ontology_context(
+    def ontology_context(
         payload: ContextRequest,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
@@ -461,7 +461,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         )
 
     @app.post("/v1/ontology/entities", response_model=Envelope)
-    async def ontology_entity_create(
+    def ontology_entity_create(
         payload: KnowledgeEntity,
         context: RequestContext = Depends(admin_context),
     ) -> Envelope:
@@ -471,7 +471,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         )
 
     @app.post("/v1/ontology/mining-jobs", response_model=Envelope)
-    async def ontology_mining_job(
+    def ontology_mining_job(
         payload: OntologyMiningSubmission,
         context: RequestContext = Depends(admin_context),
     ) -> Envelope:
@@ -486,7 +486,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         )
 
     @app.post("/v1/ontology/discovery-candidates", response_model=Envelope)
-    async def propose_ontology_discovery_candidate(
+    def propose_ontology_discovery_candidate(
         payload: OntologyDiscoveryProposal,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
@@ -499,7 +499,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         )
 
     @app.get("/v1/admin/ontology/discovery-candidates", response_model=Envelope)
-    async def ontology_discovery_candidates(
+    def ontology_discovery_candidates(
         status: str | None = "proposed",
         limit: int = 100,
         context: RequestContext = Depends(admin_context),
@@ -517,7 +517,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         "/v1/admin/ontology/discovery-candidates/{candidate_id}/review",
         response_model=Envelope,
     )
-    async def review_ontology_discovery_candidate(
+    def review_ontology_discovery_candidate(
         candidate_id: str,
         payload: OntologyDiscoveryReview,
         context: RequestContext = Depends(admin_context),
@@ -532,7 +532,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         )
 
     @app.get("/v1/ontology/entity-candidates", response_model=Envelope)
-    async def ontology_entity_candidates(
+    def ontology_entity_candidates(
         status: str = "proposed",
         limit: int = 100,
         context: RequestContext = Depends(admin_context),
@@ -550,7 +550,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         "/v1/ontology/entity-candidates/{candidate_id}",
         response_model=Envelope,
     )
-    async def ontology_entity_candidate(
+    def ontology_entity_candidate(
         candidate_id: str,
         context: RequestContext = Depends(admin_context),
     ) -> Envelope:
@@ -566,7 +566,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         "/v1/ontology/entity-candidates/{candidate_id}/approve",
         response_model=Envelope,
     )
-    async def ontology_entity_candidate_approve(
+    def ontology_entity_candidate_approve(
         candidate_id: str,
         note: str | None = None,
         context: RequestContext = Depends(admin_context),
@@ -584,7 +584,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         "/v1/ontology/entity-candidates/{candidate_id}/reject",
         response_model=Envelope,
     )
-    async def ontology_entity_candidate_reject(
+    def ontology_entity_candidate_reject(
         candidate_id: str,
         note: str | None = None,
         context: RequestContext = Depends(admin_context),
@@ -599,7 +599,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         )
 
     @app.get("/v1/review/candidates", response_model=Envelope)
-    async def candidates(
+    def candidates(
         status: str = "proposed",
         limit: int = 100,
         context: RequestContext = Depends(admin_context),
@@ -607,14 +607,14 @@ def create_app(container: Container | None = None) -> FastAPI:
         return ok(selected.application.knowledge.list_candidates(context, status, limit), context)
 
     @app.get("/v1/review/candidates/{candidate_id}", response_model=Envelope)
-    async def candidate(
+    def candidate(
         candidate_id: str,
         context: RequestContext = Depends(admin_context),
     ) -> Envelope:
         return ok(selected.application.knowledge.get_candidate(context, candidate_id), context)
 
     @app.post("/v1/review/candidates/{candidate_id}/approve", response_model=Envelope)
-    async def approve(
+    def approve(
         candidate_id: str,
         note: str | None = None,
         context: RequestContext = Depends(admin_context),
@@ -622,7 +622,7 @@ def create_app(container: Container | None = None) -> FastAPI:
         return ok(selected.application.knowledge.review_approve(context, candidate_id, note), context)
 
     @app.post("/v1/review/candidates/{candidate_id}/reject", response_model=Envelope)
-    async def reject(
+    def reject(
         candidate_id: str,
         note: str | None = None,
         context: RequestContext = Depends(admin_context),

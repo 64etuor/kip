@@ -93,6 +93,7 @@ class Settings:
     workspace: str = "default"
     database_url: str = "memory://"
     database_statement_timeout_ms: int = 15000
+    database_pool_max_size: int = 10
     cas_path: Path = Path("./var/cas")
     api_host: str = "127.0.0.1"
     api_port: int = 8080
@@ -159,6 +160,13 @@ class Settings:
                     _deep_get(raw, "database.statement_timeout_ms", 15000),
                 ),
                 "KIP_DATABASE_STATEMENT_TIMEOUT_MS",
+            ),
+            database_pool_max_size=_positive_integer(
+                os.environ.get(
+                    "KIP_DATABASE_POOL_MAX_SIZE",
+                    _deep_get(raw, "database.pool_max_size", 10),
+                ),
+                "KIP_DATABASE_POOL_MAX_SIZE",
             ),
             cas_path=cas_path,
             api_host=os.environ.get("KIP_API_HOST", str(_deep_get(raw, "api.host", "127.0.0.1"))),

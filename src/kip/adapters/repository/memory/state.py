@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from kip.domain.identity import AclSnapshot
 from kip.domain.interactions import (
     ClarificationQuestion,
@@ -53,3 +55,14 @@ class MemoryState:
         ] = {}
         self.ontology_discovery_ids_by_fingerprint: dict[tuple[str, str], str] = {}
         self.interaction_events: list[tuple[str, str, InteractionEvent]] = []
+
+    def document_latest_modified(self, document_id: str) -> datetime | None:
+        latest: datetime | None = None
+        for revision_id in self.current_revision_by_object.values():
+            packet = self.packets_by_revision.get(revision_id)
+            if packet is None or packet.logical_document.id != document_id:
+                continue
+            modified = packet.revision.source_modified_at
+            if modified is not None and (latest is None or modified > latest):
+                latest = modified
+        return latest

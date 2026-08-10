@@ -161,6 +161,24 @@ def test_generated_answer_uses_reopened_fresh_evidence_and_exact_citations(
     assert response.generation.provider_request_id == "req_fixture"
 
 
+def test_generation_receives_evidence_the_lexical_gate_would_drop(
+    tmp_path: Path,
+) -> None:
+    generator = RecordingGenerator()
+    container = _container(tmp_path, generator)
+    _ingest(container, "제출기한.txt", "정산 증빙 제출기한은 2026년 8월 15일이다.")
+    context = container.application.operations.request_context()
+
+    response = container.application.answering.answer(
+        context,
+        AnswerRequest(query="증빙 마감 언제까지야?", limit=5),
+    )
+
+    assert response.refused is False
+    assert generator.requests
+    assert generator.requests[0].evidence[0].body.endswith("8월 15일이다.")
+
+
 def test_unknown_generated_citation_returns_typed_refusal(tmp_path: Path) -> None:
     generator = RecordingGenerator(
         claims=(

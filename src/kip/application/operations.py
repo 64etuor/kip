@@ -43,6 +43,7 @@ class OperationsUseCases:
         workspace: str | None = None,
         principal_id: str = "principal_local",
         acl_scopes: list[str] | None = None,
+        roles: list[str] | None = None,
         request_id: str | None = None,
     ) -> RequestContext:
         selected_workspace = workspace or self._settings.workspace
@@ -50,6 +51,7 @@ class OperationsUseCases:
             workspace=selected_workspace,
             principal_id=principal_id,
             acl_scopes=acl_scopes or [f"workspace:{selected_workspace}"],
+            roles=list(dict.fromkeys(roles or [])),
             request_id=request_id or new_id("req"),
         )
 

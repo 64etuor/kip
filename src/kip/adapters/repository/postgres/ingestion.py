@@ -34,6 +34,21 @@ class PostgresIngestionStore:
     ) -> bool:
         return self.database.has_revision(context, source_object_id, sha256)
 
+    def current_revision_by_stat(
+        self,
+        context: RequestContext,
+        source_object_id: str,
+        *,
+        size: int,
+        mtime_ns: int,
+    ) -> str | None:
+        return self.database.current_revision_by_stat(
+            context,
+            source_object_id,
+            size=size,
+            mtime_ns=mtime_ns,
+        )
+
     def ingest_packet(
         self,
         context: RequestContext,

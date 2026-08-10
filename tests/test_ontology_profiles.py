@@ -8,7 +8,6 @@ from kip.errors import ValidationError
 from kip.ontology import OntologyCatalog, validate_ontology
 from kip.ontology_release import OntologyRelease
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 

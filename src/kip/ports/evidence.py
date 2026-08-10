@@ -20,10 +20,20 @@ class SourceFileInspectorPort(Protocol):
 
     def require_sha256(self, path: Path) -> str: ...
 
+    def stat(self, path: Path) -> tuple[int, int] | None:
+        """Return (size, mtime_ns) for a readable file, else None."""
+        ...
+
 
 class WorkbookReaderPort(Protocol):
     def read(self, path: Path, sheet: str, cell_range: str) -> list[list[JsonObject]]: ...
 
 
 class EvidenceReaderPort(Protocol):
-    def read_unit(self, context: RequestContext, unit_id: str) -> EvidenceRead: ...
+    def read_unit(
+        self,
+        context: RequestContext,
+        unit_id: str,
+        *,
+        verify_hash: bool = True,
+    ) -> EvidenceRead: ...

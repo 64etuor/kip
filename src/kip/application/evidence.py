@@ -19,11 +19,29 @@ class EvidenceUseCases:
         self._source_files = source_files
         self._workbooks = workbooks
 
-    def read_unit(self, context: RequestContext, unit_id: str) -> EvidenceRead:
+    def read_unit(
+        self,
+        context: RequestContext,
+        unit_id: str,
+        *,
+        verify_hash: bool = True,
+    ) -> EvidenceRead:
         unit = self._store.get_content_unit(context, unit_id)
         view = self._store.get_artifact(context, unit.artifact_id)
         if not view.source_object or not view.revision:
             raise NotFoundError(f"source metadata missing for unit: {unit_id}")
+        # verify_hash=False lets bulk reopen paths (context bundles, answer
+        # evidence) reuse the sync trust model: an unchanged (size, mtime_ns)
+        # stat counts as unchanged content without re-reading the file. Any
+        # mismatch or missing stat metadata falls back to the full hash.
+        if not verify_hash and self._stat_matches_revision(view):
+            return EvidenceRead(
+                unit=unit,
+                source_uri=view.source_object.canonical_uri,
+                indexed_source_sha256=view.revision.sha256,
+                current_source_sha256=view.revision.sha256,
+                source_changed_since_index=False,
+            )
         current_hash = self._current_hash(view.artifact.source_path)
         return EvidenceRead(
             unit=unit,
@@ -32,6 +50,17 @@ class EvidenceUseCases:
             current_source_sha256=current_hash,
             source_changed_since_index=current_hash != view.revision.sha256,
         )
+
+    def _stat_matches_revision(self, view: ArtifactView) -> bool:
+        revision = view.revision
+        source_path = view.artifact.source_path
+        if revision is None or not source_path:
+            return False
+        recorded_mtime = revision.metadata.get("mtime_ns")
+        if revision.size_bytes is None or not isinstance(recorded_mtime, int):
+            return False
+        current = self._source_files.stat(Path(source_path))
+        return current == (revision.size_bytes, recorded_mtime)
 
     def read_xlsx(
         self,

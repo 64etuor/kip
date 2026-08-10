@@ -35,6 +35,7 @@ from kip.evaluation.ontology import (
 from kip.evaluation.reviews import EvaluationReviewBundle
 
 SearchExecutor = Callable[[GoldenCase, str], list[SearchHit]]
+HitEnricher = Callable[[GoldenCase, list[SearchHit]], list[SearchHit]]
 
 ALLOWED_VARIANTS = frozenset({"lexical", "vector", "hybrid", "reranked"})
 
@@ -180,6 +181,7 @@ def _evaluate_variant(
     dataset: GoldenDataset,
     variant: str,
     search: SearchExecutor,
+    enrich: HitEnricher | None = None,
 ) -> dict[str, Any]:
     results: list[CaseMetrics] = []
     for case in dataset.cases:
@@ -187,6 +189,10 @@ def _evaluate_variant(
         try:
             hits = search(case, variant)
             elapsed = (time.perf_counter_ns() - started) / 1_000_000
+            # Enrichment (for example reopening evidence to measure stale
+            # warnings) runs outside the latency window on purpose.
+            if enrich is not None:
+                hits = enrich(case, hits)
             results.append(_case_result(case, hits, elapsed))
         except Exception as error:
             elapsed = (time.perf_counter_ns() - started) / 1_000_000
@@ -308,6 +314,7 @@ def run_evaluation(
     review_bundle: EvaluationReviewBundle | None = None,
     warmup_passes: int = 0,
     now: Callable[[], datetime] | None = None,
+    enrich: HitEnricher | None = None,
 ) -> dict[str, Any]:
     selected = list(dict.fromkeys(variants))
     unknown = [variant for variant in selected if variant not in ALLOWED_VARIANTS]
@@ -329,7 +336,7 @@ def run_evaluation(
     evaluated: dict[str, dict[str, Any]] = {}
     for variant in selected:
         _warm_variant(dataset, variant, search, warmup_passes)
-        evaluated[variant] = _evaluate_variant(dataset, variant, search)
+        evaluated[variant] = _evaluate_variant(dataset, variant, search, enrich)
         _attach_reviewed_quality(
             dataset,
             variant,

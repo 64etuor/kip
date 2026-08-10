@@ -6,7 +6,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from kip.adapters.connectors.filesystem import FileSystemConnector
 from kip.adapters.repository.memory import MemoryRepository
 from kip.container import build_container
 from kip.domain.egress import DataClassification
@@ -14,6 +13,7 @@ from kip.domain.identity import AclSnapshot
 from kip.domain.models import DocumentPacket, SearchRequest
 from kip.errors import ConflictError
 from kip.ids import new_id, stable_id
+from kip.ports.ingestion import DiscoveredFile
 from kip.settings import Settings
 
 
@@ -249,17 +249,14 @@ def test_hwp_reextraction_does_not_hash_other_configured_formats(
     source_root = tmp_path / "source"
     (source_root / "unrelated.pdf").write_bytes(b"%PDF-1.7 unrelated")
     hashed_suffixes: list[str] = []
-    original_hash = FileSystemConnector._hash
+    original_property = DiscoveredFile.sha256
 
-    def tracked_hash(path: Path) -> str:
-        hashed_suffixes.append(path.suffix.lower())
-        return original_hash(path)
+    def tracked_hash(self: DiscoveredFile) -> str:
+        if self._sha256 is None:
+            hashed_suffixes.append(self.path.suffix.lower())
+        return original_property.fget(self)
 
-    monkeypatch.setattr(
-        FileSystemConnector,
-        "_hash",
-        staticmethod(tracked_hash),
-    )
+    monkeypatch.setattr(DiscoveredFile, "sha256", property(tracked_hash))
 
     # When the operator prepares an HWP-only re-extraction.
     summary = container.application.ingestion.reextract_filesystem(

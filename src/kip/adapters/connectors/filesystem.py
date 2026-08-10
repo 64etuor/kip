@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import fnmatch
-import hashlib
 import os
 import time
 from collections.abc import Iterator
@@ -70,25 +69,27 @@ class FileSystemConnector:
                 if stat_before.st_size > self.max_file_bytes:
                     continue
                 if self.settle_seconds > 0:
-                    time.sleep(min(self.settle_seconds, 0.05))
-                    stat_after = path.stat()
-                    if (stat_before.st_size, stat_before.st_mtime_ns) != (
-                        stat_after.st_size,
-                        stat_after.st_mtime_ns,
-                    ):
+                    age_ns = time.time_ns() - stat_before.st_mtime_ns
+                    if 0 <= age_ns < int(self.settle_seconds * 1_000_000_000):
+                        # Modified inside the settle window; the next scan
+                        # picks it up without sleeping the whole walk.
                         continue
+                    if age_ns < 0:
+                        # Future mtime (clock skew): fall back to a short
+                        # stability probe instead of trusting the timestamp.
+                        time.sleep(min(self.settle_seconds, 0.05))
+                        stat_after = path.stat()
+                        if (stat_before.st_size, stat_before.st_mtime_ns) != (
+                            stat_after.st_size,
+                            stat_after.st_mtime_ns,
+                        ):
+                            continue
+                # The content hash is computed lazily on first access so
+                # unchanged files can be skipped by size/mtime alone.
                 yield FileRecord(
                     path=path,
                     relative_path=relative,
                     size=stat_before.st_size,
                     mtime_ns=stat_before.st_mtime_ns,
-                    sha256=self._hash(path),
                 )
 
-    @staticmethod
-    def _hash(path: Path) -> str:
-        digest = hashlib.sha256()
-        with path.open("rb") as handle:
-            for block in iter(lambda: handle.read(1024 * 1024), b""):
-                digest.update(block)
-        return digest.hexdigest()

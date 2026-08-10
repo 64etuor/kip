@@ -113,7 +113,11 @@ class OntologyContextUseCases:
                 item = evidence_by_id.get(unit_id)
                 if item is None:
                     try:
-                        item = self._evidence.read_unit(context, unit_id)
+                        item = self._evidence.read_unit(
+                            context,
+                            unit_id,
+                            verify_hash=False,
+                        )
                     except NotFoundError:
                         edge_is_stale = True
                         break

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import atexit
 import hashlib
 import json
 import math
+import threading
 from collections.abc import Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -95,38 +97,75 @@ class PostgresDatabase:
 
     name = "postgresql"
 
-    def __init__(self, database_url: str, *, statement_timeout_ms: int = 15000) -> None:
+    def __init__(
+        self,
+        database_url: str,
+        *,
+        statement_timeout_ms: int = 15000,
+        pool_max_size: int = 10,
+    ) -> None:
         self.database_url = database_url
         self.statement_timeout_ms = statement_timeout_ms
+        self.pool_max_size = pool_max_size
+        self._pool: Any = None
+        self._pool_lock = threading.Lock()
         try:
             import psycopg  # noqa: F401
+            import psycopg_pool  # noqa: F401
         except ImportError as exc:
             raise DependencyUnavailableError("Install the postgres extra: pip install '.[postgres]'") from exc
+
+    def _connection_pool(self) -> Any:
+        if self._pool is None:
+            from psycopg.rows import dict_row
+            from psycopg_pool import ConnectionPool
+
+            with self._pool_lock:
+                if self._pool is None:
+                    pool = ConnectionPool(
+                        self.database_url,
+                        min_size=0,
+                        max_size=self.pool_max_size,
+                        kwargs={"row_factory": dict_row},
+                        open=True,
+                        name="kip-postgres",
+                    )
+                    atexit.register(pool.close)
+                    self._pool = pool
+        return self._pool
+
+    def close(self) -> None:
+        with self._pool_lock:
+            if self._pool is not None:
+                self._pool.close()
+                self._pool = None
 
     @contextmanager
     def _connection(
         self,
         context: RequestContext | None = None,
     ) -> Generator[Connection[DictRow], None, None]:
-        import psycopg
-        from psycopg.rows import dict_row
-
-        with psycopg.connect(self.database_url, row_factory=dict_row) as connection:
+        with self._connection_pool().connection() as connection:
             with connection.cursor() as cursor:
-                cursor.execute("SELECT set_config('statement_timeout', %s, false)", (str(self.statement_timeout_ms),))
                 if context is not None:
-                    cursor.execute("SELECT set_config('kip.workspace_id', %s, true)", (context.workspace,))
                     cursor.execute(
-                        "SELECT set_config('kip.principal_id', %s, true)",
-                        (context.principal_id,),
+                        "SELECT set_config('statement_timeout', %s, false),"
+                        " set_config('kip.workspace_id', %s, true),"
+                        " set_config('kip.principal_id', %s, true),"
+                        " set_config('kip.acl_scopes', %s, true),"
+                        " set_config('kip.roles', %s, true)",
+                        (
+                            str(self.statement_timeout_ms),
+                            context.workspace,
+                            context.principal_id,
+                            ",".join(context.acl_scopes),
+                            ",".join(sorted(set(context.roles))),
+                        ),
                     )
+                else:
                     cursor.execute(
-                        "SELECT set_config('kip.acl_scopes', %s, true)",
-                        (",".join(context.acl_scopes),),
-                    )
-                    cursor.execute(
-                        "SELECT set_config('kip.roles', %s, true)",
-                        (",".join(sorted(set(context.roles))),),
+                        "SELECT set_config('statement_timeout', %s, false)",
+                        (str(self.statement_timeout_ms),),
                     )
             yield connection
 
@@ -240,6 +279,35 @@ class PostgresDatabase:
                 self._write_acl_snapshot(cursor, context.workspace, snapshot)
                 cursor.execute(
                     """
+                    SELECT acl_snapshot_id, acl_scopes, data_classification
+                    FROM source.objects
+                    WHERE workspace_id=%s AND id=%s
+                    """,
+                    (context.workspace, source_object_id),
+                )
+                current = cursor.fetchone()
+                unchanged = bool(
+                    current
+                    and current["acl_snapshot_id"] == snapshot.id
+                    and list(current["acl_scopes"] or []) == list(snapshot.scopes)
+                    and current["data_classification"] == classification
+                )
+                if unchanged:
+                    # Snapshot identity, scopes, and classification already
+                    # match: refreshing the snapshot row above is enough, so
+                    # skip the per-file unit and assertion cascade that would
+                    # otherwise rewrite workspace-wide rows on every sync.
+                    cursor.execute(
+                        """
+                        UPDATE source.objects SET last_seen_at=now()
+                        WHERE workspace_id=%s AND id=%s
+                        """,
+                        (context.workspace, source_object_id),
+                    )
+                    connection.commit()
+                    return
+                cursor.execute(
+                    """
                     UPDATE source.objects
                     SET acl_snapshot_id=%s, acl_scopes=%s,
                         data_classification=%s, last_seen_at=now()
@@ -311,6 +379,30 @@ class PostgresDatabase:
             """,
             (workspace, source_object_id),
         )
+
+    def current_revision_by_stat(
+        self,
+        context: RequestContext,
+        source_object_id: str,
+        *,
+        size: int,
+        mtime_ns: int,
+    ) -> str | None:
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT r.id
+                FROM source.objects o
+                JOIN source.revisions r ON r.id = o.current_revision_id
+                WHERE o.workspace_id = %s AND o.id = %s
+                  AND NOT r.is_tombstone
+                  AND r.size_bytes = %s
+                  AND r.metadata->>'mtime_ns' = %s
+                """,
+                (context.workspace, source_object_id, size, str(mtime_ns)),
+            )
+            row = cursor.fetchone()
+        return str(row["id"]) if row else None
 
     def has_revision(self, context: RequestContext, source_object_id: str, sha256: str) -> bool:
         with self._connection(context) as connection, connection.cursor() as cursor:
@@ -927,51 +1019,86 @@ class PostgresDatabase:
 
     def search(self, context: RequestContext, request: SearchRequest, lexemes: str) -> list[SearchHit]:
         websearch_query = _websearch_or_query(lexemes)
-        conditions = [
-            "l.workspace_id=%s",
+        inner_conditions = ["l.workspace_id=%s"]
+        inner_condition_params: list[Any] = [context.workspace]
+        if request.source_kinds:
+            inner_conditions.append("l.source_kind = ANY(%s::text[])")
+            inner_condition_params.append(request.source_kinds)
+        outer_conditions = [
             "(cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])",
             "kip.acl_snapshot_is_fresh(u.acl_snapshot_id)",
         ]
-        condition_params: list[Any] = [context.workspace, context.acl_scopes]
-        if request.source_kinds:
-            conditions.append("l.source_kind = ANY(%s::text[])")
-            condition_params.append(request.source_kinds)
+        outer_condition_params: list[Any] = [context.acl_scopes]
         if request.document_types:
-            conditions.append("d.document_type = ANY(%s::text[])")
-            condition_params.append(request.document_types)
+            outer_conditions.append("d.document_type = ANY(%s::text[])")
+            outer_condition_params.append(request.document_types)
         if request.project_ids:
-            conditions.append("coalesce(d.metadata->>'project_id','') = ANY(%s::text[])")
-            condition_params.append(request.project_ids)
+            outer_conditions.append("coalesce(d.metadata->>'project_id','') = ANY(%s::text[])")
+            outer_condition_params.append(request.project_ids)
 
+        # Every OR arm stays in an index-usable form (ILIKE and the %% trigram
+        # operator hit the gin_trgm_ops indexes, tsv hits its GIN index). The
+        # MATERIALIZED CTE forces one scan of lexical_units for the match set;
+        # without the fence the planner has re-scanned the bitmap once per
+        # artifact row under misestimation. ACL and freshness filters still
+        # run before ORDER BY/LIMIT, and is_latest is computed only for the
+        # LIMITed rows.
         sql = f"""
             SELECT
-                l.unit_id, l.document_id, l.artifact_id, l.source_kind, l.title,
-                left(regexp_replace(l.body, '\\s+', ' ', 'g'), 500) AS snippet,
-                (
-                    CASE WHEN lower(l.identifier_text) = lower(%s) THEN 30 ELSE 0 END
-                  + CASE WHEN lower(l.title) LIKE '%%' || lower(%s) || '%%' THEN 10 ELSE 0 END
-                  + CASE WHEN lower(l.body) LIKE '%%' || lower(%s) || '%%' THEN 6 ELSE 0 END
-                  + CASE WHEN l.tsv @@ websearch_to_tsquery('simple', %s) THEN ts_rank_cd(l.tsv, websearch_to_tsquery('simple', %s)) * 10 ELSE 0 END
-                  + similarity(l.title, %s) * 2
-                ) AS score,
-                u.locator, o.canonical_uri AS source_uri, l.source_sha256,
-                l.source_modified_at, a.file_name, d.document_type
-            FROM search.lexical_units l
-            JOIN content.units u ON u.id=l.unit_id
-            JOIN content.artifacts a ON a.id=l.artifact_id
+                q.*,
+                coalesce(
+                    q.revision_modified_at >= (
+                        SELECT max(r2.source_modified_at)
+                        FROM content.document_artifacts da2
+                        JOIN content.artifacts a2 ON a2.id=da2.artifact_id
+                        JOIN source.revisions r2 ON r2.id=a2.revision_id
+                        JOIN source.objects o2
+                          ON o2.id=r2.object_id AND o2.current_revision_id=r2.id
+                        WHERE da2.workspace_id=%s
+                          AND da2.document_id=q.document_id
+                    ),
+                    true
+                ) AS is_latest
+            FROM (
+            WITH matched AS MATERIALIZED (
+                SELECT
+                    l.unit_id, l.document_id, l.artifact_id, l.source_kind,
+                    l.title, l.source_sha256, l.source_modified_at,
+                    left(regexp_replace(l.body, '\\s+', ' ', 'g'), 500) AS snippet,
+                    (
+                        CASE WHEN lower(l.identifier_text) = lower(%s) THEN 30 ELSE 0 END
+                      + CASE WHEN l.title ILIKE '%%' || %s || '%%' THEN 10 ELSE 0 END
+                      + CASE WHEN l.body ILIKE '%%' || %s || '%%' THEN 6 ELSE 0 END
+                      + CASE WHEN l.tsv @@ websearch_to_tsquery('simple', %s) THEN ts_rank_cd(l.tsv, websearch_to_tsquery('simple', %s)) * 10 ELSE 0 END
+                      + similarity(l.title, %s) * 2
+                    ) AS score
+                FROM search.lexical_units l
+                WHERE {' AND '.join(inner_conditions)}
+                  AND (
+                        l.identifier_text ILIKE '%%' || %s || '%%'
+                     OR l.title ILIKE '%%' || %s || '%%'
+                     OR l.body ILIKE '%%' || %s || '%%'
+                     OR l.tsv @@ websearch_to_tsquery('simple', %s)
+                     OR l.title %% %s
+                  )
+            )
+            SELECT
+                m.unit_id, m.document_id, m.artifact_id, m.source_kind,
+                m.title, m.snippet, m.score,
+                u.locator, o.canonical_uri AS source_uri, m.source_sha256,
+                m.source_modified_at, a.file_name, d.document_type,
+                r.source_modified_at AS revision_modified_at
+            FROM matched m
+            JOIN content.units u ON u.id=m.unit_id
+            JOIN content.artifacts a ON a.id=m.artifact_id
             JOIN source.revisions r ON r.id=a.revision_id
             JOIN source.objects o ON o.id=r.object_id AND o.current_revision_id=r.id
-            LEFT JOIN content.logical_documents d ON d.id=l.document_id
-            WHERE {' AND '.join(conditions)}
-              AND (
-                    lower(l.identifier_text) LIKE '%%' || lower(%s) || '%%'
-                 OR lower(l.title) LIKE '%%' || lower(%s) || '%%'
-                 OR lower(l.body) LIKE '%%' || lower(%s) || '%%'
-                 OR l.tsv @@ websearch_to_tsquery('simple', %s)
-                 OR similarity(l.title, %s) > 0.15
-              )
-            ORDER BY score DESC, l.unit_id
+            LEFT JOIN content.logical_documents d ON d.id=m.document_id
+            WHERE {' AND '.join(outer_conditions)}
+            ORDER BY m.score DESC, m.unit_id
             LIMIT %s
+            ) q
+            ORDER BY q.score DESC, q.unit_id
         """
         score_params = [
             request.query,
@@ -981,17 +1108,28 @@ class PostgresDatabase:
             websearch_query,
             request.query,
         ]
-        tail_params = [
+        or_params = [
             request.query,
             request.query,
             request.query,
             websearch_query,
             request.query,
+        ]
+        all_params = [
+            context.workspace,
+            *score_params,
+            *inner_condition_params,
+            *or_params,
+            *outer_condition_params,
             request.limit,
         ]
-        all_params = score_params + condition_params + tail_params
 
         with self._connection(context) as connection, connection.cursor() as cursor:
+            # Preserve the historical similarity cutoff for the trigram %%
+            # operator, which reads this transaction-local GUC.
+            cursor.execute(
+                "SELECT set_config('pg_trgm.similarity_threshold', '0.15', true)"
+            )
             cursor.execute(sql, all_params)
             rows = cursor.fetchall()
         return [
@@ -1007,7 +1145,11 @@ class PostgresDatabase:
                 source_uri=row["source_uri"],
                 source_sha256=row["source_sha256"],
                 source_modified_at=row["source_modified_at"],
-                metadata={"file_name": row["file_name"], "document_type": row["document_type"]},
+                metadata={
+                    "file_name": row["file_name"],
+                    "document_type": row["document_type"],
+                    "is_latest": bool(row["is_latest"]),
+                },
             )
             for row in rows
         ]
@@ -1244,11 +1386,28 @@ class PostgresDatabase:
         vector = _vector_literal(query_embedding)
         sql = f"""
             SELECT
+                q.*,
+                coalesce(
+                    q.revision_modified_at >= (
+                        SELECT max(r2.source_modified_at)
+                        FROM content.document_artifacts da2
+                        JOIN content.artifacts a2 ON a2.id=da2.artifact_id
+                        JOIN source.revisions r2 ON r2.id=a2.revision_id
+                        JOIN source.objects o2
+                          ON o2.id=r2.object_id AND o2.current_revision_id=r2.id
+                        WHERE da2.workspace_id=%s
+                          AND da2.document_id=q.document_id
+                    ),
+                    true
+                ) AS is_latest
+            FROM (
+            SELECT
                 l.unit_id,l.document_id,l.artifact_id,l.source_kind,l.title,
                 left(regexp_replace(l.body, '\\s+', ' ', 'g'), 500) AS snippet,
                 1 - (v.embedding <=> %s::vector) AS score,
                 u.locator,o.canonical_uri AS source_uri,l.source_sha256,
-                l.source_modified_at,a.file_name,d.document_type
+                l.source_modified_at,a.file_name,d.document_type,
+                r.source_modified_at AS revision_modified_at
             FROM search.embeddings_1024 v
             JOIN content.units u ON u.id=v.unit_id
             JOIN search.lexical_units l ON l.unit_id=u.id
@@ -1257,10 +1416,12 @@ class PostgresDatabase:
             JOIN source.objects o ON o.id=r.object_id AND o.current_revision_id=r.id
             LEFT JOIN content.logical_documents d ON d.id=l.document_id
             WHERE {' AND '.join(conditions)}
-            ORDER BY score DESC,l.unit_id
+            ORDER BY v.embedding <=> %s::vector, l.unit_id
             LIMIT %s
+            ) q
+            ORDER BY q.score DESC, q.unit_id
         """
-        params = [vector, *condition_params, limit]
+        params = [context.workspace, vector, *condition_params, vector, limit]
         with self._connection(context) as connection, connection.cursor() as cursor:
             cursor.execute(sql, params)
             rows = cursor.fetchall()
@@ -1282,6 +1443,7 @@ class PostgresDatabase:
                     "document_type": row["document_type"],
                     "retrieval_channels": ["vector"],
                     "vector_rank": rank,
+                    "is_latest": bool(row["is_latest"]),
                 },
             )
             for rank, row in enumerate(rows, start=1)

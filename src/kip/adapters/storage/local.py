@@ -46,6 +46,15 @@ class LocalSourceFileInspector:
             return None
         return _sha256_file(path)
 
+    def stat(self, path: Path) -> tuple[int, int] | None:
+        try:
+            info = path.stat()
+        except OSError:
+            return None
+        if not path.is_file():
+            return None
+        return (info.st_size, info.st_mtime_ns)
+
     def require_sha256(self, path: Path) -> str:
         value = self.sha256(path)
         if value is None:

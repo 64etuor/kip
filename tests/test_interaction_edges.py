@@ -133,6 +133,27 @@ def test_cli_interaction_commands_emit_the_same_versioned_envelope(
     assert '"schema_version": "kip.clarification.v1"' in result.stdout
 
 
+def test_cli_admin_commands_fail_closed_without_an_explicit_role(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    container = _container(tmp_path)
+    monkeypatch.setattr(
+        "kip.cli.build_container",
+        lambda settings, load_models=True: container,
+    )
+    monkeypatch.delenv("KIP_ROLES", raising=False)
+    runner = CliRunner()
+
+    denied = runner.invoke(app, ["interaction", "prune"])
+    granted = runner.invoke(app, ["--roles", "admin", "interaction", "prune"])
+
+    assert denied.exit_code == 3
+    assert '"code": "forbidden"' in denied.stderr
+    assert granted.exit_code == 0, granted.stdout
+    assert '"deleted"' in granted.stdout
+
+
 def test_cli_interaction_validation_failure_uses_the_error_envelope(
     tmp_path: Path,
     monkeypatch,

@@ -1,0 +1,42 @@
+migrations/0014_one_active_extraction.sql
+  s_41856199ee83ad::t_1b967b26d371d5 1-23
+src/kip/adapters/repository/memory/ingestion.py
+  s_41856199ee83ad::t_bfc3b0efb4b395 14,116,144-150,152-161,191-207,215
+  s_41856199ee83ad::t_bb79fad43b0ad5 151
+  s_41856199ee83ad::t_a0dc66d0fd08af 168,170
+  s_41856199ee83ad::t_872e387087e5b0 162-167,169,171-190
+  s_41856199ee83ad::t_4693e20ace62c7 208-210,212-214
+  s_41856199ee83ad::t_defd48abdbdbf0 211
+src/kip/adapters/repository/postgres/database.py
+  s_41856199ee83ad::t_bb79fad43b0ad5 760,764,766
+  s_41856199ee83ad::t_1b967b26d371d5 681-759,761-763,765,767-919
+src/kip/adapters/repository/memory/state.py
+  s_41856199ee83ad::t_bfc3b0efb4b395 22
+tests/integration/test_postgres_repository.py
+  s_41856199ee83ad::t_34660adff95056 28-29,32,48-148,163-171
+  s_41856199ee83ad::t_bb79fad43b0ad5 149-162
+  s_41856199ee83ad::t_4e3676692066fb 172-173
+src/kip/ports/ingestion.py
+  s_41856199ee83ad::t_bfc3b0efb4b395 92-97
+tests/test_parser_reextraction.py
+  s_41856199ee83ad::t_1b967b26d371d5 6,11-15
+  s_41856199ee83ad::t_9360385b1dd6ae 1-5,7-10,16-107
+src/kip/adapters/repository/postgres/ingestion.py
+  s_41856199ee83ad::t_1b967b26d371d5 43-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "5921e9353c917f2eadc718090cad9746e6f6808b",
+  "prompts": {},
+  "sessions": {
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

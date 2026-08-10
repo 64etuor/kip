@@ -19,7 +19,7 @@
 | Filesystem connector | Ready for pilot | Read-only traversal, hash, settle-time checks |
 | XLSX shallow/deep | Ready for pilot | Shared-string shallow index and exact `.xlsx`/`.xlsm` range reader; formula/cached values, formats, dates, and hidden dimensions are explicit |
 | PDF parser | Ready for pilot | PyMuPDF; OCR is routed but not bundled |
-| HWP broker | Partial pilot | Native HWP/HWPX signatures and real-file text extraction are validated; true section/paragraph/table locators and broad shadow re-extraction remain incomplete |
+| HWP broker | Ready for retrieval pilot | Native HWP/HWPX signatures and 86/86 real-file extraction are validated; guarded shadow/atomic activation preserves prior extractions. True section/paragraph/table locators remain incomplete |
 | Slack connector | Reference adapter | Validate scopes, rate limits, edits/deletes, and retention |
 | Apple Mail connector | Reference adapter | macOS permission and mailbox allowlist required |
 | IMAP connector | Reference adapter | Validate provider-specific UID behavior |
@@ -30,7 +30,7 @@
 | Query tracing and metrics | Ready for pilot | PostgreSQL/RLS canonical redacted traces, admin-only CLI/REST inspection, bounded retention pruning, non-fatal delivery, and optional OTLP/HTTP spans and metrics without content attributes |
 | Evidence-bounded answer | Ready for pilot | CLI/API/MCP/SDK share search, exact reopen, freshness, XLSX, classification/egress, structured generation, claim-citation validation, typed refusal, explicit extractive fallback, and ACL-filtered current approved-graph context; candidates, expired relations, and stale graph evidence are excluded |
 | Local embedding sidecar | Validated shadow | Infinity 0.0.77, Qwen3 0.6B 1024d, pinned revisions, MPS smoke passed |
-| Local reranker | Validated shadow | BGE reranker v2 M3 plus opt-in pinned Jina Hugging Face adapter; Jina trial measured 613.31 ms P95 but failed quality gates, so remains shadow-only |
+| Local reranker | RapidFuzz active; model adapters shadow | RapidFuzz 3.14.5 reranks bounded ACL-filtered lexical candidates locally and passed the private OneDrive retrieval gate; BGE/Jina model adapters remain opt-in shadow candidates |
 | pgvector | Complete shadow, disabled | PostgreSQL 18/pgvector 0.8.2, 74/74 vectors, RLS and source-hash filtering; public pilot did not beat lexical |
 | Hybrid retrieval | Complete shadow | ACL-prefiltered exact vector search, RRF, bounded reranking, explicit activation command |
 | Ontology contract | Ready for pilot | YAML entity inheritance and predicate contracts; ACL-bound mining jobs; strict structured-output validation; reviewed entities/relations; exact evidence; deterministic fingerprints; current approved-graph answers; and idempotent predicate migration materialization with source-assertion lineage |
@@ -51,7 +51,10 @@
   secret manager. Operators must supply non-owner database login URLs, regular
   secret files, immutable image digests, storage, TLS/IAP, and deployment-level
   rollback and monitoring.
-- The default sync mode is incremental. Forced full re-extraction and destructive source reconciliation are intentionally not exposed as one-step starter commands.
+- The default sync mode is incremental. HWP/HWPX has an explicit non-mutating
+  `parser reextract` shadow command and a separate guarded `--activate` action.
+  Generic all-format forced re-extraction and destructive source
+  reconciliation are intentionally not exposed as one-step starter commands.
 - The PostgreSQL integration test is gated by `KIP_TEST_POSTGRES_URL`; CI or a local PostgreSQL service must run it before deployment.
 - Multi-user production requires an identity-aware proxy that issues the
   configured JWT claims. KIP verifies those claims directly and rejects legacy
@@ -66,7 +69,12 @@
   integration and fail closed in the reference container.
 - Optional HWP parser commands, Slack scopes, Apple Mail Automation permissions, and IMAP provider behavior must be validated against the target environment.
 - Neo4j remains an adoption-gate adapter stub; canonical assertions are queried from PostgreSQL.
-- The current public pilot is small and lexically distinctive. Its `keep_disabled` decision must not be generalized to a private corpus without adding reviewed internal golden cases. The private OneDrive shadow A/B also showed no gain over lexical retrieval on its small golden set, so semantic projection remains shadow-only.
+- The current public pilot is small and lexically distinctive. Its
+  `keep_disabled` semantic decision must not be generalized to a private corpus
+  without reviewed internal golden cases. Semantic projection remains
+  shadow-only. Separately, the 2026-08-10 native-HWP OneDrive A/B promoted only
+  local RapidFuzz lexical reranking; its 253 queries are source-derived rather
+  than reviewed natural-language answer cases.
 - The 2026-08-06 loaded-corpus audit is recorded in `docs/RAG_QUALITY_AUDIT_2026-08-06.md`; lexical remains active and all semantic candidates remain shadow-only.
 - Quality recommendations do not discover, install, or activate libraries. Candidate dependencies remain opt-in adapters; a scheduler may automate shadow runs only after reproducible manifest execution is added.
 - Retrieval-only reports cannot claim end-to-end RAG quality. Promotion requires
@@ -105,3 +113,16 @@ The pinned BGE reranker audit report was also processed through the new
 recommendation command. It returned `keep_disabled`: Recall did not improve,
 P95 was `10029.13 ms` against a `2000 ms` ceiling, and required evidence
 metrics were unmeasured. No projection or model activation changed.
+
+## OneDrive native parser and local reranker: 2026-08-10
+
+An isolated PostgreSQL A/B parsed 86/86 real HWP/HWPX files into 263 native
+units with zero failures and unchanged source hashes. Across 253 source-derived
+queries, PostgreSQL lexical Recall@1/Recall@5/MRR was
+`0.9407/0.9881/0.9596`; bounded RapidFuzz reranking reached
+`0.9684/0.9960/0.9796` and added `15.072 ms` at P95. RapidFuzz is therefore the
+starter lexical reranker. Kiwi, deterministic proximity, and the Kiwi ensemble
+remain rejected. The queries were not reviewed natural-language answer or
+ontology cases; those dimensions remain explicitly unmeasured. See
+`evaluation/reports/onedrive-hwp-native-rapidfuzz-20260810/decision.json` and
+ADR-031.

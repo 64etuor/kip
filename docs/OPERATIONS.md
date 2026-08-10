@@ -282,11 +282,53 @@ to `evaluate run` only for a deliberate cold-start measurement.
 
 ## Parser upgrade
 
-1. Run the new parser in shadow mode.
-2. Compare quality and golden corpus output.
-3. Keep the previous active extraction until the new extraction passes.
-4. Activate atomically.
-5. Preserve parser name, version, run ID, warnings, and output hash.
+Prepare HWP/HWPX candidates without changing the active index:
+
+```bash
+./scripts/kip parser reextract --source company-nas
+```
+
+Review `eligible`, `parsed`, `rejected`, `failed`, `unit_count`,
+`parser_counts`, and every warning in the versioned JSON envelope. Compare a
+reviewed golden corpus and exact evidence before activation. Then run the
+separate mutation command:
+
+```bash
+./scripts/kip parser reextract --source company-nas --activate
+```
+
+The activation path checks the current artifact revision, source hash, ACL
+snapshot, classification, and minimum parser quality immediately before the
+transaction. It inserts a new extraction and its units, swaps the active
+lexical rows, and deactivates the previous extraction in one PostgreSQL
+transaction. The previous extraction remains recoverable history. A rejected,
+failed, changed, or stale candidate leaves the old active extraction intact.
+Normal search and incremental sync never trigger this workflow.
+
+## Local lexical reranking
+
+The starter profiles rerank at most 40 ACL-filtered lexical candidates with
+RapidFuzz. This is local, deterministic, and does not build embeddings or send
+document text to a model endpoint:
+
+```toml
+[search]
+lexical_rerank_enabled = true
+lexical_rerank_candidate_limit = 40
+
+[models.reranker]
+enabled = true
+backend = "rapidfuzz"
+max_document_chars = 8000
+baseline_weight = 0.15
+```
+
+Candidate documents are reopened through the same ACL- and freshness-aware
+repository before reranking. If the adapter is unavailable, KIP preserves the
+lexical order and emits `metadata.lexical_rerank_degraded=true`; alert on this
+field instead of silently treating the request as reranked. Re-evaluate the
+candidate depth, latency, and ranking against each deployment's reviewed
+questions before changing these bounds.
 
 ## Dependency and model update watch
 

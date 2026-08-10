@@ -495,22 +495,38 @@ allowed_accounts = ["company@example.com"]
 allowed_mailboxes = ["INBOX", "Sent", "Archive", "Projects"]
 excluded_mailboxes = ["Junk", "Trash", "Personal"]
 
+[parsers]
+minimum_quality_score = 0.70
+shadow_parse_critical_documents = true
+
 [parsers.hwp]
-strategy = "benchmark-selected"
-primary = "kordoc"
-fallbacks = ["unhwp", "hwp-hwpx-parser", "paired-pdf"]
-shadow_on_critical = true
-minimum_quality_score = 0.82
+order = ["hwp-hwpx-parser", "kordoc", "unhwp", "paired_pdf"]
 
-[search.lexical]
-backend = "postgres-native"
-analyzer = "kiwi"
-body_trigram_index = false
+[parsers.hwp.hwp-hwpx-parser]
+enabled = true
+max_chars_per_unit = 4000
 
-[search.semantic]
+[parsers.hwp.kordoc]
 enabled = false
-provider = "local"
-space = ""
+argv = ["kordoc", "{input}", "--format", "json"]
+
+[search]
+semantic_enabled = false
+lexical_rerank_enabled = true
+lexical_rerank_candidate_limit = 40
+
+[models.reranker]
+enabled = true
+backend = "rapidfuzz"
+max_document_chars = 8000
+baseline_weight = 0.15
+
+[models.embedding]
+enabled = false
+model = "replace-with-pinned-local-model"
+revision = "replace-with-immutable-revision"
+dimensions = 1024
+space_name = "replace-with-versioned-space"
 
 [graph]
 backend = "postgres-recursive"
@@ -1861,12 +1877,14 @@ Weight는 fixture 평가로 조정한다.
 
 | Adapter | Strength | Role |
 |---|---|---|
-| `kordoc` | HWP3/HWP5/HWPX, PDF/Office, structured blocks, broad coverage | primary candidate |
-| `unhwp` | Rust, HWP5/HWPX, structured Markdown/JSON, streaming | primary/fallback candidate |
-| `hwp-hwpx-parser` | pure Python, light dependency, tables/notes/memos | fallback and test oracle |
+| `hwp-hwpx-parser` | pure Python, light dependency, tables/notes/memos | measured reference primary |
+| `kordoc` | HWP3/HWP5/HWPX, PDF/Office, structured blocks, broad coverage | installed, disabled-by-default command fallback |
+| `unhwp` | Rust, HWP5/HWPX, structured Markdown/JSON, streaming | optional command fallback |
 | paired PDF | page locator and visual fallback | evidence fallback |
 
-실제 active order는 회사 문서 corpus benchmark 결과로 정한다. 제품 문서에 영구 고정하지 않는다.
+Reference order는 실제 OneDrive corpus benchmark로 결정했다. 다른 조직은 동일
+revision과 ACL principal을 사용한 shadow benchmark로 순서를 변경할 수 있지만,
+실행 중 package download나 실패 결과의 자동 승격은 허용하지 않는다.
 
 ### 18.2 Format detection
 
@@ -2271,19 +2289,21 @@ Incremental update는 active generation에 적용한다. Full rebuild는 별도 
 
 ### 22.3 Korean analyzer
 
-`KoreanAnalyzerPort` 입력과 출력:
+`TextAnalyzerPort`는 vendor-neutral한 단일 계약을 제공한다.
 
-```json
-{
-  "text": "참여연구원 변경 승인을 요청드립니다.",
-  "tokens": ["참여", "연구원", "변경", "승인", "요청"],
-  "normalized_text": "참여 연구원 변경 승인 요청",
-  "analyzer": "kiwi",
-  "version": "..."
-}
+```python
+class TextAnalyzerPort(Protocol):
+    def analyze(self, text: str) -> str: ...
 ```
 
-Reference adapter는 Kiwi 계열을 사용할 수 있지만 contract만 고정한다. 분석기 교체는 전체 lexical projection rebuild를 요구한다.
+Reference adapter는 Unicode 정규화와 bounded 2-4자 한글 n-gram을 사용한다.
+Kiwi 계열은 별도 adapter 후보로 추가할 수 있지만, 2026-08-10 OneDrive
+평가에서는 top-1이 하락하고 aggregate 개선이 없어 채택하지 않았다. 분석기
+교체는 전체 lexical projection rebuild와 동일-corpus 회귀 평가를 요구한다.
+
+형태소 분석과 별개로, 검색 후 RapidFuzz adapter는 ACL과 freshness가 이미
+적용된 최대 40개 lexical 후보만 재정렬한다. 이 adapter는 application
+service에 vendor type을 노출하지 않고 `RerankerPort`를 구현한다.
 
 ### 22.4 Exact identifier search
 
@@ -4924,6 +4944,7 @@ All of the following must pass:
 | ADR-014 | Model and Graphify outputs are candidates only | Accepted |
 | ADR-015 | Local CAS is baseline; object storage is replaceable | Accepted |
 | ADR-016 | SQLite is a future portable profile, not v3 baseline | Accepted |
+| ADR-031 | Guarded HWP re-extraction and local RapidFuzz reranking | Accepted |
 
 ---
 
@@ -4944,6 +4965,8 @@ All of the following must pass:
 - **[R13]** Slack Developer Documentation. https://docs.slack.dev/
 - **[R14]** Apple Mail automation. https://support.apple.com/guide/mail/
 - **[R15]** Apple MailKit. https://developer.apple.com/documentation/mailkit/
+- **[R16]** RapidFuzz. https://github.com/rapidfuzz/RapidFuzz
+- **[R17]** KiwiPiePy. https://github.com/bab2min/kiwipiepy
 
 ---
 

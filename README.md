@@ -49,7 +49,9 @@ Credential 원문은 질문, state, plan, 생성 파일에 넣지 않는다. `en
 환경별 결정, AI 변경 계약, 실제 자료 인수 테스트, 자동 업데이트 알림과
 승격/rollback 기준을 한 경로로 묶는다.
 
-Prerequisites: Python 3.12+, Docker with Compose, and optionally Node.js 18+ for `kordoc`.
+Prerequisites: Python 3.12+ and Docker with Compose. Node.js is needed only if
+an operator explicitly installs and enables a Kordoc command fallback; normal
+indexing never downloads parser packages at runtime.
 
 ```bash
 cp .env.example .env
@@ -139,11 +141,22 @@ Mount NAS paths read-only. For Docker app mode, set `KIP_NAS_PATH` and Compose m
 Reference parser order:
 
 1. native `hwp-hwpx-parser` adapter with bounded evidence units;
-2. configurable `kordoc`/`unhwp` subprocess broker;
+2. disabled-by-default, preinstalled `kordoc`/`unhwp` subprocess broker;
 3. paired PDF fallback;
 4. manual review when all parsers fail.
 
-Parser binaries are not hidden inside Core. See `docs/CONNECTORS.md`.
+Parser binaries are not hidden inside Core. Existing HWP/HWPX indexes can be
+evaluated and promoted without a full source sync:
+
+```bash
+./scripts/kip parser reextract --source company-nas
+./scripts/kip parser reextract --source company-nas --activate
+```
+
+The first command is non-mutating shadow work. The second retains the previous
+extraction and swaps the active PostgreSQL/lexical state per document only
+after revision, hash, ACL, classification, and quality checks. See
+`docs/CONNECTORS.md`.
 
 ### Slack
 
@@ -173,9 +186,17 @@ repository, CLI/API contracts, PostgreSQL migrations, and pgvector shadow path
 are concrete; the local semantic path has been validated on the documented
 Apple Silicon pilot but remains shadow-only for the private corpus. Slack,
 Apple Mail, IMAP, MCP, and Neo4j remain reference adapters that require
-environment-specific validation before production use. Existing unchanged
-revisions require an explicit re-extraction workflow when parser versions
-change.
+environment-specific validation before production use. Existing unchanged HWP
+and HWPX revisions use the explicit shadow/activate re-extraction workflow when
+parser versions change; no generic all-format forced re-index command is
+exposed.
+
+The starter lexical path locally reranks up to 40 ACL-filtered candidates with
+RapidFuzz 3.14.5. The real OneDrive HWP/HWPX source-derived A/B improved
+Recall@1 from 0.9407 to 0.9684 and MRR from 0.9596 to 0.9796 with a 15.072 ms
+P95 increase. This is retrieval evidence, not reviewed answer or ontology
+quality evidence; reranking cannot recover a document absent from the lexical
+candidate set.
 
 Run `./scripts/verify.sh` before modifying or deploying the project.
 

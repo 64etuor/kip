@@ -101,7 +101,39 @@ At minimum compare the configured `kordoc` command with `rhwp-python` (`import r
 
 Choose a provisional candidate only from observed extraction quality and corpus coverage. Without a trusted rendered/PDF or human ground truth, do not claim an absolute quality winner based only on character count.
 
-The current private-corpus benchmark selected `hwp-hwpx-parser` as the native primary: same-service KIP retrieval over the real sample set measured Recall@5/MRR of `1.00/1.00`, versus `rhwp-python` at `0.875/0.8125` and the previous Kordoc path at `0.444/0.444`. This is a corpus snapshot, not a permanent universal ranking. The configured path is native first, then the Kordoc/unhwp broker and paired-PDF fallback.
+The current private-corpus benchmark selected `hwp-hwpx-parser` as the native primary: same-service KIP retrieval over the real sample set measured Recall@5/MRR of `1.00/1.00`, versus `rhwp-python` at `0.875/0.8125` and the previous Kordoc path at `0.444/0.444`. This is a corpus snapshot, not a permanent universal ranking. The configured path is native first. Kordoc/unhwp are disabled until explicitly installed, enabled, and evaluated; paired PDF remains the final evidence fallback.
+
+For unchanged revisions already indexed by an older parser, run a non-mutating
+shadow pass and inspect every count and warning before the separate activation:
+
+```bash
+./scripts/kip parser reextract --source onedrive-personal
+./scripts/kip parser reextract --source onedrive-personal --activate
+```
+
+Activation is document-atomic and rechecks source hash, revision, ACL,
+classification, and quality. It preserves the previous extraction and never
+writes to OneDrive.
+
+## Local lexical reranker comparison
+
+The current starter profile applies RapidFuzz only after PostgreSQL has
+prefiltered authorized, current lexical candidates. The isolated 2026-08-10
+OneDrive HWP/HWPX run indexed 86/86 files into 263 native units with zero
+failures and unchanged source hashes.
+
+| Variant | Recall@1 | Recall@5 | MRR | P95 ms |
+|---|---:|---:|---:|---:|
+| PostgreSQL native lexical | 0.9407 | 0.9881 | 0.9596 | 119.359 |
+| RapidFuzz top-40 rerank | 0.9684 | 0.9960 | 0.9796 | 134.431 |
+
+The 253 cases were source-derived filenames, deletion noise, and sparse source
+terms. They are not reviewed natural-language questions and do not measure
+answer or ontology quality. Kiwi alone lowered top-1, deterministic proximity
+tied baseline, and the RapidFuzz+Kiwi MRR gain of 0.0013 did not justify the
+extra runtime/index surface. Preserve the machine decision under
+`evaluation/reports/onedrive-hwp-native-rapidfuzz-20260810/decision.json` and
+rerun it for a materially different corpus.
 
 ## One complete real-corpus cycle
 

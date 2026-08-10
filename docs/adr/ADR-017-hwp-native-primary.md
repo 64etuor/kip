@@ -16,5 +16,14 @@ These numbers are parser/retrieval evidence, not final answer quality. The seman
 
 - The extractor extra installs `hwp-hwpx-parser`.
 - Native HWP units are chunked before embedding so a large document cannot exceed the model input limit as one unit.
-- A parser upgrade requires re-extraction because existing source revisions may still point at an older active extraction.
-- Kordoc, unhwp, and rhwp remain documented comparison candidates and should be rerun when their versions or the corpus change.
+- Existing source revisions adopt a parser upgrade through `parser reextract`
+  shadow evaluation and the separate guarded `--activate` action. Activation
+  keeps the prior extraction as recoverable history and changes one document
+  atomically.
+- Kordoc is disabled by default and must be installed before it is enabled;
+  indexing never invokes a runtime package downloader. Kordoc, unhwp, and rhwp
+  remain comparison candidates and should be rerun when their versions or the
+  corpus change.
+- The complete 2026-08-10 run parsed 86/86 HWP/HWPX files into 263 units with
+  native parser provenance and unchanged source hashes. Its retrieval decision
+  is recorded separately in ADR-031.

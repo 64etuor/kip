@@ -32,8 +32,10 @@
 6. `./scripts/bootstrap.sh`, `./scripts/dev-up.sh`, `./scripts/migrate.sh`, `./scripts/doctor.sh`를 실행한다.
 7. sample source로 `sync -> search -> context -> read -> xlsx-read`를 완료한다.
 8. 실제 source는 `sync run --dry-run`으로 다시 범위와 건수를 확인한다.
-9. `docs/AI_OPERATOR_RUNBOOK.md`의 real-corpus cycle을 수행하고 결과를 새 audit 문서로 보존한다.
-10. `./scripts/verify.sh`가 통과한 뒤에만 파일럿 사용자에게 연다.
+9. 기존 HWP/HWPX index가 있으면 `parser reextract --source SOURCE`로 shadow
+   결과를 검토하고, 별도 승인 후에만 `--activate`를 실행한다.
+10. `docs/AI_OPERATOR_RUNBOOK.md`의 real-corpus cycle을 수행하고 결과를 새 audit 문서로 보존한다.
+11. `./scripts/verify.sh`가 통과한 뒤에만 파일럿 사용자에게 연다.
 
 셋업 state와 plan은 versioned JSON contract이며 중단 후 재개할 수 있다. Agent는
 TOML, Compose, `.mcp.json`을 직접 편집하지 않는다. 셋업 state machine이
@@ -80,6 +82,11 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 - 지원 확장자만이 아니라 암호화, 손상, 빈 페이지, 표, 이미지, 수식 표본을 포함한다.
 - page/section/sheet/cell 등 source-reproducible locator와 parser version을 남긴다.
 - 시간·파일 크기·ZIP bomb 제한과 실패 시 이전 active extraction 보존을 검증한다.
+- HWP/HWPX upgrade는 먼저 `./scripts/kip parser reextract --source SOURCE`로
+  shadow parsing을 실행한다. `rejected=0`, `failed=0`, 원본 hash 불변, golden
+  evidence 비교를 확인한 뒤에만 `--activate`한다.
+- 활성화가 문서별 PostgreSQL transaction이고 이전 extraction과 unit을
+  보존하는지, 동일 artifact에 active extraction이 하나뿐인지 검증한다.
 - 한글 PDF OCR 후보는 rendered page와 사람이 검토한 transcript로 CER/WER, 표 구조, locator fidelity를 별도 측정한다.
 
 ### Embedding 또는 reranker
@@ -87,6 +94,12 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 - 모델 ID뿐 아니라 immutable revision, dimensions, instruction, tokenizer/runtime을 pin한다.
 - 한국어 내부 질문에 대해 lexical baseline과 Recall/MRR/nDCG, ACL leak, P95, 비용을 비교한다.
 - public MTEB 순위는 후보 선택 자료일 뿐 KIP corpus 승격 근거가 아니다.
+- starter 기본 lexical path는 ACL과 freshness가 적용된 최대 40개 후보만
+  로컬 RapidFuzz로 재정렬한다. embedding이나 외부 전송은 발생하지 않으며,
+  실패 시 lexical 순서와 `lexical_rerank_degraded` 표식을 보존한다.
+- 현재 OneDrive HWP/HWPX source-derived 253-query A/B는 RapidFuzz를
+  승격했지만 reviewed natural-language answer/ontology 평가는 아니다.
+  Kiwi analyzer는 이 corpus에서 유의미한 이득이 없어 포함하지 않는다.
 
 ### Ontology와 graph
 
@@ -121,6 +134,8 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 - 최소 30-50개 reviewed private questions, ACL negative cases, stale/latest/near-duplicate cases
 - exact read와 XLSX original range 검증
 - lexical/vector/hybrid/reranker 별 fingerprinted report
+- `evaluation/reports/onedrive-hwp-native-rapidfuzz-20260810/decision.json`과
+  같은 corpus-local 라이브러리 채택/기각 결정 기록
 - ontology diff/migration 및 assertion review 표본
 - backup/restore drill과 projection rebuild 결과
 - CLI/REST/MCP contract parity, 비소유 DB role RLS 검증
@@ -141,7 +156,7 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 - `AGENTS.md`, `CLAUDE.md`, `.env.example`, `config/kip.example.toml`
 - `README.md`, 이 문서, Quickstart, AI Operator Runbook, Operations, Security, Production Checklist
 - migrations, ontology releases/migrations, contracts, Skill, example connector payload
-- CI, Dependabot, upstream watch, verification scripts
+- CI, Dependabot, upstream watch, verification scripts, 비식별 평가 결정 기록
 
 비밀, 실제 사내 경로, private golden corpus, DB dump, CAS는 starter repository에 포함하지 않는다. 별도 승인된 안전한 채널과 환경별 bootstrap 절차로 전달한다.
 

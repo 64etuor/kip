@@ -14,19 +14,43 @@ A connector discovers immutable source revisions and emits canonical source even
 
 ## HWP/HWPX parser broker
 
-Default command templates are configuration, not Core code.
+The reference profile uses the in-process `hwp-hwpx-parser` adapter first.
+Command parsers are optional, explicitly installed fallbacks; their templates
+remain configuration, not Core code. Runtime indexing must never download or
+execute an unpinned package installer.
 
 ```toml
-[parsers.hwp.kordoc]
+[parsers.hwp]
+order = ["hwp-hwpx-parser", "kordoc", "unhwp", "paired_pdf"]
+
+[parsers.hwp.hwp-hwpx-parser]
 enabled = true
-argv = ["npx", "-y", "kordoc@4.2.7", "{input}", "--format", "json"]
+max_chars_per_unit = 4000
+
+[parsers.hwp.kordoc]
+enabled = false
+argv = ["kordoc", "{input}", "--format", "json"]
 
 [parsers.hwp.unhwp]
 enabled = false
 argv = ["unhwp", "convert", "{input}", "-o", "{output_dir}", "--all"]
 ```
 
-Validate these commands against the actual installed parser version. The broker records parser/version/output hash and never replaces a successful active extraction with a failed run.
+Validate command fallbacks against the exact installed version before enabling
+them. The broker records parser/version/output hash. A failed or below-threshold
+candidate never replaces the successful active extraction.
+
+When an existing index must adopt a new HWP parser, prepare the entire source in
+non-mutating shadow mode first. Activation is a separate operator action:
+
+```bash
+./scripts/kip parser reextract --source company-nas
+./scripts/kip parser reextract --source company-nas --activate
+```
+
+Activation rechecks the source hash and current revision, retains extraction
+history, replaces only the rebuildable active lexical projection, and commits
+each document atomically. It never writes to the source file.
 
 Keep production parser versions pinned. Upgrade a pin only after the parser conformance corpus and shadow-extraction comparison pass; do not use `@latest` in scheduled indexing.
 

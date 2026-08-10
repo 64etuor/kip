@@ -9,6 +9,7 @@ class RerankerBackend(StrEnum):
     HTTP = "http"
     HUGGINGFACE = "huggingface"
     RAPIDFUZZ = "rapidfuzz"
+    BM25 = "bm25"
 
 
 def parse_reranker_backend(value: str) -> RerankerBackend:

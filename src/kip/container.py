@@ -19,6 +19,7 @@ from kip.adapters.relation_miners import GeneratorRelationMiner
 from kip.adapters.repository.memory import MemoryRepository
 from kip.adapters.repository.postgres import PostgresRepository
 from kip.adapters.rerankers import (
+    Bm25RerankerAdapter,
     HttpRerankerAdapter,
     HuggingFaceJinaRerankerAdapter,
     RapidFuzzRerankerAdapter,
@@ -136,6 +137,14 @@ def build_container(
                     baseline_weight=float(
                         reranker_config.get("baseline_weight", 0.15)
                     ),
+                )
+            case RerankerBackend.BM25:
+                selected_reranker = Bm25RerankerAdapter(
+                    max_document_chars=int(
+                        reranker_config.get("max_document_chars", 8000)
+                    ),
+                    k1=float(reranker_config.get("bm25_k1", 1.2)),
+                    b=float(reranker_config.get("bm25_b", 0.75)),
                 )
             case RerankerBackend.HTTP:
                 if load_models:

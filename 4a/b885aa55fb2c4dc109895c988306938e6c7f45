@@ -1,0 +1,47 @@
+src/kip/adapters/rerankers/backend.py
+  s_41856199ee83ad::t_0cf643bed96dd2 1-18
+evaluation/reports/onedrive-hwp-native-rapidfuzz-20260810/decision.json
+  s_41856199ee83ad::t_3abb046de9521a 1-80
+src/kip/container.py
+  s_41856199ee83ad::t_0cf643bed96dd2 21-22,24,126,129-136,138-153,155-163
+config/kip.example.toml
+  s_41856199ee83ad::t_0cf643bed96dd2 75-76,91-94
+src/kip/application/search.py
+  s_41856199ee83ad::t_0cf643bed96dd2 113-126,133-134
+tests/test_hybrid_retrieval.py
+  s_41856199ee83ad::t_5420f58772eedf 141,162
+  s_41856199ee83ad::t_17b09a8dfb0fc0 134-140,142-161,163-172
+config/kip.container.toml
+  s_41856199ee83ad::t_0cf643bed96dd2 37-44
+src/kip/adapters/rerankers/__init__.py
+  s_41856199ee83ad::t_0cf643bed96dd2 1,4,6-12
+requirements/runtime.txt
+  s_41856199ee83ad::t_5be3b368365c9a 656-713
+pyproject.toml
+  s_41856199ee83ad::t_0cf643bed96dd2 20
+src/kip/adapters/rerankers/rapidfuzz.py
+  s_41856199ee83ad::t_0cf643bed96dd2 1-75
+src/kip/application/search_engine.py
+  s_41856199ee83ad::t_0cf643bed96dd2 61-62,64-109,165-166,172-174
+tests/test_rapidfuzz_reranker.py
+  s_41856199ee83ad::t_8aad5db15a42b3 7
+  s_41856199ee83ad::t_17b09a8dfb0fc0 1-6,8-62
+uv.lock
+  s_41856199ee83ad::t_a87aa08fe0ecd7 742,840,2038-2100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "4ab885aa55fb2c4dc109895c988306938e6c7f45",
+  "prompts": {},
+  "sessions": {
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

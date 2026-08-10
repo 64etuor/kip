@@ -1,0 +1,48 @@
+docs/OPERATIONS.md
+  s_41856199ee83ad::t_31a2e86eeadd58 300-310
+src/kip/application/ingestion_files.py
+  s_41856199ee83ad::t_127d12059d1ed0 23,81,87,163-177,184-186
+src/kip/application/ingestion.py
+  s_41856199ee83ad::t_127d12059d1ed0 18,40,46-52
+  s_41856199ee83ad::t_54eca1f6f5eba1 121
+docs/adr/ADR-031-hwp-reextraction-and-local-reranking.md
+  s_41856199ee83ad::t_31a2e86eeadd58 18-28
+docs/CONNECTORS.md
+  s_41856199ee83ad::t_31a2e86eeadd58 51-55
+src/kip/adapters/connectors/filesystem.py
+  s_41856199ee83ad::t_2fd3ad2cabc4ee 37-41,44-53,59-60
+tests/test_parser_reextraction.py
+  s_41856199ee83ad::t_1babb656658c78 9,70,235-273
+  s_41856199ee83ad::t_0067a56a5f100a 12-13,274-318
+  s_23eca52a349b8b::t_37fe5e7656de71 319-320
+src/kip/container.py
+  s_41856199ee83ad::t_127d12059d1ed0 360
+src/kip/ports/ingestion.py
+  s_41856199ee83ad::t_2fd3ad2cabc4ee 39-43
+src/kip/adapters/connectors/registry.py
+  s_41856199ee83ad::t_2fd3ad2cabc4ee 76-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "fcf6f1a591d7bfabebf74bd5aad19b249ad62471",
+  "prompts": {},
+  "sessions": {
+    "s_23eca52a349b8b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c621e9f6-c6fe-49d3-ae3f-ba90dc0b2e0d",
+        "model": "claude-opus-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

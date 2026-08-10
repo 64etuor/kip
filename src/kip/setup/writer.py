@@ -203,7 +203,15 @@ def _config_payload(plan: SetupPlan) -> dict[str, object]:
             "sync_schedule": plan.sync_schedule,
         },
         "evaluation": {"dataset": plan.evaluation_dataset},
-        "ontology": {"reviewers": plan.ontology_reviewers},
+        "ontology": {
+            "domain_profile": plan.ontology_profile,
+            "adaptive_discovery": plan.interaction_memory_mode == "explicit_consent",
+            "reviewers": plan.ontology_reviewers,
+        },
+        "interaction": {
+            "enabled": plan.interaction_memory_mode == "explicit_consent",
+            "clarification_ttl_seconds": 3600,
+        },
     }
 
 

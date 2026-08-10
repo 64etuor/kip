@@ -16,6 +16,14 @@ Use named subdirectories only. `/`, a home directory, a project root, or a paren
 
 Pass classifications and ontology reviewers as JSON arrays, including an empty array only when the CLI question permits it.
 
+## Ontology profile and interaction memory
+
+Choose `empty` for a new organization unless the bundled research-project
+example is intentionally the starting meaning contract. Choose
+`explicit_consent` only when users may opt in to durable preferences and
+non-activating ontology discovery candidates. This does not enable automatic
+facts, automatic YAML edits, or raw query/answer retention.
+
 ## Secrets
 
 Pass only a reference such as `env:KIP_DATABASE_URL`, `keychain:kip/openai`, or `secret-manager:prod/kip/database`. Never pass a URL containing a password, an API key, or a token.

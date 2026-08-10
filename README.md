@@ -29,7 +29,8 @@ KIP을 셋업해줘
 Agent는 `skills/kip-setup/SKILL.md`를 따라 `kip setup inspect`가 반환한 질문을
 항상 하나씩 묻는다. 조직 workspace, 신원 검증, 수집할 각 폴더의 절대경로와
 확장자·제외 범위·등급·ACL, 모델 전송 정책, secret reference, CAS/backup,
-평가 dataset, 온톨로지 reviewer를 모두 확정한다. 이어서 파일 수·용량·확장자
+평가 dataset, 빈 starter 또는 example ontology profile, interaction-memory
+explicit consent, 온톨로지 reviewer를 모두 확정한다. 이어서 파일 수·용량·확장자
 분포·제외·symlink를 preview하고, 사용자가 plan fingerprint와 read-only mount를
 승인한 뒤에만 다음 파일을 원자적으로 생성·검증한다.
 
@@ -124,7 +125,7 @@ python -m pip install 'kip-knowledge-fabric[mcp]'
 ```
 
 MCP is optional; the CLI remains the lowest-dependency agent interface.
-Set `KIP_WORKSPACE`, `KIP_PRINCIPAL_ID`, and `KIP_ACL_SCOPES` in the environment used by the MCP client so MCP retrieval receives the same authorization context as CLI and REST calls.
+Set `KIP_WORKSPACE`, `KIP_PRINCIPAL_ID`, and `KIP_ACL_SCOPES` in the environment used by the MCP client so MCP retrieval receives the same authorization context as CLI and REST calls. Set `KIP_ROLES=admin` only for a verified reviewer that must list or review ontology-discovery candidates.
 
 ## 6. Connect real sources
 

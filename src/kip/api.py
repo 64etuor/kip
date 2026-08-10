@@ -10,6 +10,14 @@ from fastapi.responses import JSONResponse, Response
 
 from kip.container import Container, build_container
 from kip.domain.identity import IdentityCredential
+from kip.domain.interactions import (
+    ClarificationAnswer,
+    ClarificationRequest,
+    FeedbackSubmission,
+    OntologyDiscoveryProposal,
+    OntologyDiscoveryReview,
+    UserPreferenceWrite,
+)
 from kip.domain.knowledge import KnowledgeEntity
 from kip.domain.models import (
     AnswerRequest,
@@ -338,6 +346,90 @@ def create_app(container: Container | None = None) -> FastAPI:
             context,
         )
 
+    @app.post("/v1/interactions/clarifications", response_model=Envelope)
+    async def create_clarification(
+        payload: ClarificationRequest,
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
+        return ok(
+            selected.application.interactions.create_clarification(context, payload),
+            context,
+        )
+
+    @app.get("/v1/interactions/clarifications/{question_id}", response_model=Envelope)
+    async def get_clarification(
+        question_id: str,
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
+        return ok(
+            selected.application.interactions.get_clarification(context, question_id),
+            context,
+        )
+
+    @app.post(
+        "/v1/interactions/clarifications/{question_id}/answers",
+        response_model=Envelope,
+    )
+    async def answer_clarification(
+        question_id: str,
+        payload: ClarificationAnswer,
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
+        if payload.question_id != question_id:
+            raise ValidationError("clarification answer does not match the question")
+        return ok(
+            selected.application.interactions.answer_clarification(context, payload),
+            context,
+        )
+
+    @app.get("/v1/interactions/preferences", response_model=Envelope)
+    async def list_preferences(
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
+        return ok(selected.application.interactions.list_preferences(context), context)
+
+    @app.put("/v1/interactions/preferences", response_model=Envelope)
+    async def save_preference(
+        payload: UserPreferenceWrite,
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
+        return ok(
+            selected.application.interactions.save_preference(context, payload),
+            context,
+        )
+
+    @app.delete("/v1/interactions/preferences/{key}", response_model=Envelope)
+    async def delete_preference(
+        key: str,
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
+        return ok(
+            {"deleted": selected.application.interactions.delete_preference(context, key)},
+            context,
+        )
+
+    @app.post("/v1/interactions/feedback", response_model=Envelope)
+    async def submit_feedback(
+        payload: FeedbackSubmission,
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
+        return ok(
+            selected.application.interactions.submit_feedback(context, payload),
+            context,
+        )
+
+    @app.delete(
+        "/v1/admin/interactions/clarifications/expired",
+        response_model=Envelope,
+    )
+    async def prune_expired_clarifications(
+        context: RequestContext = Depends(admin_context),
+    ) -> Envelope:
+        return ok(
+            {"deleted": selected.application.interactions.prune_expired_clarifications(context)},
+            context,
+        )
+
     @app.post("/v1/connectors/events", response_model=Envelope)
     async def connector_event(
         payload: ConnectorEvent,
@@ -390,6 +482,52 @@ def create_app(container: Container | None = None) -> FastAPI:
                     payload.unit_ids,
                 )
             },
+            context,
+        )
+
+    @app.post("/v1/ontology/discovery-candidates", response_model=Envelope)
+    async def propose_ontology_discovery_candidate(
+        payload: OntologyDiscoveryProposal,
+        context: RequestContext = Depends(authenticated_context),
+    ) -> Envelope:
+        return ok(
+            selected.application.interactions.propose_ontology_discovery(
+                context,
+                payload,
+            ),
+            context,
+        )
+
+    @app.get("/v1/admin/ontology/discovery-candidates", response_model=Envelope)
+    async def ontology_discovery_candidates(
+        status: str | None = "proposed",
+        limit: int = 100,
+        context: RequestContext = Depends(admin_context),
+    ) -> Envelope:
+        return ok(
+            selected.application.interactions.list_ontology_discovery_candidates(
+                context,
+                status=status,
+                limit=limit,
+            ),
+            context,
+        )
+
+    @app.post(
+        "/v1/admin/ontology/discovery-candidates/{candidate_id}/review",
+        response_model=Envelope,
+    )
+    async def review_ontology_discovery_candidate(
+        candidate_id: str,
+        payload: OntologyDiscoveryReview,
+        context: RequestContext = Depends(admin_context),
+    ) -> Envelope:
+        return ok(
+            selected.application.interactions.review_ontology_discovery_candidate(
+                context,
+                candidate_id,
+                payload,
+            ),
             context,
         )
 

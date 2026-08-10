@@ -10,6 +10,7 @@ import yaml
 from kip.errors import ValidationError
 
 _SEMVER_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+_PROFILE_RE = re.compile(r"^[a-z][a-z0-9-]{0,62}$")
 _EXTRACTION_POLICIES = frozenset(
     {
         "deterministic_when_source_identified",
@@ -37,7 +38,24 @@ def _load_mapping(path: Path, errors: list[str]) -> dict[str, Any]:
     return payload
 
 
-def validate_ontology(root: Path) -> list[str]:
+def domain_profile_path(root: Path, domain_profile: str) -> Path:
+    if not _PROFILE_RE.fullmatch(domain_profile):
+        raise ValidationError(
+            f"invalid ontology domain profile: {domain_profile!r}"
+        )
+    path = root / "domains" / f"{domain_profile}.yaml"
+    if not path.is_file():
+        raise ValidationError(
+            f"unknown ontology domain profile: {domain_profile}"
+        )
+    return path
+
+
+def validate_ontology(
+    root: Path,
+    *,
+    domain_profile: str = "research-project",
+) -> list[str]:
     errors: list[str] = []
     all_payloads = {
         path: _load_mapping(path, errors) for path in sorted(root.rglob("*.yaml"))
@@ -45,13 +63,17 @@ def validate_ontology(root: Path) -> list[str]:
     required_paths = {
         "entities": root / "core/entity-types.yaml",
         "predicates": root / "core/predicates.yaml",
-        "domain": root / "domains/research-project.yaml",
         "review": root / "policies/review-policy.yaml",
     }
+    try:
+        required_paths["domain"] = domain_profile_path(root, domain_profile)
+    except ValidationError as exc:
+        errors.append(str(exc))
     payloads = {
         name: all_payloads.get(path, {})
         for name, path in required_paths.items()
     }
+    payloads.setdefault("domain", {})
     for path in required_paths.values():
         if not path.is_file():
             errors.append(f"missing ontology contract: {path.relative_to(root)}")
@@ -134,14 +156,20 @@ class PredicateSpec:
 
 @dataclass(frozen=True, slots=True)
 class OntologyCatalog:
+    domain_profile: str
     version: str
     predicates: frozenset[str]
     entity_parents: dict[str, str | None]
     predicate_specs: dict[str, PredicateSpec]
 
     @classmethod
-    def load(cls, root: Path) -> OntologyCatalog:
-        errors = validate_ontology(root)
+    def load(
+        cls,
+        root: Path,
+        *,
+        domain_profile: str = "research-project",
+    ) -> OntologyCatalog:
+        errors = validate_ontology(root, domain_profile=domain_profile)
         if errors:
             raise ValidationError("invalid ontology contract: " + "; ".join(errors))
         predicate_payload = yaml.safe_load(
@@ -151,7 +179,7 @@ class OntologyCatalog:
             (root / "core/entity-types.yaml").read_text(encoding="utf-8")
         )
         domain_payload = yaml.safe_load(
-            (root / "domains/research-project.yaml").read_text(encoding="utf-8")
+            domain_profile_path(root, domain_profile).read_text(encoding="utf-8")
         )
         entity_definitions = {
             **entity_payload["entity_types"],
@@ -177,6 +205,7 @@ class OntologyCatalog:
             for name, definition in predicate_payload["predicates"].items()
         }
         return cls(
+            domain_profile=domain_profile,
             version=f"core/{predicate_payload['version']}",
             predicates=frozenset(predicate_payload["predicates"]),
             entity_parents=parents,
@@ -234,6 +263,7 @@ class OntologyCatalog:
     def mining_contract(self) -> dict[str, object]:
         return {
             "version": self.version,
+            "domain_profile": self.domain_profile,
             "entity_types": sorted(self.entity_parents),
             "predicates": {
                 name: {

@@ -1,0 +1,60 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "confirmed": {
+      "const": true,
+      "title": "Confirmed",
+      "type": "boolean"
+    },
+    "definition": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Definition",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "entity_type",
+        "predicate",
+        "controlled_value",
+        "alias"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "label": {
+      "maxLength": 140,
+      "minLength": 1,
+      "title": "Label",
+      "type": "string"
+    },
+    "symbol": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Symbol",
+      "type": "string"
+    },
+    "target_symbol": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Target Symbol"
+    }
+  },
+  "required": [
+    "kind",
+    "symbol",
+    "label",
+    "definition",
+    "confirmed"
+  ],
+  "title": "OntologyDiscoveryProposal",
+  "type": "object"
+}

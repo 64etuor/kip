@@ -127,6 +127,7 @@ class SetupAnswers(StrictModel):
     identity_admin_key_secret_ref: SecretReference | None = None
     identity_owner: str | None = None
     source_ownership: Literal["company", "personal"] | None = None
+    ontology_profile: Literal["empty", "research-project"] | None = None
     filesystem_sources: list[FilesystemSourceAnswer] | None = None
     model_provider: Literal["disabled", "local", "openai", "anthropic"] | None = None
     model_egress_classifications: list[
@@ -140,6 +141,7 @@ class SetupAnswers(StrictModel):
     retention_days: int | None = Field(default=None, ge=1, le=36500)
     sync_schedule: str | None = None
     evaluation_dataset: str | None = None
+    interaction_memory_mode: Literal["disabled", "explicit_consent"] | None = None
     ontology_reviewers: list[str] | None = None
 
     @field_validator("workspace")
@@ -239,6 +241,7 @@ class SetupPlan(StrictModel):
     identity_admin_key_secret_ref: SecretReference | None
     identity_owner: str
     source_ownership: Literal["company", "personal"]
+    ontology_profile: Literal["empty", "research-project"]
     sources: list[SourcePlan]
     mounts: list[MountPlan]
     model_provider: Literal["disabled", "local", "openai", "anthropic"]
@@ -251,6 +254,7 @@ class SetupPlan(StrictModel):
     retention_days: int
     sync_schedule: str
     evaluation_dataset: str
+    interaction_memory_mode: Literal["disabled", "explicit_consent"]
     ontology_reviewers: list[str]
     generated_files: list[str]
     warnings: list[str] = Field(default_factory=list)

@@ -6,6 +6,7 @@ from kip.application.answering import AnsweringUseCases
 from kip.application.egress import EgressPolicyUseCases
 from kip.application.evidence import EvidenceUseCases
 from kip.application.ingestion import IngestionUseCases
+from kip.application.interactions import InteractionUseCases
 from kip.application.knowledge import KnowledgeUseCases
 from kip.application.ontology_context import OntologyContextUseCases
 from kip.application.ontology_migrations import OntologyMigrationUseCases
@@ -28,3 +29,4 @@ class Application:
     ontology_context: OntologyContextUseCases
     ontology_migrations: OntologyMigrationUseCases
     telemetry: TelemetryUseCases
+    interactions: InteractionUseCases

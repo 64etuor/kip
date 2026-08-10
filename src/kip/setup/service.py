@@ -229,8 +229,10 @@ class SetupService:
         if question_id in {
             "identity_mode",
             "source_ownership",
+            "ontology_profile",
             "model_provider",
             "model_retention_policy",
+            "interaction_memory_mode",
         }:
             return value
         raise ValidationError(f"unknown setup question: {question_id}")

@@ -27,7 +27,8 @@
    원격 생성 모델을 고르면 허용 분류, provider retention 정책, credential
    reference를 각각 별도 질문으로 확인한다.
 3. `setup preview`의 파일 수, 용량, 확장자, 제외 건수와 symlink 건수를 확인한다.
-4. `setup plan`의 source scope, read-only mount, egress, reviewer, warning과 fingerprint를 승인한다.
+4. `setup plan`의 source scope, read-only mount, egress, ontology profile,
+   interaction-memory consent, reviewer, warning과 fingerprint를 승인한다.
 5. agent가 `setup apply`와 `setup verify`를 마치고 redacted receipt를 제시하게 한다.
 6. `./scripts/bootstrap.sh`, `./scripts/dev-up.sh`, `./scripts/migrate.sh`, `./scripts/doctor.sh`를 실행한다.
 7. sample source로 `sync -> search -> context -> read -> xlsx-read`를 완료한다.
@@ -107,6 +108,11 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 - `ontology validate -> ontology diff -> migration coverage -> candidate materialization -> review` 순서를 따른다.
 - 승인 assertion만 기본 graph에 투영하고 evidence ACL 교집합을 적용한다.
 - 변경 전후 real query의 path relevance, orphan, duplicate entity, contradiction을 측정한다.
+- 새 starter는 `empty` domain profile로 시작한다. 사용 패턴에서 발견한 단어는
+  명시적 동의가 있는 `OntologyDiscoveryCandidate`일 뿐, YAML/graph/answer를
+  자동으로 바꾸지 않는다.
+- agent의 follow-up은 짧은 TTL과 최대 네 개 선택지로 제한한다. 사용자 응답은
+  `remember=true` 또는 `confirmed=true`가 없으면 durable preference가 아니다.
 
 ## 5. 자동 업데이트 알림과 안전한 승격
 

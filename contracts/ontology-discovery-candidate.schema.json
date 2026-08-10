@@ -1,0 +1,145 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "definition": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Definition",
+      "type": "string"
+    },
+    "domain_profile": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Domain Profile",
+      "type": "string"
+    },
+    "fingerprint": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Fingerprint",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "entity_type",
+        "predicate",
+        "controlled_value",
+        "alias"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "label": {
+      "maxLength": 140,
+      "minLength": 1,
+      "title": "Label",
+      "type": "string"
+    },
+    "occurrence_count": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Occurrence Count",
+      "type": "integer"
+    },
+    "review_note": {
+      "anyOf": [
+        {
+          "maxLength": 500,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Review Note"
+    },
+    "reviewed_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reviewed At"
+    },
+    "reviewed_by": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reviewed By"
+    },
+    "schema_version": {
+      "const": "kip.ontology-discovery-candidate.v1",
+      "default": "kip.ontology-discovery-candidate.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "default": "proposed",
+      "enum": [
+        "proposed",
+        "accepted_for_release",
+        "rejected"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "symbol": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Symbol",
+      "type": "string"
+    },
+    "target_symbol": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Target Symbol"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "domain_profile",
+    "kind",
+    "symbol",
+    "label",
+    "definition",
+    "fingerprint"
+  ],
+  "title": "OntologyDiscoveryCandidate",
+  "type": "object"
+}

@@ -117,8 +117,16 @@ class PostgresDatabase:
                 if context is not None:
                     cursor.execute("SELECT set_config('kip.workspace_id', %s, true)", (context.workspace,))
                     cursor.execute(
+                        "SELECT set_config('kip.principal_id', %s, true)",
+                        (context.principal_id,),
+                    )
+                    cursor.execute(
                         "SELECT set_config('kip.acl_scopes', %s, true)",
                         (",".join(context.acl_scopes),),
+                    )
+                    cursor.execute(
+                        "SELECT set_config('kip.roles', %s, true)",
+                        (",".join(sorted(set(context.roles))),),
                     )
             yield connection
 

@@ -17,6 +17,25 @@ def test_setup_inspection_asks_only_first_missing_decision(tmp_path: Path) -> No
     assert [question.id for question in inspection.questions] == ["workspace"]
 
 
+def test_setup_collects_empty_ontology_profile_before_source_scope(tmp_path: Path) -> None:
+    # Given identity decisions required before source collection are complete
+    answers = SetupAnswers(
+        workspace="acme-rnd",
+        identity_mode="api_key",
+        identity_api_key_secret_ref=SecretReference.parse("env:KIP_API_KEY"),
+        identity_admin_key_secret_ref=SecretReference.parse("env:KIP_ADMIN_KEY"),
+        identity_owner="platform-security",
+        source_ownership="company",
+        ontology_profile="empty",
+    )
+
+    # When setup asks for its next missing decision
+    inspection = inspect_setup(answers, project_root=tmp_path)
+
+    # Then it asks for the bounded filesystem scope only after the profile choice
+    assert [question.id for question in inspection.questions] == ["filesystem_sources"]
+
+
 def test_setup_inspection_resumes_with_dynamic_provider_questions(
     tmp_path: Path,
 ) -> None:
@@ -41,6 +60,23 @@ def test_setup_inspection_resumes_with_dynamic_provider_questions(
     )
     assert [question.id for question in retention.questions] == [
         "model_retention_policy"
+    ]
+
+
+def test_setup_requires_explicit_consent_before_persisting_interaction_memory(
+    tmp_path: Path,
+) -> None:
+    # Given otherwise complete onboarding answers without a retention decision
+    answers = _complete_answers(tmp_path).model_copy(
+        update={"interaction_memory_mode": None}
+    )
+
+    # When setup resumes the decision flow
+    inspection = inspect_setup(answers, project_root=tmp_path)
+
+    # Then it asks for an explicit interaction-memory mode
+    assert [question.id for question in inspection.questions] == [
+        "interaction_memory_mode"
     ]
 
 
@@ -111,6 +147,7 @@ def _complete_answers(tmp_path: Path) -> SetupAnswers:
         jwt_admin_groups=["kip-admins"],
         identity_owner="platform-security",
         source_ownership="company",
+        ontology_profile="empty",
         filesystem_sources=[
             FilesystemSourceAnswer.from_user_value(
                 {
@@ -132,5 +169,6 @@ def _complete_answers(tmp_path: Path) -> SetupAnswers:
         retention_days=365,
         sync_schedule="0 * * * *",
         evaluation_dataset="none",
+        interaction_memory_mode="explicit_consent",
         ontology_reviewers=["knowledge-owner@example.invalid"],
     )

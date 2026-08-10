@@ -5,6 +5,7 @@ from typing import ClassVar
 from kip.adapters.repository.postgres.database import PostgresDatabase
 from kip.adapters.repository.postgres.evidence import PostgresEvidenceStore
 from kip.adapters.repository.postgres.ingestion import PostgresIngestionStore
+from kip.adapters.repository.postgres.interactions import PostgresInteractionStore
 from kip.adapters.repository.postgres.jobs import PostgresJobStore
 from kip.adapters.repository.postgres.knowledge import PostgresKnowledgeStore
 from kip.adapters.repository.postgres.operations import PostgresOperationsStore
@@ -32,6 +33,7 @@ class PostgresRepository:
         self.jobs = PostgresJobStore(self.database)
         self.operations = PostgresOperationsStore(self.database)
         self.telemetry = PostgresQueryTraceStore(self.database)
+        self.interactions = PostgresInteractionStore(self.database)
 
 
 __all__ = ["PostgresRepository"]

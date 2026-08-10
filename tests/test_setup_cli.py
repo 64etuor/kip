@@ -61,6 +61,7 @@ def test_setup_cli_answers_previews_plans_applies_and_verifies(
         ("jwt_admin_groups", '["kip-admins"]'),
         ("identity_owner", "platform-security"),
         ("source_ownership", "company"),
+        ("ontology_profile", "empty"),
         (
             "filesystem_sources",
             json.dumps(
@@ -81,6 +82,7 @@ def test_setup_cli_answers_previews_plans_applies_and_verifies(
         ("retention_days", "365"),
         ("sync_schedule", "manual"),
         ("evaluation_dataset", "none"),
+        ("interaction_memory_mode", "explicit_consent"),
         ("ontology_reviewers", '["knowledge-owner"]'),
     ]
     for question, value in answers:
@@ -191,6 +193,7 @@ def _write_complete_state(
         "identity_admin_key_secret_ref": None,
         "identity_owner": "platform-security",
         "source_ownership": "company",
+        "ontology_profile": "empty",
         "filesystem_sources": [
             {
                 "name": "company-docs",
@@ -212,6 +215,7 @@ def _write_complete_state(
         "retention_days": 365,
         "sync_schedule": "manual",
         "evaluation_dataset": "none",
+        "interaction_memory_mode": "explicit_consent",
         "ontology_reviewers": ["knowledge-owner"],
     }
     state.write_text(json.dumps(payload), encoding="utf-8")

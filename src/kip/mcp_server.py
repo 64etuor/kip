@@ -5,6 +5,14 @@ import os
 from typing import TYPE_CHECKING, Any, Literal
 
 from kip.container import build_container
+from kip.domain.interactions import (
+    ClarificationAnswer,
+    ClarificationRequest,
+    FeedbackSubmission,
+    OntologyDiscoveryProposal,
+    OntologyDiscoveryReview,
+    UserPreferenceWrite,
+)
 from kip.domain.knowledge import KnowledgeEntity
 from kip.domain.models import (
     AnswerRequest,
@@ -43,11 +51,26 @@ def create_server() -> FastMCP:
         principal = os.environ.get("KIP_PRINCIPAL_ID", "principal_mcp")
         raw_scopes = os.environ.get("KIP_ACL_SCOPES", "")
         scopes = [item.strip() for item in raw_scopes.split(",") if item.strip()]
-        return application.operations.request_context(
+        base = application.operations.request_context(
             workspace=workspace,
             principal_id=principal,
             acl_scopes=scopes or [f"workspace:{workspace}"],
         )
+        roles = [
+            item.strip()
+            for item in os.environ.get("KIP_ROLES", "").split(",")
+            if item.strip()
+        ]
+        return base.model_copy(update={"roles": list(dict.fromkeys(roles))})
+
+    def json_array(value: str, name: str) -> list[object]:
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"{name} must be valid JSON") from exc
+        if not isinstance(parsed, list):
+            raise ValueError(f"{name} must be a JSON array")
+        return parsed
 
     @mcp.tool()
     def kip_capabilities() -> str:
@@ -216,6 +239,159 @@ def create_server() -> FastMCP:
                 context(),
                 candidate_id,
                 note,
+            )
+        )
+
+    @mcp.tool()
+    def kip_clarify(
+        reason: str,
+        prompt: str,
+        choices_json: str = "[]",
+        allow_freeform: bool = True,
+        allow_multiple: bool = False,
+        preference_key: str | None = None,
+    ) -> str:
+        """Create a short-lived clarification; no answer is remembered unless explicitly requested later."""
+        return _json(
+            application.interactions.create_clarification(
+                context(),
+                ClarificationRequest.model_validate(
+                    {
+                        "reason": reason,
+                        "prompt": prompt,
+                        "choices": json_array(choices_json, "choices"),
+                        "allow_freeform": allow_freeform,
+                        "allow_multiple": allow_multiple,
+                        "preference_key": preference_key,
+                    }
+                ),
+            )
+        )
+
+    @mcp.tool()
+    def kip_answer_clarification(
+        question_id: str,
+        option_ids: list[str] | None = None,
+        freeform: str | None = None,
+        remember: bool = False,
+    ) -> str:
+        """Answer a clarification and persist only when remember=true and the question permits it."""
+        return _json(
+            application.interactions.answer_clarification(
+                context(),
+                ClarificationAnswer(
+                    question_id=question_id,
+                    option_ids=option_ids or [],
+                    freeform=freeform,
+                    remember=remember,
+                ),
+            )
+        )
+
+    @mcp.tool()
+    def kip_preferences() -> str:
+        """List only the caller's explicit interaction preferences."""
+        return _json(application.interactions.list_preferences(context()))
+
+    @mcp.tool()
+    def kip_remember_preference(
+        key: str,
+        values: list[str],
+        confirmed: bool = False,
+    ) -> str:
+        """Persist a user preference only after an explicit confirmation flag."""
+        if not confirmed:
+            raise ValueError("confirmed=true is required to persist a preference")
+        return _json(
+            application.interactions.save_preference(
+                context(),
+                UserPreferenceWrite(key=key, values=values, confirmed=True),
+            )
+        )
+
+    @mcp.tool()
+    def kip_forget_preference(key: str) -> str:
+        """Delete one explicit preference owned by the current caller."""
+        return _json(
+            {"deleted": application.interactions.delete_preference(context(), key)}
+        )
+
+    @mcp.tool()
+    def kip_feedback(
+        outcome: str,
+        reason_codes: list[str] | None = None,
+        request_id: str | None = None,
+    ) -> str:
+        """Record structured usefulness feedback without storing raw query or answer text."""
+        return _json(
+            application.interactions.submit_feedback(
+                context(),
+                FeedbackSubmission.model_validate(
+                    {
+                        "request_id": request_id,
+                        "outcome": outcome,
+                        "reason_codes": reason_codes or [],
+                    }
+                ),
+            )
+        )
+
+    @mcp.tool()
+    def kip_ontology_discovery_propose(
+        kind: str,
+        symbol: str,
+        label: str,
+        definition: str,
+        target_symbol: str | None = None,
+        confirmed: bool = False,
+    ) -> str:
+        """Submit a reviewed ontology-release candidate; this never changes the active ontology."""
+        if not confirmed:
+            raise ValueError("confirmed=true is required to propose ontology discovery")
+        return _json(
+            application.interactions.propose_ontology_discovery(
+                context(),
+                OntologyDiscoveryProposal.model_validate(
+                    {
+                        "kind": kind,
+                        "symbol": symbol,
+                        "label": label,
+                        "definition": definition,
+                        "target_symbol": target_symbol,
+                        "confirmed": True,
+                    }
+                ),
+            )
+        )
+
+    @mcp.tool()
+    def kip_ontology_discovery_candidates(
+        status: str | None = "proposed",
+        limit: int = 100,
+    ) -> str:
+        """List ontology discovery candidates for an administrator or configured reviewer."""
+        return _json(
+            application.interactions.list_ontology_discovery_candidates(
+                context(),
+                status=status,
+                limit=limit,
+            )
+        )
+
+    @mcp.tool()
+    def kip_ontology_discovery_review(
+        candidate_id: str,
+        action: str,
+        note: str | None = None,
+    ) -> str:
+        """Accept a candidate for a later YAML release or reject it; neither action activates it."""
+        return _json(
+            application.interactions.review_ontology_discovery_candidate(
+                context(),
+                candidate_id,
+                OntologyDiscoveryReview.model_validate(
+                    {"action": action, "note": note}
+                ),
             )
         )
 

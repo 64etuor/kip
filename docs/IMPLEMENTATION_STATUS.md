@@ -28,6 +28,7 @@
 | Quality control plane | Ready for pilot | Version-pinned parser/embedding/reranker/retrieval experiment manifests and fail-closed, read-only promotion recommendations; manifest-driven orchestration is not yet a scheduler |
 | End-to-end RAG rubric | Ready for pilot | Deterministic claim/citation/refusal and entity/relation/evidence/contradiction/path/temporal/integrity metrics; missing reviews fail closed and the bundled ontology case is synthetic contract evidence only |
 | Query tracing and metrics | Ready for pilot | PostgreSQL/RLS canonical redacted traces, admin-only CLI/REST inspection, bounded retention pruning, non-fatal delivery, and optional OTLP/HTTP spans and metrics without content attributes |
+| Adaptive ontology and interaction memory | Ready for pilot | Empty starter profile, one-question setup selection, TTL owner-scoped clarifications, confirmed preferences, structured non-trace feedback, per-principal discovery candidates, PostgreSQL RLS, and CLI/REST/MCP parity; accepted candidates require a separate YAML release |
 | Evidence-bounded answer | Ready for pilot | CLI/API/MCP/SDK share search, exact reopen, freshness, XLSX, classification/egress, structured generation, claim-citation validation, typed refusal, explicit extractive fallback, and ACL-filtered current approved-graph context; candidates, expired relations, and stale graph evidence are excluded |
 | Local embedding sidecar | Validated shadow | Infinity 0.0.77, Qwen3 0.6B 1024d, pinned revisions, MPS smoke passed |
 | Local reranker | RapidFuzz active; model adapters shadow | RapidFuzz 3.14.5 reranks bounded ACL-filtered lexical candidates locally and passed the private OneDrive retrieval gate; BGE/Jina model adapters remain opt-in shadow candidates |
@@ -96,6 +97,10 @@
 - Query trace delivery is deliberately non-blocking. Production monitoring must
   alert on collector gaps and run the retention prune schedule; PostgreSQL
   remains the incident-review source when OTLP delivery is unavailable.
+- Interaction memory is intentionally not a self-training system. It stores no
+  raw feedback text, does not read during normal retrieval, and never promotes a
+  discovery candidate. Operators must schedule expired-clarification pruning and
+  use a non-owner API/worker role before multi-user deployment.
 
 ## Self-improvement canary: 2026-08-06
 

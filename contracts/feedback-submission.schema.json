@@ -1,0 +1,40 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "outcome": {
+      "enum": [
+        "helpful",
+        "not_helpful",
+        "needs_clarification"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "reason_codes": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 4,
+      "title": "Reason Codes",
+      "type": "array"
+    },
+    "request_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Request Id"
+    }
+  },
+  "required": [
+    "outcome"
+  ],
+  "title": "FeedbackSubmission",
+  "type": "object"
+}

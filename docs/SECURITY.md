@@ -63,6 +63,29 @@
 - Trace/exporter failure never weakens ACL, evidence freshness, refusal, or
   answer semantics.
 
+## Interaction-memory boundary
+
+- Interaction persistence is disabled by default. Setup must explicitly select
+  `explicit_consent` before the application stores a clarification, preference,
+  feedback record, or discovery candidate.
+- Clarifications are scoped to one verified workspace/principal and have a
+  bounded TTL. They are not query traces and their transient prompt/answer
+  material is never exported as telemetry.
+- A preference is retained only after an explicit `remember=true` answer to a
+  preference-enabled question or a `confirmed=true` direct write. Owners can
+  list and delete only their own preferences.
+- Feedback permits only opaque KIP request IDs, controlled outcome/reason
+  values, and no free-form content. It cannot become a surrogate raw-query or
+  source-content log.
+- Discovery candidates are untrusted review proposals. They never alter the
+  active ontology, entity index, assertion store, retrieval, or answer path.
+  Workspace reviewers need the verified admin role; accepted candidates still
+  require a normal YAML release review.
+- PostgreSQL sets workspace, principal, ACL scopes, and verified roles in the
+  transaction-local session before interaction queries. Production API/worker
+  logins must remain non-owner, non-`BYPASSRLS` roles as documented in
+  `docs/OPERATIONS.md`.
+
 ## Retrieval authorization
 
 - Resolve workspace, principal, and ACL scopes only through the configured

@@ -1,0 +1,42 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "freeform": {
+      "anyOf": [
+        {
+          "maxLength": 500,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Freeform"
+    },
+    "option_ids": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 4,
+      "title": "Option Ids",
+      "type": "array"
+    },
+    "question_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Question Id",
+      "type": "string"
+    },
+    "remember": {
+      "default": false,
+      "title": "Remember",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "question_id"
+  ],
+  "title": "ClarificationAnswer",
+  "type": "object"
+}

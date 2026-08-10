@@ -31,10 +31,12 @@ class OntologyMigrationUseCases:
         store: KnowledgeStore,
         evidence: EvidenceUseCases,
         *,
+        domain_profile: str = "research-project",
         max_assertions: int = 10_000,
     ) -> None:
         self._store = store
         self._evidence = evidence
+        self._domain_profile = domain_profile
         self._max_assertions = max_assertions
 
     def materialize(
@@ -44,14 +46,22 @@ class OntologyMigrationUseCases:
         after_root: Path,
         migration: OntologyMigration,
     ) -> OntologyMigrationMaterialization:
-        diff = diff_ontologies(before_root, after_root)
+        diff = diff_ontologies(
+            before_root,
+            after_root,
+            before_domain_profile=self._domain_profile,
+            after_domain_profile=self._domain_profile,
+        )
         errors = validate_migration_coverage(diff, migration)
         if errors:
             raise ValidationError(
                 "invalid ontology migration: " + "; ".join(errors)
             )
         self._validate_entity_operations(context, migration)
-        target = OntologyCatalog.load(after_root)
+        target = OntologyCatalog.load(
+            after_root,
+            domain_profile=self._domain_profile,
+        )
         migration_sha256 = ontology_migration_sha256(migration)
         source_predicates = tuple(
             sorted(

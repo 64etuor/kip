@@ -221,6 +221,14 @@
       "title": "Identity Owner",
       "type": "string"
     },
+    "interaction_memory_mode": {
+      "enum": [
+        "disabled",
+        "explicit_consent"
+      ],
+      "title": "Interaction Memory Mode",
+      "type": "string"
+    },
     "jwt_admin_groups": {
       "items": {
         "type": "string"
@@ -310,6 +318,14 @@
       "title": "Mounts",
       "type": "array"
     },
+    "ontology_profile": {
+      "enum": [
+        "empty",
+        "research-project"
+      ],
+      "title": "Ontology Profile",
+      "type": "string"
+    },
     "ontology_reviewers": {
       "items": {
         "type": "string"
@@ -375,6 +391,7 @@
     "identity_admin_key_secret_ref",
     "identity_owner",
     "source_ownership",
+    "ontology_profile",
     "sources",
     "mounts",
     "model_provider",
@@ -387,6 +404,7 @@
     "retention_days",
     "sync_schedule",
     "evaluation_dataset",
+    "interaction_memory_mode",
     "ontology_reviewers",
     "generated_files"
   ],

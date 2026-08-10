@@ -47,6 +47,7 @@ def build_setup_plan(
         or answers.identity_mode is None
         or answers.identity_owner is None
         or answers.source_ownership is None
+        or answers.ontology_profile is None
         or answers.filesystem_sources is None
         or answers.model_provider is None
         or answers.database_secret_ref is None
@@ -55,6 +56,7 @@ def build_setup_plan(
         or answers.retention_days is None
         or answers.sync_schedule is None
         or answers.evaluation_dataset is None
+        or answers.interaction_memory_mode is None
         or answers.ontology_reviewers is None
         or (
             answers.identity_mode == "proxy_jwt"
@@ -131,6 +133,7 @@ def build_setup_plan(
         identity_admin_key_secret_ref=answers.identity_admin_key_secret_ref,
         identity_owner=answers.identity_owner,
         source_ownership=answers.source_ownership,
+        ontology_profile=answers.ontology_profile,
         sources=sources,
         mounts=mounts,
         model_provider=answers.model_provider,
@@ -145,6 +148,7 @@ def build_setup_plan(
         retention_days=answers.retention_days,
         sync_schedule=answers.sync_schedule,
         evaluation_dataset=answers.evaluation_dataset,
+        interaction_memory_mode=answers.interaction_memory_mode,
         ontology_reviewers=answers.ontology_reviewers,
         generated_files=[
             "config/kip.generated.toml",
@@ -187,6 +191,7 @@ def _first_missing_question(answers: SetupAnswers) -> SetupQuestion | None:
     ordered = [
         ("identity_owner", answers.identity_owner),
         ("source_ownership", answers.source_ownership),
+        ("ontology_profile", answers.ontology_profile),
         ("filesystem_sources", answers.filesystem_sources),
         ("model_provider", answers.model_provider),
     ]
@@ -207,6 +212,7 @@ def _first_missing_question(answers: SetupAnswers) -> SetupQuestion | None:
         ("retention_days", answers.retention_days),
         ("sync_schedule", answers.sync_schedule),
         ("evaluation_dataset", answers.evaluation_dataset),
+        ("interaction_memory_mode", answers.interaction_memory_mode),
         ("ontology_reviewers", answers.ontology_reviewers),
     ]
     for question_id, trailing_value in trailing:
@@ -297,6 +303,13 @@ _QUESTIONS = {
         example='[{"name":"company-docs","root":"/mnt/nas/team","classification":"internal","acl_scope":"workspace:acme-rnd"}]',
         why="과도한 폴더 수집을 막고 실제 수집 범위를 미리 계산합니다.",
     ),
+    "ontology_profile": SetupQuestion(
+        id="ontology_profile",
+        prompt="새 배포는 빈 도메인 프로파일과 연구과제 예제 프로파일 중 무엇으로 시작하나요?",
+        answer_format="one choice",
+        choices=["empty", "research-project"],
+        why="의미 계약의 최소 커널은 유지하면서 도메인 전제를 명시적으로 선택합니다.",
+    ),
     "model_provider": SetupQuestion(
         id="model_provider",
         prompt="생성 모델은 비활성화, 로컬, OpenAI, Anthropic 중 무엇을 사용하나요?",
@@ -374,5 +387,12 @@ _QUESTIONS = {
         answer_format="JSON array of stable role or principal identifiers",
         example='["knowledge-owner@example.invalid"]',
         why="추출된 관계가 자동으로 사실로 승격되지 않게 합니다.",
+    ),
+    "interaction_memory_mode": SetupQuestion(
+        id="interaction_memory_mode",
+        prompt="사용자 확인 기반 선호 기억과 온톨로지 발견 후보를 보존할까요?",
+        answer_format="one choice",
+        choices=["disabled", "explicit_consent"],
+        why="질의·답변·원문을 자동 보존하지 않고 명시적으로 동의한 설정만 기억합니다.",
     ),
 }

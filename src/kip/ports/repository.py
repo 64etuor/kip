@@ -4,6 +4,7 @@ from typing import Protocol
 
 from kip.ports.evidence import EvidenceStore
 from kip.ports.ingestion import IngestionStore
+from kip.ports.interactions import InteractionStore
 from kip.ports.jobs import JobStore
 from kip.ports.knowledge import KnowledgeStore
 from kip.ports.operations import OperationsStore
@@ -35,3 +36,6 @@ class RepositoryPort(Protocol):
 
     @property
     def telemetry(self) -> QueryTraceStore: ...
+
+    @property
+    def interactions(self) -> InteractionStore: ...

@@ -6,8 +6,18 @@ from pathlib import Path
 from typing import Any
 
 import typer
+from pydantic import BaseModel
+from pydantic import ValidationError as PydanticValidationError
 
 from kip.container import Container, build_container
+from kip.domain.interactions import (
+    ClarificationAnswer,
+    ClarificationRequest,
+    FeedbackSubmission,
+    OntologyDiscoveryProposal,
+    OntologyDiscoveryReview,
+    UserPreferenceWrite,
+)
 from kip.domain.knowledge import CandidateEvidence, KnowledgeEntity
 from kip.domain.models import (
     AnswerRequest,
@@ -59,6 +69,14 @@ quality_app = typer.Typer(no_args_is_help=True, help="Evaluate version-pinned ca
 ontology_app = typer.Typer(no_args_is_help=True, help="Validate and migrate ontology releases")
 telemetry_app = typer.Typer(no_args_is_help=True, help="Inspect redacted RAG query traces")
 parser_app = typer.Typer(no_args_is_help=True, help="Shadow and activate parser candidates")
+interaction_app = typer.Typer(
+    no_args_is_help=True,
+    help="Ask bounded clarification questions and manage opt-in interaction memory",
+)
+ontology_discovery_app = typer.Typer(
+    no_args_is_help=True,
+    help="Propose and review non-activating ontology discovery candidates",
+)
 
 app.add_typer(sync_app, name="sync")
 app.add_typer(xlsx_app, name="xlsx")
@@ -75,7 +93,9 @@ app.add_typer(quality_app, name="quality")
 app.add_typer(ontology_app, name="ontology")
 app.add_typer(telemetry_app, name="telemetry")
 app.add_typer(parser_app, name="parser")
+app.add_typer(interaction_app, name="interaction")
 app.add_typer(setup_app, name="setup")
+ontology_app.add_typer(ontology_discovery_app, name="discovery")
 
 
 class Runtime:
@@ -85,7 +105,13 @@ class Runtime:
 
 
 def command_loads_models(subcommand: str | None) -> bool:
-    return subcommand not in {"migrate", "parser", "quality", "telemetry"}
+    return subcommand not in {
+        "migrate",
+        "parser",
+        "quality",
+        "telemetry",
+        "interaction",
+    }
 
 
 @app.callback()
@@ -1025,13 +1051,18 @@ def quality_recommend(
 def ontology_validate(
     ctx: typer.Context,
     root: Path = typer.Option(..., "--root", exists=True, file_okay=False, readable=True),
+    domain_profile: str = typer.Option("research-project", "--domain-profile"),
 ) -> None:
     def action(runtime: Runtime) -> Any:
-        errors = validate_ontology(root)
+        errors = validate_ontology(root, domain_profile=domain_profile)
         if errors:
             raise ValidationError("invalid ontology contract: " + "; ".join(errors))
-        catalog = OntologyCatalog.load(root)
-        return {"version": catalog.version, "predicate_count": len(catalog.predicates)}
+        catalog = OntologyCatalog.load(root, domain_profile=domain_profile)
+        return {
+            "version": catalog.version,
+            "domain_profile": catalog.domain_profile,
+            "predicate_count": len(catalog.predicates),
+        }
 
     _run(ctx, action)
 
@@ -1164,10 +1195,23 @@ def ontology_diff(
     ctx: typer.Context,
     before: Path = typer.Option(..., "--before", exists=True, file_okay=False, readable=True),
     after: Path = typer.Option(..., "--after", exists=True, file_okay=False, readable=True),
+    before_domain_profile: str = typer.Option(
+        "research-project",
+        "--before-domain-profile",
+    ),
+    after_domain_profile: str = typer.Option(
+        "research-project",
+        "--after-domain-profile",
+    ),
     migration: Path | None = typer.Option(None, "--migration", dir_okay=False, readable=True),
 ) -> None:
     def action(runtime: Runtime) -> Any:
-        result = diff_ontologies(before, after)
+        result = diff_ontologies(
+            before,
+            after,
+            before_domain_profile=before_domain_profile,
+            after_domain_profile=after_domain_profile,
+        )
         selected = load_migration(migration) if migration is not None else None
         errors = validate_migration_coverage(result, selected)
         if errors:
@@ -1241,6 +1285,241 @@ def telemetry_prune(ctx: typer.Context) -> None:
         }
 
     _run(ctx, action)
+
+
+def _json_array(value: str, name: str) -> list[object]:
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise ValidationError(f"{name} must be valid JSON") from exc
+    if not isinstance(parsed, list):
+        raise ValidationError(f"{name} must be a JSON array")
+    return parsed
+
+
+def _validated_interaction_input[InteractionInputModel: BaseModel](
+    model: type[InteractionInputModel],
+    payload: object,
+) -> InteractionInputModel:
+    try:
+        return model.model_validate(payload)
+    except PydanticValidationError as exc:
+        raise ValidationError(str(exc)) from exc
+
+
+def _admin_runtime_context(runtime: Runtime) -> RequestContext:
+    roles = list(dict.fromkeys([*runtime.context.roles, "admin"]))
+    return runtime.context.model_copy(update={"roles": roles})
+
+
+@interaction_app.command("clarify")
+def interaction_clarify(
+    ctx: typer.Context,
+    reason: str = typer.Option(..., "--reason"),
+    prompt: str = typer.Option(..., "--prompt"),
+    choices_json: str = typer.Option("[]", "--choices-json"),
+    allow_freeform: bool = typer.Option(
+        True,
+        "--allow-freeform/--no-allow-freeform",
+    ),
+    allow_multiple: bool = typer.Option(False, "--allow-multiple"),
+    preference_key: str | None = typer.Option(None, "--preference-key"),
+) -> None:
+    def action(runtime: Runtime) -> Any:
+        return runtime.container.application.interactions.create_clarification(
+            runtime.context,
+            _validated_interaction_input(
+                ClarificationRequest,
+                {
+                    "reason": reason,
+                    "prompt": prompt,
+                    "choices": _json_array(choices_json, "choices"),
+                    "allow_freeform": allow_freeform,
+                    "allow_multiple": allow_multiple,
+                    "preference_key": preference_key,
+                }
+            ),
+        )
+
+    _run(ctx, action)
+
+
+@interaction_app.command("answer")
+def interaction_answer(
+    ctx: typer.Context,
+    question_id: str = typer.Option(..., "--question-id"),
+    option_id: list[str] | None = typer.Option(None, "--option-id"),
+    freeform: str | None = typer.Option(None, "--freeform"),
+    remember: bool = typer.Option(False, "--remember"),
+) -> None:
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.interactions.answer_clarification(
+            runtime.context,
+            _validated_interaction_input(
+                ClarificationAnswer,
+                {
+                    "question_id": question_id,
+                    "option_ids": option_id or [],
+                    "freeform": freeform,
+                    "remember": remember,
+                },
+            ),
+        ),
+    )
+
+
+@interaction_app.command("preferences")
+def interaction_preferences(ctx: typer.Context) -> None:
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.interactions.list_preferences(
+            runtime.context
+        ),
+    )
+
+
+@interaction_app.command("remember")
+def interaction_remember(
+    ctx: typer.Context,
+    key: str = typer.Option(..., "--key"),
+    value: list[str] | None = typer.Option(None, "--value"),
+    confirmed: bool = typer.Option(False, "--confirmed"),
+) -> None:
+    def action(runtime: Runtime) -> Any:
+        if not confirmed:
+            raise ValidationError("--confirmed is required to persist a preference")
+        return runtime.container.application.interactions.save_preference(
+            runtime.context,
+            _validated_interaction_input(
+                UserPreferenceWrite,
+                {
+                    "key": key,
+                    "values": value or [],
+                    "confirmed": True,
+                },
+            ),
+        )
+
+    _run(ctx, action)
+
+
+@interaction_app.command("forget")
+def interaction_forget(
+    ctx: typer.Context,
+    key: str = typer.Option(..., "--key"),
+) -> None:
+    _run(
+        ctx,
+        lambda runtime: {
+            "deleted": runtime.container.application.interactions.delete_preference(
+                runtime.context,
+                key,
+            )
+        },
+    )
+
+
+@interaction_app.command("feedback")
+def interaction_feedback(
+    ctx: typer.Context,
+    outcome: str = typer.Option(..., "--outcome"),
+    reason_code: list[str] | None = typer.Option(None, "--reason-code"),
+    request_id: str | None = typer.Option(None, "--request-id"),
+) -> None:
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.interactions.submit_feedback(
+            runtime.context,
+            _validated_interaction_input(
+                FeedbackSubmission,
+                {
+                    "request_id": request_id,
+                    "outcome": outcome,
+                    "reason_codes": reason_code or [],
+                }
+            ),
+        ),
+    )
+
+
+@interaction_app.command("prune")
+def interaction_prune(ctx: typer.Context) -> None:
+    def action(runtime: Runtime) -> Any:
+        return {
+            "deleted": runtime.container.application.interactions.prune_expired_clarifications(
+                _admin_runtime_context(runtime)
+            )
+        }
+
+    _run(ctx, action)
+
+
+@ontology_discovery_app.command("propose")
+def ontology_discovery_propose(
+    ctx: typer.Context,
+    kind: str = typer.Option(..., "--kind"),
+    symbol: str = typer.Option(..., "--symbol"),
+    label: str = typer.Option(..., "--label"),
+    definition: str = typer.Option(..., "--definition"),
+    target_symbol: str | None = typer.Option(None, "--target-symbol"),
+    confirmed: bool = typer.Option(False, "--confirmed"),
+) -> None:
+    def action(runtime: Runtime) -> Any:
+        if not confirmed:
+            raise ValidationError("--confirmed is required to propose ontology discovery")
+        return runtime.container.application.interactions.propose_ontology_discovery(
+            runtime.context,
+            _validated_interaction_input(
+                OntologyDiscoveryProposal,
+                {
+                    "kind": kind,
+                    "symbol": symbol,
+                    "label": label,
+                    "definition": definition,
+                    "target_symbol": target_symbol,
+                    "confirmed": True,
+                }
+            ),
+        )
+
+    _run(ctx, action)
+
+
+@ontology_discovery_app.command("list")
+def ontology_discovery_list(
+    ctx: typer.Context,
+    status: str | None = typer.Option("proposed", "--status"),
+    limit: int = typer.Option(100, "--limit", min=1, max=1000),
+) -> None:
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.interactions.list_ontology_discovery_candidates(
+            _admin_runtime_context(runtime),
+            status=status,
+            limit=limit,
+        ),
+    )
+
+
+@ontology_discovery_app.command("review")
+def ontology_discovery_review(
+    ctx: typer.Context,
+    candidate_id: str = typer.Option(..., "--candidate-id"),
+    action: str = typer.Option(..., "--action"),
+    note: str | None = typer.Option(None, "--note"),
+) -> None:
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.interactions.review_ontology_discovery_candidate(
+            _admin_runtime_context(runtime),
+            candidate_id,
+            _validated_interaction_input(
+                OntologyDiscoveryReview,
+                {"action": action, "note": note},
+            ),
+        ),
+    )
 
 
 @export_app.command("canonical")

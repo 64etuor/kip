@@ -14,6 +14,12 @@ from kip.adapters.repository.postgres import PostgresRepository
 from kip.container import build_container
 from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
+from kip.domain.interactions import (
+    ClarificationAnswer,
+    ClarificationRequest,
+    OntologyDiscoveryProposal,
+    OntologyDiscoveryReview,
+)
 from kip.domain.knowledge import (
     CandidateEvidence,
     EntityCandidate,
@@ -43,6 +49,103 @@ from kip.settings import Settings
 
 URL = os.environ.get("KIP_TEST_POSTGRES_URL") or os.environ.get("KIP_DATABASE_URL")
 pytestmark = pytest.mark.skipif(not URL, reason="PostgreSQL integration URL not configured")
+
+
+def test_postgres_interactions_enforce_owner_scope_and_review_lifecycle(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("psycopg")
+    workspace = "test_" + uuid.uuid4().hex[:12]
+    settings = Settings(
+        project_root=Path(__file__).resolve().parents[2],
+        config_path=tmp_path / "kip.toml",
+        raw={
+            "search": {"semantic_enabled": False},
+            "graph": {"backend": "memory"},
+            "sources": {"filesystem": []},
+            "interaction": {
+                "enabled": True,
+                "clarification_ttl_seconds": 3600,
+            },
+            "ontology": {
+                "domain_profile": "empty",
+                "adaptive_discovery": True,
+            },
+        },
+        environment="test",
+        workspace=workspace,
+        database_url=str(URL),
+        cas_path=tmp_path / "cas",
+    )
+    repository = PostgresRepository(str(URL))
+    container = build_container(settings, repository=repository)
+    repository.operations.migrate(settings.project_root / "migrations")
+    owner = container.application.operations.request_context(
+        workspace=workspace,
+        principal_id="principal_owner",
+        acl_scopes=[f"workspace:{workspace}"],
+    )
+    other = owner.model_copy(update={"principal_id": "principal_other"})
+
+    try:
+        question = container.application.interactions.create_clarification(
+            owner,
+            ClarificationRequest(
+                reason="scope_selection",
+                prompt="어느 범위를 검색할까요?",
+                choices=[{"id": "onedrive", "label": "OneDrive"}],
+                allow_freeform=False,
+                preference_key="default_source_scope",
+            ),
+        )
+        resolution = container.application.interactions.answer_clarification(
+            owner,
+            ClarificationAnswer(
+                question_id=question.id,
+                option_ids=["onedrive"],
+                remember=True,
+            ),
+        )
+
+        assert resolution.preference is not None
+        assert container.application.interactions.list_preferences(owner)[0].values == [
+            "onedrive"
+        ]
+        with pytest.raises(NotFoundError):
+            container.application.interactions.get_clarification(other, question.id)
+
+        proposal = OntologyDiscoveryProposal(
+            kind="entity_type",
+            symbol="contract",
+            label="계약",
+            definition="업무상 체결하는 계약을 표현한다.",
+            confirmed=True,
+        )
+        first = container.application.interactions.propose_ontology_discovery(
+            owner,
+            proposal,
+        )
+        duplicate = container.application.interactions.propose_ontology_discovery(
+            owner,
+            proposal,
+        )
+        reviewed = container.application.interactions.review_ontology_discovery_candidate(
+            owner.model_copy(update={"roles": ["admin"]}),
+            first.id,
+            OntologyDiscoveryReview(action="accept"),
+        )
+
+        assert duplicate.id == first.id
+        assert duplicate.occurrence_count == 2
+        assert reviewed.status == "accepted_for_release"
+    finally:
+        import psycopg
+
+        with (
+            psycopg.connect(str(URL), autocommit=True) as connection,
+            connection.cursor() as cursor,
+        ):
+            cursor.execute("DELETE FROM kip.workspaces WHERE slug=%s", (workspace,))
 
 
 def test_postgres_replacing_extraction_swaps_lexical_projection(

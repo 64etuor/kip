@@ -113,6 +113,127 @@
         "title": "AnswerRequest",
         "type": "object"
       },
+      "ClarificationAnswer": {
+        "additionalProperties": false,
+        "properties": {
+          "freeform": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freeform"
+          },
+          "option_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4,
+            "title": "Option Ids",
+            "type": "array"
+          },
+          "question_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Question Id",
+            "type": "string"
+          },
+          "remember": {
+            "default": false,
+            "title": "Remember",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "question_id"
+        ],
+        "title": "ClarificationAnswer",
+        "type": "object"
+      },
+      "ClarificationChoice": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 140,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "ClarificationChoice",
+        "type": "object"
+      },
+      "ClarificationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "allow_freeform": {
+            "default": true,
+            "title": "Allow Freeform",
+            "type": "boolean"
+          },
+          "allow_multiple": {
+            "default": false,
+            "title": "Allow Multiple",
+            "type": "boolean"
+          },
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/ClarificationChoice"
+            },
+            "maxItems": 4,
+            "title": "Choices",
+            "type": "array"
+          },
+          "preference_key": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preference Key"
+          },
+          "prompt": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Prompt",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "ambiguous_term",
+              "scope_selection",
+              "preference",
+              "other"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "prompt"
+        ],
+        "title": "ClarificationRequest",
+        "type": "object"
+      },
       "ConnectorEvent": {
         "additionalProperties": false,
         "properties": {
@@ -327,6 +448,45 @@
         "title": "ErrorInfo",
         "type": "object"
       },
+      "FeedbackSubmission": {
+        "additionalProperties": false,
+        "properties": {
+          "outcome": {
+            "enum": [
+              "helpful",
+              "not_helpful",
+              "needs_clarification"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 4,
+            "title": "Reason Codes",
+            "type": "array"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          }
+        },
+        "required": [
+          "outcome"
+        ],
+        "title": "FeedbackSubmission",
+        "type": "object"
+      },
       "GraphNeighborsRequest": {
         "additionalProperties": false,
         "properties": {
@@ -482,6 +642,95 @@
         "title": "KnowledgeEntity",
         "type": "object"
       },
+      "OntologyDiscoveryProposal": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmed": {
+            "const": true,
+            "title": "Confirmed",
+            "type": "boolean"
+          },
+          "definition": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Definition",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "entity_type",
+              "predicate",
+              "controlled_value",
+              "alias"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 140,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "symbol": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Symbol",
+            "type": "string"
+          },
+          "target_symbol": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Symbol"
+          }
+        },
+        "required": [
+          "kind",
+          "symbol",
+          "label",
+          "definition",
+          "confirmed"
+        ],
+        "title": "OntologyDiscoveryProposal",
+        "type": "object"
+      },
+      "OntologyDiscoveryReview": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "accept",
+              "reject"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "OntologyDiscoveryReview",
+        "type": "object"
+      },
       "OntologyMiningSubmission": {
         "additionalProperties": false,
         "properties": {
@@ -547,6 +796,38 @@
           "query"
         ],
         "title": "SearchRequest",
+        "type": "object"
+      },
+      "UserPreferenceWrite": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmed": {
+            "const": true,
+            "title": "Confirmed",
+            "type": "boolean"
+          },
+          "key": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "key",
+          "values",
+          "confirmed"
+        ],
+        "title": "UserPreferenceWrite",
         "type": "object"
       },
       "ValidationError": {
@@ -618,6 +899,238 @@
           }
         },
         "summary": "Healthz"
+      }
+    },
+    "/v1/admin/interactions/clarifications/expired": {
+      "delete": {
+        "operationId": "prune_expired_clarifications_v1_admin_interactions_clarifications_expired_delete",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-kip-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-kip-admin-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Admin-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Prune Expired Clarifications"
+      }
+    },
+    "/v1/admin/ontology/discovery-candidates": {
+      "get": {
+        "operationId": "ontology_discovery_candidates_v1_admin_ontology_discovery_candidates_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "proposed",
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-kip-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-kip-admin-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Admin-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ontology Discovery Candidates"
+      }
+    },
+    "/v1/admin/ontology/discovery-candidates/{candidate_id}/review": {
+      "post": {
+        "operationId": "review_ontology_discovery_candidate_v1_admin_ontology_discovery_candidates__candidate_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "candidate_id",
+            "required": true,
+            "schema": {
+              "title": "Candidate Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-kip-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-kip-admin-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Admin-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OntologyDiscoveryReview"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Ontology Discovery Candidate"
       }
     },
     "/v1/admin/query-traces": {
@@ -1332,6 +1845,393 @@
         "summary": "Graph Path"
       }
     },
+    "/v1/interactions/clarifications": {
+      "post": {
+        "operationId": "create_clarification_v1_interactions_clarifications_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-kip-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClarificationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Clarification"
+      }
+    },
+    "/v1/interactions/clarifications/{question_id}": {
+      "get": {
+        "operationId": "get_clarification_v1_interactions_clarifications__question_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "question_id",
+            "required": true,
+            "schema": {
+              "title": "Question Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-kip-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Clarification"
+      }
+    },
+    "/v1/interactions/clarifications/{question_id}/answers": {
+      "post": {
+        "operationId": "answer_clarification_v1_interactions_clarifications__question_id__answers_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "question_id",
+            "required": true,
+            "schema": {
+              "title": "Question Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-kip-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClarificationAnswer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer Clarification"
+      }
+    },
+    "/v1/interactions/feedback": {
+      "post": {
+        "operationId": "submit_feedback_v1_interactions_feedback_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-kip-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackSubmission"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Feedback"
+      }
+    },
+    "/v1/interactions/preferences": {
+      "get": {
+        "operationId": "list_preferences_v1_interactions_preferences_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-kip-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Preferences"
+      },
+      "put": {
+        "operationId": "save_preference_v1_interactions_preferences_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-kip-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserPreferenceWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Preference"
+      }
+    },
+    "/v1/interactions/preferences/{key}": {
+      "delete": {
+        "operationId": "delete_preference_v1_interactions_preferences__key__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-kip-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Preference"
+      }
+    },
     "/v1/jobs": {
       "get": {
         "operationId": "jobs_v1_jobs_get",
@@ -1474,6 +2374,62 @@
           }
         },
         "summary": "Ontology Context"
+      }
+    },
+    "/v1/ontology/discovery-candidates": {
+      "post": {
+        "operationId": "propose_ontology_discovery_candidate_v1_ontology_discovery_candidates_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-kip-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OntologyDiscoveryProposal"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Propose Ontology Discovery Candidate"
       }
     },
     "/v1/ontology/entities": {

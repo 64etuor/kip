@@ -1,0 +1,104 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "candidate_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Candidate Id"
+    },
+    "clarification_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Clarification Id"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "feedback_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Feedback Id"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "clarification_answered",
+        "preference_saved",
+        "preference_deleted",
+        "feedback_submitted",
+        "ontology_discovery_proposed",
+        "ontology_discovery_reviewed"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "outcome": {
+      "anyOf": [
+        {
+          "enum": [
+            "helpful",
+            "not_helpful",
+            "needs_clarification"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Outcome"
+    },
+    "preference_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Preference Id"
+    },
+    "schema_version": {
+      "const": "kip.interaction-event.v1",
+      "default": "kip.interaction-event.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind"
+  ],
+  "title": "InteractionEvent",
+  "type": "object"
+}

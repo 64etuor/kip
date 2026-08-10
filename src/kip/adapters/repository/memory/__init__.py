@@ -4,6 +4,7 @@ from typing import ClassVar
 
 from kip.adapters.repository.memory.evidence import MemoryEvidenceStore
 from kip.adapters.repository.memory.ingestion import MemoryIngestionStore
+from kip.adapters.repository.memory.interactions import MemoryInteractionStore
 from kip.adapters.repository.memory.jobs import MemoryJobStore
 from kip.adapters.repository.memory.knowledge import MemoryKnowledgeStore
 from kip.adapters.repository.memory.operations import MemoryOperationsStore
@@ -30,6 +31,7 @@ class MemoryRepository:
         self.jobs = MemoryJobStore(self.state)
         self.operations = MemoryOperationsStore(self.state)
         self.telemetry = MemoryQueryTraceStore(self.state)
+        self.interactions = MemoryInteractionStore(self.state)
 
 
 __all__ = ["MemoryRepository"]

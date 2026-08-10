@@ -237,9 +237,21 @@ def _predicate_changes(before: OntologyRelease, after: OntologyRelease) -> list[
     return changes
 
 
-def diff_ontologies(before_root: Path, after_root: Path) -> OntologyDiff:
-    before = OntologyRelease.load(before_root)
-    after = OntologyRelease.load(after_root)
+def diff_ontologies(
+    before_root: Path,
+    after_root: Path,
+    *,
+    before_domain_profile: str = "research-project",
+    after_domain_profile: str = "research-project",
+) -> OntologyDiff:
+    before = OntologyRelease.load(
+        before_root,
+        domain_profile=before_domain_profile,
+    )
+    after = OntologyRelease.load(
+        after_root,
+        domain_profile=after_domain_profile,
+    )
     changes = tuple(_entity_changes(before, after) + _predicate_changes(before, after))
     classification = max(
         (change.classification for change in changes),

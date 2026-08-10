@@ -1,0 +1,56 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "outcome": {
+      "enum": [
+        "helpful",
+        "not_helpful",
+        "needs_clarification"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "reason_codes": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 4,
+      "title": "Reason Codes",
+      "type": "array"
+    },
+    "request_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Request Id"
+    },
+    "schema_version": {
+      "const": "kip.interaction-feedback.v1",
+      "default": "kip.interaction-feedback.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "outcome"
+  ],
+  "title": "InteractionFeedback",
+  "type": "object"
+}

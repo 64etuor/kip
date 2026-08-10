@@ -145,6 +145,28 @@ on write and read, while the application additionally requires an admin role
 for inspection and retention pruning. OTel spans and metrics receive only
 bounded route/outcome/count/latency attributes, not candidate or evidence IDs.
 
+## Adaptive interaction boundary
+
+`ClarificationQuestion` is `kip.clarification.v1`: it has a bounded prompt,
+at most four stable choice IDs, a caller-only scope, and an expiry. Its answer
+is transient unless `remember=true` is accepted for a question carrying a
+preference key. Direct `UserPreferenceWrite` records require `confirmed=true`.
+`UserPreference` is `kip.user-preference.v1` and is visible only to its owning
+principal.
+
+`InteractionFeedback` is `kip.interaction-feedback.v1`. It records only an
+opaque KIP request ID when available, a controlled outcome, and controlled
+reason codes. It cannot carry query text, answer text, source content,
+principal data, or a free-form comment and is not a `QueryTrace` extension.
+
+`OntologyDiscoveryCandidate` is
+`kip.ontology-discovery-candidate.v1`. An explicitly confirmed proposal is a
+review item scoped to a YAML domain profile, never an active entity, predicate,
+controlled value, alias, assertion, or graph edge. Reviewer outcomes are
+`accepted_for_release` and `rejected`; only a separately reviewed ontology
+release can change the active catalog. Candidate fingerprints are storage-only
+and are excluded from edge output.
+
 ## Identity boundary
 
 `RequestContext` contains a verified principal, workspace, scopes, roles, and

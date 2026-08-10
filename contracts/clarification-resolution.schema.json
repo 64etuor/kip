@@ -1,0 +1,204 @@
+{
+  "$defs": {
+    "ClarificationChoice": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 140,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ],
+      "title": "ClarificationChoice",
+      "type": "object"
+    },
+    "ClarificationQuestion": {
+      "additionalProperties": false,
+      "properties": {
+        "allow_freeform": {
+          "default": true,
+          "title": "Allow Freeform",
+          "type": "boolean"
+        },
+        "allow_multiple": {
+          "default": false,
+          "title": "Allow Multiple",
+          "type": "boolean"
+        },
+        "choices": {
+          "items": {
+            "$ref": "#/$defs/ClarificationChoice"
+          },
+          "maxItems": 4,
+          "title": "Choices",
+          "type": "array"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "preference_key": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Preference Key"
+        },
+        "prompt": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Prompt",
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "ambiguous_term",
+            "scope_selection",
+            "preference",
+            "other"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "kip.clarification.v1",
+          "default": "kip.clarification.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "status": {
+          "default": "open",
+          "enum": [
+            "open",
+            "answered",
+            "expired"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason",
+        "prompt",
+        "expires_at"
+      ],
+      "title": "ClarificationQuestion",
+      "type": "object"
+    },
+    "UserPreference": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "key": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "kip.user-preference.v1",
+          "default": "kip.user-preference.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 5,
+          "minItems": 1,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "key",
+        "values"
+      ],
+      "title": "UserPreference",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "preference": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/UserPreference"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "question": {
+      "$ref": "#/$defs/ClarificationQuestion"
+    },
+    "schema_version": {
+      "const": "kip.clarification-resolution.v1",
+      "default": "kip.clarification-resolution.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "selected_values": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 5,
+      "minItems": 1,
+      "title": "Selected Values",
+      "type": "array"
+    }
+  },
+  "required": [
+    "question",
+    "selected_values"
+  ],
+  "title": "ClarificationResolution",
+  "type": "object"
+}

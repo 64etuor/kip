@@ -1,0 +1,116 @@
+{
+  "$defs": {
+    "ClarificationChoice": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 140,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ],
+      "title": "ClarificationChoice",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "allow_freeform": {
+      "default": true,
+      "title": "Allow Freeform",
+      "type": "boolean"
+    },
+    "allow_multiple": {
+      "default": false,
+      "title": "Allow Multiple",
+      "type": "boolean"
+    },
+    "choices": {
+      "items": {
+        "$ref": "#/$defs/ClarificationChoice"
+      },
+      "maxItems": 4,
+      "title": "Choices",
+      "type": "array"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "preference_key": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Preference Key"
+    },
+    "prompt": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Prompt",
+      "type": "string"
+    },
+    "reason": {
+      "enum": [
+        "ambiguous_term",
+        "scope_selection",
+        "preference",
+        "other"
+      ],
+      "title": "Reason",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "kip.clarification.v1",
+      "default": "kip.clarification.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "default": "open",
+      "enum": [
+        "open",
+        "answered",
+        "expired"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "reason",
+    "prompt",
+    "expires_at"
+  ],
+  "title": "ClarificationQuestion",
+  "type": "object"
+}

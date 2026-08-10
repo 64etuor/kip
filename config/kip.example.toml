@@ -123,6 +123,10 @@ max_characters = 120000
 max_entity_proposals = 32
 max_relation_proposals = 64
 
+[ontology]
+domain_profile = "empty"
+adaptive_discovery = false
+
 [ontology.answer_context]
 entity_limit = 8
 edge_limit = 50
@@ -130,6 +134,10 @@ max_depth = 4
 
 [ontology.migrations]
 max_assertions = 10000
+
+[interaction]
+enabled = false
+clarification_ttl_seconds = 3600
 
 [graph]
 backend = "postgres"

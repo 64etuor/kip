@@ -1,0 +1,31 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "enum": [
+        "accept",
+        "reject"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "note": {
+      "anyOf": [
+        {
+          "maxLength": 500,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Note"
+    }
+  },
+  "required": [
+    "action"
+  ],
+  "title": "OntologyDiscoveryReview",
+  "type": "object"
+}

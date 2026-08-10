@@ -156,6 +156,7 @@ def _complete_answers(tmp_path: Path) -> SetupAnswers:
         jwt_admin_groups=["kip-admins"],
         identity_owner="platform-security",
         source_ownership="company",
+        ontology_profile="empty",
         filesystem_sources=[
             FilesystemSourceAnswer.from_user_value(
                 {
@@ -177,5 +178,6 @@ def _complete_answers(tmp_path: Path) -> SetupAnswers:
         retention_days=365,
         sync_schedule="0 * * * *",
         evaluation_dataset="none",
+        interaction_memory_mode="explicit_consent",
         ontology_reviewers=["knowledge-owner@example.invalid"],
     )

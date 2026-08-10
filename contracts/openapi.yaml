@@ -707,6 +707,263 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /v1/interactions/clarifications:
+    post:
+      summary: Create Clarification
+      operationId: create_clarification_v1_interactions_clarifications_post
+      parameters:
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClarificationRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/interactions/clarifications/{question_id}:
+    get:
+      summary: Get Clarification
+      operationId: get_clarification_v1_interactions_clarifications__question_id__get
+      parameters:
+      - name: question_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Question Id
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/interactions/clarifications/{question_id}/answers:
+    post:
+      summary: Answer Clarification
+      operationId: answer_clarification_v1_interactions_clarifications__question_id__answers_post
+      parameters:
+      - name: question_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Question Id
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClarificationAnswer'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/interactions/preferences:
+    get:
+      summary: List Preferences
+      operationId: list_preferences_v1_interactions_preferences_get
+      parameters:
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    put:
+      summary: Save Preference
+      operationId: save_preference_v1_interactions_preferences_put
+      parameters:
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPreferenceWrite'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/interactions/preferences/{key}:
+    delete:
+      summary: Delete Preference
+      operationId: delete_preference_v1_interactions_preferences__key__delete
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Key
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/interactions/feedback:
+    post:
+      summary: Submit Feedback
+      operationId: submit_feedback_v1_interactions_feedback_post
+      parameters:
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackSubmission'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/admin/interactions/clarifications/expired:
+    delete:
+      summary: Prune Expired Clarifications
+      operationId: prune_expired_clarifications_v1_admin_interactions_clarifications_expired_delete
+      parameters:
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      - name: x-kip-admin-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Admin-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /v1/connectors/events:
     post:
       summary: Connector Event
@@ -886,6 +1143,134 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/OntologyMiningSubmission'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/ontology/discovery-candidates:
+    post:
+      summary: Propose Ontology Discovery Candidate
+      operationId: propose_ontology_discovery_candidate_v1_ontology_discovery_candidates_post
+      parameters:
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OntologyDiscoveryProposal'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/admin/ontology/discovery-candidates:
+    get:
+      summary: Ontology Discovery Candidates
+      operationId: ontology_discovery_candidates_v1_admin_ontology_discovery_candidates_get
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          default: proposed
+          title: Status
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 100
+          title: Limit
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      - name: x-kip-admin-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Admin-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/admin/ontology/discovery-candidates/{candidate_id}/review:
+    post:
+      summary: Review Ontology Discovery Candidate
+      operationId: review_ontology_discovery_candidate_v1_admin_ontology_discovery_candidates__candidate_id__review_post
+      parameters:
+      - name: candidate_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Candidate Id
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      - name: x-kip-admin-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Admin-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OntologyDiscoveryReview'
       responses:
         '200':
           description: Successful Response
@@ -1352,6 +1737,93 @@ components:
       required:
       - query
       title: AnswerRequest
+    ClarificationAnswer:
+      properties:
+        question_id:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: Question Id
+        option_ids:
+          items:
+            type: string
+          type: array
+          maxItems: 4
+          title: Option Ids
+        freeform:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Freeform
+        remember:
+          type: boolean
+          title: Remember
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+      - question_id
+      title: ClarificationAnswer
+    ClarificationChoice:
+      properties:
+        id:
+          type: string
+          maxLength: 64
+          minLength: 1
+          title: Id
+        label:
+          type: string
+          maxLength: 140
+          minLength: 1
+          title: Label
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - label
+      title: ClarificationChoice
+    ClarificationRequest:
+      properties:
+        reason:
+          type: string
+          enum:
+          - ambiguous_term
+          - scope_selection
+          - preference
+          - other
+          title: Reason
+        prompt:
+          type: string
+          maxLength: 500
+          minLength: 1
+          title: Prompt
+        choices:
+          items:
+            $ref: '#/components/schemas/ClarificationChoice'
+          type: array
+          maxItems: 4
+          title: Choices
+        allow_freeform:
+          type: boolean
+          title: Allow Freeform
+          default: true
+        allow_multiple:
+          type: boolean
+          title: Allow Multiple
+          default: false
+        preference_key:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Preference Key
+      additionalProperties: false
+      type: object
+      required:
+      - reason
+      - prompt
+      title: ClarificationRequest
     ConnectorEvent:
       properties:
         schema_version:
@@ -1507,6 +1979,32 @@ components:
       - code
       - message
       title: ErrorInfo
+    FeedbackSubmission:
+      properties:
+        request_id:
+          anyOf:
+          - type: string
+            maxLength: 128
+          - type: 'null'
+          title: Request Id
+        outcome:
+          type: string
+          enum:
+          - helpful
+          - not_helpful
+          - needs_clarification
+          title: Outcome
+        reason_codes:
+          items:
+            type: string
+          type: array
+          maxItems: 4
+          title: Reason Codes
+      additionalProperties: false
+      type: object
+      required:
+      - outcome
+      title: FeedbackSubmission
     GraphNeighborsRequest:
       properties:
         node_id:
@@ -1625,6 +2123,69 @@ components:
       - entity_type
       - canonical_name
       title: KnowledgeEntity
+    OntologyDiscoveryProposal:
+      properties:
+        kind:
+          type: string
+          enum:
+          - entity_type
+          - predicate
+          - controlled_value
+          - alias
+          title: Kind
+        symbol:
+          type: string
+          maxLength: 64
+          minLength: 1
+          title: Symbol
+        label:
+          type: string
+          maxLength: 140
+          minLength: 1
+          title: Label
+        definition:
+          type: string
+          maxLength: 500
+          minLength: 1
+          title: Definition
+        target_symbol:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Target Symbol
+        confirmed:
+          type: boolean
+          const: true
+          title: Confirmed
+      additionalProperties: false
+      type: object
+      required:
+      - kind
+      - symbol
+      - label
+      - definition
+      - confirmed
+      title: OntologyDiscoveryProposal
+    OntologyDiscoveryReview:
+      properties:
+        action:
+          type: string
+          enum:
+          - accept
+          - reject
+          title: Action
+        note:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Note
+      additionalProperties: false
+      type: object
+      required:
+      - action
+      title: OntologyDiscoveryReview
     OntologyMiningSubmission:
       properties:
         unit_ids:
@@ -1675,6 +2236,31 @@ components:
       required:
       - query
       title: SearchRequest
+    UserPreferenceWrite:
+      properties:
+        key:
+          type: string
+          maxLength: 64
+          minLength: 1
+          title: Key
+        values:
+          items:
+            type: string
+          type: array
+          maxItems: 5
+          minItems: 1
+          title: Values
+        confirmed:
+          type: boolean
+          const: true
+          title: Confirmed
+      additionalProperties: false
+      type: object
+      required:
+      - key
+      - values
+      - confirmed
+      title: UserPreferenceWrite
     ValidationError:
       properties:
         loc:

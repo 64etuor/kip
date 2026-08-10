@@ -213,6 +213,54 @@ application contract, and normal graph traversal reads only that active
 version. Use a dedicated entity identity migration workflow if a release changes
 a type that already has live entities.
 
+## Adaptive ontology discovery and interaction memory
+
+The starter default is `ontology.domain_profile = "empty"` and both
+`ontology.adaptive_discovery` and `interaction.enabled` are false. Guided setup
+sets both only after the operator selects `explicit_consent`. This feature does
+not run during normal search, answer, sync, or mining.
+
+Ask a bounded follow-up question and persist a selection only when the caller
+explicitly asks to remember it:
+
+```bash
+./scripts/kip interaction clarify \
+  --reason scope_selection \
+  --prompt "어느 문서 범위를 기본 검색으로 사용할까요?" \
+  --choices-json '[{"id":"onedrive","label":"OneDrive"}]' \
+  --no-allow-freeform \
+  --preference-key default_source_scope
+./scripts/kip interaction answer --question-id CLRQ_ID --option-id onedrive --remember
+./scripts/kip interaction preferences
+./scripts/kip interaction forget --key default_source_scope
+```
+
+Feedback is bounded and does not accept raw query or answer text:
+
+```bash
+./scripts/kip interaction feedback \
+  --outcome not_helpful \
+  --reason-code wrong_scope \
+  --reason-code missing_evidence
+```
+
+An ontology observation remains a candidate even after review:
+
+```bash
+./scripts/kip ontology discovery propose \
+  --kind entity_type --symbol contract --label "계약" \
+  --definition "업무상 체결하는 계약을 표현한다." --confirmed
+./scripts/kip ontology discovery list --status proposed
+./scripts/kip ontology discovery review --candidate-id ODC_ID --action accept
+```
+
+`accept` means `accepted_for_release`, not active. Write a reviewed YAML release
+and use the preceding migration workflow before changing the catalog. Schedule
+`./scripts/kip interaction prune` at least daily when interaction persistence
+is enabled; it deletes only expired clarification rows in the active workspace.
+MCP reviewers must set `KIP_ROLES=admin`; normal users do not receive reviewer
+privileges merely by using MCP.
+
 ## Redacted RAG tracing
 
 Query tracing is enabled by default and persists only the versioned redacted

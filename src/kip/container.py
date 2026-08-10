@@ -35,6 +35,7 @@ from kip.application.answering import AnsweringUseCases
 from kip.application.egress import EgressPolicyUseCases
 from kip.application.evidence import EvidenceUseCases
 from kip.application.ingestion import IngestionUseCases
+from kip.application.interactions import InteractionUseCases
 from kip.application.knowledge import KnowledgeUseCases
 from kip.application.ontology_context import OntologyContextUseCases
 from kip.application.ontology_migrations import OntologyMigrationUseCases
@@ -230,8 +231,13 @@ def build_container(
         telemetry,
     )
     ontology_root = selected.project_root / "ontology"
+    ontology_profile = str(
+        selected.get("ontology.domain_profile", "research-project")
+    )
     ontology = (
-        OntologyCatalog.load(ontology_root) if ontology_root.is_dir() else None
+        OntologyCatalog.load(ontology_root, domain_profile=ontology_profile)
+        if ontology_root.is_dir()
+        else None
     )
     egress = EgressPolicyUseCases(_build_egress_policy(selected))
     mining_config = selected.get("models.relation_mining", {}) or {}
@@ -339,6 +345,7 @@ def build_container(
     ontology_migrations = OntologyMigrationUseCases(
         selected_repository.knowledge,
         evidence,
+        domain_profile=ontology_profile,
         max_assertions=_bounded_integer(
             ontology_migration_config,
             "ontology.migrations",
@@ -346,6 +353,29 @@ def build_container(
             default=10_000,
             minimum=1,
             maximum=1_000_000,
+        ),
+    )
+    interaction_config = selected.get("interaction", {}) or {}
+    if not isinstance(interaction_config, dict):
+        raise ConfigurationError("interaction must be a table")
+    interaction_enabled = interaction_config.get("enabled", False)
+    if not isinstance(interaction_enabled, bool):
+        raise ConfigurationError("interaction.enabled must be boolean")
+    adaptive_discovery = selected.get("ontology.adaptive_discovery", False)
+    if not isinstance(adaptive_discovery, bool):
+        raise ConfigurationError("ontology.adaptive_discovery must be boolean")
+    interactions = InteractionUseCases(
+        selected_repository.interactions,
+        enabled=interaction_enabled,
+        discovery_enabled=adaptive_discovery,
+        domain_profile=ontology_profile,
+        clarification_ttl_seconds=_bounded_integer(
+            interaction_config,
+            "interaction",
+            "clarification_ttl_seconds",
+            default=3600,
+            minimum=60,
+            maximum=86_400,
         ),
     )
     application = Application(
@@ -393,6 +423,7 @@ def build_container(
         ontology_context=ontology_context,
         ontology_migrations=ontology_migrations,
         telemetry=telemetry,
+        interactions=interactions,
     )
     return Container(
         settings=selected,

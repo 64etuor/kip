@@ -1,6 +1,13 @@
 from __future__ import annotations
 
 from kip.domain.identity import AclSnapshot
+from kip.domain.interactions import (
+    ClarificationQuestion,
+    InteractionEvent,
+    InteractionFeedback,
+    OntologyDiscoveryCandidate,
+    UserPreference,
+)
 from kip.domain.json_types import JsonObject
 from kip.domain.knowledge import EntityCandidate, KnowledgeEntity
 from kip.domain.models import (
@@ -38,3 +45,11 @@ class MemoryState:
         self.embeddings: dict[tuple[str, str], EmbeddingRecord] = {}
         self.acl_snapshots: dict[str, AclSnapshot] = {}
         self.query_traces: list[tuple[str, QueryTrace]] = []
+        self.clarifications: dict[str, tuple[str, str, ClarificationQuestion]] = {}
+        self.preferences: dict[tuple[str, str, str], UserPreference] = {}
+        self.interaction_feedback: list[tuple[str, str, InteractionFeedback]] = []
+        self.ontology_discovery_candidates: dict[
+            str, tuple[str, OntologyDiscoveryCandidate]
+        ] = {}
+        self.ontology_discovery_ids_by_fingerprint: dict[tuple[str, str], str] = {}
+        self.interaction_events: list[tuple[str, str, InteractionEvent]] = []

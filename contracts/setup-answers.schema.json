@@ -205,6 +205,22 @@
       "default": null,
       "title": "Identity Owner"
     },
+    "interaction_memory_mode": {
+      "anyOf": [
+        {
+          "enum": [
+            "disabled",
+            "explicit_consent"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Interaction Memory Mode"
+    },
     "jwt_admin_groups": {
       "anyOf": [
         {
@@ -322,6 +338,22 @@
         }
       ],
       "default": null
+    },
+    "ontology_profile": {
+      "anyOf": [
+        {
+          "enum": [
+            "empty",
+            "research-project"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ontology Profile"
     },
     "ontology_reviewers": {
       "anyOf": [

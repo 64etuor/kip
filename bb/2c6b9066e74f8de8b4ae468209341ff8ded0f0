@@ -1,0 +1,53 @@
+src/kip/container.py
+  s_41856199ee83ad::t_e83eb1c695cc19 162,200,340-348,577-591
+  s_03506c0be5fcc9::t_9031958f00463a 592-596
+src/kip/application/ingestion_files.py
+  s_41856199ee83ad::t_e83eb1c695cc19 6,21,23,60-76,83,88,101-105,107,110,114-118,121-124,127-193,195-232,240-241,258,260-261,273-274,283-284,292-293,308-312
+  s_41856199ee83ad::t_6ebf88038c6c4a 307
+tests/test_parser_reextraction.py
+  s_41856199ee83ad::t_32019c790dc244 3-6,10,14-78,178-265
+src/kip/domain/models.py
+  s_41856199ee83ad::t_e83eb1c695cc19 483-497
+tests/test_cli_surface.py
+  s_41856199ee83ad::t_32019c790dc244 35,52-65
+  s_41856199ee83ad::t_ce88c8480d9ac9 66-67
+src/kip/application/ingestion.py
+  s_41856199ee83ad::t_51f9648fd90649 18
+  s_41856199ee83ad::t_e83eb1c695cc19 10-16,39-41,45,47,104-164
+  s_80cdafa7f5ecd2::t_bc60c62e2e89d7 165-166
+src/kip/cli.py
+  s_41856199ee83ad::t_e83eb1c695cc19 61,77,88,561-581
+  s_03506c0be5fcc9::t_a4e9aad33692f5 582-583
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "bb2c6b9066e74f8de8b4ae468209341ff8ded0f0",
+  "prompts": {},
+  "sessions": {
+    "s_03506c0be5fcc9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe45d-d747-77b2-a41f-9b77d2b510d0",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_80cdafa7f5ecd2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe564-ad79-7650-a2dc-053afe41b9ca",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

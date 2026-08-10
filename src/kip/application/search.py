@@ -110,15 +110,28 @@ class RetrievalUseCases:
                 warnings=["search_failed"],
             )
             raise
-        degraded = any(bool(hit.metadata.get("semantic_degraded")) for hit in hits)
+        semantic_degraded = any(
+            bool(hit.metadata.get("semantic_degraded")) for hit in hits
+        )
+        lexical_rerank_degraded = any(
+            bool(hit.metadata.get("lexical_rerank_degraded")) for hit in hits
+        )
+        warnings = [
+            warning
+            for warning, active in (
+                ("semantic_degraded", semantic_degraded),
+                ("lexical_rerank_degraded", lexical_rerank_degraded),
+            )
+            if active
+        ]
         self._record_search_trace(
             context,
             request,
             hits,
             started_at=started_at,
             duration_ms=(perf_counter() - started) * 1000,
-            outcome="degraded" if degraded else "succeeded",
-            warnings=["semantic_degraded"] if degraded else [],
+            outcome="degraded" if warnings else "succeeded",
+            warnings=warnings,
         )
         return hits
 

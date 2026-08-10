@@ -58,9 +58,55 @@ class SearchEngine:
             raise ValidationError(f"unsupported search mode: {raw_mode}") from exc
         lexemes = self._analyzer.analyze(request.query)
         if selected_mode is SearchMode.LEXICAL:
-            return self._annotate_lexical(
-                self._store.search(context, request, lexemes)
+            lexical_rerank_enabled = bool(
+                self._settings.get("search.lexical_rerank_enabled", False)
             )
+            if not lexical_rerank_enabled:
+                return self._annotate_lexical(
+                    self._store.search(context, request, lexemes)
+                )
+            candidate_limit = min(
+                100,
+                max(
+                    request.limit,
+                    int(
+                        self._settings.get(
+                            "search.lexical_rerank_candidate_limit",
+                            40,
+                        )
+                    ),
+                ),
+            )
+            candidate_request = request.model_copy(
+                update={"limit": candidate_limit}
+            )
+            lexical = self._annotate_lexical(
+                self._store.search(context, candidate_request, lexemes)
+            )
+            if self._reranker is None:
+                raise DependencyUnavailableError(
+                    "lexical reranking is enabled without a reranker adapter"
+                )
+            try:
+                return self._rerank(
+                    context,
+                    request,
+                    lexical,
+                    candidate_limit=candidate_limit,
+                )
+            except DependencyUnavailableError:
+                return [
+                    hit.model_copy(
+                        update={
+                            "metadata": {
+                                **hit.metadata,
+                                "lexical_rerank_degraded": True,
+                            }
+                        },
+                        deep=True,
+                    )
+                    for hit in lexical[: request.limit]
+                ]
 
         candidate_limit = min(
             100,
@@ -116,12 +162,16 @@ class SearchEngine:
         context: RequestContext,
         request: SearchRequest,
         fused: list[SearchHit],
+        *,
+        candidate_limit: int | None = None,
     ) -> list[SearchHit]:
         if self._reranker is None:
             raise DependencyUnavailableError("reranker adapter is disabled")
         rerank_depth = min(
             len(fused),
-            int(self._settings.get("search.rerank_candidate_limit", 20)),
+            candidate_limit
+            if candidate_limit is not None
+            else int(self._settings.get("search.rerank_candidate_limit", 20)),
         )
         rerank_hits = fused[:rerank_depth]
         rerank_units = {

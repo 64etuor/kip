@@ -1,0 +1,80 @@
+{
+  "schema_version": "kip.evaluation-decision.v1",
+  "run_id": "onedrive-hwp-native-rapidfuzz-20260810",
+  "corpus": {
+    "source": "private-onedrive-hwp-hwpx",
+    "source_files": 86,
+    "indexed_files": 86,
+    "failed_files": 0,
+    "content_units": 263,
+    "parser_counts": {
+      "hwp-hwpx-parser": 86
+    },
+    "source_unchanged": true
+  },
+  "queries": {
+    "total": 253,
+    "exact_filename": 85,
+    "single_character_deletion": 85,
+    "sparse_source_terms": 83,
+    "reviewed_natural_language": 0
+  },
+  "baseline": {
+    "name": "postgres-native-lexical",
+    "recall_at_1": 0.9407,
+    "recall_at_5": 0.9881,
+    "mrr": 0.9596,
+    "latency_p95_ms": 119.359
+  },
+  "candidate": {
+    "name": "rapidfuzz-3.14.5-wratio-token-set",
+    "candidate_depth": 40,
+    "recall_at_1": 0.9684,
+    "recall_at_5": 0.996,
+    "mrr": 0.9796,
+    "latency_p95_ms": 134.431
+  },
+  "deltas": {
+    "recall_at_1": 0.0277,
+    "recall_at_5": 0.0079,
+    "mrr": 0.02,
+    "latency_p95_ms": 15.072
+  },
+  "rejected_candidates": {
+    "kiwipiepy-0.23.2": {
+      "recall_at_1": 0.9368,
+      "recall_at_5": 0.9921,
+      "mrr": 0.9605,
+      "reason": "no material aggregate gain and lower top-1 than baseline"
+    },
+    "deterministic-proximity": {
+      "recall_at_1": 0.9407,
+      "recall_at_5": 0.9881,
+      "mrr": 0.9596,
+      "reason": "identical to baseline"
+    },
+    "rapidfuzz-kiwi-ensemble": {
+      "recall_at_1": 0.9684,
+      "recall_at_5": 0.996,
+      "mrr": 0.9809,
+      "reason": "0.0013 MRR over RapidFuzz did not justify Kiwi runtime, index, and license cost"
+    }
+  },
+  "gates": {
+    "no_recall_at_5_regression": true,
+    "mrr_improvement_at_least_0_01": true,
+    "p95_latency_increase_at_most_25_ms": true,
+    "acl_prefilter_before_rerank": true,
+    "source_hash_unchanged": true
+  },
+  "decision": {
+    "status": "promote",
+    "candidate": "rapidfuzz-3.14.5-wratio-token-set",
+    "scope": "local reranking of ACL-filtered lexical candidates",
+    "limitations": [
+      "source-derived queries are not reviewed natural-language questions",
+      "answer faithfulness and ontology relevance were not measured",
+      "reranking cannot recover a document missing from the lexical candidate set"
+    ]
+  }
+}

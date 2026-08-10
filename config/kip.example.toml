@@ -72,6 +72,8 @@ korean_ngram_min = 2
 korean_ngram_max = 4
 hybrid_candidate_limit = 40
 rerank_candidate_limit = 6
+lexical_rerank_enabled = true
+lexical_rerank_candidate_limit = 40
 rrf_rank_constant = 60
 
 [models.embedding]
@@ -86,9 +88,10 @@ query_instruction = "Retrieve relevant Korean evidence for this query: "
 space_name = "qwen3-embedding-0.6b-1024"
 
 [models.reranker]
-enabled = false
-# Set backend = "huggingface" to run the optional pinned Jina adapter locally.
-backend = "http"
+enabled = true
+backend = "rapidfuzz"
+max_document_chars = 8000
+baseline_weight = 0.15
 base_url = "http://127.0.0.1:7997"
 model = "kip-bge-reranker-v2-m3"
 revision = "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"

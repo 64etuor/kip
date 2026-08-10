@@ -2,24 +2,11 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
-from enum import StrEnum
 from importlib import import_module
 from typing import Protocol, cast
 
 from kip.errors import ConfigurationError, DependencyUnavailableError
 from kip.ports.reranker import RerankScore
-
-
-class RerankerBackend(StrEnum):
-    HTTP = "http"
-    HUGGINGFACE = "huggingface"
-
-
-def parse_reranker_backend(value: str) -> RerankerBackend:
-    try:
-        return RerankerBackend(value)
-    except ValueError as error:
-        raise ConfigurationError(f"unsupported reranker backend: {value}") from error
 
 
 class JinaSequenceClassifier(Protocol):

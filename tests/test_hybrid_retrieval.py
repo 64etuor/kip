@@ -131,6 +131,45 @@ def test_default_lexical_mode_makes_no_model_call(
     assert embedding.query_calls == 0
 
 
+def test_local_reranker_can_improve_lexical_mode_without_vector_search(
+    test_container,
+    tmp_path: Path,
+) -> None:
+    # Given lexical candidates, a local reranker, and no semantic projection.
+    source_root = tmp_path / "source"
+    (source_root / "승인.txt").write_text("참여율 변경을 승인한다.", encoding="utf-8")
+    (source_root / "허가.txt").write_text("계약 변경 조건을 허가한다.", encoding="utf-8")
+    embedding = FixtureEmbedding()
+    reranker = FixtureReranker()
+    test_container.settings.raw["search"].update(
+        {
+            "lexical_rerank_enabled": True,
+            "lexical_rerank_candidate_limit": 10,
+        }
+    )
+    container = build_container(
+        test_container.settings,
+        repository=test_container.repository,
+        embedding=embedding,
+        reranker=reranker,
+    )
+    context = container.application.operations.request_context()
+    container.application.ingestion.sync_filesystem(context, "fixture")
+
+    # When default lexical search runs.
+    hits = container.application.retrieval.search(
+        context,
+        SearchRequest(query="변경", limit=10),
+    )
+
+    # Then reranking happens after ACL-filtered lexical retrieval without embeddings.
+    assert hits[0].title.startswith("허가")
+    assert hits[0].metadata["retrieval_channels"] == ["lexical"]
+    assert hits[0].metadata["rerank_rank"] == 1
+    assert reranker.document_counts == [2]
+    assert embedding.query_calls == 0
+
+
 def test_embedding_space_identity_ignores_operational_batch_settings(
     test_container,
 ) -> None:

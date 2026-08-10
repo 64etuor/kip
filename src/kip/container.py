@@ -18,9 +18,10 @@ from kip.adapters.parsers.registry import ParserRegistry
 from kip.adapters.relation_miners import GeneratorRelationMiner
 from kip.adapters.repository.memory import MemoryRepository
 from kip.adapters.repository.postgres import PostgresRepository
-from kip.adapters.rerankers.http import HttpRerankerAdapter
-from kip.adapters.rerankers.huggingface import (
+from kip.adapters.rerankers import (
+    HttpRerankerAdapter,
     HuggingFaceJinaRerankerAdapter,
+    RapidFuzzRerankerAdapter,
     RerankerBackend,
     parse_reranker_backend,
 )
@@ -122,26 +123,44 @@ def build_container(
 
     reranker_config = selected.get("models.reranker", {}) or {}
     selected_reranker = reranker
-    if load_models and selected_reranker is None and reranker_config.get("enabled", False):
+    if selected_reranker is None and reranker_config.get("enabled", False):
         backend = parse_reranker_backend(str(reranker_config.get("backend", "http")))
         match backend:
+            case RerankerBackend.RAPIDFUZZ:
+                selected_reranker = RapidFuzzRerankerAdapter(
+                    max_document_chars=int(
+                        reranker_config.get("max_document_chars", 8000)
+                    ),
+                    baseline_weight=float(
+                        reranker_config.get("baseline_weight", 0.15)
+                    ),
+                )
             case RerankerBackend.HTTP:
-                selected_reranker = HttpRerankerAdapter(
-                    base_url=str(reranker_config.get("base_url", "http://127.0.0.1:7997")),
-                    model=str(reranker_config["model"]),
-                    revision=str(reranker_config["revision"]),
-                    allow_remote_egress=allow_remote_egress,
-                    timeout_seconds=float(reranker_config.get("timeout_seconds", 30)),
-                )
+                if load_models:
+                    selected_reranker = HttpRerankerAdapter(
+                        base_url=str(
+                            reranker_config.get(
+                                "base_url",
+                                "http://127.0.0.1:7997",
+                            )
+                        ),
+                        model=str(reranker_config["model"]),
+                        revision=str(reranker_config["revision"]),
+                        allow_remote_egress=allow_remote_egress,
+                        timeout_seconds=float(
+                            reranker_config.get("timeout_seconds", 30)
+                        ),
+                    )
             case RerankerBackend.HUGGINGFACE:
-                selected_reranker = HuggingFaceJinaRerankerAdapter(
-                    model=str(reranker_config["model"]),
-                    revision=str(reranker_config["revision"]),
-                    max_length=int(reranker_config.get("max_length", 1024)),
-                    device=str(reranker_config["device"])
-                    if reranker_config.get("device")
-                    else None,
-                )
+                if load_models:
+                    selected_reranker = HuggingFaceJinaRerankerAdapter(
+                        model=str(reranker_config["model"]),
+                        revision=str(reranker_config["revision"]),
+                        max_length=int(reranker_config.get("max_length", 1024)),
+                        device=str(reranker_config["device"])
+                        if reranker_config.get("device")
+                        else None,
+                    )
             case unreachable:
                 assert_never(unreachable)
     selected_generator = generator

@@ -32,6 +32,7 @@ def test_cli_exposes_agent_and_application_compatibility_commands():
         "evaluate",
         "quality",
         "ontology",
+        "parser",
     ]:
         assert command in result.stdout
 
@@ -46,6 +47,22 @@ def test_source_neutral_sync_run_supports_dry_run():
     assert result.exit_code == 0, result.stdout
     assert '"ok": true' in result.stdout
     assert '"source": "sample"' in result.stdout
+
+
+def test_parser_reextract_defaults_to_non_mutating_shadow_mode() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        ["parser", "reextract", "--source", "sample"],
+        env=_env(),
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["schema_version"] == "kip.envelope.v1"
+    assert payload["data"]["activate"] is False
+    assert payload["data"]["activated"] == 0
 
 
 def test_answer_command_returns_versioned_evidence_response() -> None:

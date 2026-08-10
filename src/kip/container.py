@@ -159,6 +159,7 @@ def build_container(
             allow_remote_egress=allow_remote_egress,
         )
     selected.cas_path.mkdir(parents=True, exist_ok=True)
+    source_files = LocalSourceFileInspector()
     telemetry_config = selected.get("telemetry", {}) or {}
     if not isinstance(telemetry_config, dict):
         raise ConfigurationError("telemetry must be a table")
@@ -196,7 +197,7 @@ def build_container(
     )
     evidence = EvidenceUseCases(
         selected_repository.evidence,
-        LocalSourceFileInspector(),
+        source_files,
         LocalWorkbookReader(),
     )
     retrieval = RetrievalUseCases(
@@ -336,6 +337,15 @@ def build_container(
             parsers,
             analyzer,
             LocalContentAddressedStore(selected.cas_path),
+            source_files,
+            minimum_quality_score=_bounded_float(
+                selected.get("parsers", {}) or {},
+                "parsers",
+                "minimum_quality_score",
+                default=0.70,
+                minimum=0.0,
+                maximum=1.0,
+            ),
         ),
         retrieval=retrieval,
         evidence=evidence,
@@ -559,6 +569,26 @@ def _bounded_integer(
         value = int(str(raw.get(name, default)))
     except ValueError as error:
         raise ConfigurationError(f"{section}.{name} must be an integer") from error
+    if not minimum <= value <= maximum:
+        raise ConfigurationError(
+            f"{section}.{name} must be between {minimum} and {maximum}"
+        )
+    return value
+
+
+def _bounded_float(
+    raw: dict[str, object],
+    section: str,
+    name: str,
+    *,
+    default: float,
+    minimum: float,
+    maximum: float,
+) -> float:
+    try:
+        value = float(str(raw.get(name, default)))
+    except ValueError as error:
+        raise ConfigurationError(f"{section}.{name} must be a number") from error
     if not minimum <= value <= maximum:
         raise ConfigurationError(
             f"{section}.{name} must be between {minimum} and {maximum}"

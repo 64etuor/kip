@@ -58,6 +58,7 @@ evaluate_app = typer.Typer(no_args_is_help=True, help="Measure retrieval quality
 quality_app = typer.Typer(no_args_is_help=True, help="Evaluate version-pinned candidates")
 ontology_app = typer.Typer(no_args_is_help=True, help="Validate and migrate ontology releases")
 telemetry_app = typer.Typer(no_args_is_help=True, help="Inspect redacted RAG query traces")
+parser_app = typer.Typer(no_args_is_help=True, help="Shadow and activate parser candidates")
 
 app.add_typer(sync_app, name="sync")
 app.add_typer(xlsx_app, name="xlsx")
@@ -73,6 +74,7 @@ app.add_typer(evaluate_app, name="evaluate")
 app.add_typer(quality_app, name="quality")
 app.add_typer(ontology_app, name="ontology")
 app.add_typer(telemetry_app, name="telemetry")
+app.add_typer(parser_app, name="parser")
 app.add_typer(setup_app, name="setup")
 
 
@@ -83,7 +85,7 @@ class Runtime:
 
 
 def command_loads_models(subcommand: str | None) -> bool:
-    return subcommand not in {"migrate", "quality", "telemetry"}
+    return subcommand not in {"migrate", "parser", "quality", "telemetry"}
 
 
 @app.callback()
@@ -554,6 +556,29 @@ def sync_imap(ctx: typer.Context) -> None:
 @sync_app.command("apple-mail")
 def sync_apple_mail(ctx: typer.Context) -> None:
     _run(ctx, lambda runtime: _sync_one(runtime, "apple-mail"))
+
+
+@parser_app.command("reextract")
+def parser_reextract(
+    ctx: typer.Context,
+    source: str = typer.Option(..., "--source", help="Configured filesystem source or nas"),
+    activate: bool = typer.Option(
+        False,
+        "--activate",
+        help="Atomically replace active units after all safety gates pass",
+    ),
+) -> None:
+    def action(runtime: Runtime) -> Any:
+        selected = _resolve_sync_source(runtime, source)
+        if selected not in _enabled_filesystem_sources(runtime):
+            raise ValidationError("parser re-extraction requires one filesystem source")
+        return runtime.container.application.ingestion.reextract_filesystem(
+            runtime.context,
+            selected,
+            activate=activate,
+        )
+
+    _run(ctx, action)
 
 
 @xlsx_app.command("read")

@@ -480,6 +480,21 @@ class SyncSummary(StrictModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class ReextractionSummary(StrictModel):
+    source: str
+    activate: bool = False
+    scanned: int = 0
+    eligible: int = 0
+    parsed: int = 0
+    activated: int = 0
+    rejected: int = 0
+    failed: int = 0
+    skipped: int = 0
+    unit_count: int = 0
+    parser_counts: dict[str, int] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+
+
 class EvidenceRead(StrictModel):
     unit: ContentUnit
     source_uri: str

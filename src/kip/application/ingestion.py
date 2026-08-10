@@ -7,8 +7,15 @@ from kip.application.ingestion_events import EventIngestionWorkflow
 from kip.application.ingestion_files import FileIngestionWorkflow
 from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
-from kip.domain.models import ConnectorEvent, IngestResult, RequestContext, SyncSummary
+from kip.domain.models import (
+    ConnectorEvent,
+    IngestResult,
+    ReextractionSummary,
+    RequestContext,
+    SyncSummary,
+)
 from kip.errors import KipError, ValidationError
+from kip.ports.evidence import SourceFileInspectorPort
 from kip.ports.ingestion import (
     ContentAddressedStorePort,
     DiscoveredFile,
@@ -29,11 +36,15 @@ class IngestionUseCases:
         parsers: ParserRegistryPort,
         analyzer: TextAnalyzerPort,
         content_store: ContentAddressedStorePort,
+        source_files: SourceFileInspectorPort,
+        *,
+        minimum_quality_score: float,
     ) -> None:
         self._jobs = jobs
         self._sources = sources
-        self._files = FileIngestionWorkflow(store, parsers, analyzer)
+        self._files = FileIngestionWorkflow(store, parsers, analyzer, source_files)
         self._events = EventIngestionWorkflow(store, analyzer, content_store)
+        self._minimum_quality_score = minimum_quality_score
 
     def ingest_file(
         self,
@@ -88,6 +99,69 @@ class IngestionUseCases:
                 )
                 continue
             self._record_result(summary, result)
+        return summary
+
+    def reextract_filesystem(
+        self,
+        context: RequestContext,
+        source_name: str,
+        *,
+        activate: bool = False,
+    ) -> ReextractionSummary:
+        source = self._sources.filesystem(source_name)
+        scope = source.acl_scope or f"workspace:{context.workspace}"
+        summary = ReextractionSummary(source=source_name, activate=activate)
+        for record in source.scan():
+            summary.scanned += 1
+            if record.path.suffix.lower() not in {".hwp", ".hwpx"}:
+                summary.skipped += 1
+                continue
+            summary.eligible += 1
+            try:
+                prepared = self._files.prepare_reextraction(
+                    context,
+                    source_name=source_name,
+                    source_root=source.root,
+                    record=record,
+                    acl_scopes=[scope],
+                    acl_snapshot=source.acl_snapshot,
+                    classification=source.classification,
+                )
+            except (KipError, OSError) as exc:
+                summary.failed += 1
+                summary.warnings.append(
+                    f"{record.relative_path}: {type(exc).__name__}: {exc}"
+                )
+                continue
+            extraction = prepared.packet.extraction
+            summary.parsed += 1
+            summary.unit_count += len(prepared.packet.units)
+            summary.parser_counts[extraction.parser_name] = (
+                summary.parser_counts.get(extraction.parser_name, 0) + 1
+            )
+            summary.warnings.extend(
+                f"{record.relative_path}: {warning}"
+                for warning in extraction.warnings
+            )
+            quality_score = extraction.quality_score or 0.0
+            if quality_score < self._minimum_quality_score:
+                summary.rejected += 1
+                summary.warnings.append(
+                    f"{record.relative_path}: quality {quality_score:.3f} is below "
+                    f"{self._minimum_quality_score:.3f}"
+                )
+                continue
+            if not activate:
+                continue
+            try:
+                self._files.activate_reextraction(prepared)
+            except (KipError, OSError) as exc:
+                summary.failed += 1
+                summary.warnings.append(
+                    f"{record.relative_path}: {type(exc).__name__}: {exc}"
+                )
+                continue
+            summary.activated += 1
         return summary
 
     def sync_slack(

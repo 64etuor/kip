@@ -1,0 +1,148 @@
+src/kip/adapters/repository/memory/ingestion.py
+  s_e752ec1bf74db5::t_a73a4001308f7d 59-80
+src/kip/application/evidence.py
+  s_e752ec1bf74db5::t_0ee92d1e142608 22-28,33-44,54-63
+  s_e752ec1bf74db5::t_46deef2eca889d 64
+src/kip/application/ontology_context.py
+  s_e752ec1bf74db5::t_b2a061876dacb4 116-120
+src/kip/application/operations.py
+  s_e752ec1bf74db5::t_9b9da9562d39d0 46,54
+src/kip/adapters/repository/memory/state.py
+  s_e752ec1bf74db5::t_5e126d8f503da3 58-68
+  s_e752ec1bf74db5::t_403d92014c5d7e 3-4
+docs/IMPLEMENTATION_STATUS.md
+  s_e752ec1bf74db5::t_a9980a89c38b1f 13
+  s_e752ec1bf74db5::t_01fcc7deeae0c2 14
+  s_e752ec1bf74db5::t_24ffe7f7ced760 27
+  s_e752ec1bf74db5::t_1f0f8a122a85af 32
+  s_e752ec1bf74db5::t_42b51e6bc4f396 19
+  s_e752ec1bf74db5::t_b91f84927d0b88 12
+  s_e752ec1bf74db5::t_f5f6a5c2642586 11
+  s_e752ec1bf74db5::t_f6fad3fff6dc67 36
+src/kip/application/answers.py
+  s_e752ec1bf74db5::t_f8f69a7ae7b366 79,81-84,86-94
+  s_e752ec1bf74db5::t_201fe4fab04538 105
+src/kip/adapters/repository/postgres/ingestion.py
+  s_e752ec1bf74db5::t_f7ede3c3e76b8a 37-51
+src/kip/settings.py
+  s_e752ec1bf74db5::t_baebde3836120c 164-170
+  s_e752ec1bf74db5::t_f79f502a538c41 96
+src/kip/ports/ingestion.py
+  s_e752ec1bf74db5::t_6e72a64cfa5a37 3,15-20,22-45
+  s_e752ec1bf74db5::t_a0c30bd0f69d13 21
+  s_e752ec1bf74db5::t_a6ed169ad3192a 116-124
+docs/adr/ADR-033-retrieval-and-authorization-hardening.md
+  s_e752ec1bf74db5::t_91b7964688161c 1-73
+src/kip/adapters/repository/postgres/__init__.py
+  s_e752ec1bf74db5::t_16c015db10a8d1 24,29
+src/kip/api.py
+  s_e752ec1bf74db5::t_74b0a964903caa 184,188,194,200,207,214,221,229,236,243,250,257,264,283,290,297,311,318,326,341,350,360,373,386,392,402,412,425,434,441,451,464,474,489,502,520,535,553,569,587,602,610,617,625
+tests/test_filesystem_retrieval.py
+  s_e752ec1bf74db5::t_036ed99e63adbf 101-127
+  s_e752ec1bf74db5::t_096ba1d5856876 3-7
+  s_e752ec1bf74db5::t_d1dcbb5db2b60f 41-60
+  s_e752ec1bf74db5::t_de0d6ec8835d42 39-40,61-100,128-159
+tests/test_evaluation_runner.py
+  s_e752ec1bf74db5::t_cde5af4f1cc547 116-177
+src/kip/adapters/connectors/filesystem.py
+  s_e752ec1bf74db5::t_b0ebdcbcaf598f 72-75,77-88
+src/kip/ports/evidence.py
+  s_e752ec1bf74db5::t_6c52592233eec4 33-39
+  s_e752ec1bf74db5::t_f160b3f8feda9c 23-26
+tests/test_hybrid_retrieval.py
+  s_e752ec1bf74db5::t_b00060f2e44e34 240-271
+tests/test_parser_reextraction.py
+  s_e752ec1bf74db5::t_66aaaf47eaf89b 252,254,257,259
+  s_e752ec1bf74db5::t_9a20dff33b7eb5 255-256
+  s_e752ec1bf74db5::t_a0c30bd0f69d13 16
+config/kip.example.toml
+  s_e752ec1bf74db5::t_650941867a4a38 9,76
+  s_e752ec1bf74db5::t_29e24bc3eca54b 72
+src/kip/evaluation/runner.py
+  s_e752ec1bf74db5::t_41f19a94220978 184,192-195
+  s_e752ec1bf74db5::t_aeb7739b3bd307 339
+  s_e752ec1bf74db5::t_665525a0ccb2c1 38
+  s_e752ec1bf74db5::t_720e049db2ec6b 317
+src/kip/container.py
+  s_e752ec1bf74db5::t_d5c6a217074f4d 99
+migrations/9002_optional_hnsw_1024.sql
+  s_e752ec1bf74db5::t_1df63cde5b25a9 1-20
+migrations/0016_force_rls_core.sql
+  s_e752ec1bf74db5::t_9949b90e939300 1-19
+pyproject.toml
+  s_e752ec1bf74db5::t_1f5c5c502b450a 24
+  s_e752ec1bf74db5::t_20cce4e7a341bb 47
+src/kip/adapters/repository/postgres/database.py
+  s_e752ec1bf74db5::t_ab022128e16712 1390,1392-1397,1400-1402
+  s_e752ec1bf74db5::t_090d0aadc82e29 282-308
+  s_e752ec1bf74db5::t_fac7c515a831cf 1148-1152
+  s_e752ec1bf74db5::t_c80902805a8ab1 1389,1391,1398-1399,1403,1409-1410,1421-1422,1424
+  s_e752ec1bf74db5::t_974d7204b44679 383-406
+  s_e752ec1bf74db5::t_e7293b676605cf 1048-1062,1085,1090,1100-1101,1388
+  s_e752ec1bf74db5::t_5a84e7177ab8bb 1419
+  s_e752ec1bf74db5::t_67e230b058cc52 3,7
+  s_e752ec1bf74db5::t_169ca62f20ec5d 1128-1132
+  s_e752ec1bf74db5::t_eb7dab39058c72 1446
+  s_e752ec1bf74db5::t_8ee9d3a5ec44a3 1022-1027,1031,1033-1034,1036-1037,1039-1045,1063-1084,1086-1089,1091-1093,1096-1098,1111
+  s_e752ec1bf74db5::t_a0c30bd0f69d13 1118-1123
+  s_e752ec1bf74db5::t_de29ad83aa96aa 100-106,109-111,114,118-142,148,152-163,165,167-168
+  s_e752ec1bf74db5::t_e6774eaa617f75 280-281,1117
+src/kip/adapters/repository/memory/lexical.py
+  s_e752ec1bf74db5::t_93f450c2ee5e30 69-75
+  s_e752ec1bf74db5::t_273f727be577d8 177-187,193-194
+  s_e752ec1bf74db5::t_f61327b5d50547 216
+src/kip/application/ingestion_files.py
+  s_e752ec1bf74db5::t_a7e40a474f7d78 104-105,108,112-139
+src/kip/application/search_engine.py
+  s_e752ec1bf74db5::t_18db76ed393681 196-201
+tests/test_interaction_edges.py
+  s_e752ec1bf74db5::t_3e0935ad73c55e 151-152
+  s_e752ec1bf74db5::t_435b4286cd7bf2 136-150,153-156
+tests/test_answers.py
+  s_e752ec1bf74db5::t_e7495c9a01be16 1
+  s_e752ec1bf74db5::t_1f5a2f01ba45ee 43-71
+src/kip/cli.py
+  s_e752ec1bf74db5::t_419f64966caf13 1038
+  s_e752ec1bf74db5::t_62f4913a21429c 1327-1329
+  s_e752ec1bf74db5::t_32d9e99ead7b2a 1491,1538,1555
+  s_e752ec1bf74db5::t_c88f76bdf4c483 153-155,160
+  s_e752ec1bf74db5::t_25b199ff5897d0 997-1027
+  s_e752ec1bf74db5::t_0fbd4012c5b515 1315
+  s_e752ec1bf74db5::t_db50061e43e550 130-140
+migrations/0017_lexical_body_trgm_index.sql
+  s_e752ec1bf74db5::t_1a4727ec4bc15e 1-12
+src/kip/adapters/repository/memory/semantic.py
+  s_e752ec1bf74db5::t_efa745be8d7a75 217-218
+  s_e752ec1bf74db5::t_bed45de8f38567 7
+  s_e752ec1bf74db5::t_c0bdcbf2606618 160-167
+  s_e752ec1bf74db5::t_0446af0534a774 242
+src/kip/application/search.py
+  s_e752ec1bf74db5::t_024d2556108ad4 158-163,175-177
+  s_e752ec1bf74db5::t_aa56c7e06f5d27 165-169
+  s_e752ec1bf74db5::t_1cacb4ad975f63 50
+tests/test_generated_answers.py
+  s_e752ec1bf74db5::t_23f7e7d4b4558f 164-181
+src/kip/adapters/storage/local.py
+  s_e752ec1bf74db5::t_f3253fa974fefb 49-57
+src/kip/application/answering.py
+  s_e752ec1bf74db5::t_eee8427e70e465 156-158
+  s_e752ec1bf74db5::t_d5f71f502e21ed 134-138
+uv.lock
+  s_e752ec1bf74db5::t_334e29f5e00e55 759,795,834-835,1733-1744
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "4e27fc2d6096bf0eed885e7fc468748fc9e23f80",
+  "prompts": {},
+  "sessions": {
+    "s_e752ec1bf74db5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0cda1f36-e31d-42f3-bfe4-3a8e98d377fa",
+        "model": "claude-fable-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

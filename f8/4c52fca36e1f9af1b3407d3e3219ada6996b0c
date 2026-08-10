@@ -1,0 +1,39 @@
+docs/OPERATIONS.md
+  s_41856199ee83ad::t_74f8315ca568a3 285-331
+docs/TRD.md
+  s_41856199ee83ad::t_b18605f269803e 498-501,503-522,1880-1882,1885-1887,2292,2294-2296,2299-2306,4947,4968-4969
+  s_41856199ee83ad::t_e09ba50afd5f98 524,526-529
+  s_41856199ee83ad::t_38011dd676804f 523
+docs/adr/ADR-031-hwp-reextraction-and-local-reranking.md
+  s_41856199ee83ad::t_e09ba50afd5f98 77
+  s_41856199ee83ad::t_69d3a4e5973383 1-76,78-85
+docs/adr/ADR-017-hwp-native-primary.md
+  s_41856199ee83ad::t_b18605f269803e 19-29
+README.md
+  s_41856199ee83ad::t_35eed808d0f6d5 52-54,144,148-159,189-199
+docs/STARTER_KIT_GUIDE.md
+  s_41856199ee83ad::t_35eed808d0f6d5 35-38,85-89,97-102,137-138,159
+docs/AI_OPERATOR_RUNBOOK.md
+  s_41856199ee83ad::t_69d3a4e5973383 104-136
+docs/IMPLEMENTATION_STATUS.md
+  s_41856199ee83ad::t_e09ba50afd5f98 116-128
+  s_41856199ee83ad::t_35eed808d0f6d5 22,33,54-57,72-77
+docs/CONNECTORS.md
+  s_41856199ee83ad::t_74f8315ca568a3 17-20,23-26,28-32,39-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "f84c52fca36e1f9af1b3407d3e3219ada6996b0c",
+  "prompts": {},
+  "sessions": {
+    "s_41856199ee83ad": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fe44c-d708-78c3-8616-3ae32b070a22",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

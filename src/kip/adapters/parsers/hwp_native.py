@@ -5,8 +5,8 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any, Literal
 
-from kip.application.analyzer import normalize_text
 from kip.domain.models import ContentUnit, EvidenceLocator, ExtractionRun
+from kip.domain.text import normalize_text
 from kip.errors import DependencyUnavailableError, ParserError
 from kip.ids import new_id, sha256_bytes, stable_id
 

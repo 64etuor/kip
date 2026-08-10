@@ -4,7 +4,6 @@ import json
 from enum import StrEnum
 from typing import assert_never
 
-from kip.application.analyzer import KoreanNgramAnalyzer, normalize_text
 from kip.domain.egress import DataClassification
 from kip.domain.models import (
     Artifact,
@@ -19,9 +18,11 @@ from kip.domain.models import (
     SourceObject,
     SourceRevision,
 )
+from kip.domain.text import normalize_text
 from kip.errors import ValidationError
 from kip.ids import new_id, sha256_bytes, stable_id
 from kip.ports.ingestion import ContentAddressedStorePort, IngestionStore
+from kip.ports.text_analyzer import TextAnalyzerPort
 
 
 class EventFamily(StrEnum):
@@ -37,7 +38,7 @@ class EventIngestionWorkflow:
     def __init__(
         self,
         store: IngestionStore,
-        analyzer: KoreanNgramAnalyzer,
+        analyzer: TextAnalyzerPort,
         content_store: ContentAddressedStorePort,
     ) -> None:
         self._store = store

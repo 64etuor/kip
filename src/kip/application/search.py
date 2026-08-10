@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from time import perf_counter
 
-from kip.application.analyzer import KoreanNgramAnalyzer
 from kip.application.search_engine import SearchEngine
 from kip.application.semantic import SemanticProjectionUseCases
 from kip.application.telemetry import TelemetryUseCases
@@ -32,6 +31,7 @@ from kip.ports.evidence import EvidenceReaderPort
 from kip.ports.operations import OperationsStore
 from kip.ports.reranker import RerankerPort
 from kip.ports.retrieval import RetrievalStore
+from kip.ports.text_analyzer import TextAnalyzerPort
 from kip.settings import Settings
 
 
@@ -42,7 +42,7 @@ class RetrievalUseCases:
         store: RetrievalStore,
         operations: OperationsStore,
         evidence: EvidenceReaderPort,
-        analyzer: KoreanNgramAnalyzer,
+        analyzer: TextAnalyzerPort,
         embedding: EmbeddingPort,
         reranker: RerankerPort | None = None,
         telemetry: TelemetryUseCases | None = None,

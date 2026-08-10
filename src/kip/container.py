@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import assert_never
 
+from kip.adapters.analyzers import KoreanNgramAnalyzer
 from kip.adapters.connectors.registry import ConfiguredSourceCatalog
 from kip.adapters.embeddings.http import HttpEmbeddingAdapter
 from kip.adapters.embeddings.noop import DisabledEmbeddingAdapter
@@ -29,7 +30,6 @@ from kip.adapters.storage import (
     LocalWorkbookReader,
 )
 from kip.adapters.telemetry.otel import OpenTelemetryQueryTraceExporter
-from kip.application.analyzer import KoreanNgramAnalyzer
 from kip.application.answering import AnsweringUseCases
 from kip.application.egress import EgressPolicyUseCases
 from kip.application.evidence import EvidenceUseCases

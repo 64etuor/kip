@@ -6,8 +6,8 @@ from pathlib import Path, PurePosixPath
 from xml.etree import ElementTree as ET
 
 from kip.adapters.parsers.xlsx_read import read_xlsx_range
-from kip.application.analyzer import normalize_text
 from kip.domain.models import ContentUnit, EvidenceLocator, ExtractionRun
+from kip.domain.text import normalize_text
 from kip.errors import ParserError, ValidationError
 from kip.ids import new_id, sha256_bytes, stable_id
 

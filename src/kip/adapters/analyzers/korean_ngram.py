@@ -1,22 +1,19 @@
 from __future__ import annotations
 
 import re
-import unicodedata
+from dataclasses import dataclass
+from typing import Final
 
-_TOKEN_RE = re.compile(r"[0-9A-Za-z가-힣_./:@+-]+")
-_HANGUL_SEQUENCE_RE = re.compile(r"[가-힣]+")
+from kip.domain.text import normalize_text
 
-
-def normalize_text(text: str) -> str:
-    value = unicodedata.normalize("NFKC", text)
-    value = value.replace("\x00", " ")
-    return " ".join(value.split())
+_TOKEN_RE: Final = re.compile(r"[0-9A-Za-z가-힣_./:@+-]+")
+_HANGUL_SEQUENCE_RE: Final = re.compile(r"[가-힣]+")
 
 
+@dataclass(frozen=True, slots=True)
 class KoreanNgramAnalyzer:
-    def __init__(self, min_n: int = 2, max_n: int = 4) -> None:
-        self.min_n = min_n
-        self.max_n = max_n
+    min_n: int = 2
+    max_n: int = 4
 
     def analyze(self, text: str) -> str:
         normalized = normalize_text(text).lower()

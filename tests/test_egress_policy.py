@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
+from kip.adapters.analyzers.korean_ngram import KoreanNgramAnalyzer
 from kip.adapters.connectors.registry import ConfiguredSourceCatalog
 from kip.adapters.repository.memory import MemoryRepository
 from kip.adapters.storage import LocalContentAddressedStore
-from kip.application.analyzer import KoreanNgramAnalyzer
 from kip.application.egress import EgressPolicyUseCases
 from kip.application.ingestion_events import EventIngestionWorkflow
 from kip.container import build_container

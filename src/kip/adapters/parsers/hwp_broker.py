@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from kip.application.analyzer import normalize_text
 from kip.domain.models import ContentUnit, EvidenceLocator, ExtractionRun
+from kip.domain.text import normalize_text
 from kip.errors import ParserError
 from kip.ids import new_id, sha256_bytes, stable_id
 

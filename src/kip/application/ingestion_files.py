@@ -6,7 +6,6 @@ import unicodedata
 from datetime import UTC, datetime
 from pathlib import Path
 
-from kip.application.analyzer import KoreanNgramAnalyzer
 from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
 from kip.domain.models import (
@@ -21,6 +20,7 @@ from kip.domain.models import (
 from kip.errors import ValidationError
 from kip.ids import stable_id
 from kip.ports.ingestion import DiscoveredFile, IngestionStore, ParserRegistryPort
+from kip.ports.text_analyzer import TextAnalyzerPort
 
 _VERSION_SUFFIX_RE = re.compile(
     r"(?:[ _.-]*(?:검색본|열람본|pdf|scan|scanned|원본파일))$",
@@ -60,7 +60,7 @@ class FileIngestionWorkflow:
         self,
         store: IngestionStore,
         parsers: ParserRegistryPort,
-        analyzer: KoreanNgramAnalyzer,
+        analyzer: TextAnalyzerPort,
     ) -> None:
         self._store = store
         self._parsers = parsers

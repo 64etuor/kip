@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
-from kip.application.analyzer import KoreanNgramAnalyzer
 from kip.application.ingestion_events import EventIngestionWorkflow
 from kip.application.ingestion_files import FileIngestionWorkflow
 from kip.domain.egress import DataClassification
@@ -18,6 +17,7 @@ from kip.ports.ingestion import (
     SourceCatalogPort,
 )
 from kip.ports.jobs import JobStore
+from kip.ports.text_analyzer import TextAnalyzerPort
 
 
 class IngestionUseCases:
@@ -27,7 +27,7 @@ class IngestionUseCases:
         jobs: JobStore,
         sources: SourceCatalogPort,
         parsers: ParserRegistryPort,
-        analyzer: KoreanNgramAnalyzer,
+        analyzer: TextAnalyzerPort,
         content_store: ContentAddressedStorePort,
     ) -> None:
         self._jobs = jobs

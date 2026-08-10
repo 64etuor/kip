@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from enum import StrEnum, unique
 
-from kip.application.analyzer import KoreanNgramAnalyzer
 from kip.application.retrieval import apply_rerank, reciprocal_rank_fusion
 from kip.application.semantic import SemanticProjectionUseCases
 from kip.domain.models import RequestContext, SearchHit, SearchRequest
@@ -10,6 +9,7 @@ from kip.errors import DependencyUnavailableError, ValidationError
 from kip.ports.embedding import EmbeddingPort
 from kip.ports.reranker import RerankerPort
 from kip.ports.retrieval import RetrievalStore
+from kip.ports.text_analyzer import TextAnalyzerPort
 from kip.settings import Settings
 
 
@@ -26,7 +26,7 @@ class SearchEngine:
         self,
         settings: Settings,
         store: RetrievalStore,
-        analyzer: KoreanNgramAnalyzer,
+        analyzer: TextAnalyzerPort,
         embedding: EmbeddingPort,
         semantic: SemanticProjectionUseCases,
         reranker: RerankerPort | None = None,

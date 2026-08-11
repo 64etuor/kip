@@ -1,0 +1,81 @@
+src/kip/domain/generation.py
+  s_e752ec1bf74db5::t_1706ee5ea7f389 81
+  s_e752ec1bf74db5::t_c5c5be570c1644 96-99
+contracts/generation-result.schema.json
+  s_e752ec1bf74db5::t_b034e29f973dd6 9-10
+src/kip/adapters/parsers/hwp_native.py
+  s_e752ec1bf74db5::t_5af948b9fac774 133-137,139,143
+  s_e752ec1bf74db5::t_d99216357919d3 87-92
+  s_e752ec1bf74db5::t_c6b191dabfce4d 78,80-85
+  s_e752ec1bf74db5::t_2efb67c62a6bd3 32-42,45-46,48,50,58-73
+  s_e752ec1bf74db5::t_729f36b243cd9e 161
+src/kip/adapters/generators/_http.py
+  s_e752ec1bf74db5::t_a8166178b3ca0a 36
+contracts/answer-response.schema.json
+  s_e752ec1bf74db5::t_b034e29f973dd6 190-191
+src/kip/adapters/repository/postgres/database.py
+  s_e752ec1bf74db5::t_7242fa7bce2e0a 90,92-99
+src/kip/adapters/generators/anthropic.py
+  s_e752ec1bf74db5::t_b034e29f973dd6 67-70
+tests/test_hwp_parser.py
+  s_e752ec1bf74db5::t_b4f0921ab979d7 13-35
+tests/test_websearch_query_bound.py
+  s_e752ec1bf74db5::t_767c167ed4d1d6 1-28
+docs/IMPLEMENTATION_STATUS.md
+  s_e752ec1bf74db5::t_d242c3299333e5 17,22-23
+tests/test_generation_contract.py
+  s_e752ec1bf74db5::t_19a259935b5673 59-74
+src/kip/adapters/connectors/slack.py
+  s_e752ec1bf74db5::t_81cc40c6ab29f6 13
+  s_e752ec1bf74db5::t_7821d35b21c53d 43-47,49-51,56-61,68,72-113
+src/kip/adapters/generators/openai_compatible.py
+  s_e752ec1bf74db5::t_b034e29f973dd6 68-71
+tests/test_generated_answers.py
+  s_e752ec1bf74db5::t_897d2de1ebd5ec 182-218
+evaluation/reports/query-bound-20260811/decision.md
+  s_e752ec1bf74db5::t_7503fa49a252ba 1-27
+tests/test_slack_thread_units.py
+  s_e752ec1bf74db5::t_c0f4ba24595e5d 1-86
+evaluation/reports/query-bound-20260811/rapidfuzz/eval_20260811T070351232049Z.json
+  s_c85ac92eed5e28::t_f5f8f3bb2aaf79 1-612
+evaluation/reports/query-bound-20260811/rapidfuzz/eval_20260811T070351232049Z.md
+  s_c85ac92eed5e28::t_3003db7b8856a3 1-27
+evaluation/reports/query-bound-20260811/rapidfuzz/latest.json
+  s_c85ac92eed5e28::t_57ccb5713bb7c0 1-612
+evaluation/reports/query-bound-20260811/rapidfuzz/latest.md
+  s_c85ac92eed5e28::t_d8cbf3f7cae241 1-27
+evaluation/reports/query-bound-20260811/bm25/eval_20260811T070644247802Z.json
+  s_e752ec1bf74db5::t_16c3ea71f50b84 1-605
+evaluation/reports/query-bound-20260811/bm25/eval_20260811T070644247802Z.md
+  s_e752ec1bf74db5::t_eefdfbb01edb24 1-27
+evaluation/reports/query-bound-20260811/bm25/latest.json
+  s_e752ec1bf74db5::t_77fcaf5cd86c65 1-605
+evaluation/reports/query-bound-20260811/bm25/latest.md
+  s_e752ec1bf74db5::t_9f956de4acbcb9 1-27
+evaluation/reports/query-bound-20260811/evolution.jsonl
+  s_e752ec1bf74db5::t_9a8148d1984b1c 1-2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "cf797bbb4f991d821728ee17b611319ffd27b1f7",
+  "prompts": {},
+  "sessions": {
+    "s_c85ac92eed5e28": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fef21-fcc2-7841-86ac-e1c0b8aef715",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_e752ec1bf74db5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0cda1f36-e31d-42f3-bfe4-3a8e98d377fa",
+        "model": "claude-fable-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

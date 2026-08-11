@@ -38,7 +38,7 @@ dev = [
   "pytest-cov>=6,<8",
   "jsonschema>=4.23,<5",
   "ruff>=0.9,<1",
-  "mypy>=1.14,<2",
+  "mypy>=1.14,<3",
   "pip-audit==2.10.1",
   "types-PyYAML>=6.0,<7",
 ]

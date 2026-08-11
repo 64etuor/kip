@@ -63,3 +63,35 @@ def test_rest_rejects_a_blank_query_with_a_serializable_envelope(test_container)
     # The envelope must be JSON-serializable even for custom validators.
     assert json.dumps(payload)
     assert good.status_code == 200
+
+
+def test_error_code_mapping_is_shared_across_edges():
+    from pydantic import ValidationError as PydanticValidationError
+
+    from kip.errors import (
+        AuthorizationError,
+        ConflictError,
+        NotFoundError,
+        ValidationError,
+        error_code,
+        http_status,
+    )
+    from kip.domain.models import SearchRequest
+
+    assert error_code(NotFoundError("x")) == "not_found"
+    assert error_code(ConflictError("x")) == "conflict"
+    assert error_code(ValidationError("x")) == "validation_error"
+    assert error_code(AuthorizationError("x")) == "forbidden"
+    assert error_code(RuntimeError("x")) == "internal_error"
+    assert http_status(NotFoundError("x")) == 404
+    assert http_status(AuthorizationError("x")) == 403
+
+    # A request-model (Pydantic) error must map the same everywhere, not
+    # internal_error on one surface and validation_error on another.
+    try:
+        SearchRequest(query="   ")
+    except PydanticValidationError as exc:
+        assert error_code(exc) == "validation_error"
+        assert http_status(exc) == 422
+    else:  # pragma: no cover
+        raise AssertionError("expected a validation error")

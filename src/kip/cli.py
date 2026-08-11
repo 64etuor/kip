@@ -32,7 +32,7 @@ from kip.domain.models import (
     SearchHit,
     SearchRequest,
 )
-from kip.errors import AuthorizationError, ConflictError, KipError, NotFoundError, ValidationError
+from kip.errors import KipError, NotFoundError, ValidationError, error_code
 from kip.evaluation.models import GoldenCase
 from kip.evaluation.reporting import append_evolution_record, write_report
 from kip.evaluation.reviews import load_review_bundle
@@ -183,21 +183,9 @@ def _emit(runtime: Runtime, data: Any) -> None:
 
 def _emit_error(runtime: Runtime | None, exc: BaseException) -> None:
     context = runtime.context if runtime else RequestContext(request_id=new_id("req"))
-    if isinstance(exc, NotFoundError):
-        code = "not_found"
-    elif isinstance(exc, ConflictError):
-        code = "conflict"
-    elif isinstance(exc, ValidationError | PydanticValidationError):
-        # Contract violations surfaced by request models are caller errors,
-        # not internal failures.
-        code = "validation_error"
-    elif isinstance(exc, AuthorizationError):
-        code = "forbidden"
-    else:
-        code = "internal_error"
     envelope = Envelope(
         ok=False,
-        error=ErrorInfo(code=code, message=str(exc)),
+        error=ErrorInfo(code=error_code(exc), message=str(exc)),
         meta=EnvelopeMeta(
             request_id=context.request_id or new_id("req"),
             workspace=context.workspace,

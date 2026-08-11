@@ -32,7 +32,13 @@ from kip.domain.models import (
     RequestContext,
     SearchRequest,
 )
-from kip.errors import AuthorizationError, ConflictError, KipError, NotFoundError, ValidationError
+from kip.errors import (
+    AuthorizationError,
+    KipError,
+    ValidationError,
+    error_code,
+    http_status,
+)
 from kip.ids import new_id
 from kip.settings import Settings
 
@@ -122,23 +128,16 @@ def create_app(container: Container | None = None) -> FastAPI:
 
     @app.exception_handler(KipError)
     async def kip_error_handler(request: Request, exc: KipError) -> JSONResponse:
-        status = 500
-        code = "internal_error"
-        if isinstance(exc, NotFoundError):
-            status, code = 404, "not_found"
-        elif isinstance(exc, ValidationError):
-            status, code = 422, "validation_error"
-        elif isinstance(exc, ConflictError):
-            status, code = 409, "conflict"
-        elif isinstance(exc, AuthorizationError):
-            status, code = 403, "forbidden"
         context = _error_context(selected, request)
         envelope = Envelope(
             ok=False,
-            error=ErrorInfo(code=code, message=str(exc)),
+            error=ErrorInfo(code=error_code(exc), message=str(exc)),
             meta=EnvelopeMeta(request_id=context.request_id or new_id("req"), workspace=context.workspace),
         )
-        return JSONResponse(status_code=status, content=envelope.model_dump(mode="json"))
+        return JSONResponse(
+            status_code=http_status(exc),
+            content=envelope.model_dump(mode="json"),
+        )
 
     async def authenticated_context(
         request: Request,

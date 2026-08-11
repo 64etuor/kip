@@ -158,6 +158,15 @@ def assemble_extractive_answer(
     remaining = request.max_chars
     passages: list[str] = []
     citations = []
+    # An extract quotes one document. Concatenating passages from several
+    # documents produced a body that read like a synthesized answer while
+    # silently mixing unrelated sources; the generation path is what
+    # combines sources, and it validates every claim against its citation.
+    if evidence:
+        leading_document = evidence[0].unit.document_id
+        evidence = tuple(
+            item for item in evidence if item.unit.document_id == leading_document
+        )
     for item in evidence:
         passage = item.unit.body[:remaining]
         if not passage:

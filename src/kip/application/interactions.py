@@ -180,8 +180,10 @@ class InteractionUseCases:
         status: str | None = "proposed",
         limit: int = 100,
     ) -> list[OntologyDiscoveryCandidate]:
-        self._require_enabled()
+        # Authorization is checked before the feature flag so a missing
+        # role is never masked by the feature being disabled.
         self._require_admin(context)
+        self._require_enabled()
         if not 1 <= limit <= 1000:
             raise ValidationError("ontology discovery limit must be between 1 and 1000")
         return self._store.list_ontology_discovery_candidates(
@@ -198,8 +200,10 @@ class InteractionUseCases:
         *,
         now: datetime | None = None,
     ) -> OntologyDiscoveryCandidate:
-        self._require_enabled()
+        # Authorization is checked before the feature flag so a missing
+        # role is never masked by the feature being disabled.
         self._require_admin(context)
+        self._require_enabled()
         return self._store.review_ontology_discovery_candidate(
             context,
             candidate_id,
@@ -213,8 +217,10 @@ class InteractionUseCases:
         *,
         now: datetime | None = None,
     ) -> int:
-        self._require_enabled()
+        # Authorization is checked before the feature flag so a missing
+        # role is never masked by the feature being disabled.
         self._require_admin(context)
+        self._require_enabled()
         return self._store.delete_expired_clarifications(
             context,
             before=now or datetime.now(UTC),

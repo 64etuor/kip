@@ -13,6 +13,7 @@ from kip.domain.models import (
     SearchRequest,
     VocabularyItem,
 )
+from kip.errors import ValidationError
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,13 +110,17 @@ class MemoryLexicalStore:
         limit: int = 20,
     ) -> list[VocabularyItem]:
         needle = prefix.strip().lower()
+        if not needle:
+            raise ValidationError("vocabulary prefix must not be blank")
+        if len(needle.split()) > 1:
+            raise ValidationError("vocabulary prefix must be a single term")
         counts: dict[str, tuple[int, int]] = {}
         for unit in self.state.units.values():
             if not unit_is_visible(self.state, unit, context):
                 continue
             per_document: set[str] = set()
             for token in unit.lexical_text.lower().split():
-                if needle and needle not in token:
+                if not token.startswith(needle):
                     continue
                 documents, corpus = counts.get(token, (0, 0))
                 counts[token] = (documents, corpus + 1)

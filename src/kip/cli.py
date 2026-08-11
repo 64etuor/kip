@@ -487,10 +487,17 @@ def read(
     unit_id_option: str | None = typer.Option(None, "--unit-id"),
 ) -> None:
     """Read one exact evidence unit and report source staleness."""
-    selected = unit_id_option or unit_id
-    if not selected:
-        raise typer.BadParameter("provide UNIT_ID or --unit-id")
-    _run(ctx, lambda runtime: runtime.container.application.evidence.read_unit(runtime.context, selected))
+
+    def action(runtime: Runtime) -> Any:
+        selected = unit_id_option or unit_id
+        if not selected:
+            raise ValidationError("provide UNIT_ID or --unit-id")
+        return runtime.container.application.evidence.read_unit(
+            runtime.context,
+            selected,
+        )
+
+    _run(ctx, action)
 
 
 @get_app.command("artifact")
@@ -652,19 +659,20 @@ def xlsx_read_alias(
     require_fresh: bool = typer.Option(True, "--require-fresh/--allow-stale"),
 ) -> None:
     """Read an exact XLSX range; stable top-level alias for agents and apps."""
-    selected_artifact = artifact_id_option or artifact_id
-    if not selected_artifact:
-        raise typer.BadParameter("provide ARTIFACT_ID or --artifact-id")
-    _run(
-        ctx,
-        lambda runtime: runtime.container.application.evidence.read_xlsx(
+
+    def action(runtime: Runtime) -> Any:
+        selected_artifact = artifact_id_option or artifact_id
+        if not selected_artifact:
+            raise ValidationError("provide ARTIFACT_ID or --artifact-id")
+        return runtime.container.application.evidence.read_xlsx(
             runtime.context,
             selected_artifact,
             sheet=sheet,
             cell_range=cell_range,
             require_fresh=require_fresh,
-        ),
-    )
+        )
+
+    _run(ctx, action)
 
 
 @graph_app.command("neighbors")

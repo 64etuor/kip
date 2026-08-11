@@ -1481,6 +1481,16 @@ class PostgresDatabase:
         }
 
     def vocabulary(self, context: RequestContext, prefix: str, limit: int = 20) -> list[VocabularyItem]:
+        normalized = prefix.strip().lower()
+        if not normalized:
+            raise ValidationError("vocabulary prefix must not be blank")
+        if len(normalized.split()) > 1:
+            raise ValidationError("vocabulary prefix must be a single term")
+        # Restrict the lexeme unnest to units that already contain a token
+        # with this prefix. Unnesting every unit first materialized roughly
+        # (units x n-grams) rows and exceeded the statement timeout for
+        # short Hangul prefixes.
+        tsquery = "'" + normalized.replace("'", "").replace("\\", "") + "':*"
         with self._connection(context) as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -1491,13 +1501,14 @@ class PostgresDatabase:
                 WHERE l.workspace_id=%s
                   AND (cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])
                   AND kip.acl_snapshot_is_fresh(u.acl_snapshot_id)
+                  AND l.tsv @@ to_tsquery('simple', %s)
                   AND token <> ''
-                  AND (token ILIKE '%%' || %s || '%%')
+                  AND token LIKE %s || '%%'
                 GROUP BY token
                 ORDER BY document_frequency DESC, corpus_frequency DESC, token
                 LIMIT %s
                 """,
-                (context.workspace, context.acl_scopes, prefix, limit),
+                (context.workspace, context.acl_scopes, tsquery, normalized, limit),
             )
             rows = cursor.fetchall()
         return [VocabularyItem(**dict(row)) for row in rows]

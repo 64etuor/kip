@@ -1,0 +1,33 @@
+src/kip/adapters/repository/postgres/database.py
+  s_e752ec1bf74db5::t_aef57b9f188a7c 1484-1493,1504,1506,1511
+tests/test_vocabulary_prefix.py
+  s_e752ec1bf74db5::t_9b12222d2d805e 1-38
+src/kip/cli.py
+  s_e752ec1bf74db5::t_c89c9a7e53026d 490-500
+  s_e752ec1bf74db5::t_c235ec9753fe9a 662-667,673-675
+tests/test_cli_envelope_contract.py
+  s_e752ec1bf74db5::t_40251ad64f81ee 1-46
+src/kip/application/interactions.py
+  s_e752ec1bf74db5::t_c961294a49a8cd 183-184,186,203-204,206,220-221,223
+src/kip/application/answers.py
+  s_e752ec1bf74db5::t_77207d2042ba3a 161-169
+src/kip/adapters/repository/memory/lexical.py
+  s_e752ec1bf74db5::t_4265bf23ebdce0 113-116,123
+  s_e752ec1bf74db5::t_02f7f6c6c7a4fb 16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "443ff18e5e97e062f72e980364b7e5ddfc93233f",
+  "prompts": {},
+  "sessions": {
+    "s_e752ec1bf74db5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0cda1f36-e31d-42f3-bfe4-3a8e98d377fa",
+        "model": "claude-opus-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

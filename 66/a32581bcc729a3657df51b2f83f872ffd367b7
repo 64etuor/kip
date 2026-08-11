@@ -1,0 +1,78 @@
+evaluation/golden/private-onedrive-nl.yaml
+  s_e752ec1bf74db5::t_79b246342d2b30 1-247
+docs/IMPLEMENTATION_STATUS.md
+  s_e752ec1bf74db5::t_1e11d4fa436233 34-35
+tests/test_search_diversity.py
+  s_e752ec1bf74db5::t_85b835c4cd5456 1-64
+config/kip.example.toml
+  s_e752ec1bf74db5::t_d0676d6edd9a3f 75
+  s_e752ec1bf74db5::t_f0e76f4aff2664 97
+docs/adr/ADR-034-bm25-reranker-promotion.md
+  s_e752ec1bf74db5::t_4732e068d2ea2b 1-56
+src/kip/application/search_engine.py
+  s_e752ec1bf74db5::t_878bd4f64c1968 234-238
+  s_e752ec1bf74db5::t_30aeb1a3b0502e 177-184,187-201
+  s_e752ec1bf74db5::t_5d7ef09845bfeb 224
+  s_e752ec1bf74db5::t_e0973aa3f5def9 242-256
+  s_e752ec1bf74db5::t_ef0b82069f275e 45-71
+  s_e752ec1bf74db5::t_e609b6f05956e1 294-297
+  s_e752ec1bf74db5::t_5f5c3c40c856e4 145-152
+evaluation/reports/final-config-20260811/bm25-exp/eval_20260811T090315480240Z.json
+  s_c85ac92eed5e28::t_626278005b2839 1-618
+evaluation/reports/final-config-20260811/bm25-exp/eval_20260811T090315480240Z.md
+  s_c85ac92eed5e28::t_6584c1daacd10d 1-27
+evaluation/reports/final-config-20260811/bm25-exp/latest.json
+  s_c85ac92eed5e28::t_c7bf704c48960b 1-618
+evaluation/reports/final-config-20260811/bm25-exp/latest.md
+  s_c85ac92eed5e28::t_827eba8545c5f6 1-27
+evaluation/reports/final-config-20260811/rapidfuzz-exp/eval_20260811T090033672622Z.json
+  s_d8f321dd73853a::t_c9fd1402b98f74 1-626
+evaluation/reports/final-config-20260811/rapidfuzz-exp/eval_20260811T090033672622Z.md
+  s_d8f321dd73853a::t_a138f913c9df90 1-27
+evaluation/reports/final-config-20260811/rapidfuzz-exp/latest.json
+  s_d8f321dd73853a::t_aa58ff6a626ad7 1-626
+evaluation/reports/final-config-20260811/rapidfuzz-exp/latest.md
+  s_d8f321dd73853a::t_f6db4743c86fa0 1-27
+evaluation/reports/final-config-20260811/bm25-noexp/eval_20260811T090543736191Z.json
+  s_e752ec1bf74db5::t_3a965a4d409a0e 1-619
+evaluation/reports/final-config-20260811/bm25-noexp/eval_20260811T090543736191Z.md
+  s_e752ec1bf74db5::t_92a7704bceb3e3 1-27
+evaluation/reports/final-config-20260811/bm25-noexp/latest.json
+  s_e752ec1bf74db5::t_0acdfd01ff43e4 1-619
+evaluation/reports/final-config-20260811/bm25-noexp/latest.md
+  s_e752ec1bf74db5::t_675327d00ba854 1-27
+evaluation/reports/final-config-20260811/evolution.jsonl
+  s_e752ec1bf74db5::t_a49845074cd509 1-3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "66a32581bcc729a3657df51b2f83f872ffd367b7",
+  "prompts": {},
+  "sessions": {
+    "s_c85ac92eed5e28": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fef21-fcc2-7841-86ac-e1c0b8aef715",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_d8f321dd73853a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "75873341-d233-4cce-885e-6a47a5d6e2f1",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_e752ec1bf74db5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0cda1f36-e31d-42f3-bfe4-3a8e98d377fa",
+        "model": "claude-fable-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

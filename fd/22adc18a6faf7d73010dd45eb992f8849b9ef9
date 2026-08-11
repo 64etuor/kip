@@ -1,0 +1,37 @@
+src/kip/domain/models.py
+  s_e752ec1bf74db5::t_7383e64d87efa0 168-179
+  s_e752ec1bf74db5::t_bfae798c99af2c 6
+tests/test_cli_envelope_contract.py
+  s_e752ec1bf74db5::t_c533f3de96b3b7 47-65
+src/kip/application/search_engine.py
+  s_e752ec1bf74db5::t_573d05329db602 69-79
+tests/test_search_diversity.py
+  s_e752ec1bf74db5::t_c4d0f4cab322ca 3-5
+  s_e752ec1bf74db5::t_6ecd9e846210d2 68-89
+tests/test_filesystem_retrieval.py
+  s_e752ec1bf74db5::t_7a5615f106967e 51-57,59,62-66
+src/kip/api.py
+  s_e752ec1bf74db5::t_dc821f05115c00 40-63
+  s_e752ec1bf74db5::t_610ef238e322da 119
+  s_e752ec1bf74db5::t_db9bee0e7720b8 115-118,120
+src/kip/application/search.py
+  s_e752ec1bf74db5::t_7409514c37c403 164-170
+src/kip/cli.py
+  s_e752ec1bf74db5::t_b817c97f394653 190-192
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "fd22adc18a6faf7d73010dd45eb992f8849b9ef9",
+  "prompts": {},
+  "sessions": {
+    "s_e752ec1bf74db5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0cda1f36-e31d-42f3-bfe4-3a8e98d377fa",
+        "model": "claude-opus-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

@@ -44,3 +44,22 @@ def test_missing_artifact_id_still_emits_the_error_envelope(
     payload = json.loads(result.stderr)
     assert payload["ok"] is False
     assert payload["error"]["code"] == "validation_error"
+
+
+def test_rest_rejects_a_blank_query_with_a_serializable_envelope(test_container):
+    from fastapi.testclient import TestClient
+
+    from kip.api import create_app
+
+    client = TestClient(create_app(test_container))
+    headers = {"X-KIP-API-Key": "test-key"}
+
+    blank = client.post("/v1/search", headers=headers, json={"query": "   ", "limit": 3})
+    good = client.post("/v1/search", headers=headers, json={"query": "정산", "limit": 3})
+
+    assert blank.status_code == 422
+    payload = blank.json()
+    assert payload["error"]["code"] == "request_validation_error"
+    # The envelope must be JSON-serializable even for custom validators.
+    assert json.dumps(payload)
+    assert good.status_code == 200

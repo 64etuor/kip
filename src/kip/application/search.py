@@ -161,8 +161,13 @@ class RetrievalUseCases:
         # Cap each item's contribution so one oversized unit (for example a
         # flattened XLSX sheet) cannot consume the whole bundle budget and
         # leave the remaining slots empty.
-        item_cap = int(
-            self._settings.get("search.context_item_max_chars", 8000)
+        # The configured cap is a floor for the default budget; an explicitly
+        # larger max_chars raises each item's fair share so callers can
+        # actually retrieve longer passages instead of silently hitting the
+        # same per-item ceiling.
+        item_cap = max(
+            int(self._settings.get("search.context_item_max_chars", 8000)),
+            request.max_chars // max(1, request.limit),
         )
         for hit in hits:
             evidence = self._evidence.read_unit(

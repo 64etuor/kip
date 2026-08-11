@@ -66,7 +66,17 @@ class SearchEngine:
         for hit in overflow:
             if len(selected) >= limit:
                 break
-            selected.append(hit)
+            # Backfilling past the cap is how the result count is preserved
+            # when too few distinct documents match; mark it so a caller can
+            # tell a diverse result set from a padded one.
+            selected.append(
+                hit.model_copy(
+                    update={
+                        "metadata": {**hit.metadata, "diversity_backfill": True}
+                    },
+                    deep=True,
+                )
+            )
         return selected
 
     def _alias_expansion(

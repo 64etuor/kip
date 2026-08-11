@@ -25,7 +25,6 @@ from kip.ids import stable_id
 from kip.ports.interactions import InteractionStore
 
 
-
 class InteractionUseCases:
     def __init__(
         self,

@@ -48,14 +48,22 @@ def test_context_item_cap_keeps_one_big_unit_from_starving_the_bundle(
     context = test_container.application.operations.request_context()
     test_container.application.ingestion.sync_filesystem(context, "fixture")
 
-    bundle = test_container.application.retrieval.context_bundle(
+    # The configured value is a floor; each item may also claim its fair
+    # share of the caller's budget (max_chars // limit).
+    tight = test_container.application.retrieval.context_bundle(
         context,
-        ContextRequest(query="정산 기준", limit=5, max_chars=10000),
+        ContextRequest(query="정산 기준", limit=5, max_chars=2000),
+    )
+    generous = test_container.application.retrieval.context_bundle(
+        context,
+        ContextRequest(query="정산 기준", limit=5, max_chars=100000),
     )
 
-    assert len(bundle.items) >= 2
-    assert all(len(item.body) <= 500 for item in bundle.items)
-    assert bundle.truncated is True
+    assert len(tight.items) >= 2
+    assert all(len(item.body) <= 500 for item in tight.items)
+    assert tight.truncated is True
+    # Raising the budget must actually return longer passages.
+    assert max(len(item.body) for item in generous.items) > 500
 
 
 def test_second_sync_skips_unchanged_files_without_reading_them(test_container):

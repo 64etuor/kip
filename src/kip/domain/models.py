@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from kip.domain.egress import DataClassification, EgressDecision
 from kip.domain.generation import GeneratedClaim, GenerationUsage, ModelRevision
@@ -164,6 +164,18 @@ class SearchRequest(StrictModel):
     document_types: list[str] = Field(default_factory=list)
     project_ids: list[str] = Field(default_factory=list)
     include_candidate_assertions: bool = False
+
+    @field_validator("query")
+    @classmethod
+    def query_carries_content(cls, query: str) -> str:
+        # A whitespace- or punctuation-only query analyzes to no lexemes, so
+        # the substring arms match on incidental characters and return
+        # unranked noise. Reject it the same way an empty query is rejected.
+        if not query.strip():
+            raise ValueError("query must not be blank")
+        if not any(character.isalnum() for character in query):
+            raise ValueError("query must contain at least one letter or digit")
+        return query
 
 
 class SearchHit(StrictModel):

@@ -37,6 +37,30 @@ from kip.ids import new_id
 from kip.settings import Settings
 
 
+def _serializable_errors(errors: list[Any]) -> list[dict[str, Any]]:
+    """Strip values pydantic cannot JSON-encode from validation errors.
+
+    Custom field validators put the raising exception object in `ctx`, and
+    `input` can hold arbitrary request data; including either made the error
+    response itself fail to serialize.
+    """
+    cleaned: list[dict[str, Any]] = []
+    for error in errors:
+        if not isinstance(error, dict):
+            cleaned.append({"msg": str(error)})
+            continue
+        item = {
+            key: value
+            for key, value in error.items()
+            if key not in {"ctx", "input", "url"}
+        }
+        context = error.get("ctx")
+        if isinstance(context, dict):
+            item["ctx"] = {key: str(value) for key, value in context.items()}
+        cleaned.append(item)
+    return cleaned
+
+
 def create_app(container: Container | None = None) -> FastAPI:
     selected = container or build_container()
     app = FastAPI(
@@ -88,7 +112,12 @@ def create_app(container: Container | None = None) -> FastAPI:
     ) -> JSONResponse:
         return JSONResponse(
             status_code=422,
-            content=error_envelope(request, "request_validation_error", "request validation failed", {"errors": exc.errors()}),
+            content=error_envelope(
+                request,
+                "request_validation_error",
+                "request validation failed",
+                {"errors": _serializable_errors(exc.errors())},
+            ),
         )
 
     @app.exception_handler(KipError)

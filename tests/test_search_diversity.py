@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import pytest
+from pydantic import ValidationError as PydanticValidationError
+
 from kip.domain.models import SearchRequest
 
 
@@ -62,3 +65,25 @@ def test_cap_zero_disables_diversity(test_container):
     )
 
     assert len(hits) == 2
+
+
+def test_backfilled_hits_past_the_cap_are_marked(test_container):
+    _seed_same_document_twice(test_container)
+    context = test_container.application.operations.request_context()
+    test_container.settings.raw["search"]["max_hits_per_document"] = 1
+
+    hits = test_container.application.retrieval.search(
+        context,
+        SearchRequest(query="부서장 전결", limit=5),
+    )
+
+    assert hits[0].metadata.get("diversity_backfill") is None
+    assert hits[1].metadata.get("diversity_backfill") is True
+
+
+def test_blank_and_symbol_only_queries_are_rejected():
+    with pytest.raises(PydanticValidationError, match="must not be blank"):
+        SearchRequest(query="   ")
+    with pytest.raises(PydanticValidationError, match="letter or digit"):
+        SearchRequest(query="!!!")
+    assert SearchRequest(query="정산").query == "정산"

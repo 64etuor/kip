@@ -187,7 +187,9 @@ def _emit_error(runtime: Runtime | None, exc: BaseException) -> None:
         code = "not_found"
     elif isinstance(exc, ConflictError):
         code = "conflict"
-    elif isinstance(exc, ValidationError):
+    elif isinstance(exc, ValidationError | PydanticValidationError):
+        # Contract violations surfaced by request models are caller errors,
+        # not internal failures.
         code = "validation_error"
     elif isinstance(exc, AuthorizationError):
         code = "forbidden"

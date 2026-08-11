@@ -239,6 +239,7 @@ def build_container(
         selected_embedding,
         selected_reranker,
         telemetry,
+        selected_repository.knowledge,
     )
     ontology_root = selected.project_root / "ontology"
     ontology_profile = str(

@@ -4,9 +4,11 @@ from enum import StrEnum, unique
 
 from kip.application.retrieval import apply_rerank, reciprocal_rank_fusion
 from kip.application.semantic import SemanticProjectionUseCases
+from kip.domain.knowledge import normalize_entity_name
 from kip.domain.models import RequestContext, SearchHit, SearchRequest
 from kip.errors import DependencyUnavailableError, ValidationError
 from kip.ports.embedding import EmbeddingPort
+from kip.ports.knowledge import KnowledgeStore
 from kip.ports.reranker import RerankerPort
 from kip.ports.retrieval import RetrievalStore
 from kip.ports.text_analyzer import TextAnalyzerPort
@@ -30,6 +32,7 @@ class SearchEngine:
         embedding: EmbeddingPort,
         semantic: SemanticProjectionUseCases,
         reranker: RerankerPort | None = None,
+        knowledge: KnowledgeStore | None = None,
     ) -> None:
         self._settings = settings
         self._store = store
@@ -37,6 +40,49 @@ class SearchEngine:
         self._embedding = embedding
         self._semantic = semantic
         self._reranker = reranker
+        self._knowledge = knowledge
+
+    def _alias_expansion(
+        self,
+        context: RequestContext,
+        query: str,
+    ) -> list[str]:
+        """Human-approved synonyms for entities mentioned in the query.
+
+        Only active (reviewed) entities pass, and resolve_entities applies
+        the ACL prefilter, so expansion never widens what a principal can
+        see — it only adds vocabulary the reviewers have already bound to
+        the same concept.
+        """
+        if self._knowledge is None or not bool(
+            self._settings.get("search.alias_expansion_enabled", True)
+        ):
+            return []
+        normalized_query = normalize_entity_name(query)
+        if not normalized_query:
+            return []
+        max_terms = int(
+            self._settings.get("search.alias_expansion_max_terms", 16)
+        )
+        terms: list[str] = []
+        seen: set[str] = set()
+        for entity in self._knowledge.resolve_entities(
+            context,
+            normalized_query,
+            limit=8,
+        ):
+            # Expand only alias -> canonical: documents predominantly use
+            # the canonical form, so adding it widens candidate recall,
+            # while spraying sibling aliases has measurably diluted rank
+            # precision on the golden set.
+            canonical = normalize_entity_name(entity.canonical_name)
+            if not canonical or canonical in normalized_query or canonical in seen:
+                continue
+            seen.add(canonical)
+            terms.append(entity.canonical_name)
+            if len(terms) >= max_terms:
+                return terms
+        return terms
 
     def search(
         self,
@@ -57,6 +103,13 @@ class SearchEngine:
         except ValueError as exc:
             raise ValidationError(f"unsupported search mode: {raw_mode}") from exc
         lexemes = self._analyzer.analyze(request.query)
+        expansion = self._alias_expansion(context, request.query)
+        if expansion:
+            # Expansion widens candidate retrieval only. The reranker keeps
+            # scoring against the user's original wording: injecting synonyms
+            # into the rerank query measurably promoted synonym-dense but
+            # off-target documents on the golden set.
+            lexemes = f"{lexemes} {self._analyzer.analyze(' '.join(expansion))}"
         if selected_mode is SearchMode.LEXICAL:
             lexical_rerank_enabled = bool(
                 self._settings.get("search.lexical_rerank_enabled", False)

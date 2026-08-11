@@ -28,6 +28,7 @@ from kip.domain.telemetry import (
 )
 from kip.ports.embedding import EmbeddingPort
 from kip.ports.evidence import EvidenceReaderPort
+from kip.ports.knowledge import KnowledgeStore
 from kip.ports.operations import OperationsStore
 from kip.ports.reranker import RerankerPort
 from kip.ports.retrieval import RetrievalStore
@@ -46,6 +47,7 @@ class RetrievalUseCases:
         embedding: EmbeddingPort,
         reranker: RerankerPort | None = None,
         telemetry: TelemetryUseCases | None = None,
+        knowledge: KnowledgeStore | None = None,
     ) -> None:
         self._settings = settings
         self._store = store
@@ -63,6 +65,7 @@ class RetrievalUseCases:
             embedding,
             self._semantic,
             reranker,
+            knowledge,
         )
         self._embedding = embedding
         self._reranker = reranker

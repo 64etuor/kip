@@ -72,6 +72,7 @@ context_max_chars = 40000
 context_item_max_chars = 8000
 alias_expansion_enabled = true
 alias_expansion_max_terms = 16
+max_hits_per_document = 3
 korean_ngram_min = 2
 korean_ngram_max = 4
 hybrid_candidate_limit = 40
@@ -93,7 +94,7 @@ space_name = "qwen3-embedding-0.6b-1024"
 
 [models.reranker]
 enabled = true
-backend = "rapidfuzz"
+backend = "bm25"  # promoted 2026-08-11 on the reviewed NL set; rapidfuzz remains the fallback backend
 max_document_chars = 8000
 baseline_weight = 0.15
 # backend = "bm25"   # candidate-local Okapi BM25 shadow candidate (no model)

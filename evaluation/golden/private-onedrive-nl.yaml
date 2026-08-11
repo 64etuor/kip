@@ -1,13 +1,21 @@
 schema_version: kip.golden-dataset.v1
-name: private-onedrive-nl-draft
+name: private-onedrive-nl
 description: >
   19 corpus-grounded Korean retrieval cases over the private OneDrive
   workspace (QMS procedures, battery QC, government program notices).
   Every question was derived from a verbatim quote read from the expected
   document's evidence unit. Lifecycle is draft on purpose: cases were
-  machine-grounded and await human review before this set can gate any
-  promotion decision.
-lifecycle: draft
+  machine-grounded, then adversarially re-verified case by case by an
+  independent agent (18/19 pass; EI-001 widened to both legitimate
+  targets). Promotion authority for this review was explicitly delegated
+  by the workspace owner in the 2026-08-11 session. corpus_fingerprint is
+  sha256 over the sorted current revision hashes of the default
+  workspace at review time.
+lifecycle: reviewed
+version: 1.0.0
+reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+source_revision: git-cf797bb
+corpus_fingerprint: sha256:336dbd508736f26b49c4b75d29067989d3f0d1c48118504b7ff4d9cd555e416a
 cases:
   - id: NL-001
     question: 협력업체 선정 평가에서 70점 미만으로 승인불가 판정된 업체를 다시 승인하려면 어떤 조건을 충족해야 하는가?
@@ -16,6 +24,10 @@ cases:
     acl_scopes: [workspace:default]
     expected_documents: [ldoc_edd7c8f4333e6cf306a4834678ec779f]
     recall_at: 10
+    lifecycle: reviewed
+    version: 1.0.0
+    reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+    source_revision: git-cf797bb
     notes: SEKR-QMS-I201 협력업체 관리 지침 p7 — "3 개월 이내에 재 평가를 실시하여 70 점 이상일 경우 업체를 승인한다"
   - id: NL-002
     question: 자격인증 필수 이수교육 후 과정별 평가는 언제까지 완료해야 하는가?
@@ -24,6 +36,10 @@ cases:
     acl_scopes: [workspace:default]
     expected_documents: [ldoc_e857f0b97ec2840a57a67a8556649bd4]
     recall_at: 10
+    lifecycle: reviewed
+    version: 1.0.0
+    reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+    source_revision: git-cf797bb
     notes: SEKR-QMS-W902 자격인증 절차 p8 — "교육 완료 2 주 이내에 평가를 완료한다"
   - id: NL-003
     question: 안전보건에 관한 정기교육의 교육대상과 교육시기는 어떻게 규정되어 있는가?
@@ -32,6 +48,10 @@ cases:
     acl_scopes: [workspace:default]
     expected_documents: [ldoc_6576c14eb8ef7eb96990d1b2a169d8cc]
     recall_at: 10
+    lifecycle: reviewed
+    version: 1.0.0
+    reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+    source_revision: git-cf797bb
     notes: SEKR-QMS-W901 교육훈련 절차 p7 — "교육대상 ... 모든 임직원 및 상주업체 직원, 교육시기 매분기"
   - id: NL-004
     question: 확장형 전자출판물 제작 지원 사업의 1차 서면평가에서는 어떤 기준으로 몇 배수를 선정하는가?
@@ -40,6 +60,10 @@ cases:
     acl_scopes: [workspace:default]
     expected_documents: [ldoc_b8ccdc1749fbbed038d24bbe316e5a15]
     recall_at: 10
+    lifecycle: reviewed
+    version: 1.0.0
+    reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+    source_revision: git-cf797bb
     notes: 공고문 2026 확장형 전자출판물 p3 — 1차 서면평가 고득점순 70점 이상 2배수 내외
   - id: NL-005
     question: 문서화된 정보 관리 절차에서 정의하는 '회사표준'에는 어떤 문서들이 포함되는가?
@@ -48,6 +72,10 @@ cases:
     acl_scopes: [workspace:default]
     expected_documents: [ldoc_c1ed2e642783ae2da44923017ec97831]
     recall_at: 10
+    lifecycle: reviewed
+    version: 1.0.0
+    reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+    source_revision: git-cf797bb
     notes: SEKR-QMS-W704 문서화된 정보 관리 절차 p3 — 매뉴얼/프로세스/절차/규정/지침/기술표준/기록양식
   - id: NL-006
     question: 2023년 IATF 16949 내부심사에서 발견된 부적합 건수는 시스템, 공정, 제품별로 각각 몇 건인가?
@@ -56,6 +84,10 @@ cases:
     acl_scopes: [workspace:default]
     expected_documents: [ldoc_d3c4890c5a04127c038e198961952cd0]
     recall_at: 10
+    lifecycle: reviewed
+    version: 1.0.0
+    reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+    source_revision: git-cf797bb
     notes: SEKR-QMS-W701-F01 경영검토서 8.심사결과 — 시스템 3건 공정 1건 제품 0건
   - id: NL-007
     question: 계측기의 대여 및 이관을 시행하는 경우 어떤 양식을 작성하여 누구의 승인을 받아야 하는가?
@@ -64,6 +96,10 @@ cases:
     acl_scopes: [workspace:default]
     expected_documents: [ldoc_df884b1de2232cfd6c3c336a3396e188]
     recall_at: 10
+    lifecycle: reviewed
+    version: 1.0.0
+    reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+    source_revision: git-cf797bb
     notes: SEKR-QMS-W405 측정자원 관리 절차 p8 — 계측기 반출 요청서 W405-F06, 사용부서 승인
   - id: SP-001
     question: 공급업체를 신규 거래처로 등록할 때 요구되는 신용평가 등급 기준은 무엇인가?
@@ -72,6 +108,10 @@ cases:
     acl_scopes: [workspace:default]
     expected_documents: [ldoc_edd7c8f4333e6cf306a4834678ec779f]
     recall_at: 10
+    lifecycle: reviewed
+    version: 1.0.0
+    reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+    source_revision: git-cf797bb
     notes: 협력업체 관리 지침 p6 — 신용등급 B- 이상 (질문은 공급업체/거래처로 패러프레이즈)
   - id: SP-002
     question: 반년 넘게 병으로 휴직해 해당 업무를 하지 않은 직원의 인증 자격은 어떻게 처리되는가?
@@ -80,6 +120,10 @@ cases:
     acl_scopes: [workspace:default]
     expected_documents: [ldoc_e857f0b97ec2840a57a67a8556649bd4]
     recall_at: 10
+    lifecycle: reviewed
+    version: 1.0.0
+    reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+    source_revision: git-cf797bb
     notes: 자격인증 절차 p8 — 취소사유 "6 개월 이상 병가 혹은 공가로 인해 해당 업무 미종사자"
   - id: SP-003
     question: 배터리 컨테이너 출하 검수에서 셀 간 온도 편차 시험을 통과하려면 어떤 상태가 확인되어야 하는가?
@@ -88,6 +132,10 @@ cases:
     acl_scopes: [workspace:default]
     expected_documents: [ldoc_b23b1c76b5e8a3134775502ac4bd49c0]
     recall_at: 10
+    lifecycle: reviewed
+    version: 1.0.0
+    reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+    source_revision: git-cf797bb
     notes: 230907_QC-CONTAINER p17 — 온도 불균형 경고가 스트링 BMS 모니터링에 표시
   - id: SP-004
     question: IATF 16949 내부 감사는 어느 기간에 진행되었는가?
@@ -96,6 +144,10 @@ cases:
     acl_scopes: [workspace:default]
     expected_documents: [ldoc_d3c4890c5a04127c038e198961952cd0]
     recall_at: 10
+    lifecycle: reviewed
+    version: 1.0.0
+    reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+    source_revision: git-cf797bb
     notes: 경영검토서 8.심사결과 — 심사일정 2023년 1월 16일~18일 (질문은 감사/기간으로 패러프레이즈)
   - id: SP-005
     question: 양산 개시 승인 심사에서 장비 유지보수 준비 상태와 관련해 확인하는 항목들은 무엇인가?
@@ -104,6 +156,10 @@ cases:
     acl_scopes: [workspace:default]
     expected_documents: [ldoc_699b54963b2e6661afda34e2df8c871a]
     recall_at: 10
+    lifecycle: reviewed
+    version: 1.0.0
+    reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+    source_revision: git-cf797bb
     notes: 공장가동승인_제조_제조물류 — 설비 기준정보/이력관리/보전 Schedule/일상점검
   - id: SP-006
     question: 전력과 용수 같은 기반 유틸리티 공급이 끊기는 위험에 대비해 어떤 대비책이 마련되어 있는가?
@@ -112,6 +168,10 @@ cases:
     acl_scopes: [workspace:default]
     expected_documents: [ldoc_5bbfe4f5850a5c0813c570fa402b0d1b]
     recall_at: 10
+    lifecycle: reviewed
+    version: 1.0.0
+    reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+    source_revision: git-cf797bb
     notes: SEKF-IQW-103-01 리스크 관리대장 — Backup/Standby 설비, Spare parts 확보
   - id: SP-007
     question: 전자책 제작 지원 사업의 평가 위원단은 몇 명 규모로 꾸려지는가?
@@ -120,6 +180,10 @@ cases:
     acl_scopes: [workspace:default]
     expected_documents: [ldoc_bfc04cf7c43828b69a4d74bef05a7674]
     recall_at: 10
+    lifecycle: reviewed
+    version: 1.0.0
+    reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+    source_revision: git-cf797bb
     notes: 공고문 2026 제1차 전자책 제작 지원 p5 — 심사위원회 6명 내외
   - id: EN-001
     question: 고객불만 조사 보고서(SEKR-QMS-W601-F01)의 보존기간은 몇 년인가?
@@ -128,6 +192,10 @@ cases:
     acl_scopes: [workspace:default]
     expected_documents: [ldoc_992d4ea57a52b7b9f25ea66b7a7d15d0]
     recall_at: 10
+    lifecycle: reviewed
+    version: 1.0.0
+    reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+    source_revision: git-cf797bb
     notes: SEKR-QMS-W601 고객불만 관리 절차 p10 — 보존기간 20년
   - id: EN-002
     question: 정기 안전보건교육에서 비사무직 근로자는 분기당 몇 시간 이상 교육을 받아야 하는가?
@@ -136,6 +204,10 @@ cases:
     acl_scopes: [workspace:default]
     expected_documents: [ldoc_6576c14eb8ef7eb96990d1b2a169d8cc]
     recall_at: 10
+    lifecycle: reviewed
+    version: 1.0.0
+    reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+    source_revision: git-cf797bb
     notes: 교육훈련 절차 p7 — 비사무직 6시간 이상/분기
   - id: EN-004
     question: 산업AI솔루션 실증·확산 지원 사업의 전체 연구개발기간은 몇 개월인가?
@@ -144,14 +216,22 @@ cases:
     acl_scopes: [workspace:default]
     expected_documents: [ldoc_08a5fe2b545f89c1761232dc7b832acd]
     recall_at: 10
+    lifecycle: reviewed
+    version: 1.0.0
+    reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+    source_revision: git-cf797bb
     notes: 산업AI솔루션 실증확산 신청서식 — 2026.6.1~2027.2.28 (9개월)
   - id: EI-001
     question: SEKR-QMS-W403 부적합품 통보서 NCR
     category: exact_identifier
     principal: principal_local
     acl_scopes: [workspace:default]
-    expected_documents: [ldoc_596acccbacceaf8d56c3496e587898f9]
+    expected_documents: [ldoc_596acccbacceaf8d56c3496e587898f9, ldoc_ae6e51718bceece27e55d2b9c6aaf821]
     recall_at: 10
+    lifecycle: reviewed
+    version: 1.0.0
+    reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+    source_revision: git-cf797bb
     notes: SEKR-QMS-W403 부적합품 관리 절차 p11 — [양식 1] 부적합품 통보서(NCR)
   - id: EI-002
     question: SEKR-QMS-W902-F01 자격인증 평가 Report
@@ -160,4 +240,8 @@ cases:
     acl_scopes: [workspace:default]
     expected_documents: [ldoc_0c3df7875764df07378c649932b55dbd]
     recall_at: 10
+    lifecycle: reviewed
+    version: 1.0.0
+    reviewer: independent adversarial verification agent; promotion delegated by yangha.park (2026-08-11)
+    source_revision: git-cf797bb
     notes: SEKR-QMS-W902-F01-Rev.1 자격인증 평가 Report.xlsx

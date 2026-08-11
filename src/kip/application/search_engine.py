@@ -42,6 +42,33 @@ class SearchEngine:
         self._reranker = reranker
         self._knowledge = knowledge
 
+    def _diversify(self, hits: list[SearchHit], limit: int) -> list[SearchHit]:
+        """Cap hits per document so one file cannot fill every slot.
+
+        Overflow hits backfill the tail when there are not enough distinct
+        documents, so result count never shrinks below what the pool allows.
+        """
+        cap = int(self._settings.get("search.max_hits_per_document", 3))
+        if cap <= 0:
+            return hits[:limit]
+        selected: list[SearchHit] = []
+        overflow: list[SearchHit] = []
+        counts: dict[str, int] = {}
+        for hit in hits:
+            if len(selected) >= limit:
+                break
+            seen = counts.get(hit.document_id, 0)
+            if seen < cap:
+                counts[hit.document_id] = seen + 1
+                selected.append(hit)
+            else:
+                overflow.append(hit)
+        for hit in overflow:
+            if len(selected) >= limit:
+                break
+            selected.append(hit)
+        return selected
+
     def _alias_expansion(
         self,
         context: RequestContext,
@@ -115,8 +142,14 @@ class SearchEngine:
                 self._settings.get("search.lexical_rerank_enabled", False)
             )
             if not lexical_rerank_enabled:
-                return self._annotate_lexical(
-                    self._store.search(context, request, lexemes)
+                pool_request = request.model_copy(
+                    update={"limit": min(100, max(request.limit, 40))}
+                )
+                return self._diversify(
+                    self._annotate_lexical(
+                        self._store.search(context, pool_request, lexemes)
+                    ),
+                    request.limit,
                 )
             candidate_limit = min(
                 100,
@@ -141,25 +174,31 @@ class SearchEngine:
                     "lexical reranking is enabled without a reranker adapter"
                 )
             try:
-                return self._rerank(
-                    context,
-                    request,
-                    lexical,
-                    candidate_limit=candidate_limit,
+                return self._diversify(
+                    self._rerank(
+                        context,
+                        request,
+                        lexical,
+                        candidate_limit=candidate_limit,
+                    ),
+                    request.limit,
                 )
             except DependencyUnavailableError:
-                return [
-                    hit.model_copy(
-                        update={
-                            "metadata": {
-                                **hit.metadata,
-                                "lexical_rerank_degraded": True,
-                            }
-                        },
-                        deep=True,
-                    )
-                    for hit in lexical[: request.limit]
-                ]
+                return self._diversify(
+                    [
+                        hit.model_copy(
+                            update={
+                                "metadata": {
+                                    **hit.metadata,
+                                    "lexical_rerank_degraded": True,
+                                }
+                            },
+                            deep=True,
+                        )
+                        for hit in lexical
+                    ],
+                    request.limit,
+                )
 
         candidate_limit = min(
             100,
@@ -182,7 +221,7 @@ class SearchEngine:
                 limit=candidate_limit,
             )
             if selected_mode is SearchMode.VECTOR:
-                return vector[: request.limit]
+                return self._diversify(vector, request.limit)
             fused = reciprocal_rank_fusion(
                 lexical,
                 vector,
@@ -192,23 +231,29 @@ class SearchEngine:
                 ),
             )
             if selected_mode is SearchMode.HYBRID:
-                return fused[: request.limit]
-            return self._rerank(context, request, fused)
+                return self._diversify(fused, request.limit)
+            return self._diversify(
+                self._rerank(context, request, fused),
+                request.limit,
+            )
         except DependencyUnavailableError:
             if explicit:
                 raise
-            return [
-                hit.model_copy(
-                    update={
-                        "metadata": {
-                            **hit.metadata,
-                            "semantic_degraded": True,
-                        }
-                    },
-                    deep=True,
-                )
-                for hit in lexical[: request.limit]
-            ]
+            return self._diversify(
+                [
+                    hit.model_copy(
+                        update={
+                            "metadata": {
+                                **hit.metadata,
+                                "semantic_degraded": True,
+                            }
+                        },
+                        deep=True,
+                    )
+                    for hit in lexical
+                ],
+                request.limit,
+            )
 
     def _rerank(
         self,
@@ -246,11 +291,10 @@ class SearchEngine:
             for hit in rerank_hits
         ]
         scores = self._reranker.rerank(request.query, documents)
-        reranked = apply_rerank(rerank_hits, scores, limit=request.limit)
-        if len(reranked) < request.limit:
-            reranked.extend(
-                fused[rerank_depth : rerank_depth + request.limit - len(reranked)]
-            )
+        # Return the full ranked pool (reranked head + fused tail); the
+        # caller applies per-document diversity before truncating.
+        reranked = apply_rerank(rerank_hits, scores, limit=len(rerank_hits))
+        reranked.extend(fused[rerank_depth:])
         return reranked
 
     @staticmethod

@@ -187,7 +187,8 @@
         "certainty": {
           "enum": [
             "supported",
-            "uncertain"
+            "uncertain",
+            "disputed"
           ],
           "title": "Certainty",
           "type": "string"

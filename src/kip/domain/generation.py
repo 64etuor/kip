@@ -78,7 +78,7 @@ class GenerationRequest(GenerationModel):
 class GeneratedClaim(GenerationModel):
     text: str = Field(min_length=1)
     evidence_ids: tuple[str, ...]
-    certainty: Literal["supported", "uncertain"]
+    certainty: Literal["supported", "uncertain", "disputed"]
 
     @field_validator("evidence_ids")
     @classmethod
@@ -93,6 +93,10 @@ class GeneratedClaim(GenerationModel):
     def supported_claim_has_evidence(self) -> GeneratedClaim:
         if self.certainty == "supported" and not self.evidence_ids:
             raise ValueError("supported claim requires evidence")
+        if self.certainty == "disputed" and len(self.evidence_ids) < 2:
+            raise ValueError(
+                "disputed claim must cite every disagreeing evidence unit"
+            )
         return self
 
 

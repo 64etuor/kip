@@ -33,7 +33,7 @@ CLAIMS_SCHEMA: dict[str, Any] = {
                     },
                     "certainty": {
                         "type": "string",
-                        "enum": ["supported", "uncertain"],
+                        "enum": ["supported", "uncertain", "disputed"],
                     },
                 },
                 "required": ["text", "evidence_ids", "certainty"],

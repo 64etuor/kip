@@ -10,7 +10,7 @@ import httpx
 
 from kip.domain.models import ConnectorEvent
 from kip.errors import ConfigurationError, SourceUnavailableError
-from kip.ids import stable_id
+from kip.ids import sha256_bytes, stable_id
 
 
 class SlackConnector:
@@ -40,25 +40,77 @@ class SlackConnector:
                     payload["cursor"] = cursor
                 response = self._call("conversations.history", payload)
                 for message in response.get("messages", []):
-                    yield self._event(conversation_id, message)
+                    thread_ts = message.get("thread_ts")
+                    if thread_ts and thread_ts != message.get("ts"):
+                        # Broadcast replies surface in history; the thread
+                        # event that owns them is emitted from the root.
+                        continue
                     if int(message.get("reply_count") or 0) > 0:
-                        yield from self._pull_replies(conversation_id, str(message["ts"]))
+                        yield self._thread_event(conversation_id, message)
+                    else:
+                        yield self._event(conversation_id, message)
                 cursor = ((response.get("response_metadata") or {}).get("next_cursor") or "").strip()
                 if not cursor:
                     break
 
-    def _pull_replies(self, conversation_id: str, thread_ts: str) -> Iterator[ConnectorEvent]:
+    def _collect_thread(
+        self,
+        conversation_id: str,
+        thread_ts: str,
+    ) -> list[dict[str, Any]]:
+        messages: list[dict[str, Any]] = []
         cursor: str | None = None
         while True:
             payload: dict[str, Any] = {"channel": conversation_id, "ts": thread_ts, "limit": 200}
             if cursor:
                 payload["cursor"] = cursor
             response = self._call("conversations.replies", payload)
-            for message in response.get("messages", [])[1:]:
-                yield self._event(conversation_id, message)
+            messages.extend(response.get("messages", []))
             cursor = ((response.get("response_metadata") or {}).get("next_cursor") or "").strip()
             if not cursor:
                 break
+        return messages
+
+    def _thread_event(
+        self,
+        conversation_id: str,
+        root: dict[str, Any],
+    ) -> ConnectorEvent:
+        """One semantic event per thread: question and answers stay together.
+
+        The external ID stays keyed on the thread root, so new replies become
+        a new revision of the same source object instead of scattered units.
+        """
+        root_ts = str(root["ts"])
+        messages = self._collect_thread(conversation_id, root_ts) or [root]
+        text = "\n\n".join(
+            f"[{message.get('user') or 'unknown'}] {message.get('text', '')}"
+            for message in messages
+        )
+        external_id = f"{self.workspace_id}:{conversation_id}:{root_ts}"
+        return ConnectorEvent(
+            event_id=stable_id(
+                "evt",
+                "slack",
+                f"{external_id}:thread:{sha256_bytes(text.encode('utf-8'))}",
+            ),
+            connector_name=self.name,
+            operation="upsert",
+            external_id=external_id,
+            occurred_at=datetime.now(UTC),
+            payload={
+                "workspace_id": self.workspace_id,
+                "conversation_id": conversation_id,
+                "ts": root_ts,
+                "thread_ts": root_ts,
+                "user_id": root.get("user"),
+                "text": text,
+                "thread": True,
+                "message_count": len(messages),
+                "raw_thread": messages,
+            },
+            acl_scopes=[f"slack:{self.workspace_id}:{conversation_id}"],
+        )
 
     def _call(self, method: str, payload: dict[str, Any]) -> dict[str, Any]:
         while True:

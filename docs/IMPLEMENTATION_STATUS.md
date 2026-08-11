@@ -14,13 +14,13 @@
 | REST API | Ready for pilot | Read, exact evidence, assertion explain, connector event, sync, and review endpoints; trusted API-key or verified JWT identity; blocking handlers run synchronously in the server threadpool instead of on the event loop |
 | Identity and ACL snapshots | Ready for pilot | JWT issuer/audience/JWKS verification, configured API-key principal, stale dynamic snapshot exclusion, and legacy identity-header rejection |
 | Data classification and model egress | Ready for pilot | Canonical source/unit classification, local loopback policy, remote provider/classification/retention/secret gates, and atomic denial decisions |
-| Structured generation adapters | Ready for pilot | Provider-neutral typed contract with bounded HTTP responses, explicit timeouts, pinned model revisions, request IDs, token accounting, citation-ID validation, and OpenAI Responses/Anthropic Messages adapters |
+| Structured generation adapters | Ready for pilot | Provider-neutral typed contract with bounded HTTP responses, explicit timeouts, pinned model revisions, request IDs, token accounting, citation-ID validation, and OpenAI Responses/Anthropic Messages adapters. Claims support a `disputed` certainty that must cite every disagreeing evidence unit, and the prompt instructs the model to surface source conflicts instead of picking one |
 | MCP | Ready for pilot | Optional stdio adapter shares the application services; guided setup selects the generated config, and real client discovery/search/graph/answer parity has been validated |
 | Filesystem connector | Ready for pilot | Read-only traversal with an mtime settle window; content hashes are lazy and unchanged files are skipped by size/mtime against the stored revision without being read |
 | XLSX shallow/deep | Ready for pilot | Shared-string shallow index and exact `.xlsx`/`.xlsm` range reader; formula/cached values, formats, dates, and hidden dimensions are explicit |
 | PDF parser | Ready for pilot | PyMuPDF; OCR is routed but not bundled |
-| HWP broker | Ready for retrieval pilot | Native HWP/HWPX signatures and 86/86 real-file extraction are validated; guarded shadow/atomic activation preserves prior extractions. True section/paragraph/table locators remain incomplete |
-| Slack connector | Reference adapter | Validate scopes, rate limits, edits/deletes, and retention |
+| HWP broker | Ready for retrieval pilot | Native HWP/HWPX signatures and 86/86 real-file extraction are validated; guarded shadow/atomic activation preserves prior extractions. Parser 1.1 chunks with a 400-char overlap so boundary-spanning facts stay retrievable (86/86 re-extracted and activated). True section/paragraph/table locators remain incomplete |
+| Slack connector | Reference adapter | Threads are ingested as one semantic event keyed on the root message (replies become revisions); validate scopes, rate limits, edits/deletes, and retention |
 | Apple Mail connector | Reference adapter | macOS permission and mailbox allowlist required |
 | IMAP connector | Reference adapter | Validate provider-specific UID behavior |
 | Public evaluation corpus | Ready | Six checksum-pinned KOGL Type 1 PDFs; 30 relevance and 6 ACL cases |

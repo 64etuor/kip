@@ -56,6 +56,22 @@ def test_supported_claim_requires_evidence_and_unique_references() -> None:
         )
 
 
+def test_disputed_claim_must_cite_every_disagreeing_source() -> None:
+    with pytest.raises(ValidationError, match="disagreeing evidence"):
+        GeneratedClaim(
+            text="재시도 횟수는 문서와 코드가 다르게 규정한다.",
+            evidence_ids=("unit_1",),
+            certainty="disputed",
+        )
+
+    claim = GeneratedClaim(
+        text="운영 문서는 즉시 실패, 현재 정책 문서는 3회 재시도를 규정한다.",
+        evidence_ids=("unit_doc", "unit_policy"),
+        certainty="disputed",
+    )
+    assert claim.certainty == "disputed"
+
+
 def test_generation_result_enforces_claim_cardinality() -> None:
     result = _result(
         GeneratedClaim(text="첫 주장", evidence_ids=("unit_1",), certainty="supported"),

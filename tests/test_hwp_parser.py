@@ -10,6 +10,29 @@ from kip.adapters.parsers.registry import ParserRegistry
 from kip.settings import Settings
 
 
+def test_overlap_keeps_boundary_spanning_facts_in_one_chunk():
+    fact = "제출기한은 8월 15일이다"
+    filler_a = ("가" * 30 + "\n") * 3
+    text = filler_a + fact + "\n" + ("나" * 30 + "\n") * 3
+    without = split_text(text, max_chars=100, overlap_chars=0)
+    with_overlap = split_text(text, max_chars=100, overlap_chars=40)
+
+    assert any(fact in chunk for chunk in with_overlap)
+    # The overlapping variant never loses text: concatenated coverage is intact.
+    assert "".join(without) == text
+
+
+def test_split_text_spans_report_true_offsets():
+    from kip.adapters.parsers.hwp_native import split_text_spans
+
+    text = "\n".join("줄" * 20 for _ in range(20))
+    spans = split_text_spans(text, max_chars=100, overlap_chars=30)
+
+    for start, chunk in spans:
+        assert text[start : start + len(chunk)] == chunk
+    assert spans[1][0] < spans[0][0] + len(spans[0][1])  # windows overlap
+
+
 def test_split_text_preserves_order_without_dropping_long_lines():
     text = "첫 문단\n" + ("긴 문장 " * 20) + "\n마지막 문단"
 

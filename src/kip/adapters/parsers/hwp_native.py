@@ -29,13 +29,25 @@ def has_hwp_signature(path: Path) -> bool:
     return False
 
 
-def split_text(text: str, *, max_chars: int) -> list[str]:
+def split_text_spans(
+    text: str,
+    *,
+    max_chars: int,
+    overlap_chars: int = 0,
+) -> list[tuple[int, str]]:
+    """Split into (offset, chunk) windows with an overlapping tail.
+
+    Overlap keeps a fact that straddles a window boundary fully inside at
+    least one chunk, so it stays retrievable by lexical and vector search.
+    """
     if max_chars < 1:
         raise ValueError("max_chars must be positive")
+    if overlap_chars < 0 or overlap_chars >= max_chars // 2:
+        raise ValueError("overlap_chars must be non-negative and below half of max_chars")
     if len(text) <= max_chars:
-        return [text] if text else []
+        return [(0, text)] if text else []
 
-    chunks: list[str] = []
+    spans: list[tuple[int, str]] = []
     start = 0
     while start < len(text):
         end = min(start + max_chars, len(text))
@@ -43,17 +55,41 @@ def split_text(text: str, *, max_chars: int) -> list[str]:
             line_break = text.rfind("\n", start, end)
             if line_break > start + max_chars // 2:
                 end = line_break + 1
-        chunks.append(text[start:end])
-        start = end
-    return chunks
+        spans.append((start, text[start:end]))
+        if end >= len(text):
+            break
+        start = max(end - overlap_chars, start + 1)
+    return spans
+
+
+def split_text(text: str, *, max_chars: int, overlap_chars: int = 0) -> list[str]:
+    return [
+        chunk
+        for _, chunk in split_text_spans(
+            text,
+            max_chars=max_chars,
+            overlap_chars=overlap_chars,
+        )
+    ]
 
 
 class HwpNativeParser:
     name = "hwp-hwpx-parser"
-    version = "1.0"
+    version = "1.1"
 
-    def __init__(self, *, max_chars_per_unit: int = 4000) -> None:
+    def __init__(
+        self,
+        *,
+        max_chars_per_unit: int = 4000,
+        overlap_chars: int = 400,
+    ) -> None:
         self.max_chars_per_unit = max_chars_per_unit
+        # Overlap must stay under half the window for splitting to progress;
+        # clamp so small windows (tests, tuned configs) remain valid.
+        self.overlap_chars = min(
+            overlap_chars,
+            max(0, max_chars_per_unit // 2 - 1),
+        )
 
     def supports(self, path: Path) -> bool:
         return has_hwp_signature(path)
@@ -94,15 +130,17 @@ class HwpNativeParser:
             raise ParserError("native HWP parser returned no usable text")
 
         extraction_id = new_id("ext")
-        chunks = split_text(text, max_chars=self.max_chars_per_unit)
+        spans = split_text_spans(
+            text,
+            max_chars=self.max_chars_per_unit,
+            overlap_chars=self.overlap_chars,
+        )
         units: list[ContentUnit] = []
-        cursor = 0
-        for ordinal, chunk in enumerate(chunks):
+        for ordinal, (chunk_start, chunk) in enumerate(spans):
             normalized = normalize_text(chunk)
             if not normalized:
-                cursor += len(chunk)
                 continue
-            end = cursor + len(chunk)
+            end = chunk_start + len(chunk)
             units.append(
                 ContentUnit(
                     id=stable_id("unit", extraction_id, str(ordinal)),
@@ -120,7 +158,7 @@ class HwpNativeParser:
                         data={
                             "section": None,
                             "chunk": ordinal,
-                            "char_start": cursor,
+                            "char_start": chunk_start,
                             "char_end": end,
                             "format": path.suffix.lower(),
                         },
@@ -133,7 +171,6 @@ class HwpNativeParser:
                     },
                 )
             )
-            cursor = end
 
         if not units:
             raise ParserError("native HWP parser returned no usable text units")

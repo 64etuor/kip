@@ -179,6 +179,43 @@ def test_generation_receives_evidence_the_lexical_gate_would_drop(
     assert generator.requests[0].evidence[0].body.endswith("8월 15일이다.")
 
 
+def test_disputed_claim_flows_through_with_both_citations(tmp_path: Path) -> None:
+    generator = RecordingGenerator()
+    container = _container(tmp_path, generator)
+    _ingest(container, "운영문서.txt", "정산 증빙 제출기한은 2026년 8월 15일이다.")
+    _ingest(container, "개정안내.txt", "정산 증빙 제출기한은 2026년 9월 30일로 연장되었다.")
+    context = container.application.operations.request_context()
+
+    def disputed_claims(request: GenerationRequest):
+        ids = tuple(item.id for item in request.evidence[:2])
+        return (
+            GeneratedClaim(
+                text="제출기한은 문서에 따라 8월 15일과 9월 30일로 상충한다.",
+                evidence_ids=ids,
+                certainty="disputed",
+            ),
+        )
+
+    original_generate = generator.generate
+
+    def generate(request: GenerationRequest):
+        generator.claims = disputed_claims(request)
+        return original_generate(request)
+
+    generator.generate = generate  # type: ignore[method-assign]
+
+    response = container.application.answering.answer(
+        context,
+        AnswerRequest(query="정산 증빙 제출기한", limit=5),
+    )
+
+    assert response.refused is False
+    assert response.claims[0].certainty == "disputed"
+    assert len(response.claims[0].evidence_ids) == 2
+    cited = {citation.unit_id for citation in response.citations}
+    assert set(response.claims[0].evidence_ids) <= cited
+
+
 def test_unknown_generated_citation_returns_typed_refusal(tmp_path: Path) -> None:
     generator = RecordingGenerator(
         claims=(

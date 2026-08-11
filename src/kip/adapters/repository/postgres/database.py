@@ -87,9 +87,16 @@ def _vector_literal(values: list[float]) -> str:
     return "[" + ",".join(format(value, ".9g") for value in values) + "]"
 
 
-def _websearch_or_query(lexemes: str) -> str:
+def _websearch_or_query(lexemes: str, *, max_terms: int = 64) -> str:
     terms = list(dict.fromkeys(term.replace('"', "") for term in lexemes.split() if term))
-    return " OR ".join(f'"{term}"' for term in terms[:256])
+    if len(terms) > max_terms:
+        # Long natural-language questions expand into hundreds of n-grams;
+        # ORing them all pushed queries past the statement timeout. Keep the
+        # most selective terms (longer first, stable order within a length)
+        # instead of truncating in emission order, which kept mostly 2-grams.
+        terms.sort(key=len, reverse=True)
+        terms = terms[:max_terms]
+    return " OR ".join(f'"{term}"' for term in terms)
 
 
 class PostgresDatabase:

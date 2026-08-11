@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import StrEnum, unique
 
 from kip.application.retrieval import apply_rerank, reciprocal_rank_fusion
@@ -21,6 +22,18 @@ class SearchMode(StrEnum):
     VECTOR = "vector"
     HYBRID = "hybrid"
     RERANKED = "reranked"
+
+
+@dataclass(frozen=True, slots=True)
+class _QueryPlan:
+    mode: SearchMode
+    explicit: bool
+
+
+@dataclass(frozen=True, slots=True)
+class _AnalyzedQuery:
+    text: str
+    lexemes: str
 
 
 class SearchEngine:
@@ -128,6 +141,16 @@ class SearchEngine:
         *,
         mode: str | None = None,
     ) -> list[SearchHit]:
+        # The pipeline is a fixed sequence of stages with one exit:
+        #   plan → analyze → build ranked pool → diversify + truncate.
+        # Each stage is a named method so a change in one cannot silently
+        # reorder another; only the pool builder branches on mode.
+        plan = self._resolve_mode(mode)
+        query = self._analyze(context, request.query)
+        pool = self._ranked_pool(context, request, query, plan)
+        return self._diversify(pool, request.limit)
+
+    def _resolve_mode(self, mode: str | None) -> _QueryPlan:
         explicit = mode is not None
         configured_mode = (
             str(self._settings.get("search.default_mode", "reranked"))
@@ -136,102 +159,99 @@ class SearchEngine:
         )
         raw_mode = mode or configured_mode
         try:
-            selected_mode = SearchMode(raw_mode)
+            return _QueryPlan(mode=SearchMode(raw_mode), explicit=explicit)
         except ValueError as exc:
             raise ValidationError(f"unsupported search mode: {raw_mode}") from exc
-        lexemes = self._analyzer.analyze(request.query)
-        expansion = self._alias_expansion(context, request.query)
+
+    def _analyze(self, context: RequestContext, query_text: str) -> _AnalyzedQuery:
+        lexemes = self._analyzer.analyze(query_text)
+        expansion = self._alias_expansion(context, query_text)
         if expansion:
             # Expansion widens candidate retrieval only. The reranker keeps
             # scoring against the user's original wording: injecting synonyms
             # into the rerank query measurably promoted synonym-dense but
             # off-target documents on the golden set.
             lexemes = f"{lexemes} {self._analyzer.analyze(' '.join(expansion))}"
-        if selected_mode is SearchMode.LEXICAL:
-            lexical_rerank_enabled = bool(
-                self._settings.get("search.lexical_rerank_enabled", False)
-            )
-            if not lexical_rerank_enabled:
-                pool_request = request.model_copy(
-                    update={"limit": min(100, max(request.limit, 40))}
-                )
-                return self._diversify(
-                    self._annotate_lexical(
-                        self._store.search(context, pool_request, lexemes)
-                    ),
-                    request.limit,
-                )
-            candidate_limit = min(
-                100,
-                max(
-                    request.limit,
-                    int(
-                        self._settings.get(
-                            "search.lexical_rerank_candidate_limit",
-                            40,
-                        )
-                    ),
-                ),
-            )
-            candidate_request = request.model_copy(
-                update={"limit": candidate_limit}
-            )
-            lexical = self._annotate_lexical(
-                self._store.search(context, candidate_request, lexemes)
-            )
-            if self._reranker is None:
-                raise DependencyUnavailableError(
-                    "lexical reranking is enabled without a reranker adapter"
-                )
-            try:
-                return self._diversify(
-                    self._rerank(
-                        context,
-                        request,
-                        lexical,
-                        candidate_limit=candidate_limit,
-                    ),
-                    request.limit,
-                )
-            except DependencyUnavailableError:
-                return self._diversify(
-                    [
-                        hit.model_copy(
-                            update={
-                                "metadata": {
-                                    **hit.metadata,
-                                    "lexical_rerank_degraded": True,
-                                }
-                            },
-                            deep=True,
-                        )
-                        for hit in lexical
-                    ],
-                    request.limit,
-                )
+        return _AnalyzedQuery(text=query_text, lexemes=lexemes)
 
-        candidate_limit = min(
+    def _ranked_pool(
+        self,
+        context: RequestContext,
+        request: SearchRequest,
+        query: _AnalyzedQuery,
+        plan: _QueryPlan,
+    ) -> list[SearchHit]:
+        if plan.mode is SearchMode.LEXICAL:
+            return self._lexical_pool(context, request, query)
+        return self._semantic_pool(context, request, query, plan)
+
+    def _candidate_limit(self, request: SearchRequest, setting: str) -> int:
+        return min(
             100,
-            max(
-                request.limit,
-                int(self._settings.get("search.hybrid_candidate_limit", 40)),
-            ),
+            max(request.limit, int(self._settings.get(setting, 40))),
         )
+
+    def _candidate_pool(
+        self,
+        context: RequestContext,
+        request: SearchRequest,
+        query: _AnalyzedQuery,
+        candidate_limit: int,
+    ) -> list[SearchHit]:
         candidate_request = request.model_copy(update={"limit": candidate_limit})
-        lexical = self._annotate_lexical(
-            self._store.search(context, candidate_request, lexemes)
+        return self._annotate_lexical(
+            self._store.search(context, candidate_request, query.lexemes)
         )
+
+    def _lexical_pool(
+        self,
+        context: RequestContext,
+        request: SearchRequest,
+        query: _AnalyzedQuery,
+    ) -> list[SearchHit]:
+        if not bool(self._settings.get("search.lexical_rerank_enabled", False)):
+            candidate_limit = self._candidate_limit(
+                request, "search.hybrid_candidate_limit"
+            )
+            return self._candidate_pool(context, request, query, candidate_limit)
+        candidate_limit = self._candidate_limit(
+            request, "search.lexical_rerank_candidate_limit"
+        )
+        lexical = self._candidate_pool(context, request, query, candidate_limit)
+        if self._reranker is None:
+            raise DependencyUnavailableError(
+                "lexical reranking is enabled without a reranker adapter"
+            )
         try:
-            space = self._semantic.search_space(context, explicit=explicit)
+            return self._rerank(
+                context, request, lexical, candidate_limit=candidate_limit
+            )
+        except DependencyUnavailableError:
+            return self._mark(lexical, "lexical_rerank_degraded")
+
+    def _semantic_pool(
+        self,
+        context: RequestContext,
+        request: SearchRequest,
+        query: _AnalyzedQuery,
+        plan: _QueryPlan,
+    ) -> list[SearchHit]:
+        candidate_limit = self._candidate_limit(
+            request, "search.hybrid_candidate_limit"
+        )
+        lexical = self._candidate_pool(context, request, query, candidate_limit)
+        candidate_request = request.model_copy(update={"limit": candidate_limit})
+        try:
+            space = self._semantic.search_space(context, explicit=plan.explicit)
             vector = self._store.vector_search(
                 context,
                 candidate_request,
-                self._embedding.embed_query(request.query),
+                self._embedding.embed_query(query.text),
                 space_id=space.id,
                 limit=candidate_limit,
             )
-            if selected_mode is SearchMode.VECTOR:
-                return self._diversify(vector, request.limit)
+            if plan.mode is SearchMode.VECTOR:
+                return vector
             fused = reciprocal_rank_fusion(
                 lexical,
                 vector,
@@ -240,30 +260,23 @@ class SearchEngine:
                     self._settings.get("search.rrf_rank_constant", 60)
                 ),
             )
-            if selected_mode is SearchMode.HYBRID:
-                return self._diversify(fused, request.limit)
-            return self._diversify(
-                self._rerank(context, request, fused),
-                request.limit,
-            )
+            if plan.mode is SearchMode.HYBRID:
+                return fused
+            return self._rerank(context, request, fused)
         except DependencyUnavailableError:
-            if explicit:
+            if plan.explicit:
                 raise
-            return self._diversify(
-                [
-                    hit.model_copy(
-                        update={
-                            "metadata": {
-                                **hit.metadata,
-                                "semantic_degraded": True,
-                            }
-                        },
-                        deep=True,
-                    )
-                    for hit in lexical
-                ],
-                request.limit,
+            return self._mark(lexical, "semantic_degraded")
+
+    @staticmethod
+    def _mark(hits: list[SearchHit], flag: str) -> list[SearchHit]:
+        return [
+            hit.model_copy(
+                update={"metadata": {**hit.metadata, flag: True}},
+                deep=True,
             )
+            for hit in hits
+        ]
 
     def _rerank(
         self,

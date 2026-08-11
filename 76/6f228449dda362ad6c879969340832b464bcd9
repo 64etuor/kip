@@ -1,0 +1,57 @@
+evaluation/reports/reranker-ab-20260811/decision.md
+  s_e752ec1bf74db5::t_13c957fa7b2f88 1-52
+docs/IMPLEMENTATION_STATUS.md
+  s_e752ec1bf74db5::t_ef74134a89bde1 34
+evaluation/golden/private-onedrive-nl-draft.yaml
+  s_e752ec1bf74db5::t_45ea4976e52f38 1-163
+evaluation/reports/reranker-ab-20260811/norerank/eval_20260811T005750558120Z.json
+  s_876c2fe18e2cba::t_f40382d5874b46 1-619
+evaluation/reports/reranker-ab-20260811/norerank/eval_20260811T005750558120Z.md
+  s_876c2fe18e2cba::t_57603c270e302f 1-27
+evaluation/reports/reranker-ab-20260811/norerank/latest.json
+  s_876c2fe18e2cba::t_01cb374252776d 1-619
+evaluation/reports/reranker-ab-20260811/norerank/latest.md
+  s_876c2fe18e2cba::t_eb6fe2fb81824b 1-27
+evaluation/reports/reranker-ab-20260811/bm25/eval_20260811T010805116718Z.json
+  s_e752ec1bf74db5::t_1d08931bbaacda 1-606
+evaluation/reports/reranker-ab-20260811/bm25/eval_20260811T010805116718Z.md
+  s_e752ec1bf74db5::t_404dfc1117a281 1-27
+evaluation/reports/reranker-ab-20260811/bm25/latest.json
+  s_e752ec1bf74db5::t_683c3f1e115839 1-606
+evaluation/reports/reranker-ab-20260811/bm25/latest.md
+  s_e752ec1bf74db5::t_a09f3b74dfc100 1-27
+evaluation/reports/reranker-ab-20260811/evolution.jsonl
+  s_e752ec1bf74db5::t_74183b9eccfbac 1-3
+evaluation/reports/reranker-ab-20260811/rapidfuzz/eval_20260811T010115818651Z.json
+  s_e752ec1bf74db5::t_2d49f851feb1b1 1-614
+evaluation/reports/reranker-ab-20260811/rapidfuzz/eval_20260811T010115818651Z.md
+  s_e752ec1bf74db5::t_222144fbdf19c4 1-27
+evaluation/reports/reranker-ab-20260811/rapidfuzz/latest.json
+  s_e752ec1bf74db5::t_429f77ccc163d6 1-614
+evaluation/reports/reranker-ab-20260811/rapidfuzz/latest.md
+  s_e752ec1bf74db5::t_52c20773de0543 1-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "766f228449dda362ad6c879969340832b464bcd9",
+  "prompts": {},
+  "sessions": {
+    "s_876c2fe18e2cba": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c9d0dafe-c944-4159-8844-2174dd2fc5d1",
+        "model": "claude-opus-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_e752ec1bf74db5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0cda1f36-e31d-42f3-bfe4-3a8e98d377fa",
+        "model": "claude-fable-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

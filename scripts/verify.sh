@@ -17,4 +17,7 @@ fi
 if command -v mypy >/dev/null 2>&1; then
   mypy src/kip
 fi
+# Retrieval regression floor on the reviewed golden set. Self-skips when no
+# durable corpus is configured, so it only gates where the corpus exists.
+"$PY" scripts/golden_gate.py
 printf 'Verification passed.\n'

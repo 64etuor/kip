@@ -1,0 +1,12 @@
+{
+  "dataset": "private-onedrive-nl",
+  "variant": "lexical",
+  "note": "Retrieval regression floor. A change dropping below these on the reviewed set fails scripts/golden_gate.py. Update deliberately, with an ADR, when an intended trade-off moves them.",
+  "recorded_at": "2026-08-11",
+  "recorded_recall_at_k": 0.7895,
+  "recorded_mrr": 0.6462,
+  "floor_recall_at_k": 0.76,
+  "floor_mrr": 0.62,
+  "max_failed_cases": 0,
+  "max_p95_ms": 15000
+}

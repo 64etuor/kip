@@ -1,0 +1,22 @@
+src/kip/application/search_engine.py
+  s_e752ec1bf74db5::t_e940abd4ea5cfa 3,27-36
+  s_e752ec1bf74db5::t_ee2ae98ada780d 188-193,199,213-214,216-218,220,239-240,242
+  s_e752ec1bf74db5::t_5e4cc4903e78e1 144-153,162,165-168,175-187,194-198,200-212,219,221-223,225-227,229-230,232-238,245,249,253-254,263-265,267,269-276,278-279
+  s_e752ec1bf74db5::t_cd2ca96516f841 37-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "806ccd026e84f3d0caa556c9966ed6253f0e1951",
+  "prompts": {},
+  "sessions": {
+    "s_e752ec1bf74db5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0cda1f36-e31d-42f3-bfe4-3a8e98d377fa",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

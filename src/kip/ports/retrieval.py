@@ -66,6 +66,12 @@ class RetrievalStore(Protocol):
         limit: int = 20,
     ) -> list[VocabularyItem]: ...
 
+    def term_document_frequencies(
+        self,
+        context: RequestContext,
+        terms: list[str],
+    ) -> dict[str, int]: ...
+
     def get_content_units(
         self,
         context: RequestContext,

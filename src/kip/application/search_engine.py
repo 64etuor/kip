@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from enum import StrEnum, unique
 
 from kip.application.retrieval import apply_rerank, reciprocal_rank_fusion
@@ -34,6 +35,14 @@ class _QueryPlan:
 class _AnalyzedQuery:
     text: str
     lexemes: str
+    content_tokens: list[str] = field(default_factory=list)
+    expansion_terms: list[str] = field(default_factory=list)
+
+
+# Whole meaningful tokens (Korean runs and ASCII words of length >= 2), as
+# opposed to the n-gram fragments the index also stores. These are what the
+# abstention gate checks against corpus document frequency.
+_CONTENT_TOKEN_RE = re.compile(r"[0-9A-Za-z]{2,}|[가-힣]{2,}")
 
 
 class SearchEngine:
@@ -147,8 +156,42 @@ class SearchEngine:
         # reorder another; only the pool builder branches on mode.
         plan = self._resolve_mode(mode)
         query = self._analyze(context, request.query)
+        if self._should_abstain(context, query):
+            return []
         pool = self._ranked_pool(context, request, query, plan)
         return self._diversify(pool, request.limit)
+
+    def _should_abstain(
+        self,
+        context: RequestContext,
+        query: _AnalyzedQuery,
+    ) -> bool:
+        """Return True when the query's vocabulary is absent from the corpus.
+
+        A query whose whole content tokens never occur in the reachable
+        corpus (a typo, a nonsense string, a topic that simply is not
+        indexed) otherwise matches on incidental n-gram fragments and
+        returns unranked noise. Abstaining here makes "no results" an
+        honest signal instead of a list of score-zero documents.
+
+        Scope is deliberately narrow: abstain only when the query's ENTIRE
+        vocabulary — every content token and every approved-alias
+        expansion — is absent from the reachable corpus. That is the only
+        lexical threshold that never abstains a legitimate query (any
+        single grounded term keeps retrieval alive), so it catches typos
+        and nonsense without touching paraphrases. Distinguishing partial
+        nonsense from a low-overlap paraphrase, or a real-word query with
+        no factual answer, needs the calibrated semantic score — which
+        plugs into this same gate once the vector space is active.
+        """
+        if not bool(self._settings.get("search.abstain_on_unknown_terms", True)):
+            return False
+        tokens = query.content_tokens
+        if not tokens:
+            return False
+        candidates = list(dict.fromkeys([*tokens, *query.expansion_terms]))
+        frequencies = self._store.term_document_frequencies(context, candidates)
+        return max(frequencies.values(), default=0) == 0
 
     def _resolve_mode(self, mode: str | None) -> _QueryPlan:
         explicit = mode is not None
@@ -172,7 +215,22 @@ class SearchEngine:
             # into the rerank query measurably promoted synonym-dense but
             # off-target documents on the golden set.
             lexemes = f"{lexemes} {self._analyzer.analyze(' '.join(expansion))}"
-        return _AnalyzedQuery(text=query_text, lexemes=lexemes)
+        content_tokens = list(
+            dict.fromkeys(_CONTENT_TOKEN_RE.findall(query_text.lower()))
+        )
+        expansion_terms = list(
+            dict.fromkeys(
+                token
+                for term in expansion
+                for token in _CONTENT_TOKEN_RE.findall(term.lower())
+            )
+        )
+        return _AnalyzedQuery(
+            text=query_text,
+            lexemes=lexemes,
+            content_tokens=content_tokens,
+            expansion_terms=expansion_terms,
+        )
 
     def _ranked_pool(
         self,

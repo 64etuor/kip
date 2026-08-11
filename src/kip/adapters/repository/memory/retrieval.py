@@ -102,6 +102,13 @@ class MemoryRetrievalStore:
     ) -> list[VocabularyItem]:
         return self.lexical.vocabulary(context, prefix, limit)
 
+    def term_document_frequencies(
+        self,
+        context: RequestContext,
+        terms: list[str],
+    ) -> dict[str, int]:
+        return self.lexical.term_document_frequencies(context, terms)
+
     def get_content_units(
         self,
         context: RequestContext,

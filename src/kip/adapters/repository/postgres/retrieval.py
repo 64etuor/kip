@@ -91,6 +91,13 @@ class PostgresRetrievalStore:
     ) -> list[VocabularyItem]:
         return self.database.vocabulary(context, prefix, limit)
 
+    def term_document_frequencies(
+        self,
+        context: RequestContext,
+        terms: list[str],
+    ) -> dict[str, int]:
+        return self.database.term_document_frequencies(context, terms)
+
     def get_content_units(
         self,
         context: RequestContext,

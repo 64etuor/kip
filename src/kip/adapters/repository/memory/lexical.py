@@ -145,6 +145,24 @@ class MemoryLexicalStore:
         )
         return items[:limit]
 
+    def term_document_frequencies(
+        self,
+        context: RequestContext,
+        terms: list[str],
+    ) -> dict[str, int]:
+        cleaned = [term for term in dict.fromkeys(terms) if term]
+        if not cleaned:
+            return {}
+        documents: dict[str, set[str | None]] = {term: set() for term in cleaned}
+        for unit in self.state.units.values():
+            if not unit_is_visible(self.state, unit, context):
+                continue
+            tokens = set(unit.lexical_text.lower().split())
+            for term in cleaned:
+                if term.lower() in tokens:
+                    documents[term].add(unit.document_id)
+        return {term: len(docs) for term, docs in documents.items()}
+
     @staticmethod
     def _score(
         haystack: str,

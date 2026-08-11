@@ -1513,6 +1513,37 @@ class PostgresDatabase:
             rows = cursor.fetchall()
         return [VocabularyItem(**dict(row)) for row in rows]
 
+    def term_document_frequencies(
+        self,
+        context: RequestContext,
+        terms: list[str],
+    ) -> dict[str, int]:
+        # ACL-filtered count of documents whose lexical projection contains
+        # each whole term. Used by the abstention gate to decide whether the
+        # query's vocabulary exists in the reachable corpus at all.
+        cleaned = [term for term in dict.fromkeys(terms) if term]
+        if not cleaned:
+            return {}
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            frequencies: dict[str, int] = {}
+            for term in cleaned:
+                tsquery = "'" + term.replace("'", "").replace("\\", "") + "'"
+                cursor.execute(
+                    """
+                    SELECT count(DISTINCT l.document_id)::int AS df
+                    FROM search.lexical_units l
+                    JOIN content.units u ON u.id=l.unit_id
+                    WHERE l.workspace_id=%s
+                      AND (cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])
+                      AND kip.acl_snapshot_is_fresh(u.acl_snapshot_id)
+                      AND l.tsv @@ to_tsquery('simple', %s)
+                    """,
+                    (context.workspace, context.acl_scopes, tsquery),
+                )
+                row = cursor.fetchone()
+                frequencies[term] = int(row["df"]) if row else 0
+        return frequencies
+
     def get_content_units(self, context: RequestContext, unit_ids: Sequence[str]) -> list[ContentUnit]:
         if not unit_ids:
             return []

@@ -1,0 +1,44 @@
+src/kip/adapters/repository/postgres/retrieval.py
+  s_e752ec1bf74db5::t_d4c0109274b44a 94-100
+src/kip/ports/retrieval.py
+  s_e752ec1bf74db5::t_79bdbf9bfa3b94 69-74
+tests/test_abstention.py
+  s_e752ec1bf74db5::t_f43523aabd92e4 36
+  s_e752ec1bf74db5::t_ed5742f1e1f09f 1-35,37-61,63-67
+  s_e752ec1bf74db5::t_cef897dc75306b 62
+config/kip.example.toml
+  s_e752ec1bf74db5::t_f43523aabd92e4 77
+  s_e752ec1bf74db5::t_380533f1127eef 76
+src/kip/adapters/repository/memory/lexical.py
+  s_e752ec1bf74db5::t_672f1d371812f2 155-156,163-164
+  s_e752ec1bf74db5::t_c23140c84e9f13 148-154,157-162,165
+src/kip/adapters/repository/postgres/database.py
+  s_e752ec1bf74db5::t_d20cadf8f1c849 1516-1546
+src/kip/application/search_engine.py
+  s_e752ec1bf74db5::t_378ef58fc992d7 38,40-45
+  s_e752ec1bf74db5::t_aa485f590cccf6 3-4
+  s_e752ec1bf74db5::t_35091263ac9cfa 159-160,164-176,186-191
+  s_e752ec1bf74db5::t_b4c5f2f0acbe99 177-185,192-194
+  s_e752ec1bf74db5::t_70b5a9a1694f64 39
+  s_e752ec1bf74db5::t_a34759bcb75cf4 218,220,228-231,233
+  s_e752ec1bf74db5::t_39d7fd392c7443 219,221-227,232
+  s_e752ec1bf74db5::t_ef6ec6fca4ad82 195
+src/kip/adapters/repository/memory/retrieval.py
+  s_e752ec1bf74db5::t_b697f0aaba1c18 105-111
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "47aba8d4d65eb5a4a7958e38b35883c11c6f5f5e",
+  "prompts": {},
+  "sessions": {
+    "s_e752ec1bf74db5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0cda1f36-e31d-42f3-bfe4-3a8e98d377fa",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

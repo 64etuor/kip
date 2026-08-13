@@ -1,0 +1,177 @@
+evaluation/reports/semantic-qwen3-final-20260813/manual-qa.md
+  s_9e1b25ddfedb29::t_4067999d70eca7 1-43
+  s_9e1b25ddfedb29::t_cd045f8b5ecc5c 44-45
+evaluation/reports/semantic-qwen3-final-20260813/eval_20260813T043920194657Z.md
+  s_9e1b25ddfedb29::t_5db283fb8b5057 1-28
+docs/plans/2026-08-13-production-search-completion.md
+  s_9e1b25ddfedb29::t_6c54a87f80fa84 1-134
+docs/AI_OPERATOR_RUNBOOK.md
+  s_9e1b25ddfedb29::t_6f40faae229898 100-106
+  s_9e1b25ddfedb29::t_6227967f543564 85-87,94-97,107-111,137-141,154-156,279-280
+docs/APP_INTEGRATION.md
+  s_9e1b25ddfedb29::t_ca5e2037046a01 14-18
+  s_9e1b25ddfedb29::t_4d7778fdcf0852 10-13,90-94
+evaluation/reports/semantic-qwen3-final-20260813/decision.md
+  s_9e1b25ddfedb29::t_b8937e976bfb91 1-54
+docs/adr/ADR-005-local-first-hybrid-retrieval.md
+  s_9e1b25ddfedb29::t_f69b761adfa1da 46-48
+  s_9e1b25ddfedb29::t_cd045f8b5ecc5c 36
+  s_9e1b25ddfedb29::t_fac0f099eeec59 28-33,39
+  s_9e1b25ddfedb29::t_b8937e976bfb91 34-35,37-38
+tests/test_root_agent_files.py
+  s_9e1b25ddfedb29::t_a42e1aaa65262e 10
+docs/STARTER_KIT_GUIDE.md
+  s_9e1b25ddfedb29::t_f9712846061d97 68-71,103-110,168-169
+  s_9e1b25ddfedb29::t_ca5e2037046a01 111-122
+README.md
+  s_9e1b25ddfedb29::t_e9173a6b9b27d1 10-14
+  s_9e1b25ddfedb29::t_cd045f8b5ecc5c 241
+  s_9e1b25ddfedb29::t_6f40faae229898 185,196-198
+  s_9e1b25ddfedb29::t_7a106e6e3f0fcc 194-195,199-200,203-207,239-240,244
+  s_9e1b25ddfedb29::t_b8937e976bfb91 242-243
+docs/PRD.md
+  s_9e1b25ddfedb29::t_65f5712a2698ae 4-6,14,29-33,38,608-611,824-827,830-854
+  s_9e1b25ddfedb29::t_68b8f50f2cec3c 660-664
+  s_9e1b25ddfedb29::t_6056a239efc935 95,116,118,493-496,620-624,773,855
+docs/OPERATIONS.md
+  s_9e1b25ddfedb29::t_176c6cc551c850 297
+  s_9e1b25ddfedb29::t_2e46458b9f3c95 426-428,437,447-449
+  s_9e1b25ddfedb29::t_e3df1d16d2625f 291-296,306-311,325-332,334-336,347-353,374-392
+  s_9e1b25ddfedb29::t_37b3ce2f016dd6 338-343
+  s_9e1b25ddfedb29::t_3946f07b3529b6 320-324
+  s_9e1b25ddfedb29::t_ec7d11b30337d1 318-319
+  s_9e1b25ddfedb29::t_c18dbb1cc7d361 344-345
+  s_9e1b25ddfedb29::t_72c352015c898f 312,337,346,393
+docs/TRD.md
+  s_9e1b25ddfedb29::t_f3b217eb143fc3 33-36
+  s_9e1b25ddfedb29::t_e2cd90265606d8 2487,3232
+  s_9e1b25ddfedb29::t_6f40faae229898 3352-3353
+  s_9e1b25ddfedb29::t_71f3d1b43215d2 2262-2265
+  s_9e1b25ddfedb29::t_3928f123743118 2050-2052,3861-3863,3866-3873
+  s_9e1b25ddfedb29::t_50db5ecacf3882 2404-2409,2413-2415,2419-2429,2431,2434-2439,2441-2442,2446-2451,2461,2480-2482,2484,2488-2489,2492-2496,2514-2517,2535-2536,2540-2541
+  s_9e1b25ddfedb29::t_b01977b380f0bd 292-295,303-304,308-309,316,319-321,327-328,331,337-342,348-349,352-353,355-356,358,360-362
+  s_9e1b25ddfedb29::t_68b8f50f2cec3c 3001-3006
+  s_9e1b25ddfedb29::t_54d269b24aa664 4807-4809,4891-4893,4896-4920
+  s_9e1b25ddfedb29::t_0e0fc5b3379321 3168,3175-3177,3180-3185,3198,3201-3204,3211,3216-3217,3292-3294,3296-3298
+  s_9e1b25ddfedb29::t_aa52957dad059a 3026-3028,3034,3038-3049,3051,3053,3057,3060,3062-3063,3068-3079,3088,3091,3093-3096,3105,3107,3111,3114-3117,3127-3131,3133-3135,3139-3140,3143-3145,3153-3156
+  s_9e1b25ddfedb29::t_37a7b6b9f9a173 481
+  s_9e1b25ddfedb29::t_f72be53acfda6f 3437,3439,3442,3444,3446-3449
+  s_9e1b25ddfedb29::t_16592b18517131 391-392,394-405
+  s_9e1b25ddfedb29::t_40630f20d2dc63 4-6,15,19-20,28-30,40-42,430-431,434-437,441-443,446-448,450-451,457-461,465,468,472,485-486,489,492-493
+  s_9e1b25ddfedb29::t_81c26a0bf5ce5e 3303-3304,3306,3309-3312,3314-3316,3321-3322,3325-3326,3330-3334,3348,3361-3362,3370-3374,3376-3379,3389-3394,3399-3401,3404-3407,3411-3414,3417,3421-3425
+  s_9e1b25ddfedb29::t_6056a239efc935 68,330,729,735-742,2455-2458,2462-2463,2466-2470,2474-2476,2542-2545,2907-2909,3178-3179,3190-3193,3231,3233-3234,3240,3248-3253,4296-4300,4708
+  s_9e1b25ddfedb29::t_822a9daed06990 3224-3227,3239,3241-3244,3254,3259,3261-3262,3265-3275,3280-3282
+  s_9e1b25ddfedb29::t_a3524d5080b7ec 3109-3110
+  s_9e1b25ddfedb29::t_70c05849c58631 494,2910
+docs/adr/ADR-037-production-search-contract-and-readiness-gates.md
+  s_9e1b25ddfedb29::t_f69b761adfa1da 1-70
+docs/adr/ADR-036-fixed-retrieval-pipeline-and-corpus-gate.md
+  s_9e1b25ddfedb29::t_f69b761adfa1da 31-35,48-50,56-57
+  s_9e1b25ddfedb29::t_ae56aab4e8d16b 1-30,36-47,51-55,58-59
+docs/adr/ADR-018-jina-huggingface-reranker.md
+  s_9e1b25ddfedb29::t_4d7778fdcf0852 37-39
+docs/PRODUCTION_CHECKLIST.md
+  s_9e1b25ddfedb29::t_4d7778fdcf0852 5-11,19,53-54
+  s_9e1b25ddfedb29::t_e3df1d16d2625f 12-18,55-57,85-86
+evaluation/reports/semantic-qwen3-final-20260813/latest.md
+  s_9e1b25ddfedb29::t_5db283fb8b5057 1-28
+evaluation/reports/semantic-qwen3-final-20260813/latest.json
+  s_9e1b25ddfedb29::t_5db283fb8b5057 1-1185
+docs/DATA_CONTRACTS.md
+  s_9e1b25ddfedb29::t_68b8f50f2cec3c 97-100
+  s_9e1b25ddfedb29::t_c71cd5c91e5442 23-24,33,46-48,50-53,102-105
+  s_9e1b25ddfedb29::t_4d7778fdcf0852 41,49
+  s_9e1b25ddfedb29::t_ca5e2037046a01 25-32,34-40,42-45
+  s_9e1b25ddfedb29::t_37857e4b0a7e34 3-6
+docs/PRODUCTION_DESIGN_ALIGNMENT.md
+  s_9e1b25ddfedb29::t_070460a1d20f70 34,38,41-42,46,51-52,85-89,93-94,98-105
+  s_9e1b25ddfedb29::t_b8937e976bfb91 95-97
+  s_9e1b25ddfedb29::t_f2924516c16ed9 45
+  s_9e1b25ddfedb29::t_ae56aab4e8d16b 1-31,40,53-56,58-60,65-84,90-92
+  s_9e1b25ddfedb29::t_cd045f8b5ecc5c 44,57,61-64
+  s_9e1b25ddfedb29::t_a37a45e186934b 43
+  s_9e1b25ddfedb29::t_19d23b47a2f390 32-33,35-37,39,47-50
+docs/IMPLEMENTATION_STATUS.md
+  s_9e1b25ddfedb29::t_9d6e16a3ca9891 15,17,19,25,33,38,42,68-86
+  s_9e1b25ddfedb29::t_cd045f8b5ecc5c 39,105
+  s_9e1b25ddfedb29::t_5763b4f18354a6 161-166
+  s_9e1b25ddfedb29::t_f68328b48dadff 3-6,44
+  s_9e1b25ddfedb29::t_b8937e976bfb91 106-107
+  s_9e1b25ddfedb29::t_bb8e6e5050efe1 108-110
+  s_9e1b25ddfedb29::t_e2512f33788206 43,102-104
+evaluation/reports/semantic-qwen3-20260812/decision.md
+  s_9e1b25ddfedb29::t_e2512f33788206 1-49
+docs/SECURITY.md
+  s_9e1b25ddfedb29::t_ca5e2037046a01 100-105
+  s_9e1b25ddfedb29::t_196cd4e2a12a70 45-50
+docs/plans/2026-08-13-production-search-completion-design.md
+  s_9e1b25ddfedb29::t_6c54a87f80fa84 1-71
+evaluation/reports/semantic-qwen3-final-20260813/eval_20260813T043920194657Z.json
+  s_9e1b25ddfedb29::t_5db283fb8b5057 1-1185
+docs/RAG_EVALUATION.md
+  s_9e1b25ddfedb29::t_02b70e98a6954b 5-7,9,20-28,33-35,41
+  s_9e1b25ddfedb29::t_b8937e976bfb91 8,36-38
+  s_9e1b25ddfedb29::t_6f40faae229898 11-14,156-159
+  s_9e1b25ddfedb29::t_cd045f8b5ecc5c 29-32,39
+  s_9e1b25ddfedb29::t_2bd719cc1f6c7b 10,40
+AGENTS.md
+  s_9e1b25ddfedb29::t_1ebca46328fc1f 14,58-72,84-86
+docs/adr/ADR-035-versioned-resumable-semantic-projections.md
+  s_9e1b25ddfedb29::t_b8937e976bfb91 49,51
+  s_9e1b25ddfedb29::t_ae56aab4e8d16b 1-48,52-56
+  s_9e1b25ddfedb29::t_cd045f8b5ecc5c 50,57
+evaluation/reports/semantic-qwen3-all-modes-final-20260813/decision.md
+  s_9e1b25ddfedb29::t_cd045f8b5ecc5c 1-60
+scripts/verify_project.py
+  s_9e1b25ddfedb29::t_7b6b342a381556 29-33
+evaluation/reports/semantic-qwen3-20260812/evolution.jsonl
+  s_9e1b25ddfedb29::t_6c38aa440cc469 1-4
+evaluation/reports/semantic-qwen3-20260812/qwen3-head-tail/eval_20260812T151656562026Z.json
+  s_9e1b25ddfedb29::t_1718f48f0ec323 1-2341
+evaluation/reports/semantic-qwen3-20260812/qwen3-head-tail/eval_20260812T151656562026Z.md
+  s_9e1b25ddfedb29::t_9101c07d551de4 1-30
+evaluation/reports/semantic-qwen3-20260812/qwen3-head-tail/latest.json
+  s_9e1b25ddfedb29::t_97b77841431b96 1-2341
+evaluation/reports/semantic-qwen3-20260812/qwen3-head-tail/latest.md
+  s_9e1b25ddfedb29::t_2923988190fce5 1-30
+evaluation/reports/semantic-qwen3-20260813/eval_20260813T040321910277Z.json
+  s_9e1b25ddfedb29::t_c30d8d16f39ede 1-2339
+evaluation/reports/semantic-qwen3-20260813/eval_20260813T040321910277Z.md
+  s_9e1b25ddfedb29::t_87c48aaa972fab 1-32
+evaluation/reports/semantic-qwen3-20260813/latest.json
+  s_9e1b25ddfedb29::t_e6f38aa06d99b2 1-2339
+evaluation/reports/semantic-qwen3-20260813/latest.md
+  s_9e1b25ddfedb29::t_43048384c76cb6 1-32
+evaluation/reports/semantic-qwen3-all-modes-final-20260813/eval_20260813T045409019529Z.json
+  s_9e1b25ddfedb29::t_16a56dc2d381bb 1-2341
+evaluation/reports/semantic-qwen3-all-modes-final-20260813/eval_20260813T045409019529Z.md
+  s_9e1b25ddfedb29::t_06a68094d18237 1-30
+evaluation/reports/semantic-qwen3-all-modes-final-20260813/latest.json
+  s_9e1b25ddfedb29::t_b120981a90710e 1-2341
+evaluation/reports/semantic-qwen3-all-modes-final-20260813/latest.md
+  s_9e1b25ddfedb29::t_47f80a1b65c34c 1-30
+evaluation/reports/semantic-qwen3-hnsw-20260813/eval_20260813T043848557970Z.json
+  s_9e1b25ddfedb29::t_a5ba6df92c0144 1-603
+evaluation/reports/semantic-qwen3-hnsw-20260813/eval_20260813T043848557970Z.md
+  s_9e1b25ddfedb29::t_1df14dedcfd6dd 1-27
+evaluation/reports/semantic-qwen3-hnsw-20260813/latest.json
+  s_9e1b25ddfedb29::t_32c5f07e9566dd 1-603
+evaluation/reports/semantic-qwen3-hnsw-20260813/latest.md
+  s_9e1b25ddfedb29::t_4542edd176b0d6 1-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "248be6b84950bb6ba515541853db47c2ea291484",
+  "prompts": {},
+  "sessions": {
+    "s_9e1b25ddfedb29": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ff387-ced8-7d32-ae21-b5971ac436b7",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

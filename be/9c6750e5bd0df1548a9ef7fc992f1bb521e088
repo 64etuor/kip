@@ -1,0 +1,46 @@
+evaluation/reports/evolution.jsonl
+  s_9e1b25ddfedb29::t_5db283fb8b5057 50-51
+  s_9e1b25ddfedb29::t_23cf19cec3c912 45-49,52-55
+evaluation/golden/production-regression.yaml
+  s_9e1b25ddfedb29::t_8ec99b38a27630 90
+  s_9e1b25ddfedb29::t_dc04069566f8e3 1-89,91-252
+scripts/verify.sh
+  s_9e1b25ddfedb29::t_3e067dc3552a87 20
+scripts/golden_gate.py
+  s_9e1b25ddfedb29::t_3e067dc3552a87 14,29-38,41,45,52
+src/kip/evaluation/portable_contract.py
+  s_9e1b25ddfedb29::t_1ddd8467d8f6f4 1-7,9-52,57-84,86-88,93-99,101-104,109-120
+  s_9e1b25ddfedb29::t_b72c6b50070ad1 8,53-56
+  s_9e1b25ddfedb29::t_67ca8ab12e24b3 85,89-92,100,105-108
+scripts/portable_golden_gate.py
+  s_9e1b25ddfedb29::t_05cfae84f68ad1 1-36
+src/kip/evaluation/runner.py
+  s_9e1b25ddfedb29::t_edbe5975407d4a 43-46
+tests/test_portable_golden_gate.py
+  s_9e1b25ddfedb29::t_9fd2a3075045d4 3-5,53-76
+  s_9e1b25ddfedb29::t_147986d2090d81 1-2,6-52
+tests/test_evaluation_runner.py
+  s_9e1b25ddfedb29::t_d04a95228e3aad 26,32-50
+  s_9e1b25ddfedb29::t_5f8025c7783b4b 51-52
+src/kip/evaluation/portable.py
+  s_9e1b25ddfedb29::t_1ddd8467d8f6f4 23-29
+  s_9e1b25ddfedb29::t_05cfae84f68ad1 1-22,30-182
+.github/workflows/ci.yml
+  s_9e1b25ddfedb29::t_3e067dc3552a87 102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "be9c6750e5bd0df1548a9ef7fc992f1bb521e088",
+  "prompts": {},
+  "sessions": {
+    "s_9e1b25ddfedb29": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ff387-ced8-7d32-ae21-b5971ac436b7",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

@@ -40,6 +40,10 @@ HitEnricher = Callable[[GoldenCase, list[SearchHit]], list[SearchHit]]
 ALLOWED_VARIANTS = frozenset({"lexical", "vector", "hybrid", "reranked"})
 
 
+def requires_stale_enrichment(dataset: GoldenDataset) -> bool:
+    return any(case.expected_stale_warning is not None for case in dataset.cases)
+
+
 def _sha256(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()
 

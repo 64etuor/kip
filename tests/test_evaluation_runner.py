@@ -23,9 +23,31 @@ from kip.evaluation.runner import (
     compare_variants,
     configuration_fingerprint,
     load_dataset,
+    requires_stale_enrichment,
     run_evaluation,
     validate_activation_report,
 )
+
+
+def test_stale_enrichment_runs_only_for_cases_that_assert_staleness() -> None:
+    case = GoldenCase(
+        id="GQ-STALE",
+        question="최신 근거인가?",
+        category="freshness",
+        principal="principal_public",
+        acl_scopes=["workspace:default"],
+        expected_documents=["doc_a"],
+    )
+    dataset = GoldenDataset(name="freshness-fixture", cases=[case])
+
+    assert requires_stale_enrichment(dataset) is False
+    assert requires_stale_enrichment(
+        dataset.model_copy(
+            update={
+                "cases": [case.model_copy(update={"expected_stale_warning": False})]
+            }
+        )
+    ) is True
 
 
 def _write_dataset(path: Path, *, duplicate: bool = False) -> None:

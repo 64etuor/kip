@@ -11,6 +11,7 @@ gating where the corpus actually exists.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -25,23 +26,30 @@ _DATASET = _ROOT / "evaluation" / "golden" / "private-onedrive-nl.yaml"
 _FLOOR = _ROOT / "evaluation" / "golden" / "private-onedrive-nl.floor.json"
 
 
+def _private_gate_unavailable(reason: str) -> int:
+    required = os.environ.get("KIP_REQUIRE_PRIVATE_GOLDEN", "").casefold() in {
+        "1",
+        "true",
+        "yes",
+    }
+    print(f"golden-gate: {reason}; {'FAILED' if required else 'skipping'}")
+    return 1 if required else 0
+
+
 def main() -> int:
     if not _DATASET.exists() or not _FLOOR.exists():
-        print("golden-gate: reviewed dataset or floor missing; skipping")
-        return 0
+        return _private_gate_unavailable("reviewed dataset or floor missing")
 
     settings = Settings.load()
     if settings.database_url.startswith("memory://"):
-        print("golden-gate: no durable corpus configured; skipping")
-        return 0
+        return _private_gate_unavailable("no durable corpus configured")
 
     container = build_container(settings)
     status = container.application.operations.status(
         container.application.operations.request_context()
     )
     if status.content_units == 0:
-        print("golden-gate: corpus is empty; skipping")
-        return 0
+        return _private_gate_unavailable("durable corpus is empty")
 
     dataset = load_dataset(_DATASET)
     floor = json.loads(_FLOOR.read_text(encoding="utf-8"))

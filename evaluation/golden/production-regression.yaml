@@ -1,0 +1,252 @@
+schema_version: kip.portable-golden.v1
+name: portable-production-regression-v1
+description: >
+  Deterministic non-sensitive CI contract suite. Twenty synthetic documents
+  expand to one hundred positive retrieval cases and twenty ACL-denial cases.
+  This suite blocks pipeline and authorization regressions; it does not replace
+  the separately protected real-corpus promotion gate.
+version: 1.0.0
+reviewer: owner-delegated context-free CI fixture review (2026-08-13)
+source_revision: portable-corpus-v1
+workspace: portable
+acl_scope: workspace:portable
+documents:
+  - id: PORT-001
+    document_id: ldoc_portable_001
+    code: KIP-POL-001
+    title: 협력업체 재승인 지침
+    body: KIP-POL-001 협력업체 재승인 지침 Supplier approval. 재평가 합격점수는 70점이며 3개월 이내에 재평가한다.
+    questions:
+      exact_identifier: KIP-POL-001 협력업체 재승인 지침
+      natural_language: 협력업체를 다시 승인하기 위한 재평가 합격점수는 몇 점인가?
+      terse: 협력업체 재승인 합격점수
+      code_switch: Supplier approval 재평가 기준 점수
+      typo_noise: KIP-POL-001 협력업채 재승인 합격점수??
+
+  - id: PORT-002
+    document_id: ldoc_portable_002
+    code: KIP-POL-002
+    title: 자격인증 교육평가 절차
+    body: KIP-POL-002 자격인증 교육평가 절차 Certification evaluation. 필수교육을 마친 뒤 2주 이내에 과정평가를 완료한다.
+    questions:
+      exact_identifier: KIP-POL-002 자격인증 교육평가 절차
+      natural_language: 자격인증 필수교육 이후 과정평가는 언제까지 완료해야 하는가?
+      terse: 자격인증 과정평가 완료기한
+      code_switch: Certification evaluation 완료 timing
+      typo_noise: KIP-POL-002 자격인증 교욱평가 완료기한??
+
+  - id: PORT-003
+    document_id: ldoc_portable_003
+    code: KIP-POL-003
+    title: 안전보건 정기교육 기준
+    body: KIP-POL-003 안전보건 정기교육 기준 Safety training. 비사무직 근로자는 분기마다 6시간 이상 교육을 이수한다.
+    questions:
+      exact_identifier: KIP-POL-003 안전보건 정기교육 기준
+      natural_language: 비사무직 근로자의 분기별 안전보건 교육시간은 얼마인가?
+      terse: 안전보건 정기교육 분기 시간
+      code_switch: Safety training 비사무직 hours
+      typo_noise: KIP-POL-003 안전보건 정기교욱 시간??
+
+  - id: PORT-004
+    document_id: ldoc_portable_004
+    code: KIP-POL-004
+    title: 고객불만 보고서 보존정책
+    body: KIP-POL-004 고객불만 보고서 보존정책 Complaint retention. 고객불만 조사 보고서는 20년 동안 보존한다.
+    questions:
+      exact_identifier: KIP-POL-004 고객불만 보고서 보존정책
+      natural_language: 고객불만 조사 보고서의 보존기간은 몇 년인가?
+      terse: 고객불만 보고서 보존기간
+      code_switch: Complaint retention 보고서 기간
+      typo_noise: KIP-POL-004 고객불만 보거서 보존기간??
+
+  - id: PORT-005
+    document_id: ldoc_portable_005
+    code: KIP-POL-005
+    title: 유틸리티 비상대응 계획
+    body: KIP-POL-005 유틸리티 비상대응 계획 Utility recovery. 전력 공급 중단 시 예비설비를 30분 이내에 가동한다.
+    questions:
+      exact_identifier: KIP-POL-005 유틸리티 비상대응 계획
+      natural_language: 전력 공급이 끊기면 예비설비를 몇 분 이내에 가동하는가?
+      terse: 유틸리티 예비설비 가동시간
+      code_switch: Utility recovery 예비설비 timing
+      typo_noise: KIP-POL-005 유틸리티 비상대응 가동시긴??
+
+  - id: PORT-006
+    document_id: ldoc_portable_006
+    code: KIP-POL-006
+    title: 정보보안 사고보고 규정
+    body: KIP-POL-006 정보보안 사고보고 규정 Security incident. 심각도 높은 보안사고는 탐지 후 1시간 이내에 보고한다.
+    questions:
+      exact_identifier: KIP-POL-006 정보보안 사고보고 규정
+      natural_language: 심각한 정보보안 사고는 탐지 후 언제까지 보고해야 하는가?
+      terse: 정보보안 사고 보고기한
+      code_switch: Security incident 보고 deadline
+      typo_noise: KIP-POL-006 정보보안 사고보거 기한??
+
+  - id: PORT-007
+    document_id: ldoc_portable_007
+    code: KIP-POL-007
+    title: 계약 지연배상 기준
+    body: KIP-POL-007 계약 지연배상 기준 Delay penalty. 납품이 지연되면 하루당 적용하는 배상률은 계약금액의 0.5퍼센트이다.
+    questions:
+      exact_identifier: KIP-POL-007 계약 지연배상 기준
+      natural_language: 납품이 지연되면 하루당 적용하는 배상률은 얼마인가?
+      terse: 계약 지연배상률
+      code_switch: Delay penalty 납품 배상 rate
+      typo_noise: KIP-POL-007 계약 지연배상율??
+
+  - id: PORT-008
+    document_id: ldoc_portable_008
+    code: KIP-POL-008
+    title: 재고 재주문 운영기준
+    body: KIP-POL-008 재고 재주문 운영기준 Inventory reorder. 안전재고가 25개 이하가 되면 재주문을 시작한다.
+    questions:
+      exact_identifier: KIP-POL-008 재고 재주문 운영기준
+      natural_language: 안전재고가 몇 개 이하일 때 재주문을 시작하는가?
+      terse: 재고 재주문 기준수량
+      code_switch: Inventory reorder 안전재고 threshold
+      typo_noise: KIP-POL-008 재고 재주뮨 기준수량??
+
+  - id: PORT-009
+    document_id: ldoc_portable_009
+    code: KIP-POL-009
+    title: 개인정보 보존기간 정책
+    body: KIP-POL-009 개인정보 보존기간 정책 Data retention. 계약 종료 고객의 개인정보는 3년 뒤 파기한다.
+    questions:
+      exact_identifier: KIP-POL-009 개인정보 보존기간 정책
+      natural_language: 계약이 종료된 고객의 개인정보는 몇 년 뒤 파기하는가?
+      terse: 개인정보 계약종료 보존기간
+      code_switch: Data retention 계약종료 고객
+      typo_noise: KIP-POL-009 개인정보 보존기갼??
+
+  - id: PORT-010
+    document_id: ldoc_portable_010
+    code: KIP-POL-010
+    title: 변경 승인위원회 운영안
+    body: KIP-POL-010 변경 승인위원회 운영안 Change approval. 중요 변경을 심의하는 승인위원회는 5명으로 구성한다.
+    questions:
+      exact_identifier: KIP-POL-010 변경 승인위원회 운영안
+      natural_language: 중요 변경을 심의하는 승인위원회는 몇 명으로 구성하는가?
+      terse: 변경 승인위원회 구성인원
+      code_switch: Change approval committee 인원
+      typo_noise: KIP-POL-010 변경 승인위윈회 구성인원??
+
+  - id: PORT-011
+    document_id: ldoc_portable_011
+    code: KIP-POL-011
+    title: 협력사 품질감사 계획
+    body: KIP-POL-011 협력사 품질감사 계획 Supplier audit. 핵심 협력사는 분기마다 1회 품질감사를 수행한다.
+    questions:
+      exact_identifier: KIP-POL-011 협력사 품질감사 계획
+      natural_language: 핵심 협력사에 대한 품질감사는 얼마나 자주 수행하는가?
+      terse: 협력사 품질감사 주기
+      code_switch: Supplier audit 핵심 협력사 frequency
+      typo_noise: KIP-POL-011 협력사 품질감사 쥬기??
+
+  - id: PORT-012
+    document_id: ldoc_portable_012
+    code: KIP-POL-012
+    title: 계측기 교정주기 지침
+    body: KIP-POL-012 계측기 교정주기 지침 Calibration interval. 정밀 계측기는 12개월마다 교정한다.
+    questions:
+      exact_identifier: KIP-POL-012 계측기 교정주기 지침
+      natural_language: 정밀 계측기는 몇 개월마다 교정해야 하는가?
+      terse: 계측기 교정주기
+      code_switch: Calibration interval 정밀 계측기
+      typo_noise: KIP-POL-012 계측기 교정쥬기??
+
+  - id: PORT-013
+    document_id: ldoc_portable_013
+    code: KIP-POL-013
+    title: 출하검수 온도편차 기준
+    body: KIP-POL-013 출하검수 온도편차 기준 Shipment inspection. 배터리 셀 간 온도편차는 3도 이하여야 한다.
+    questions:
+      exact_identifier: KIP-POL-013 출하검수 온도편차 기준
+      natural_language: 배터리 출하검수에서 셀 간 온도편차 허용치는 얼마인가?
+      terse: 출하검수 셀 온도편차
+      code_switch: Shipment inspection battery 온도 threshold
+      typo_noise: KIP-POL-013 출하검수 온도편챠??
+
+  - id: PORT-014
+    document_id: ldoc_portable_014
+    code: KIP-POL-014
+    title: 암호키 교체주기 정책
+    body: KIP-POL-014 암호키 교체주기 정책 Key rotation. 운영 시스템의 암호키는 90일마다 교체한다.
+    questions:
+      exact_identifier: KIP-POL-014 암호키 교체주기 정책
+      natural_language: 운영 시스템 암호키는 며칠마다 교체하는가?
+      terse: 암호키 교체주기
+      code_switch: Key rotation 운영 시스템 days
+      typo_noise: KIP-POL-014 암호키 교채주기??
+
+  - id: PORT-015
+    document_id: ldoc_portable_015
+    code: KIP-POL-015
+    title: 백업 복구목표 기준
+    body: KIP-POL-015 백업 복구목표 기준 Recovery objective. 핵심 업무의 복구시간 목표는 4시간이다.
+    questions:
+      exact_identifier: KIP-POL-015 백업 복구목표 기준
+      natural_language: 핵심 업무의 백업 복구시간 목표는 몇 시간인가?
+      terse: 백업 복구시간 목표
+      code_switch: Recovery objective 핵심 업무 hours
+      typo_noise: KIP-POL-015 백업 복구시갼 목표??
+
+  - id: PORT-016
+    document_id: ldoc_portable_016
+    code: KIP-POL-016
+    title: 접근권한 재검토 절차
+    body: KIP-POL-016 접근권한 재검토 절차 Access review. 관리자 권한은 매월 1회 재검토한다.
+    questions:
+      exact_identifier: KIP-POL-016 접근권한 재검토 절차
+      natural_language: 관리자 접근권한은 얼마나 자주 재검토하는가?
+      terse: 관리자 접근권한 재검토 주기
+      code_switch: Access review 관리자 frequency
+      typo_noise: KIP-POL-016 접근권한 재검토 쥬기??
+
+  - id: PORT-017
+    document_id: ldoc_portable_017
+    code: KIP-POL-017
+    title: 세금계산서 정산기한 규정
+    body: KIP-POL-017 세금계산서 정산기한 규정 Invoice settlement. 검수 완료 세금계산서는 10영업일 이내에 정산한다.
+    questions:
+      exact_identifier: KIP-POL-017 세금계산서 정산기한 규정
+      natural_language: 검수가 끝난 세금계산서는 며칠 이내에 정산하는가?
+      terse: 세금계산서 정산기한
+      code_switch: Invoice settlement 검수 완료 deadline
+      typo_noise: KIP-POL-017 세금계산서 정산기핸??
+
+  - id: PORT-018
+    document_id: ldoc_portable_018
+    code: KIP-POL-018
+    title: 설비 예방정비 기준
+    body: KIP-POL-018 설비 예방정비 기준 Preventive maintenance. 포장설비는 누적가동 500시간마다 예방정비한다.
+    questions:
+      exact_identifier: KIP-POL-018 설비 예방정비 기준
+      natural_language: 포장설비는 누적 몇 시간마다 예방정비하는가?
+      terse: 포장설비 예방정비 주기
+      code_switch: Preventive maintenance 포장설비 hours
+      typo_noise: KIP-POL-018 설비 예방정비 쥬기??
+
+  - id: PORT-019
+    document_id: ldoc_portable_019
+    code: KIP-POL-019
+    title: 문서 개정승인 절차
+    body: KIP-POL-019 문서 개정승인 절차 Document revision. 품질절차서 개정안은 품질부서장이 최종 승인한다.
+    questions:
+      exact_identifier: KIP-POL-019 문서 개정승인 절차
+      natural_language: 품질절차서 개정안의 최종 승인자는 누구인가?
+      terse: 품질절차서 개정 최종승인자
+      code_switch: Document revision 최종 approver
+      typo_noise: KIP-POL-019 문서 개정승인 최종승인쟈??
+
+  - id: PORT-020
+    document_id: ldoc_portable_020
+    code: KIP-POL-020
+    title: 생산개시 승인점수 기준
+    body: KIP-POL-020 생산개시 승인점수 기준 Production release. 양산 개시 심사는 85점 이상일 때 승인한다.
+    questions:
+      exact_identifier: KIP-POL-020 생산개시 승인점수 기준
+      natural_language: 양산 개시 심사를 승인하는 최소 점수는 몇 점인가?
+      terse: 생산개시 승인점수
+      code_switch: Production release 양산 minimum score
+      typo_noise: KIP-POL-020 생산개시 승인점슈??

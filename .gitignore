@@ -22,3 +22,10 @@ node_modules/
 dist/
 build/
 *.egg-info/
+
+# Local agent, browser-QA, and generated review artifacts
+.omc/
+.omo/
+.playwright-cli/
+output/
+.debug-journal.md

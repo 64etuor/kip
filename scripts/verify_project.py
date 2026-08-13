@@ -26,6 +26,11 @@ def main() -> int:
     require((ROOT / ".mcp.json").is_file(), ".mcp.json must exist at project root", errors)
     require((ROOT / "docs/PRD.md").is_file(), "docs/PRD.md is missing", errors)
     require((ROOT / "docs/TRD.md").is_file(), "docs/TRD.md is missing", errors)
+    require(
+        (ROOT / "docs/PRODUCTION_DESIGN_ALIGNMENT.md").is_file(),
+        "docs/PRODUCTION_DESIGN_ALIGNMENT.md is missing",
+        errors,
+    )
     require((ROOT / "skills/knowledge-fabric/SKILL.md").is_file(), "project Skill is missing", errors)
     require((ROOT / ".claude/skills/knowledge-fabric/SKILL.md").is_file(), "Claude project Skill is missing", errors)
     errors.extend(validate_ontology(ROOT / "ontology"))

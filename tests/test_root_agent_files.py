@@ -7,6 +7,7 @@ def test_root_agent_files_present_and_imported():
     assert (ROOT / "AGENTS.md").is_file()
     assert (ROOT / "CLAUDE.md").read_text(encoding="utf-8").strip() == "@AGENTS.md"
     assert (ROOT / ".mcp.json").is_file()
+    assert (ROOT / "docs/PRODUCTION_DESIGN_ALIGNMENT.md").is_file()
 
 
 def test_project_skill_mirrors_portable_skill():

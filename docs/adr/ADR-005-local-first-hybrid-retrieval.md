@@ -25,13 +25,27 @@ Recall@10 1.000 but lower MRR, and BGE reranking did not improve the hybrid
 ranking. The complete 74-vector semantic space remains in `shadow` status for
 future, harder corpora.
 
+### 2026-08-13 amendment
+
+Promotion is evaluated per retrieval variant, not by forcing every vector
+space through hybrid and reranked composition. On the reviewed 19-case private
+set, vector-only Recall@10/MRR (`0.947/0.822`) exceeded hybrid
+(`0.895/0.702`) and reranked (`0.842/0.656`). The candidate therefore remains
+vector-only for future gate work. After ADR-037's HNSW path and the
+ACL-prefiltered index-scan correction, the same aggregate and category quality
+metrics hold at P95 `133.75 ms`, with zero failed cases and zero ACL leaks. It
+is still disabled because stale-warning coverage is missing. A quality or
+latency win does not waive the remaining gate or activate a space.
+
 ## Consequences
 
 - The core package remains usable without PyTorch or a model server.
 - Semantic projections can be rebuilt or compared without altering canonical content.
 - CLI/API processes share a warmed local model service.
 - Operators must manage one optional loopback process and model cache.
-- Exact pgvector search is used before HNSW; an ANN index needs separate scale evidence.
+- The supported PostgreSQL production profile carries the 1024-dimensional
+  HNSW index from ADR-037. Exact-search comparisons remain mandatory evidence
+  for ANN recall and filtered-candidate sufficiency.
 - Reports and the evolution ledger provide reproducible improvement evidence, but promotion remains an explicit human decision.
 
 ## References

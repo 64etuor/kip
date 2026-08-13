@@ -2,6 +2,21 @@
 
 The default Compose profile is a local pilot profile. Before serving multiple users or indexing sensitive mail/Slack data:
 
+## Documentation and acceptance evidence
+
+- Review `PRODUCTION_DESIGN_ALIGNMENT.md` and treat every unresolved row as a
+  gate or an explicitly accepted pilot limitation.
+- Update PRD/TRD, contracts, operations, security, implementation status,
+  examples, and ADRs in the same change whenever their behavior or design
+  changes. A dated acceptance report is historical evidence, not current status.
+- Deploy the supported PostgreSQL reference profile with pgvector migration 0006
+  and the 1024-dimensional HNSW migration 0018. Keep semantic activation a
+  separate reviewed decision.
+- Require the 120-case portable search/ACL gate on every merge. Treat a skipped
+  private golden gate as missing evidence; set
+  `KIP_REQUIRE_PRIVATE_GOLDEN=1` on the approved corpus-bearing runner so an
+  unavailable corpus fails the merge.
+
 ## Identity and database
 
 - Create separate migration, worker, read-agent, reviewer, and backup roles.
@@ -35,6 +50,11 @@ The default Compose profile is a local pilot profile. Before serving multiple us
 - Benchmark HWP adapters on real HWP/HWPX samples before selecting a default.
 - Keep previous extraction active until shadow output passes quality and contract tests.
 - Maintain 30-50 pilot golden questions, then at least 100 before broad rollout.
+- The current reviewed private retrieval set has 19 cases. It is below the
+  30-50 question pilot target and does not certify answer/refusal quality.
+- The checked-in portable suite has 100 positive and 20 ACL-negative cases. It
+  is a deterministic merge gate, not a substitute for reviewed private
+  questions or a frozen holdout.
 - Verify XLSX search recall separately from numeric range-read correctness.
 - Treat the six-document public scorecard as a harness validation, not a
   production corpus result. Add near-duplicates, revisions, tables, stale
@@ -62,7 +82,8 @@ The default Compose profile is a local pilot profile. Before serving multiple us
 - Require changelog/license review, shadow evaluation, rollback evidence, and
   explicit activation for every parser, model, database, and runtime upgrade.
 - Rebuild lexical, vector, and graph projections independently.
-- Do not activate pgvector or Neo4j without the gates documented in PRD/TRD.
+- Do not activate semantic retrieval or Neo4j without the gates documented in
+  PRD/TRD. Installing pgvector/HNSW is readiness, not activation.
 - Require `projection verify --name semantic` parity and pass the full,
   fingerprint-matched evaluation report to `projection activate --report ...
   --candidate ...`. The command rejects non-promoted, stale-code, and

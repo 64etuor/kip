@@ -1,5 +1,9 @@
 # Implementation Status
 
+This is the current readiness inventory, not the target architecture. The
+target-to-current matrix and ordered gap register live in
+`docs/PRODUCTION_DESIGN_ALIGNMENT.md`.
+
 | Area | Status | Notes |
 |---|---|---|
 | Root agent files | Ready | `AGENTS.md`, `CLAUDE.md`, `.mcp.json` included |
@@ -8,16 +12,17 @@
 | CI supply-chain gates | Ready | SHA-pinned actions, Python 3.12/3.13 matrix, contracts, architecture, Ruff, mypy, dependency audit, migrations, tests, 75% coverage, clean-wheel smoke, hardened-image smoke, candidate bundle, and tag-only GHCR publish with attestations |
 | Backup and recovery | Ready for operational adoption | Sealed PostgreSQL/CAS/config backup, `row_security=off` manifest, explicit empty-target restore, row/migration/extension/RLS/CAS comparison, projection rebuild, fingerprinted evaluation comparison, and checksummed drill receipt |
 | Memory repository | Ready | Used for tests and offline smoke checks |
-| PostgreSQL migrations | Ready for pilot | Workspace, required-scope, and ACL-snapshot freshness RLS included; core evidence tables are `FORCE ROW LEVEL SECURITY` so owner-role connections are also policy-bound; test with non-owner production roles |
+| PostgreSQL migrations | Ready as the production reference profile | Workspace, required-scope, ACL-snapshot freshness, and owner-bound `FORCE ROW LEVEL SECURITY` are included. Normal migration installs pgvector, the 1024d projection, and migration 0018's cosine HNSW index; semantic activation remains separate |
 | PostgreSQL repository | Pilot reference | Core ingest, search, exact read, ACL, job, assertion, export, and rebuild methods implemented; evidence and graph reads are ACL- and freshness-prefiltered; repository calls share a bounded connection pool (`database.pool_max_size`) |
-| CLI | Ready for pilot | JSON-first commands; source-neutral `sync run`, top-level `xlsx-read`, projection and canonical export aliases; operator roles come only from explicit `--role`/`--roles`/`KIP_ROLES` and admin commands fail closed without them |
+| CLI | Ready for pilot | JSON-first commands; source-neutral `sync run`, top-level `xlsx-read`, projection and canonical export aliases; operator roles come only from explicit `--role`/`--roles`/`KIP_ROLES` and admin commands fail closed. Search exposes the full canonical request including mode and filters; explicit ACL options replace ambient scopes |
 | REST API | Ready for pilot | Read, exact evidence, assertion explain, connector event, sync, and review endpoints; trusted API-key or verified JWT identity; blocking handlers run synchronously in the server threadpool instead of on the event loop |
+| Python SDK | Ready as a thin REST client | Capabilities, search, context, answer, evidence, graph, ontology, jobs, and review helpers delegate to REST. Search, context, and answer expose the canonical mode and filter set while omitted defaults stay absent from payloads |
 | Identity and ACL snapshots | Ready for pilot | JWT issuer/audience/JWKS verification, configured API-key principal, stale dynamic snapshot exclusion, and legacy identity-header rejection |
 | Data classification and model egress | Ready for pilot | Canonical source/unit classification, local loopback policy, remote provider/classification/retention/secret gates, and atomic denial decisions |
 | Structured generation adapters | Ready for pilot | Provider-neutral typed contract with bounded HTTP responses, explicit timeouts, pinned model revisions, request IDs, token accounting, citation-ID validation, and OpenAI Responses/Anthropic Messages adapters. Claims support a `disputed` certainty that must cite every disagreeing evidence unit, and the prompt instructs the model to surface source conflicts instead of picking one |
 | MCP | Ready for pilot | Optional stdio adapter shares the application services; guided setup selects the generated config, and real client discovery/search/graph/answer parity has been validated |
 | Filesystem connector | Ready for pilot | Read-only traversal with an mtime settle window; content hashes are lazy and unchanged files are skipped by size/mtime against the stored revision without being read |
-| XLSX shallow/deep | Ready for pilot | Shared-string shallow index and exact `.xlsx`/`.xlsm` range reader; formula/cached values, formats, dates, and hidden dimensions are explicit |
+| XLSX shallow/deep | Ready for pilot | Shared-string shallow index and exact `.xlsx`/`.xlsm` range reader; formula/cached values, formats, dates, and hidden dimensions are explicit. Date, datetime, and time values serialize through the versioned JSON envelope |
 | PDF parser | Ready for pilot | PyMuPDF; OCR is routed but not bundled |
 | HWP broker | Ready for retrieval pilot | Native HWP/HWPX signatures and 86/86 real-file extraction are validated; guarded shadow/atomic activation preserves prior extractions. Parser 1.1 chunks with a 400-char overlap so boundary-spanning facts stay retrievable (86/86 re-extracted and activated). True section/paragraph/table locators remain incomplete |
 | Slack connector | Reference adapter | Threads are ingested as one semantic event keyed on the root message (replies become revisions); validate scopes, rate limits, edits/deletes, and retention |
@@ -25,18 +30,18 @@
 | IMAP connector | Reference adapter | Validate provider-specific UID behavior |
 | Public evaluation corpus | Ready | Six checksum-pinned KOGL Type 1 PDFs; 30 relevance and 6 ACL cases |
 | Evaluation reports | Ready with coverage gaps | Retrieval, answer, and ontology metrics; immutable dataset/review binding; full-case coverage gates; ACL/integrity checks; fingerprints; Markdown scorecards; append-only ledger; search hits now carry `is_latest` and the runner reopens evidence for stale-warning measurement, so both dimensions are measurable; public locator/recovery and end-to-end reviews remain incomplete |
-| Retrieval regression gate | Active where a corpus exists | `scripts/golden_gate.py` runs the reviewed private golden set and fails verify.sh if recall@k/MRR/failed-cases/P95 breach a committed floor; self-skips on memory or empty corpus so unit CI is unaffected |
+| Retrieval regression gate | Active in hosted CI and private runners | The checked-in portable manifest expands to 100 positive and 20 ACL-negative cases and always runs in CI/verify. `scripts/golden_gate.py` checks the reviewed private floor; protected runners set `KIP_REQUIRE_PRIVATE_GOLDEN=1` so missing corpus evidence fails closed |
 | Quality control plane | Ready for pilot | Version-pinned parser/embedding/reranker/retrieval experiment manifests and fail-closed, read-only promotion recommendations; manifest-driven orchestration is not yet a scheduler |
 | End-to-end RAG rubric | Ready for pilot | Deterministic claim/citation/refusal and entity/relation/evidence/contradiction/path/temporal/integrity metrics; missing reviews fail closed and the bundled ontology case is synthetic contract evidence only |
 | Query tracing and metrics | Ready for pilot | PostgreSQL/RLS canonical redacted traces, admin-only CLI/REST inspection, bounded retention pruning, non-fatal delivery, and optional OTLP/HTTP spans and metrics without content attributes |
 | Adaptive ontology and interaction memory | Ready for pilot | Empty starter profile, one-question setup selection, TTL owner-scoped clarifications, confirmed preferences, structured non-trace feedback, per-principal discovery candidates, PostgreSQL RLS, and CLI/REST/MCP parity; accepted candidates require a separate YAML release |
-| Evidence-bounded answer | Ready for pilot | CLI/API/MCP/SDK share search, exact reopen, freshness, XLSX, classification/egress, structured generation, claim-citation validation, typed refusal, explicit extractive fallback, and ACL-filtered current approved-graph context; candidates, expired relations, and stale graph evidence are excluded. The lexical relevance gate applies only to the extractive fallback; the structured-generation path receives all fresh ACL-filtered evidence and relies on claim-citation validation |
-| Local embedding sidecar | Validated shadow | Infinity 0.0.77, Qwen3 0.6B 1024d, pinned revisions, MPS smoke passed |
+| Evidence-bounded answer | Ready for bounded pilot; broad quality gate pending | CLI/API/MCP/SDK share search, exact reopen, freshness, XLSX, egress, generation validation, citations, extractive fallback, and approved-graph context. Identifier, numeric, focused-fact, and short multi-document adequacy gates return typed `answer_not_present` or `clarification_required`; broader reviewed answer/citation/refusal coverage remains required |
+| Local embedding sidecar | Validated shadow | Infinity 0.0.77, Qwen3 0.6B 1024d, pinned revisions, MPS smoke passed; resumable projection uses current active ACL-fresh units and versioned bounded input. The private space is 30,565/30,565 complete; vector Recall@10/MRR is 0.947/0.822 with P95 133.75 ms and zero ACL leaks. It remains shadow only because stale-warning evidence is absent (`evaluation/reports/semantic-qwen3-all-modes-final-20260813/decision.md`) |
 | Local reranker | BM25 active; RapidFuzz fallback; model adapters shadow | RapidFuzz 3.14.5 reranks bounded ACL-filtered lexical candidates locally and passed the private OneDrive retrieval gate; BGE/Jina model adapters remain opt-in shadow candidates. A candidate-local Okapi BM25 backend (`models.reranker.backend = "bm25"`, word+bigram Korean tokens, no model or extension dependency) beat RapidFuzz on the 19-case grounded draft set (Recall@10 0.842 vs 0.684, MRR 0.639 vs 0.566, lower P95; see `evaluation/reports/reranker-ab-20260811/decision.md`) and was promoted on 2026-08-11 after the dataset was adversarially re-verified and versioned (`reviewed 1.0.0`, ADR-034); RapidFuzz remains the fallback backend |
 | Search result diversity | Active | Per-document cap (`search.max_hits_per_document`, default 3) with tail backfill across every search path, so one file cannot occupy all result slots |
-| pgvector | Complete shadow, disabled | PostgreSQL 18/pgvector 0.8.2, 74/74 vectors, RLS and source-hash filtering; public pilot did not beat lexical |
-| Hybrid retrieval | Complete shadow | ACL-prefiltered exact vector search, RRF, bounded reranking that preserves the un-reranked fused tail up to the request limit, explicit activation command |
-| Alias query expansion | Active for the lexical path | Human-approved entity aliases (ACL-prefiltered `resolve_entities`) expand candidate retrieval only; reranking keeps the user's original wording. On the grounded draft set it lifts rapidfuzz overall recall +0.053 and paraphrase recall 0.286→0.429; near-neutral under the bm25 shadow candidate — re-evaluate together if bm25 is promoted (`evaluation/reports/alias-expansion-20260811/decision.md`) |
+| pgvector and HNSW | Production-profile ready; semantic shadow disabled | PostgreSQL 18/pgvector 0.8.2, RLS/source-hash filtering, migration 0018 HNSW with bounded strict iterative scan, and a complete 30,565/30,565 private Qwen3 shadow space. EXPLAIN confirms the HNSW index path; activation is still quality-gated |
+| Hybrid retrieval | Complete shadow | ACL-prefiltered exact vector search, RRF, bounded reranking that preserves the un-reranked fused tail up to the request limit, explicit activation command. On the reviewed 19-case private set, vector-only Recall@10/MRR was 0.947/0.822, ahead of hybrid at 0.895/0.702 and reranked at 0.842/0.656 |
+| Alias query expansion | Active for the lexical path | Human-approved entity aliases (ACL-prefiltered `resolve_entities`) expand candidate retrieval only; reranking keeps the user's original wording. It lifted RapidFuzz on the grounded draft set and is aggregate-neutral-to-positive under the now-active BM25 backend; re-evaluate if candidate generation changes (`evaluation/reports/alias-expansion-20260811/decision.md`) |
 | Ontology contract | Ready for pilot | YAML entity inheritance and predicate contracts; ACL-bound mining jobs; strict structured-output validation; reviewed entities/relations; exact evidence; deterministic fingerprints; current approved-graph answers; and idempotent predicate migration materialization with source-assertion lineage |
 | Neo4j | Port only | Do not deploy before adoption gate |
 | Review UI | Not included | CLI/API review workflow only |
@@ -60,6 +65,25 @@
   Generic all-format forced re-extraction and destructive source
   reconciliation are intentionally not exposed as one-step starter commands.
 - The PostgreSQL integration test is gated by `KIP_TEST_POSTGRES_URL`; CI or a local PostgreSQL service must run it before deployment.
+- Pgvector/HNSW is part of the supported PostgreSQL production reference
+  profile. A future extension-free distribution would need a separate migration
+  and CI matrix; disabling semantic search does not uninstall the extension.
+- Canonical search mode and filters now have CLI/REST/MCP/SDK parity, and
+  capabilities prove a compatible complete active space rather than
+  configuration alone. Current CLI exit statuses still group most typed KIP
+  errors under code 3, and list/search edges do not expose cursor pagination.
+- The portable 120-case gate blocks deterministic stage/filter/ACL regressions
+  in hosted CI. It does not replace the reviewed private corpus; only a protected
+  runner with `KIP_REQUIRE_PRIVATE_GOLDEN=1` supports the stronger merge claim.
+- Context-free private-corpus QA still shows candidate-recall limits: some
+  supplier paraphrases and Korean-English code-switched queries rank relevant
+  evidence near or outside a small lexical result window. Conservative
+  identifier, numeric, focused-fact, and ambiguity gates now refuse instead of
+  presenting unsupported extractive success, but the behavior needs a larger
+  reviewed end-to-end set.
+- Explicit local CLI ACL values replace ambient `KIP_ACL_SCOPES`, including an
+  explicitly empty set. Repository/RLS and local outsider probes observed no
+  leak; production identity still comes from the configured adapter.
 - Multi-user production requires an identity-aware proxy that issues the
   configured JWT claims. KIP verifies those claims directly and rejects legacy
   caller identity/ACL headers; target-provider revocation latency is bounded by
@@ -75,10 +99,15 @@
 - Neo4j remains an adoption-gate adapter stub; canonical assertions are queried from PostgreSQL.
 - The current public pilot is small and lexically distinctive. Its
   `keep_disabled` semantic decision must not be generalized to a private corpus
-  without reviewed internal golden cases. Semantic projection remains
-  shadow-only. Separately, the 2026-08-10 native-HWP OneDrive A/B promoted only
-  local RapidFuzz lexical reranking; its 253 queries are source-derived rather
-  than reviewed natural-language answer cases.
+  without reviewed internal golden cases. The reviewed private OneDrive set now
+  shows a material vector gain, including semantic-paraphrase Recall@10
+  `0.429 -> 0.857`, with zero exact-recall regression and zero ACL leaks.
+  HNSW now preserves those metrics at P95 `133.75 ms`, below the `2000 ms`
+  gate. Semantic projection nevertheless remains shadow-only because
+  stale-warning coverage is absent and therefore fails closed.
+  Separately, the 2026-08-10 native-HWP OneDrive A/B first promoted local
+  RapidFuzz on a 253-query source-derived set; ADR-034 superseded that default
+  with candidate-local BM25 after the reviewed 19-case comparison.
 - The 2026-08-06 loaded-corpus audit is recorded in `docs/RAG_QUALITY_AUDIT_2026-08-06.md`; lexical remains active and all semantic candidates remain shadow-only.
 - Quality recommendations do not discover, install, or activate libraries. Candidate dependencies remain opt-in adapters; a scheduler may automate shadow runs only after reproducible manifest execution is added.
 - Retrieval-only reports cannot claim end-to-end RAG quality. Promotion requires
@@ -129,8 +158,11 @@ units with zero failures and unchanged source hashes. Across 253 source-derived
 queries, PostgreSQL lexical Recall@1/Recall@5/MRR was
 `0.9407/0.9881/0.9596`; bounded RapidFuzz reranking reached
 `0.9684/0.9960/0.9796` and added `15.072 ms` at P95. RapidFuzz is therefore the
-starter lexical reranker. Kiwi, deterministic proximity, and the Kiwi ensemble
-remain rejected. The queries were not reviewed natural-language answer or
-ontology cases; those dimensions remain explicitly unmeasured. See
+winner for this **historical source-derived experiment**, not the current
+starter default. ADR-034 later promoted candidate-local BM25 on the reviewed
+19-case set; RapidFuzz remains its fallback. Kiwi, deterministic proximity, and
+the Kiwi ensemble remain rejected. The 253 queries were not reviewed
+natural-language answer or ontology cases; those dimensions remain explicitly
+unmeasured. See
 `evaluation/reports/onedrive-hwp-native-rapidfuzz-20260810/decision.json` and
 ADR-031.

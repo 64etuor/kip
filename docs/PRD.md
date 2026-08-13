@@ -1,9 +1,9 @@
 ---
 document_id: KIP-PRD-003
 title: KIP v3 Agent-First Knowledge Fabric 제품 요구사항 정의서
-version: 3.0.0
-status: proposed
-last_updated: 2026-07-28
+version: 3.1.0
+status: accepted
+last_updated: 2026-08-13
 language: ko-KR
 audience:
   - product
@@ -11,6 +11,7 @@ audience:
   - ai-agent
   - knowledge-operations
 source_of_truth: true
+current_implementation: docs/IMPLEMENTATION_STATUS.md
 supersedes:
   - KIP v2 Agent-First PRD
 normative_keywords:
@@ -25,11 +26,16 @@ normative_keywords:
 
 이 문서는 NAS 문서, HWP/HWPX, PDF, XLSX, Slack, Apple Mail을 하나의 근거 체계로 연결하고 Claude Code, Codex 및 기타 AI agent가 안전하게 검색·열람·인용하도록 만드는 제품의 기준 문서다.
 
+이 문서는 승인된 **제품 목표**다. 현재 구현 여부와 측정된 한계는
+`docs/IMPLEMENTATION_STATUS.md`와 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`가
+판정한다. 이 문서의 현재형 문구만으로 기능이 구현·승격·운영 승인됐다고
+해석하지 않는다.
+
 - `MUST`는 출시 전 반드시 충족해야 한다.
 - `SHOULD`는 특별한 사유가 없으면 충족해야 한다.
 - `MAY`는 요구가 확인된 뒤 구현할 수 있다.
 - 요구사항 식별자는 변경하지 않는다. 문구가 바뀌더라도 ID는 유지한다.
-- 구현 세부사항은 `KIP_v3_Knowledge_Fabric_TRD.md`를 따른다.
+- 구현 세부사항은 `docs/TRD.md`를 따른다.
 
 ### 0.1 AI reading map
 
@@ -86,7 +92,7 @@ Claude Code / Codex / 기타 AI agent
 |---|---|---|
 | SQLite 단일 DB | 소형·오프라인·개인용 경량 배포의 미래 옵션 | 기준 구현에서 제외 |
 | PostgreSQL | canonical state, 동시 수집, ACL, 감사, 검색 projection의 기준 저장소 | **채택** |
-| pgvector | 의미 검색용 재생성 가능한 projection | **참조 배포에는 설치, Core는 미설치도 허용; 기본 비활성** |
+| pgvector | 의미 검색용 재생성 가능한 projection | **PostgreSQL 프로덕션 참조 profile에 필수; 의미 검색은 기본 비활성** |
 | Neo4j | 깊은 경로 탐색·그래프 알고리즘이 입증된 뒤 붙이는 read projection | **MVP 제외, 확장 포트만 제공** |
 | Apache AGE | PostgreSQL 내부 graph adapter 후보 | 기본 제외 |
 
@@ -107,9 +113,9 @@ Neo4j는 온톨로지 원장으로 사용하지 않는다. 그래프가 중요�
 | 1-4 hop 승인 관계 | recursive CTE 가능 | **충분** | PostgreSQL과 동일 | 가능하지만 운영 store 추가 |
 | 깊은 경로·graph algorithms | 제한적 | 제한적 | 제한적 | **가장 적합** |
 | 백업·감사·다중 worker | 단순하지만 단일 파일 제약 | **가장 균형적** | PostgreSQL 운영에 포함 | 추가 백업·동기화 필요 |
-| 도구 제거 시 축소 | 매우 쉬움 | pgvector/graph 기능만 비활성화 가능 | projection 삭제 가능 | projection 삭제 후 PostgreSQL로 fallback 필요 |
+| 도구 제거 시 축소 | 매우 쉬움 | semantic/graph 기능만 비활성화 가능 | projection 삭제 가능 | projection 삭제 후 PostgreSQL로 fallback 필요 |
 
-결론은 `PostgreSQL canonical + PostgreSQL lexical + optional pgvector + optional Neo4j projection`이다. 네 가지를 처음부터 모두 적극 사용한다는 뜻이 아니라, PostgreSQL만으로 필수 기능을 완성하고 검증된 필요에 따라 projection을 켠다는 뜻이다.
+결론은 `PostgreSQL canonical + PostgreSQL lexical + pgvector production profile + optional Neo4j projection`이다. pgvector 설치와 semantic 활성화는 별개다. 참조 profile은 배포·migration 일관성을 위해 pgvector를 포함하지만, vector projection은 재생성 가능하고 품질·ACL·freshness·지연시간 gate 전에는 검색 기본 경로에서 비활성이다.
 
 ### 1.3 제품 인터페이스 선택
 
@@ -484,7 +490,10 @@ Agent 흐름:
 - **FR-VEC-005 MUST**: vector result에는 source ACL 필터를 적용해야 한다.
 - **FR-VEC-006 SHOULD**: lexical과 vector 결과는 raw score 직접 비교가 아니라 RRF 또는 별도 reranker로 결합해야 한다.
 - **FR-VEC-007 SHOULD**: semantic search 도입 전 golden query에서 실제 개선을 입증해야 한다.
-- **FR-VEC-008 MAY**: HNSW index를 활성화할 수 있어야 한다.
+- **FR-VEC-008 MUST**: 1024차원 프로덕션 reference projection은 HNSW cosine
+  index를 사용하고, ACL/freshness filter 뒤 후보 부족을 막는 bounded iterative
+  scan 설정을 가져야 한다. 승격 전 exact-search 비교로 recall trade-off를
+  측정해야 한다.
 
 ### 9.10 Entity and identity
 
@@ -596,6 +605,10 @@ Agent 흐름:
 - **NFR-MNT-002 MUST**: adapter contract test가 모든 구현체에 공통 적용돼야 한다.
 - **NFR-MNT-003 MUST**: schema, ontology, CLI contract는 각각 version을 가져야 한다.
 - **NFR-MNT-004 SHOULD**: 주요 선택은 ADR로 기록해야 한다.
+- **NFR-MNT-005 MUST**: 제품 동작, public contract, architecture, configuration,
+  security, operations, parser/model/projection lifecycle 또는 알려진 한계가
+  바뀌면 영향을 받는 canonical 문서와 현재 구현 상태를 같은 변경에서
+  갱신해야 한다.
 
 ### 10.4 검색 품질
 
@@ -604,6 +617,11 @@ Agent 흐름:
 - **NFR-RET-003 MUST**: 중요 답변의 locator 정확도 98% 이상을 목표로 한다.
 - **NFR-RET-004 MUST**: stale source가 있는 답변은 100% 경고해야 한다.
 - **NFR-RET-005 SHOULD**: vector search는 lexical baseline보다 유의미한 개선이 있을 때만 기본 활성화한다.
+- **NFR-RET-006 MUST**: 공개 저장소 CI는 최소 100개 positive 검색 계약과
+  ACL-negative 계약을 매 merge에 실행해야 한다. Synthetic portable gate는
+  실제 조직 corpus 품질 승격 근거를 대체하지 않는다.
+- **NFR-RET-007 MUST**: 보호된 private-corpus runner에서는 dataset 또는 corpus
+  부재와 gate skip을 실패로 취급해야 한다.
 
 ### 10.5 보안
 
@@ -639,6 +657,11 @@ Agent는 다음을 지켜야 한다.
 - 이메일은 Message-ID와 MIME part를 표시한다.
 - relation candidate는 공식 사실처럼 표현하지 않는다.
 - 원본 hash가 색인 hash와 다르면 stale 경고를 표시한다.
+- 검색된 문서에 질문이 요구한 식별자, 수치 대상, 또는 focused fact가 실제로
+  없으면 관련 단어가 있다는 이유만으로 성공 답변을 만들지 않고
+  `answer_not_present`로 거절한다.
+- 짧은 질문이 서로 다른 여러 문서에 동시에 걸려 하나의 근거를 선택할 수
+  없으면 임의 선택 대신 `clarification_required`를 반환한다.
 
 ---
 
@@ -747,7 +770,7 @@ Agent는 다음을 지켜야 한다.
 - embedding provider adapter
 - pgvector exact search
 - hybrid evaluation
-- 필요 시 HNSW
+- 1024차원 HNSW production index와 exact-search recall 비교
 
 ### Phase 5 — Optional graph projection
 
@@ -798,18 +821,38 @@ KIP v3 baseline은 다음을 모두 만족해야 인수된다.
 
 ## 17. 결정 기록
 
+이 표는 현재 저장소에 실제 ADR 파일이 있는 결정만 나열한다. 번호 공백은
+역사적 예약 또는 미작성 결정을 뜻하며, 존재하지 않는 ADR을 승인 근거로
+인용하지 않는다.
+
 | Decision ID | Decision | Status |
 |---|---|---|
-| ADR-001 | PostgreSQL 18을 canonical store로 사용 | Accepted |
-| ADR-002 | pgvector는 optional semantic projection | Accepted |
-| ADR-003 | Neo4j는 optional read projection | Accepted |
-| ADR-004 | 온톨로지는 DB 밖의 versioned contract | Accepted |
-| ADR-005 | canonical assertion과 graph projection 분리 | Accepted |
-| ADR-006 | Excel은 shallow index + deep read | Accepted |
-| ADR-007 | HWP는 parser broker + paired PDF | Accepted |
-| ADR-008 | Agent-facing CLI/JSON이 기본 API | Accepted |
-| ADR-009 | Frontend와 MCP는 baseline 제외 | Accepted |
-| ADR-010 | Slack/Mail content에 source ACL 전파 | Accepted |
+| ADR-001 | PostgreSQL is canonical | Accepted |
+| ADR-002 | CLI, REST, and MCP are edge adapters | Accepted |
+| ADR-003 | Neo4j is optional and non-canonical | Accepted |
+| ADR-004 | XLSX uses shallow indexing and deep reads | Accepted |
+| ADR-005 | Local-first hybrid retrieval is evaluation-gated | Accepted |
+| ADR-017 | Native hwp-hwpx-parser is the HWP primary | Accepted |
+| ADR-018 | Jina Hugging Face reranker remains an opt-in shadow adapter | Accepted |
+| ADR-019 | Evidence-first quality control plane | Accepted |
+| ADR-020 | Trusted identity and expiring ACL snapshots | Accepted |
+| ADR-021 | Canonical classification and atomic model egress | Accepted |
+| ADR-022 | Provider-neutral structured generation | Accepted |
+| ADR-023 | Verified generated-answer orchestration | Accepted |
+| ADR-024 | Typed ontology relation candidates | Accepted |
+| ADR-025 | Reviewed ontology mining jobs | Accepted |
+| ADR-026 | Approved graph answer context | Accepted |
+| ADR-027 | Materialize ontology changes as reviewed assertion candidates | Accepted |
+| ADR-028 | Persist redacted RAG decisions and export bounded telemetry | Accepted |
+| ADR-029 | Bind end-to-end RAG gates to reviewed immutable datasets | Accepted |
+| ADR-030 | Seal complete backups and preserve rebuildable lexical input | Accepted |
+| ADR-031 | Guarded HWP re-extraction and local lexical reranking | Accepted |
+| ADR-032 | Consent-based interaction memory and staged ontology discovery | Accepted |
+| ADR-033 | Retrieval and authorization hardening | Accepted |
+| ADR-034 | Promote the candidate-local BM25 reranker | Accepted |
+| ADR-035 | Version semantic inputs and resume projection rebuilds | Accepted |
+| ADR-036 | Fix retrieval stage order and gate corpus regressions | Accepted |
+| ADR-037 | Align the production search contract and readiness gates | Accepted |
 
 ---
 

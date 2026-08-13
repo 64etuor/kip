@@ -42,6 +42,12 @@
   ACL-filtered exact evidence reopen and freshness checks. Evidence is encoded
   only as untrusted payload data; unknown ontology values or evidence IDs make
   the complete mining result invalid.
+- A loopback-only embedding/reranker sidecar is a local model boundary, not
+  remote model egress. When `models.generation.enabled=false`, `kip answer`
+  returns the local extractive path and does not call a generator. Security
+  review must inspect the resolved configuration, adapter destination, and
+  trace/egress decision; the command name `answer` alone is not evidence that
+  private content leaves the machine.
 
 ## Secrets
 
@@ -91,6 +97,12 @@
 - Resolve workspace, principal, and ACL scopes only through the configured
   identity adapter. Production rejects caller-supplied `X-KIP-Workspace`,
   `X-KIP-Principal`, and `X-KIP-ACL-Scopes` headers.
+- The local operator CLI is not the production identity boundary. With no ACL
+  option it uses the configured `KIP_ACL_SCOPES`. Any explicitly supplied
+  `--acl-scope` or `--acl-scopes` value replaces that ambient set; an explicitly
+  empty plural value remains empty. This makes outsider and deny-all probes
+  deterministic instead of silently unioning an environment grant. REST still
+  derives its context only through the configured identity adapter.
 - Production `proxy_jwt` mode verifies the issuer, audience, signature,
   algorithm allow-list, expiry, and required identity/ACL snapshot claims. JWKS
   retrieval has bounded timeout and cache lifetime; verification failure denies

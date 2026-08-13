@@ -11,6 +11,7 @@ This repository implements an evidence-first knowledge fabric for NAS documents,
 - Security: `docs/SECURITY.md`
 - Connector rules: `docs/CONNECTORS.md`
 - Current implementation status: `docs/IMPLEMENTATION_STATUS.md`
+- Production-design alignment and known gaps: `docs/PRODUCTION_DESIGN_ALIGNMENT.md`
 - Starter-kit adoption and upgrade guide: `docs/STARTER_KIT_GUIDE.md`
 
 ## Architecture rules
@@ -54,11 +55,21 @@ This repository implements an evidence-first knowledge fabric for NAS documents,
 ## Change workflow
 
 1. Read the relevant PRD/TRD section and existing port contract.
-2. Add or update a contract test before changing an adapter.
-3. Keep migrations append-only. Never edit an already-released migration.
-4. Run `./scripts/verify.sh` before considering work complete.
-5. Update `docs/IMPLEMENTATION_STATUS.md` when a reference adapter becomes production-ready or its limitations change.
-6. Record architecture changes as an ADR under `docs/adr/`.
+2. Treat documentation as part of the change. Any change to product behavior,
+   public contracts, architecture, configuration, security, operations,
+   parser/model/projection lifecycle, or a known limitation MUST update every
+   affected canonical document in the same change. A known implementation/doc
+   divergence is a completion blocker, not deferred cleanup.
+3. Add or update a contract test before changing an adapter.
+4. Keep migrations append-only. Never edit an already-released migration.
+5. Run `./scripts/verify.sh` before considering work complete.
+6. Update `docs/IMPLEMENTATION_STATUS.md` and
+   `docs/PRODUCTION_DESIGN_ALIGNMENT.md` whenever readiness, measured evidence,
+   or limitations change.
+7. Record architecture or design changes as an ADR under `docs/adr/`, and also
+   update the parent PRD/TRD plus `DATA_CONTRACTS`, `OPERATIONS`, `SECURITY`, or
+   the starter guide wherever the decision changes their contract. An ADR alone
+   does not satisfy documentation synchronization.
 
 ## Definition of done
 
@@ -70,4 +81,6 @@ A change is complete only when:
 - root `AGENTS.md` and `CLAUDE.md` remain present;
 - no source mutation path was introduced;
 - evidence locators and stale-source checks are preserved;
-- documentation and example configuration match the implementation.
+- every affected design, contract, operations, security, status, guide, ADR,
+  and example-configuration document matches the implementation, and any
+  remaining target gap is explicitly recorded as a limitation.

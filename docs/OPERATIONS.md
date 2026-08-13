@@ -288,6 +288,13 @@ collector loss.
 
 ### Local semantic shadow
 
+The supported PostgreSQL production reference profile includes pgvector through
+`0006_pgvector_1024_projection.sql` and the 1024-dimensional HNSW index through
+`0018_embeddings_1024_hnsw.sql`. Migration 0018 uses a transaction-local
+unlimited statement timeout for index construction; normal query timeouts remain
+unchanged. Semantic retrieval is still disabled when
+`search.semantic_enabled=false`.
+
 ```bash
 ./scripts/bootstrap-semantic.sh
 ./scripts/semantic-server.sh run
@@ -296,18 +303,54 @@ collector loss.
 ./scripts/kip projection verify --name semantic
 ```
 
+For an interactive shell, `semantic-server.sh start` backgrounds the process.
+For CI, agent runners, containers, launchd, systemd, or another supervisor, use
+`semantic-server.sh run` as the supervised foreground process; detached child
+lifetime is not guaranteed after an ephemeral runner command returns. Readiness
+is `GET http://127.0.0.1:7997/models`, and both served model names must be present
+before rebuild or evaluation.
+
 The isolated semantic environment pins Infinity 0.0.77 and Click 8.1.8.
 Click 8.4.x is incompatible with Infinity's Typer 0.12.5 dual boolean flags.
 Apple MPS also runs with BetterTransformer disabled because Infinity's optional
 Optimum precheck is invalid on that path. Defaults of four embedding inputs and
 two reranking pairs per server batch fit the validated 24 GB Apple Silicon
-profile; adjust the `KIP_*_SERVER_BATCH_SIZE` variables only after measuring.
+profile. The application also bounds each document input to the configured
+`models.embedding.max_document_chars` (default 4000); this preprocessing value
+uses the versioned `head_tail_v1` strategy, preserving the title and sampling
+both ends of oversized units. The cap and strategy are part of the
+embedding-space identity, so changing either creates a new shadow space instead
+of mixing incompatible vectors. Adjust either batch size or input cap only
+after measuring.
 
-`projection verify` accepts a complete `shadow` or `active` space and checks
-that its vector count equals current active content units. `projection
-activate` refuses an incomplete space. Activation is still a separate operator
-decision after `evaluate compare`; the current public pilot says to keep it
-disabled.
+The reference HNSW query settings are:
+
+```toml
+[search]
+hnsw_ef_search = 200
+hnsw_max_scan_tuples = 100000
+```
+
+Each vector query also sets `hnsw.iterative_scan=strict_order` transaction
+locally. Change these bounds only with an exact-search recall comparison and
+filtered ACL/freshness candidate-sufficiency evidence.
+
+`projection rebuild` is resumable for a stable embedding-space identity: it
+embeds only current active ACL-fresh units whose vector is missing or whose
+source hash changed. `projection verify` uses that same current-unit set as its
+denominator, accepts a complete `shadow` or `active` space, and ignores vectors
+from inactive extractions or superseded revisions. `projection activate`
+refuses an incomplete space. Activation is still a separate operator decision
+after `evaluate compare`; both the public pilot and the current private
+Qwen3 report say to keep it disabled, for different measured reasons.
+
+Public v1 `SearchRequest.mode` accepts `lexical`, `vector`, `hybrid`, and
+`reranked` across CLI, REST, MCP, and SDK. An explicit vector-family request is
+diagnostic access, not activation evidence: only after a fingerprint-matched
+promotion, `projection activate`, and a separate reviewed
+`search.semantic_enabled=true` configuration change may the deployment default
+use a semantic mode. `capabilities.semantic_search` must be true before clients
+offer that path as ready.
 
 ### Periodic public scorecard
 
@@ -327,6 +370,26 @@ use `python -m kip.cli` directly for this workflow because it does not load
 `.env`. The default scorecard performs one untimed full-dataset warmup pass per
 variant, suitable for the persistent model sidecar. Pass `--warmup-passes 0`
 to `evaluate run` only for a deliberate cold-start measurement.
+
+### Merge and private-corpus regression gates
+
+```bash
+./scripts/portable_golden_gate.py
+./scripts/golden_gate.py
+KIP_REQUIRE_PRIVATE_GOLDEN=1 ./scripts/golden_gate.py
+```
+
+The portable gate expands the checked-in 20-document manifest into 100 positive
+query contracts and 20 ACL-negative cases. It always runs in hosted CI and
+protects search stages, filters, envelope behavior, and authorization without
+shipping private data. It is synthetic contract evidence, not a production
+quality score.
+
+The private gate uses the approved real corpus. Developer environments may skip
+it when that corpus is intentionally absent. Protected corpus-bearing runners
+must set `KIP_REQUIRE_PRIVATE_GOLDEN=1`; missing dataset, empty repository, or a
+skip then fails closed. Do not report a merge as private-corpus-gated unless that
+protected job actually ran.
 
 ## Parser upgrade
 
@@ -360,8 +423,9 @@ incremental sync never trigger this workflow.
 ## Local lexical reranking
 
 The starter profiles rerank at most 40 ACL-filtered lexical candidates with
-RapidFuzz. This is local, deterministic, and does not build embeddings or send
-document text to a model endpoint:
+candidate-local Okapi BM25. This is local, deterministic, and does not build
+embeddings or send document text to a model endpoint. RapidFuzz remains the
+supported fallback backend:
 
 ```toml
 [search]
@@ -370,7 +434,7 @@ lexical_rerank_candidate_limit = 40
 
 [models.reranker]
 enabled = true
-backend = "rapidfuzz"
+backend = "bm25"
 max_document_chars = 8000
 baseline_weight = 0.15
 ```
@@ -380,7 +444,9 @@ repository before reranking. If the adapter is unavailable, KIP preserves the
 lexical order and emits `metadata.lexical_rerank_degraded=true`; alert on this
 field instead of silently treating the request as reranked. Re-evaluate the
 candidate depth, latency, and ranking against each deployment's reviewed
-questions before changing these bounds.
+questions before changing these bounds. ADR-031 records the older
+source-derived RapidFuzz promotion; ADR-034 records why BM25 superseded it on
+the reviewed 19-case set.
 
 ## Dependency and model update watch
 

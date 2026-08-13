@@ -34,7 +34,9 @@ database round trips and risked making the ACL boundary harder to audit.
 The 2026-08-06 public-government trial used six PDFs, 36 golden cases, and 70
 current content units after sync. The Jina model was served locally by the
 Infinity sidecar and was also exercised directly through the Hugging Face
-adapter in `KnowledgeService`.
+adapter. The current composition boundary is `Application.retrieval`; the
+former `KnowledgeService` symbol referenced by the original experiment no
+longer exists.
 
 | Variant | Recall@10 | MRR | nDCG@10 | P95 ms | ACL leaks |
 |---|---:|---:|---:|---:|---:|

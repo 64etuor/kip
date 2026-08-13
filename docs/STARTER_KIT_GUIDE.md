@@ -65,6 +65,10 @@ AI가 기능이나 라이브러리를 바꿀 때 다음 순서를 유지한다.
 6. baseline과 candidate를 같은 source revision, ACL principal, golden dataset으로 비교한다.
 7. 품질·지연시간·실패·locator·stale-source·ACL gate가 모두 통과한 경우에만 사람이 활성화를 승인한다.
 8. 변경 후 CLI, REST, MCP가 같은 application service 의미를 유지하는지 확인한다.
+9. 제품 동작, public contract, architecture, configuration, security,
+   operations, parser/model/projection lifecycle 또는 알려진 한계가 바뀌면
+   PRD/TRD와 영향을 받는 contract·runbook·status·ADR을 같은 변경에서
+   갱신한다. 구현과 문서가 다르면 변경은 완료되지 않았다.
 
 AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild를 시작해서는 안 된다. 검색에서 발견한 관계는 답변 한정 가설 또는 assertion candidate일 수 있지만 자동 승인된 사실이 될 수 없다.
 
@@ -96,11 +100,26 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 - 한국어 내부 질문에 대해 lexical baseline과 Recall/MRR/nDCG, ACL leak, P95, 비용을 비교한다.
 - public MTEB 순위는 후보 선택 자료일 뿐 KIP corpus 승격 근거가 아니다.
 - starter 기본 lexical path는 ACL과 freshness가 적용된 최대 40개 후보만
-  로컬 RapidFuzz로 재정렬한다. embedding이나 외부 전송은 발생하지 않으며,
-  실패 시 lexical 순서와 `lexical_rerank_degraded` 표식을 보존한다.
-- 현재 OneDrive HWP/HWPX source-derived 253-query A/B는 RapidFuzz를
-  승격했지만 reviewed natural-language answer/ontology 평가는 아니다.
-  Kiwi analyzer는 이 corpus에서 유의미한 이득이 없어 포함하지 않는다.
+  candidate-local BM25로 재정렬한다. embedding이나 외부 전송은 발생하지
+  않으며, 실패 시 lexical 순서와 `lexical_rerank_degraded` 표식을 보존한다.
+  RapidFuzz는 fallback backend다.
+- 2026-08-10 OneDrive HWP/HWPX source-derived 253-query A/B는 RapidFuzz를
+  먼저 승격했지만 reviewed natural-language answer/ontology 평가가 아니었다.
+  ADR-034가 이후 reviewed 19-case 비교로 BM25를 기본값으로 승격했다. Kiwi
+  analyzer는 이 corpus에서 유의미한 이득이 없어 포함하지 않는다.
+- Semantic shadow는 `evaluate run --variants lexical,vector,hybrid,reranked`로
+  비교한다. Public v1 `SearchRequest.mode`로도 같은 네 mode를 명시할 수
+  있지만, `capabilities.semantic_search`가 false인 배포에서 vector 계열
+  mode를 운영 기본값으로 간주하지 않는다. Shadow 평가 성공과 명시적
+  projection activation은 서로 다른 승인 단계다.
+- 배포 가능한 저장소 CI는 private corpus가 없어도 checksum-pinned
+  `production-regression.yaml`의 100개 positive 검색과 20개 ACL-negative
+  계약을 항상 실행한다. 실제 조직 corpus gate는 이 portable gate를
+  대체하지 않으며, `KIP_REQUIRE_PRIVATE_GOLDEN=1`인 보호 runner에서 corpus
+  부재 또는 skip을 실패로 취급한다.
+- PostgreSQL 프로덕션 참조 profile은 pgvector와 1024차원 HNSW migration을
+  포함한다. 의미 검색은 기본 비활성이고, 완전한 active space와 품질,
+  freshness, ACL, 지연시간 gate가 모두 확인될 때만 capability가 true다.
 
 ### Ontology와 graph
 
@@ -146,6 +165,8 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 - backup/restore drill과 projection rebuild 결과
 - CLI/REST/MCP contract parity, 비소유 DB role RLS 검증
 - `./scripts/verify.sh` 결과와 알려진 제한 목록
+- `docs/PRODUCTION_DESIGN_ALIGNMENT.md`의 target/current/gap 판정과 skip된
+  gate 목록
 
 이 묶음이 없으면 “설치 가능” 또는 “retrieval pilot”로 표현하고, production-ready 또는 end-to-end RAG로 표현하지 않는다.
 

@@ -2,16 +2,43 @@
 
 ## Current decision
 
-Keep semantic search disabled by default. The implemented Qwen3, pgvector,
-hybrid, and BGE reranking paths are operational and remain available as a
-complete shadow projection, but this public pilot does not prove a quality gain
-over the corrected PostgreSQL lexical path.
+Keep semantic search disabled by default. The reason is no longer “semantic
+quality did not improve” for every corpus. On the reviewed 19-case private
+OneDrive set, vector-only retrieval materially beats the active lexical path,
+and its HNSW P95 passes, but its stale-warning gate fails closed. On the six-document public
+pilot, lexical remains equal or better. These are separate corpus decisions.
+
+Public v1 `SearchRequest.mode` exposes `lexical`, `vector`, `hybrid`, and
+`reranked` consistently across the four edges. `kip evaluate run` remains the
+fingerprinted comparison surface; a one-off explicit mode request is diagnostic
+evidence and never substitutes for projection promotion and activation.
 
 The latest loaded-corpus audit, including the corrected unmeasured-metric
 semantics and all four retrieval variants, is
 [`RAG_QUALITY_AUDIT_2026-08-06.md`](RAG_QUALITY_AUDIT_2026-08-06.md).
 
-## Reproducible pilot
+## Reviewed private shadow: 2026-08-13
+
+The current Qwen3 space
+`qwen3-embedding-0.6b-1024-c4000-ht1` is complete at 30,565/30,565 current
+active ACL-fresh units. It uses the pinned local Infinity sidecar and versioned
+`head_tail_v1` input policy from ADR-035.
+
+| Variant | Recall@10 | MRR | nDCG@10 | P95 ms | ACL leaks |
+|---|---:|---:|---:|---:|---:|
+| lexical | 0.789 | 0.646 | 0.680 | 7385.80 | 0 |
+| vector HNSW | **0.947** | **0.822** | **0.853** | **133.75** | 0 |
+| hybrid | 0.895 | 0.702 | 0.750 | 7924.98 | 0 |
+| reranked | 0.842 | 0.656 | 0.700 | 15512.58 | 0 |
+
+Semantic-paraphrase Recall@10 improves from `0.429` to `0.857`; exact
+identifier and exact numeric Recall@10 remain `1.000`. Nevertheless the
+decision is `keep_disabled`: vector P95 passes the `2000 ms` ceiling, but the
+retrieval-only dataset contains no stale-warning observations, so that mandatory
+gate is `null`. No activation command ran. The authoritative report is
+`evaluation/reports/semantic-qwen3-all-modes-final-20260813/decision.md`.
+
+## Reproducible public pilot
 
 - Hardware: Apple Silicon M4 Pro, arm64, 24 GB unified memory
 - Runtime: CPython 3.13.13
@@ -126,9 +153,10 @@ This six-document pilot is intentionally small and lexically distinctive. It
 does not justify a claim that lexical retrieval will dominate on a private,
 larger, or more paraphrase-heavy corpus. Before activation, extend the golden
 set with explicitly allowlisted internal documents, confusing near-duplicates,
-tables, document revisions, stale-source cases, and harder paraphrases. Add
-HNSW only when exact pgvector latency is measured to be insufficient at the
-real corpus size.
+tables, document revisions, stale-source cases, and harder paraphrases. The
+production reference path now uses HNSW; retain exact pgvector comparison runs
+to measure ANN recall and ACL/freshness-filtered candidate sufficiency whenever
+its parameters change.
 
 ## Quality control plane
 

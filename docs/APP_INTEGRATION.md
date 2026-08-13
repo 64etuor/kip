@@ -7,7 +7,15 @@
 3. MCP for AI clients that support tools.
 4. CLI subprocess for local automation and agents.
 
-All four surfaces call the same application services.
+CLI and MCP call the focused application use cases directly, REST exposes those
+same use cases over HTTP, and the Python SDK delegates to REST. The SDK does not
+contain ranking, ACL, or review logic.
+
+Search uses one `SearchRequest` across CLI, REST, MCP, and the Python SDK:
+`query`, `limit`, optional `mode`, source kinds, document types, project IDs,
+and candidate-assertion inclusion. Missing fields use canonical defaults, and
+every edge delegates ranking, ACL, and refusal behavior to the shared
+application services. See `DATA_CONTRACTS.md` for the exact wire contract.
 
 ## Read API
 
@@ -79,4 +87,8 @@ Use a stable `event_id` and `external_id`. A repeated identical event is safe: t
 
 ## Integration boundary
 
-REST, MCP, the CLI, and connector events are edge adapters. They must not implement ranking, ACL policy, ontology promotion, or parser decisions. Add a new client protocol by calling `KnowledgeService` and preserving the checked-in contracts under `contracts/`.
+REST, MCP, the CLI, and connector events are edge adapters. They must not
+implement ranking, ACL policy, ontology promotion, or parser decisions. Add a
+new direct edge by composing the focused use cases in
+`src/kip/application/runtime.py`; add a remote client through the versioned
+REST/OpenAPI contract. Preserve the checked-in contracts under `contracts/`.

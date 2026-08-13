@@ -1,6 +1,9 @@
 # Data Contracts
 
-All edge adapters exchange canonical Pydantic models and versioned JSON envelopes. Static JSON Schema files are generated into `contracts/`.
+Application boundaries use canonical Pydantic models. CLI, REST, and MCP
+serialize those models through versioned JSON envelopes, while the Python SDK
+consumes the REST JSON contract. Static JSON Schema files are generated into
+`contracts/`.
 
 ## Public envelope
 
@@ -16,6 +19,37 @@ All edge adapters exchange canonical Pydantic models and versioned JSON envelope
   }
 }
 ```
+
+## Search boundary
+
+`SearchRequest` is the canonical application search request. Its versioned
+fields are `query`, `limit`, optional `mode`, `source_kinds`,
+`document_types`, `project_ids`, and `include_candidate_assertions`.
+`mode` accepts `lexical`, `vector`, `hybrid`, or `reranked`; omitting it selects
+the deployment default. CLI, REST, MCP, and the Python SDK expose the same
+fields and call the same application service. Omitted optional filters retain
+the canonical model defaults, and SDK payloads omit those defaults rather than
+inventing a second wire contract.
+
+Workspace, principal, roles, and ACL scopes belong to the verified internal
+`RequestContext`; an API search payload cannot choose them. Local CLI
+authorization flags are operator-test inputs, not part of `SearchRequest`.
+When a CLI ACL option is explicitly present, including an explicitly empty
+plural value, it replaces ambient `KIP_ACL_SCOPES`; when no option is present,
+the configured environment value is used. This prevents a negative-scope test
+from accidentally inheriting an ambient grant.
+
+Public v1 does not yet carry a date range, entity filter, graph-expansion plan,
+or cursor. Adding any such planner field requires a compatible generated-schema
+change and parity updates across every edge; an edge-only planner option would
+violate the contract.
+
+`SearchHit` exposes `unit_id`, optional `document_id`, `artifact_id`,
+`source_kind`, title, snippet, scalar score, reproducible locator, source URI,
+indexed source hash, optional source modification time, and metadata.
+Channel ranks, `is_latest`, diversity backfill, and degradation markers live in
+metadata. Array order is result rank. The snippet and score remain discovery
+data, never final evidence.
 
 ## Canonical source sequence
 
@@ -60,9 +94,15 @@ unique, and all returned IDs must be a subset of the request.
 `AnswerResponse` remains `kip.answer.v1` and adds structured claims, generation
 metadata, and the applied `EgressDecision`. A successful generated answer cites
 only fresh evidence reopened by the application service. Typed refusals cover
-egress denial, provider unavailability, and invalid generated citations.
+no admissible or fresh evidence, requested facts absent from the reopened
+evidence (`answer_not_present`), unresolved short multi-document ambiguity
+(`clarification_required`), exact XLSX-read requirements, egress denial,
+provider unavailability, and invalid generated citations.
 Extractive fallback is visible through `retrieval_mode` and `warnings`; it is
-never selected unless configuration explicitly permits it.
+the primary local behavior when structured generation is disabled. When
+generation is enabled, a generator failure falls back only when
+`models.generation.fallback_on_error=true`; otherwise it returns a typed
+refusal. With generation disabled, `kip answer` makes no remote generator call.
 
 ## Knowledge sequence
 

@@ -82,16 +82,33 @@ Treat the smoke check and the actual listening socket as authoritative. If `star
 timeout 3600 ./scripts/semantic-server.sh run
 ```
 
-After smoke passes, set `search.semantic_enabled = true` in the local ignored `config/kip.toml`, keep the embedding and reranker adapters enabled, and then build the disposable semantic projection:
+After smoke passes, enable the embedding adapter but keep
+`search.semantic_enabled = false` while building and evaluating the disposable
+shadow projection:
 
 ```bash
 ./scripts/kip capabilities
 ./scripts/kip projection rebuild --name semantic
 ./scripts/kip projection verify --name semantic
 ./scripts/kip projection status
+./scripts/kip evaluate run \
+  --dataset evaluation/golden/private-onedrive-nl.yaml \
+  --variants lexical,vector,hybrid,reranked \
+  --output-dir evaluation/reports/private-shadow
 ```
 
-If the sidecar is unavailable, run lexical retrieval as a valid partial cycle and record that semantic behavior is unverified. If normal search returns hits with `metadata.semantic_degraded=true`, report semantic degradation; do not call that a successful semantic run.
+Public v1 `SearchRequest.mode` accepts `lexical`, `vector`, `hybrid`, and
+`reranked` through CLI, REST, MCP, and SDK. `evaluate run` remains the
+reproducible multi-variant comparison surface. An explicit one-off vector mode
+is diagnostic evidence, not activation: set `search.semantic_enabled=true` or
+change the default mode only after a fingerprint-matched report passes every
+gate, the space is explicitly activated, and the configuration change is
+separately approved.
+
+If the sidecar is unavailable, run lexical retrieval as a valid partial cycle
+and record that semantic behavior is unverified. If a prematurely enabled
+normal search returns `metadata.semantic_degraded=true`, report degradation;
+do not call that a successful semantic run.
 
 ## HWP/HWPX parser comparison
 
@@ -117,10 +134,11 @@ writes to OneDrive.
 
 ## Local lexical reranker comparison
 
-The current starter profile applies RapidFuzz only after PostgreSQL has
-prefiltered authorized, current lexical candidates. The isolated 2026-08-10
-OneDrive HWP/HWPX run indexed 86/86 files into 263 native units with zero
-failures and unchanged source hashes.
+The current starter profile applies candidate-local Okapi BM25 only after
+PostgreSQL has prefiltered authorized, current lexical candidates. RapidFuzz is
+the supported fallback. The isolated 2026-08-10 OneDrive HWP/HWPX run below is
+the historical source-derived evidence that first promoted RapidFuzz, not the
+current default:
 
 | Variant | Recall@1 | Recall@5 | MRR | P95 ms |
 |---|---:|---:|---:|---:|
@@ -133,7 +151,9 @@ answer or ontology quality. Kiwi alone lowered top-1, deterministic proximity
 tied baseline, and the RapidFuzz+Kiwi MRR gain of 0.0013 did not justify the
 extra runtime/index surface. Preserve the machine decision under
 `evaluation/reports/onedrive-hwp-native-rapidfuzz-20260810/decision.json` and
-rerun it for a materially different corpus.
+rerun it for a materially different corpus. ADR-034 records the subsequent
+reviewed 19-case promotion to BM25 (Recall@10/MRR `0.789/0.646` versus
+RapidFuzz `0.737/0.576` under the final comparison configuration).
 
 ## One complete real-corpus cycle
 
@@ -256,7 +276,8 @@ commands or architecture context. Test at least the six case classes in
 discovered, whether it read exact evidence, whether XLSX values came from the
 original range, and whether weak/stale/unauthorized cases produced refusal.
 The agent's fluent prose is not a pass unless the machine-readable evidence and
-ACL outcomes pass independently.
+ACL outcomes pass independently. The current 2026-08-13 observation matrix and
+unresolved gaps are recorded in `docs/PRODUCTION_DESIGN_ALIGNMENT.md`.
 
 ## Candidate promotion workflow
 

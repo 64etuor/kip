@@ -7,6 +7,11 @@ KIP is an agent-first, evidence-first foundation for indexing and retrieving com
 
 The baseline runtime is PostgreSQL 18 with PostgreSQL-native lexical search. `pgvector` is installed by the reference image but semantic search remains disabled until an evaluation proves value. Neo4j is not canonical and is only a future read projection.
 
+The approved target, current implementation, measured evidence, and remaining
+production gaps are separated in
+[`docs/PRODUCTION_DESIGN_ALIGNMENT.md`](docs/PRODUCTION_DESIGN_ALIGNMENT.md).
+Do not infer current readiness from PRD/TRD target language alone.
+
 ## 1. Repository guarantees
 
 - `AGENTS.md` and `CLAUDE.md` are at the project root.
@@ -177,7 +182,7 @@ Use an app password or organization-approved credential. The connector uses UID 
 |---|---|
 | Minimal | PostgreSQL, filesystem source, lexical search, CLI |
 | Standard | Minimal + API, worker, HWP broker, Slack/Mail optional connectors |
-| Expanded | Standard + pgvector activation, relation miner, optional Neo4j projection, review UI |
+| Expanded | Standard + explicitly activated semantic retrieval, relation miner, optional Neo4j projection; review remains headless CLI/API |
 
 ## 8. Important limitations of this starter
 
@@ -186,18 +191,20 @@ adapter is complete. The filesystem, text, PDF, XLSX shallow/deep path, memory
 repository, CLI/API contracts, PostgreSQL migrations, and pgvector shadow path
 are concrete; the local semantic path has been validated on the documented
 Apple Silicon pilot but remains shadow-only for the private corpus. Slack,
-Apple Mail, IMAP, MCP, and Neo4j remain reference adapters that require
-environment-specific validation before production use. Existing unchanged HWP
-and HWPX revisions use the explicit shadow/activate re-extraction workflow when
-parser versions change; no generic all-format forced re-index command is
-exposed.
+Apple Mail, IMAP, and Neo4j remain environment-specific reference adapters;
+the stdio MCP adapter is implemented and uses the shared application services.
+The supported PostgreSQL reference profile includes pgvector and the 1024d HNSW
+index even while semantic search is disabled; installation is not activation.
+Existing unchanged HWP and HWPX revisions use the explicit
+shadow/activate re-extraction workflow when parser versions change; no generic
+all-format forced re-index command is exposed.
 
 The starter lexical path locally reranks up to 40 ACL-filtered candidates with
-RapidFuzz 3.14.5. The real OneDrive HWP/HWPX source-derived A/B improved
-Recall@1 from 0.9407 to 0.9684 and MRR from 0.9596 to 0.9796 with a 15.072 ms
-P95 increase. This is retrieval evidence, not reviewed answer or ontology
-quality evidence; reranking cannot recover a document absent from the lexical
-candidate set.
+candidate-local BM25; RapidFuzz 3.14.5 is the fallback. On the reviewed 19-case
+private set, the final BM25 configuration reached Recall@10/MRR
+`0.789/0.646` versus RapidFuzz `0.737/0.576`. This is retrieval evidence, not
+reviewed answer or ontology quality evidence; reranking cannot recover a
+document absent from the lexical candidate set.
 
 Run `./scripts/verify.sh` before modifying or deploying the project.
 
@@ -229,9 +236,12 @@ make evaluate
 
 The current public result keeps semantic search disabled: corrected lexical
 retrieval reached Recall@10 and MRR 1.000 with zero ACL leaks, while the
-semantic variants did not improve quality. The implementation remains a
-complete shadow path for harder, explicitly allowlisted corpora. Exact results,
-latency, fingerprints, and improvement history are in
+semantic variants did not improve quality. The reviewed private result is
+different: vector-only Recall@10/MRR reached `0.947/0.822` versus lexical
+`0.789/0.646`, with HNSW P95 `133.75 ms` and zero ACL leaks. Stale-warning
+coverage is still absent, so it remains disabled under the fail-closed gate.
+Exact results, latency, fingerprints, target gaps,
+and improvement history are in `docs/PRODUCTION_DESIGN_ALIGNMENT.md`,
 `docs/RAG_EVALUATION.md` and `evaluation/reports/`.
 
 The loaded-corpus parser, retrieval, semantic, graph, and ontology audit is in

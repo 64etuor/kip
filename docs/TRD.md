@@ -1,9 +1,9 @@
 ---
 document_id: KIP-TRD-003
 title: KIP v3 Agent-First Knowledge Fabric 기술 요구사항 및 설계서
-version: 3.0.0
-status: proposed
-last_updated: 2026-07-28
+version: 3.1.0
+status: accepted
+last_updated: 2026-08-13
 language: ko-KR
 audience:
   - backend-engineering
@@ -12,10 +12,12 @@ audience:
   - security
   - knowledge-operations
 source_of_truth: true
+current_implementation: docs/IMPLEMENTATION_STATUS.md
 supersedes:
   - KIP v2 Agent-First TRD
 related_documents:
-  - KIP_v3_Knowledge_Fabric_PRD.md
+  - docs/PRD.md
+  - docs/PRODUCTION_DESIGN_ALIGNMENT.md
 ---
 
 # KIP v3 Agent-First Knowledge Fabric TRD
@@ -23,11 +25,21 @@ related_documents:
 ## 0. 문서 규칙
 
 - 이 문서는 구현 가능한 기술 기준을 정의한다.
+- 이 문서는 승인된 기술 목표를 정의한다. 현재 구현·승격·운영 승인 여부는
+  `docs/IMPLEMENTATION_STATUS.md`와
+  `docs/PRODUCTION_DESIGN_ALIGNMENT.md`에서 확인한다.
 - `MUST`, `SHOULD`, `MAY`의 의미는 PRD와 같다.
 - 예시 SQL과 JSON은 기준 구조를 설명한다. 실제 migration은 versioned 파일로 관리한다.
+- `current`라고 명시하지 않은 schema, SQL, topology, command 예시는 승인된
+  target 또는 conceptual model이다. 현재 public payload는
+  `docs/DATA_CONTRACTS.md`, generated schemas/OpenAPI, 그리고 실제 CLI
+  `--help`가 판정한다. Target 예시를 현재 구현 증거로 사용하지 않는다.
 - 외부 제품명은 reference adapter를 뜻하며 domain contract가 아니다.
 - Core가 특정 vendor SDK를 직접 import하면 아키텍처 위반이다.
 - 모든 public CLI output은 JSON Schema로 검증해야 한다.
+- 설계, public contract, configuration, security, operations 또는 알려진
+  한계를 바꾸는 구현은 영향을 받는 canonical 문서와 ADR을 같은 변경에서
+  갱신해야 한다. 문서와 구현의 알려진 불일치는 완료 상태가 아니다.
 
 ### 0.1 AI reading map
 
@@ -53,7 +65,7 @@ related_documents:
 |---|---|---|---|
 | Canonical database | PostgreSQL 18 | managed PostgreSQL | 동시 write, RLS, transaction, audit, 확장성 |
 | Lexical search | PostgreSQL `tsvector` + `pg_trgm` + vocabulary | PGroonga, Tantivy, OpenSearch | 한국어 전처리와 정확 검색을 결합하고 구성 수를 줄임 |
-| Semantic search | optional pgvector adapter, disabled by default | external vector engine | 참조 profile에서는 같은 DB를 쓰되 Core는 extension 부재도 허용 |
+| Semantic search | pgvector production profile, disabled by default | external vector engine | 참조 profile은 extension과 HNSW를 포함하되 활성화는 별도 gate로 통제 |
 | Graph query | PostgreSQL assertion tables + recursive CTE | Neo4j, Apache AGE | 현재 규모에서 충분하며 원장과 권한을 단순화 |
 | Graph database | None in baseline | Neo4j read projection | 입증 전 운영 비용을 만들지 않음 |
 | Raw object storage | local content-addressed filesystem | S3-compatible object store | Slack/EML raw snapshot과 첨부 보존 |
@@ -277,6 +289,10 @@ secrets:
 
 ## 6. Repository layout
 
+다음은 현재 checkout의 안정된 책임 경계다. 개별 generated schema와 migration
+파일 목록은 각각 `contracts/`와 `migrations/`가 최종 권위이며, 이 절의 tree를
+새 파일의 승인 목록처럼 해석하지 않는다.
+
 ```text
 kip/
 ├── AGENTS.md
@@ -284,86 +300,66 @@ kip/
 ├── README.md
 ├── pyproject.toml
 ├── compose.yaml
-│
+├── compose.production.yaml
+├── sdk/python/
 ├── docs/
 │   ├── PRD.md
 │   ├── TRD.md
+│   ├── IMPLEMENTATION_STATUS.md
+│   ├── PRODUCTION_DESIGN_ALIGNMENT.md
 │   ├── OPERATIONS.md
 │   ├── SECURITY.md
 │   ├── DATA_CONTRACTS.md
 │   └── adr/
-│
 ├── config/
 │   ├── kip.example.toml
+│   ├── kip.container.toml
 │   └── logging.yaml
-│
 ├── contracts/
-│   ├── cli-envelope.schema.json
-│   ├── source-object.schema.json
-│   ├── document-packet.schema.json
-│   ├── content-unit.schema.json
-│   ├── evidence-locator.schema.json
-│   ├── assertion.schema.json
-│   ├── search-result.schema.json
-│   └── graph-result.schema.json
-│
+│   ├── openapi.json
+│   ├── openapi.yaml
+│   └── *.schema.json
 ├── ontology/
 │   ├── core/
 │   ├── sources/
 │   ├── domains/
 │   ├── policies/
-│   └── mappings/
-│
+│   ├── mappings/
+│   └── migrations/
 ├── migrations/
-│   ├── 0001_extensions.sql
-│   ├── 0002_core.sql
-│   ├── 0003_sources.sql
-│   ├── 0004_knowledge.sql
-│   ├── 0005_search.sql
-│   └── 0006_rls.sql
-│
+│   ├── 0001_...sql through 0018_...sql
+│   └── 9001_...sql and 9002_...sql (manual optional projections)
 ├── src/kip/
 │   ├── domain/
 │   ├── application/
 │   ├── ports/
 │   ├── adapters/
-│   │   ├── repositories/postgres/
-│   │   ├── sources/filesystem/
-│   │   ├── sources/slack/
-│   │   ├── sources/apple_mail/
-│   │   ├── sources/imap/
-│   │   ├── parsers/
-│   │   ├── search/postgres_native/
-│   │   ├── semantic/pgvector/
-│   │   ├── graph/postgres_recursive/
-│   │   └── graph/neo4j/
-│   └── cli/
-│
+│   ├── evaluation/
+│   ├── setup/
+│   ├── cli.py
+│   ├── api.py
+│   ├── mcp_server.py
+│   └── worker.py
 ├── scripts/
 │   ├── kip
 │   ├── bootstrap.sh
 │   ├── doctor.sh
 │   ├── backup.sh
+│   ├── restore.sh
+│   ├── verify.sh
 │   └── install-launchd.sh
-│
 ├── skills/
-│   ├── knowledge-retrieval/
-│   ├── knowledge-sync/
-│   └── ontology-curation/
-│
+│   ├── knowledge-fabric/
+│   └── kip-setup/
 ├── tests/
-│   ├── contracts/
-│   ├── unit/
+│   ├── characterization/
+│   ├── contract/
 │   ├── integration/
-│   ├── parser-conformance/
-│   ├── graph-parity/
-│   ├── security/
-│   └── golden-queries/
-│
+│   └── test_*.py
 └── var/
-    ├── objects/
-    ├── spool/
-    ├── exports/
+    ├── cas/
+    ├── log/
+    ├── run/
     └── backups/
 ```
 
@@ -392,49 +388,21 @@ workers  → application
 
 ### 7.2 Core ports
 
-```python
-from typing import Protocol, Iterable
+현재 concrete protocol 이름과 위치는 다음과 같다. Signature의 최종 권위는
+각 source file과 contract test다.
 
-class SourceConnectorPort(Protocol):
-    def capabilities(self) -> dict: ...
-    def list_changes(self, cursor: str | None, limit: int) -> "ChangePage": ...
-    def fetch_revision(self, external_key: str, revision_key: str) -> "RawRevision": ...
-
-class ParserPort(Protocol):
-    def supports(self, media_type: str, signature: bytes) -> bool: ...
-    def parse(self, artifact: "ArtifactInput") -> "DocumentPacket": ...
-
-class CanonicalRepositoryPort(Protocol):
-    def upsert_source_revision(self, revision: "SourceRevision") -> str: ...
-    def stage_extraction(self, extraction: "ExtractionBundle") -> str: ...
-    def activate_extraction(self, extraction_id: str) -> None: ...
-    def save_assertion_candidate(self, candidate: "AssertionCandidate") -> str: ...
-
-class LexicalSearchPort(Protocol):
-    def search(self, request: "SearchRequest") -> "SearchResponse": ...
-    def vocabulary(self, request: "VocabularyRequest") -> "VocabularyResponse": ...
-
-class SemanticSearchPort(Protocol):
-    def enabled(self) -> bool: ...
-    def search(self, request: "SemanticRequest") -> "SemanticResponse": ...
-
-class GraphQueryPort(Protocol):
-    def neighbors(self, request: "NeighborRequest") -> "GraphResult": ...
-    def paths(self, request: "PathRequest") -> "GraphResult": ...
-    def subgraph(self, request: "SubgraphRequest") -> "GraphResult": ...
-    def explain(self, assertion_id: str, principal: "Principal") -> "AssertionExplanation": ...
-
-class EmbeddingProviderPort(Protocol):
-    def describe_space(self) -> "EmbeddingSpace": ...
-    def embed(self, texts: list[str]) -> list[list[float]]: ...
-
-class RelationMinerPort(Protocol):
-    def propose(self, packet: "KnowledgePacket") -> list["AssertionCandidate"]: ...
-
-class ObjectStorePort(Protocol):
-    def put(self, stream, media_type: str) -> "ObjectRef": ...
-    def open(self, object_ref: "ObjectRef"): ...
-```
+| Responsibility | Current protocol/source |
+|---|---|
+| Composed canonical repository | `RepositoryPort` in `src/kip/ports/repository.py` |
+| Ingestion and source catalog | `IngestionStore`, `FilesystemSourcePort`, `SourceCatalogPort`, `ContentAddressedStorePort` in `src/kip/ports/ingestion.py` |
+| Retrieval and semantic projection | `RetrievalStore` in `src/kip/ports/retrieval.py` |
+| Exact evidence and workbook read | `EvidenceStore`, `SourceFileInspectorPort`, `WorkbookReaderPort` in `src/kip/ports/evidence.py` |
+| Knowledge, jobs, operations, interactions | capability protocols in `src/kip/ports/{knowledge,jobs,operations,interactions}.py` |
+| Parsers and connectors | `ParserPort` and `SourceConnectorPort` |
+| Embedding and reranking | `EmbeddingPort` and `RerankerPort` |
+| Structured generation and relation mining | `GenerationPort` and `RelationMinerPort` |
+| Identity and graph projection | `IdentityResolverPort` and `GraphProjectionPort` |
+| Redacted telemetry | `QueryTraceStore` and `QueryTraceExporter` |
 
 ### 7.3 Adapter process contract
 
@@ -459,65 +427,49 @@ exit 50: transient dependency error
 ### 8.1 Precedence
 
 ```text
-CLI flag > environment variable > kip.local.toml > kip.toml > defaults
+root --config > KIP_CONFIG > config/kip.toml
+supported KIP_* value override > loaded TOML value > application default
 ```
+
+현재 loader는 `kip.local.toml`을 자동 병합하지 않는다. CLI의 workspace,
+principal, scope, role 같은 request-context option은 로드된 application
+settings를 덮는 별도 요청 입력이다.
 
 ### 8.2 Example
 
 ```toml
-[workspace]
-id = "company"
-principal = "local-operator"
+[app]
+environment = "development"
+workspace = "company"
 
 [database]
-dsn_env = "KIP_DATABASE_URL"
-statement_timeout_seconds = 30
-application_name = "kip"
+url_env = "KIP_DATABASE_URL"
+statement_timeout_ms = 15000
+pool_max_size = 10
 
-[object_store]
-backend = "local"
-root = "./var/objects"
+[storage]
+cas_path = "./var/cas"
 
 [[sources.filesystem]]
 name = "company-nas"
 root = "/Volumes/CompanyNAS/Documents"
-read_only = true
-exclude = ["**/.DS_Store", "**/~$*", "**/Trash/**"]
-
-[sources.slack]
-enabled = false
-workspace_id = ""
-token_env = "KIP_SLACK_TOKEN"
-
-[sources.apple_mail]
-enabled = false
-allowed_accounts = ["company@example.com"]
-allowed_mailboxes = ["INBOX", "Sent", "Archive", "Projects"]
-excluded_mailboxes = ["Junk", "Trash", "Personal"]
-
-[parsers]
-minimum_quality_score = 0.70
-shadow_parse_critical_documents = true
-
-[parsers.hwp]
-order = ["hwp-hwpx-parser", "kordoc", "unhwp", "paired_pdf"]
-
-[parsers.hwp.hwp-hwpx-parser]
 enabled = true
-max_chars_per_unit = 4000
-
-[parsers.hwp.kordoc]
-enabled = false
-argv = ["kordoc", "{input}", "--format", "json"]
+read_only = true
+include_extensions = [".hwp", ".hwpx", ".pdf", ".xlsx", ".xlsm"]
+exclude_globs = ["**/.DS_Store", "**/~$*", "**/Trash/**"]
+acl_scope = "workspace:company"
+classification = "internal"
 
 [search]
 semantic_enabled = false
+default_mode = "reranked"
 lexical_rerank_enabled = true
 lexical_rerank_candidate_limit = 40
+abstain_on_unknown_terms = true
 
 [models.reranker]
 enabled = true
-backend = "rapidfuzz"
+backend = "bm25"
 max_document_chars = 8000
 baseline_weight = 0.15
 
@@ -526,17 +478,19 @@ enabled = false
 model = "replace-with-pinned-local-model"
 revision = "replace-with-immutable-revision"
 dimensions = 1024
+max_document_chars = 4000
 space_name = "replace-with-versioned-space"
 
 [graph]
-backend = "postgres-recursive"
-max_depth = 4
-include_candidates_by_default = false
+backend = "postgres"
+max_depth_default = 4
 
 [security]
-external_model_egress = false
-require_live_hash_for_material_answers = true
+allow_remote_model_egress = false
 ```
+
+전체 copy-ready 예시는 `config/kip.example.toml`이 유일한 기준이다. 이
+절의 부분 예시는 그 파일에 없는 key를 새 계약처럼 추가하지 않는다.
 
 ### 8.3 Configuration validation
 
@@ -772,13 +726,20 @@ Required lexical profile:
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 ```
 
-Optional semantic profile:
+Production reference semantic projection dependency:
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
-Core migrations and all mandatory commands MUST succeed when `vector` is not installed. Vector tables and indexes live in a separate optional migration set, for example `migrations/optional/pgvector/`. The reference Docker profile includes pgvector to make later activation easy, but `capabilities` reports semantic search as unavailable until the extension, schema, embedding provider, and active embedding space all exist.
+The supported PostgreSQL production reference profile includes pgvector. Normal
+migration creates the extension, 1024-dimensional projection table, and HNSW
+index. This dependency does not activate semantic search: lexical commands
+continue to work with `search.semantic_enabled=false`, and
+`capabilities.semantic_search` remains false until the embedding adapter plus a
+compatible, complete, active space are verified. A future extension-free profile
+would be a separate supported distribution with its own migration and test
+matrix; it is not the current production contract.
 
 `pgcrypto`는 application-generated UUIDv7/ULID를 사용하면 필수가 아니다. ID 생성은 domain utility가 담당한다.
 
@@ -2083,15 +2044,12 @@ ZIP-level parser가 읽는 파일:
 ./scripts/kip xlsx-read ARTIFACT_ID \
   --sheet "정산" \
   --range "A1:F40" \
-  --values both \
   --require-fresh
 ```
 
-`--values`:
-
-- `formula`: formula text
-- `cached`: cached calculated value
-- `both`: both where available
+현재 deep reader는 별도 `--values` option 없이 formula workbook과
+data-only workbook을 모두 열어 각 cell의 `value`와 `cached_value`를 함께
+반환한다. `sheet`와 `range`는 필수이며 default preview mode는 없다.
 
 ### 20.6 Large sheet policy
 
@@ -2301,9 +2259,10 @@ Kiwi 계열은 별도 adapter 후보로 추가할 수 있지만, 2026-08-10 OneD
 평가에서는 top-1이 하락하고 aggregate 개선이 없어 채택하지 않았다. 분석기
 교체는 전체 lexical projection rebuild와 동일-corpus 회귀 평가를 요구한다.
 
-형태소 분석과 별개로, 검색 후 RapidFuzz adapter는 ACL과 freshness가 이미
-적용된 최대 40개 lexical 후보만 재정렬한다. 이 adapter는 application
-service에 vendor type을 노출하지 않고 `RerankerPort`를 구현한다.
+형태소 분석과 별개로, 검색 후 current reference backend는 ACL과 freshness가
+이미 적용된 최대 40개 lexical 후보를 candidate-local Okapi BM25로
+재정렬한다. RapidFuzz adapter는 fallback이다. 둘 다 application service에
+concrete type을 노출하지 않고 `RerankerPort`를 구현한다.
 
 ### 22.4 Exact identifier search
 
@@ -2442,84 +2401,99 @@ Semantic search는 다음을 만족한 뒤 활성화한다.
 1. lexical golden query baseline이 존재한다.
 2. 의미가 다르게 표현된 실패 query가 충분히 수집됐다.
 3. embedding provider의 privacy와 비용 정책이 승인됐다.
-4. hybrid retrieval이 Recall 또는 MRR을 유의미하게 개선한다.
+4. 같은 fingerprint에서 vector, hybrid, reranked 중 활성화할 candidate가
+   Recall 또는 MRR을 유의미하게 개선한다. 조합이 단일 vector보다 나쁘면
+   hybrid를 강제하지 않는다.
+5. exact/latest/ACL 회귀, stale-warning, latency, resource gate를 모두 통과한다.
+6. 사람이 fingerprint-matched report를 검토한 뒤 projection activation과
+   `search.semantic_enabled` configuration 변경을 각각 승인한다.
 
 ### 23.2 Embedding space metadata
 
-다음 DDL은 optional pgvector migration에 속한다. `vector` extension이 없는 배포에는 생성하지 않는다.
+현재 metadata는 canonical migration에, 1024차원 vector row는 reference
+pgvector migration에 저장된다. 실제 이름과 컬럼은 다음과 같으며 migration
+파일이 최종 권위다.
 
 ```sql
 CREATE TABLE search.embedding_spaces (
-  embedding_space_id uuid PRIMARY KEY,
-  workspace_id uuid NOT NULL REFERENCES core.workspaces,
-  space_key text NOT NULL,
-  provider_key text NOT NULL,
-  model_key text NOT NULL,
-  model_version text NOT NULL,
-  dimension integer NOT NULL,
-  distance_metric text NOT NULL CHECK (
-    distance_metric IN ('cosine', 'inner_product', 'l2')
-  ),
-  normalized boolean NOT NULL,
-  status text NOT NULL CHECK (status IN ('building', 'shadow', 'active', 'retired')),
+  id text PRIMARY KEY,
+  workspace_id text NOT NULL REFERENCES kip.workspaces(slug),
+  name text NOT NULL,
+  provider text NOT NULL,
+  model text NOT NULL,
+  model_revision text NOT NULL,
+  dimensions integer NOT NULL,
+  distance_metric text NOT NULL DEFAULT 'cosine',
+  status text NOT NULL DEFAULT 'inactive',
+  normalized boolean NOT NULL DEFAULT true,
+  configuration jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (workspace_id, space_key)
+  UNIQUE (workspace_id, name)
 );
 
-CREATE TABLE search.content_embeddings (
-  workspace_id uuid NOT NULL REFERENCES core.workspaces,
-  embedding_space_id uuid NOT NULL REFERENCES search.embedding_spaces,
-  content_unit_id uuid NOT NULL REFERENCES content.units,
-  access_scope_id uuid NOT NULL REFERENCES core.access_scopes,
-  input_sha256 text NOT NULL,
-  embedding vector NOT NULL,
+CREATE TABLE search.embeddings_1024 (
+  workspace_id text NOT NULL REFERENCES kip.workspaces(slug),
+  unit_id text NOT NULL REFERENCES content.units(id),
+  space_id text NOT NULL REFERENCES search.embedding_spaces(id),
+  embedding vector(1024) NOT NULL,
+  source_hash text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (embedding_space_id, content_unit_id)
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (workspace_id, unit_id, space_id)
 );
 ```
 
-Application은 `vector_dims(embedding)`과 metadata dimension 일치를 검증한다.
+Application은 space와 row 모두 1024차원인지 검증한다. 현재 row는 원본
+freshness 비교용 `source_hash`를 저장하지만 정규화된 최종 embedding input의
+per-row hash는 저장하지 않는다. 따라서 PRD `FR-VEC-002`의 input-hash 요구는
+아직 완전히 충족되지 않았다. Input cap과 `head_tail_v1` strategy는 space
+configuration/ID에 versioning되어 서로 다른 preprocessing vector가 섞이지
+않게 한다.
 
 ### 23.3 Per-space ANN index
 
-Active space마다 partial expression index를 생성한다.
+Migration `0018_embeddings_1024_hnsw.sql` creates the production-reference
+HNSW index on the 1024-dimensional table. Index construction disables the
+transaction-local statement timeout so a deployment-wide short query timeout
+does not leave the migration half-applied.
 
 ```sql
-CREATE INDEX CONCURRENTLY embedding_space_active_hnsw
-ON search.content_embeddings
-USING hnsw ((embedding::vector(1024)) vector_cosine_ops)
-WHERE embedding_space_id = '...';
+CREATE INDEX embeddings_1024_hnsw_cosine_idx
+ON search.embeddings_1024 USING hnsw (embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 128);
 ```
 
-Dimension은 space metadata에 따라 migration generator가 채운다.
+현재 index는 per-space partial index가 아니다. Query transaction은
+`hnsw.iterative_scan=strict_order`, `search.hnsw_ef_search` 기본 200,
+`search.hnsw_max_scan_tuples` 기본 100000을 적용해 ACL/freshness filter로 인한
+후보 부족을 bounded하게 보완한다. 운영자는 실제 corpus에서 recall, memory,
+build time, filtered candidate sufficiency를 계속 측정한다.
 
 ### 23.4 Exact before approximate
 
-초기 unit 수가 작으면 index 없이 exact vector search를 사용한다. HNSW는 성능 측정 후 추가한다. ANN은 recall trade-off가 있으므로 exact comparison suite를 유지한다.
+HNSW는 프로덕션 참조 경로다. ANN은 recall trade-off가 있으므로 승격 및
+설정 변경 때 exact comparison suite를 유지한다. 작은 개발용 memory profile과
+semantic-disabled 경로는 이 index를 검색에 사용하지 않는다.
 
 ### 23.5 Embedding eligibility and input
 
-모든 content unit을 무조건 embedding하지 않는다. Space별 eligibility policy를 versioning한다.
+현재 reference adapter는 요청 context에서 보이는 current source revision,
+active extraction, ACL-fresh content unit을 대상으로 한다. Missing vector와
+`source_hash`가 달라진 row만 재생성하므로 동일 space rebuild는 resumable이다.
 
-기본 제외 후보:
-
-- 지나치게 짧은 Slack 반응·인사
-- 이메일 서명과 반복 인용문
-- 자동 생성 footer·법적 고지
-- binary/OCR 품질 미달 unit
-- 이미 동일 `input_sha256`로 처리된 중복 body
-- 정책상 외부 또는 semantic processing이 금지된 scope
-
-Embedding text는 다음을 조합한다.
+현재 versioned input은 다음과 같다.
 
 ```text
-source title
-heading path
-content unit body
-selected verified entity aliases
+content unit title (non-empty이면 trailing newline 포함)
+normalized content unit body
+-> max_document_chars 경계에서 head_tail_v1
 ```
 
-Input builder는 email quoted history, Slack block fallback text, 표 구조 등을 source-aware하게 정규화한다. `input_sha256`는 정규화된 최종 입력으로 계산한다.
+길이 제한, `head_tail_v1`, model revision, dimensions, normalization,
+document instruction은 embedding-space identity를 결정한다. Batch size와
+timeout은 결과 의미를 바꾸지 않는 operational knob다. Email quoted history,
+Slack block, 표 구조, verified alias를 별도로 조합하는 source-aware builder는
+목표 설계이며 현재 구현이라고 주장하지 않는다.
 
 ACL, hidden metadata, raw secrets를 embedding provider에 불필요하게 보내지 않는다. Remote provider를 사용할 때는 redaction과 egress policy를 먼저 적용한다.
 
@@ -2536,6 +2510,10 @@ space-v1 active
 ```
 
 Approved assertions와 content units는 바뀌지 않는다.
+
+Current rebuild는 stable space에 대해 missing/source-hash-stale rows만 다시
+만들고, verify와 activation은 같은 current active ACL-fresh denominator를
+사용한다. 자세한 결정은 ADR-035를 따른다.
 
 ### 23.7 Hybrid retrieval
 
@@ -2554,11 +2532,17 @@ Sources:
 - vector
 - approved graph expansion
 
-최종 reranking은 optional adapter다.
+최종 reranking은 optional adapter다. 각 variant는 독립적으로 평가하며,
+2026-08-13 private report에서는 vector-only가 hybrid와 reranked보다 우수했다.
 
 ### 23.8 Vector ACL
 
-Vector query는 workspace, source type, date, access scope 등 structured filter를 포함한다. HNSW에서 filter 후 결과가 부족할 수 있으므로 iterative scan 또는 larger candidate pool을 사용하고, 부족하면 exact fallback한다.
+Current vector query는 workspace, current revision, source-hash equality, ACL
+scope, ACL-snapshot freshness, source kind, document type, project ID를 SQL
+안에서 제한한다. Date range는 아직 public `SearchRequest`에 없다. HNSW
+filtered-query 후보 부족은 transaction-local strict iterative scan과 bounded
+scan tuple 설정으로 보완하며, private corpus의 exact comparison에서 별도
+측정한다.
 
 ---
 
@@ -2920,6 +2904,10 @@ Neo4j가 unavailable이면:
 
 ### 28.1 Planner inputs
 
+다음은 장기 목표 planner model이다. 현재 public `SearchRequest`는 네 retrieval
+mode와 공통 filters를 제공하지만 time range, context budget, graph depth는
+아직 edge payload가 아니다. 차이는 §29.9에 명시한다.
+
 ```json
 {
   "query": "A과제 참여율 변경 승인 근거와 사전 논의를 정리해줘",
@@ -3010,6 +2998,12 @@ Agent Skill이 다음을 강제한다.
 - stale warning
 - spreadsheet calculation method와 range 표시
 - 접근할 수 없는 source가 있을 가능성을 과장하지 않음
+- explicit identifier, numeric target, possessive/focused fact가 exact reopened
+  evidence에 없으면 `answer_not_present`
+- 짧은 multi-document ambiguity가 해소되지 않으면
+  `clarification_required`
+- refusal은 검색 실패와 분리된 versioned `AnswerResponse` outcome이며, discovery
+  hit가 존재해도 unsupported answer success로 승격하지 않음
 
 
 ## 29. Agent-facing CLI and JSON contracts
@@ -3029,53 +3023,60 @@ Agent Skill이 다음을 강제한다.
 
 ### 29.2 Command tree
 
+다음 tree는 현재 Typer surface다. `./scripts/kip --help`와 각 group의
+`--help`가 최종 권위다.
+
 ```text
 kip
 ├── capabilities
 ├── status
 ├── doctor
-├── sync
-│   ├── run
-│   ├── reconcile
-│   └── history
+├── migrate
 ├── search
 ├── vocab
 ├── context
-├── get
-│   ├── source-object
-│   ├── document
-│   ├── entity
-│   └── assertion
+├── answer
 ├── read
+├── explain
 ├── xlsx-read
+├── rebuild
+├── sync
+│   ├── all
+│   ├── run
+│   ├── filesystem
+│   ├── slack
+│   ├── imap
+│   └── apple-mail
+├── get
+│   ├── artifact
+│   ├── document
+│   ├── candidate
+│   └── assertion
 ├── graph
 │   ├── neighbors
-│   ├── path
-│   └── subgraph
-├── explain
+│   └── path
 ├── review
 │   ├── list
-│   ├── show
+│   ├── propose
 │   ├── approve
-│   ├── reject
-│   ├── edit-approve
-│   └── revoke
-├── ontology
-│   ├── validate
-│   ├── diff
-│   ├── release
-│   └── migrate
+│   └── reject
+├── jobs
 ├── projection
 │   ├── status
 │   ├── rebuild
-│   └── verify
-├── backup
-│   ├── create
 │   ├── verify
-│   └── restore-plan
-└── export
-    ├── canonical
-    └── evidence
+│   └── activate
+├── export
+│   └── canonical
+├── api
+├── worker
+├── evaluate
+├── quality
+├── ontology
+├── telemetry
+├── parser
+├── interaction
+└── setup
 ```
 
 ### 29.3 Public response envelope
@@ -3084,22 +3085,15 @@ kip
 
 ```json
 {
-  "contract_version": "1.0",
-  "command": "search",
-  "request_id": "req_01K...",
-  "workspace_id": "ws_company",
-  "generated_at": "2026-07-28T09:00:00Z",
+  "schema_version": "kip.envelope.v1",
   "ok": true,
   "data": {},
-  "warnings": [],
-  "page": {
-    "next_cursor": null,
-    "count": 0
-  },
+  "error": null,
   "meta": {
-    "duration_ms": 42,
-    "backend": "postgres-native",
-    "schema_version": "2026.07.1"
+    "request_id": "req_...",
+    "workspace": "company",
+    "generated_at": "2026-08-13T00:00:00Z",
+    "warnings": []
   }
 }
 ```
@@ -3108,25 +3102,19 @@ kip
 
 ```json
 {
-  "contract_version": "1.0",
-  "command": "read",
-  "request_id": "req_01K...",
-  "workspace_id": "ws_company",
-  "generated_at": "2026-07-28T09:00:00Z",
+  "schema_version": "kip.envelope.v1",
   "ok": false,
+  "data": null,
   "error": {
-    "code": "SOURCE_STALE",
-    "message": "The source changed after the active extraction was created.",
-    "retryable": false,
-    "details": {
-      "artifact_id": "art_...",
-      "indexed_sha256": "...",
-      "current_sha256": "..."
-    }
+    "code": "not_found",
+    "message": "content unit not found: unit_missing",
+    "details": {}
   },
-  "warnings": [],
   "meta": {
-    "duration_ms": 18
+    "request_id": "req_...",
+    "workspace": "company",
+    "generated_at": "2026-08-13T00:00:00Z",
+    "warnings": []
   }
 }
 ```
@@ -3136,35 +3124,36 @@ kip
 | Exit | Symbol | Meaning |
 |---:|---|---|
 | 0 | `OK` | 요청 성공 |
-| 2 | `USAGE_ERROR` | argument 또는 schema 오류 |
-| 3 | `NOT_FOUND` | 대상 없음 |
-| 4 | `ACCESS_DENIED` | RLS 또는 capability 거부 |
-| 5 | `STALE_SOURCE` | 정확한 근거 확인이 필요한데 원본이 변경됨 |
-| 6 | `CONFLICT` | review·activation·cursor 충돌 |
-| 7 | `DEPENDENCY_UNAVAILABLE` | source, parser, model, projection 장애 |
-| 8 | `PARTIAL_RESULT` | 일부 source만 성공; envelope의 `ok`는 false 또는 policy에 따라 true + warning |
-| 10 | `INTERNAL_ERROR` | 예상하지 못한 오류 |
+| 1 | `INTERNAL_ERROR` | 처리되지 않은 예외 |
+| 2 | `USAGE_ERROR` | Typer argument 또는 option 오류 |
+| 3 | `KIP_ERROR` | `NotFoundError` 이외의 typed KIP 오류; 세부 분류는 envelope `error.code`로 판정 |
+| 4 | `NOT_FOUND` | typed `NotFoundError` |
+| 130 | `INTERRUPTED` | 사용자 SIGINT |
 
-Agent는 exit code만 보고 결론을 만들지 않고 response envelope를 읽어야 한다.
+현재 CLI exit code는 envelope의 typed error code보다 거칠다. Agent는 exit
+code만 보고 결론을 만들지 않고 response envelope를 읽어야 한다. 오류별
+고유 exit code가 필요하면 public contract 변경으로 versioning한다.
 
 ### 29.5 Stable identifiers
 
-Public ID는 ULID 또는 UUIDv7 기반 prefixed string을 사용한다.
+Public ID는 opaque prefixed string을 사용한다. 현재 random ID는 UUID4 hex,
+deterministic ID는 SHA-256 prefix로 생성된다.
 
 ```text
-ws_      workspace
-src_     source system
-obj_     source object
+workspace slug (prefix 없음)
+srcsys_  source system
+srcobj_  source object
 rev_     source revision
 art_     artifact
 ldoc_    logical document
 ext_     extraction
 unit_    content unit
-ent_     entity
 cand_    candidate
 ast_     approved/reviewed assertion
-run_     sync/extraction/projection run
-qry_     retrieval query
+req_     request
+job_     durable job
+aclsnap_ ACL snapshot
+qtrace_  redacted query trace
 ```
 
 규칙:
@@ -3176,134 +3165,121 @@ qry_     retrieval query
 ### 29.6 `capabilities`
 
 ```bash
-./scripts/kip capabilities --workspace ws_company
+./scripts/kip --workspace company capabilities
 ```
 
 응답 예시:
 
 ```json
 {
-  "sources": {
-    "filesystem": {"enabled": true, "healthy": true},
-    "slack": {"enabled": true, "healthy": true},
-    "apple_mail": {"enabled": false, "reason": "not_configured"}
-  },
-  "parsers": {
-    "hwp": ["kordoc", "unhwp", "paired-pdf"],
-    "pdf": ["pypdf-fast", "ocr-fallback"],
-    "xlsx": ["xlsx-shallow", "xlsx-live-range"]
-  },
-  "search": {
-    "exact": true,
-    "lexical": true,
-    "semantic": false,
-    "graph": "postgres-recursive"
-  },
-  "review": true
+  "repository": "postgresql",
+  "lexical_search": true,
+  "semantic_search": false,
+  "semantic_search_configured": false,
+  "semantic_projection_status": "disabled",
+  "graph_backend": "postgres",
+  "api": true,
+  "mcp": true,
+  "parsers": {"plain-text": "1.0", "xlsx-shallow": "1.0"},
+  "connectors": {"filesystem": "configured", "slack": "disabled"},
+  "warnings": []
 }
 ```
 
 Skill은 사용 가능 여부를 추측하지 말고 capability를 먼저 확인해야 한다.
+`semantic_search`는 configuration뿐 아니라 matching active space가 compatible,
+complete, active 상태이며 verification을 통과한 경우에만 true다. 설정 의도와
+projection 상태는 각각 `semantic_search_configured`와
+`semantic_projection_status`로 분리해 진단한다.
 
 ### 29.7 `status`
 
 ```bash
-./scripts/kip status --workspace ws_company
+./scripts/kip --workspace company status
 ```
 
-필수 출력:
-
-- last successful sync per source
-- source cursor/watermark
-- pending and failed jobs
-- active parser versions
-- lexical/vector/graph projection lag
-- stale artifacts
-- pending candidates
-- backup age
-- database and CAS disk use
+현재 출력은 repository 이름과 source object, revision, artifact, active
+extraction, content/lexical unit, candidate/assertion, queued/failed job count다.
+Source별 cursor, parser version, vector/graph lag, stale artifact, backup age,
+disk usage는 목표 운영 status이며 현재 단일 `status` response에는 없다.
 
 ### 29.8 `sync`
 
 ```bash
 ./scripts/kip sync run --source nas --mode incremental
 ./scripts/kip sync run --source slack --since 2026-07-01T00:00:00Z
-./scripts/kip sync reconcile --source mail --dry-run
+./scripts/kip sync run --source all --dry-run
 ```
 
 안전 규칙:
 
-- `--mode full`은 일반 retrieval Skill에서 호출할 수 없다.
-- `reconcile`은 source-wide deletion을 적용하기 전에 missing-source guard를 확인한다.
+- 현재 starter는 `--mode incremental`만 허용한다.
+- Public `sync reconcile`과 `history` command는 아직 없다.
 - `--dry-run`은 예상 create/update/tombstone 수를 반환한다.
 - cursor는 batch가 commit된 뒤에만 갱신한다.
 
 ### 29.9 `search`
 
 ```bash
-./scripts/kip search \
-  --query "A과제 참여율 변경 승인" \
-  --source nas,slack,mail \
-  --project ent_project_a \
-  --from 2026-01-01 \
-  --to 2026-07-28 \
+./scripts/kip search "A과제 참여율 변경 승인" \
+  --source-kind filesystem \
+  --document-type approval \
+  --project-id ent_project_a \
   --limit 20
 ```
 
-Search request schema:
+현재 canonical application `SearchRequest` schema는 다음과 같다.
+Workspace, principal, ACL scope는 caller payload가 아니라 검증된
+`RequestContext`에 있다. CLI, REST, MCP, Python SDK는 아래 fields를 모두
+노출하고 같은 application service로 매핑한다.
 
 ```json
 {
   "query": "A과제 참여율 변경 승인",
-  "workspace_id": "ws_company",
-  "principal_id": "principal_agent",
-  "filters": {
-    "source_types": ["nas", "slack", "mail"],
-    "entity_ids": ["ent_project_a"],
-    "date_from": "2026-01-01",
-    "date_to": "2026-07-28",
-    "document_types": [],
-    "only_current_versions": true
-  },
-  "retrieval": {
-    "exact": true,
-    "lexical": true,
-    "graph_expand": false,
-    "semantic": "auto"
-  },
-  "limit": 20
+  "limit": 20,
+  "mode": "hybrid",
+  "source_kinds": ["filesystem"],
+  "document_types": ["approval"],
+  "project_ids": ["ent_project_a"],
+  "include_candidate_assertions": false
 }
 ```
+
+Public v1에는 date filter, entity filter, graph expansion 또는 cursor가 없다.
+`mode`는 `lexical|vector|hybrid|reranked` 중 하나이며 생략하면
+`search.default_mode`를 사용한다. Vector 계열 mode는 compatible complete
+active space가 없으면 typed dependency error로 실패하며 lexical인 척
+fallback하지 않는다. Planner field를 추가할 때는 모든 edge와 generated
+schema를 같은 변경에서 갱신한다.
 
 Search result item:
 
 ```json
 {
-  "rank": 1,
+  "unit_id": "unit_...",
   "document_id": "ldoc_...",
-  "content_unit_id": "unit_...",
-  "source_type": "pdf",
+  "artifact_id": "art_...",
+  "source_kind": "filesystem",
   "title": "A과제 협약변경 승인",
-  "matched_fields": ["title", "body"],
-  "matched_terms": ["참여율", "변경", "승인"],
-  "scores": {
-    "exact": 0.0,
-    "lexical": 8.42,
-    "trigram": 0.73,
-    "semantic": null,
-    "fusion_rank": 1
-  },
   "snippet": "...",
-  "locator_preview": {"type": "pdf_page", "page": 3},
-  "status": {
-    "current_version": true,
-    "stale": false,
-    "access_scope": "project:A"
+  "score": 8.42,
+  "locator": {"type": "pdf_page", "data": {"page": 3}},
+  "source_uri": "file:///approved-root/document.pdf",
+  "source_sha256": "...",
+  "source_modified_at": "2026-07-28T00:00:00Z",
+  "metadata": {
+    "retrieval_channels": ["lexical"],
+    "lexical_rank": 1,
+    "file_name": "document.pdf",
+    "document_type": "approval",
+    "is_latest": true
   }
 }
 ```
 
-Snippet은 discovery aid이며 evidence가 아니다.
+Rank는 배열 순서다. `metadata`의 channel별 rank와 degradation flag는
+diagnostic이며 public top-level field가 아니다. Snippet은 discovery aid이며
+evidence가 아니다.
 
 ### 29.10 `vocab`
 
@@ -3313,54 +3289,49 @@ Snippet은 discovery aid이며 evidence가 아니다.
 
 반환 항목:
 
-- normalized term
-- surface forms
-- document frequency
-- source distribution
-- entity alias matches
-- trigram-near terms
+- `term`
+- `document_frequency`
+- `corpus_frequency`
 
-LLM이 색인에 없는 임의 동의어를 무제한 생성하는 것을 줄인다.
+현재 vocabulary edge는 alias/source-distribution/near-term 설명을 별도 필드로
+반환하지 않는다. LLM이 색인에 없는 임의 동의어를 추측하는 대신 실제
+projection term 존재를 확인하는 용도다.
 
 ### 29.11 `context`
 
 ```bash
-./scripts/kip context \
-  --query "A과제 참여율 변경 승인 근거" \
+./scripts/kip context "A과제 참여율 변경 승인 근거" \
+  --limit 8 \
   --max-chars 30000 \
-  --max-documents 8 \
-  --include-graph approved
+  --source-kind filesystem
 ```
 
-`context`는 search와 exact read를 orchestration하고 agent에게 바로 공급할 evidence pack을 반환한다. 다음을 보장한다.
+`context`는 search와 exact read를 orchestration하고 `ContextBundle`을 반환한다.
+현재 public field는 query, items, total_chars, truncated이며 각 item은
+`SearchHit`, exact body, current source hash, source-changed flag를 포함한다.
+Public CLI에는 graph-inclusion이나 max-document flag가 없다.
 
-- source diversity limits
-- per-document unit limit
-- exact locator
-- source/index hash and stale status
-- approved/candidate 분리
-- truncation marker
-- retrieval plan trace
+- source diversity와 per-document cap은 공통 search stage에서 적용된다.
+- max-char 경계에서 item을 자르고 `truncated`를 표시한다.
+- Graph context는 `ontology context`/answer orchestration의 별도 surface다.
 
 ### 29.12 `read`
 
 ```bash
-./scripts/kip read --unit-id unit_...
-./scripts/kip read --document-id ldoc_... --page 3
-./scripts/kip read --source-object-id obj_... --revision latest
+./scripts/kip read unit_...
+# 또는 ./scripts/kip read --unit-id unit_...
 ```
 
-`read`는 default로 active extraction을 반환한다. `--raw`는 승인된 operator/reviewer capability에만 허용한다.
+현재 `read`는 ACL-visible active extraction의 content unit 하나만 연다.
+Document/source/revision/raw 선택은 이 command의 public option이 아니다.
 
 응답은 다음을 포함한다.
 
-- body or structured table
-- complete evidence locator
-- source URI 또는 provider deep link
-- active extraction/parser metadata
-- current source hash check
-- ACL scope
-- surrounding context pointers
+- complete `ContentUnit`
+- source URI
+- indexed source hash
+- optional current source hash
+- source-changed-since-index flag
 
 ### 29.13 `xlsx-read`
 
@@ -3369,18 +3340,17 @@ LLM이 색인에 없는 임의 동의어를 무제한 생성하는 것을 줄인
   --artifact-id art_... \
   --sheet "정산" \
   --range "A1:F40" \
-  --values formula,calculated \
   --require-fresh
 ```
 
 제약:
 
-- `range`가 없으면 sheet size policy에 따라 preview만 반환한다.
+- `sheet`와 `range`는 필수다. Range 없는 preview mode는 현재 없다.
 - row/column upper bound를 적용한다.
 - formula와 cached calculated value를 구분한다.
 - merged cells, hidden rows/columns, filtered rows를 metadata로 반환한다.
-- 날짜 serial과 number format을 함께 반환한다.
-- 계산 요청은 typed values를 사용하고 display string만 사용하지 않는다.
+- 날짜 serial과 number format을 함께 반환하고 Python `date`, `datetime`,
+  `time` 값은 versioned envelope 경계에서 ISO 8601 JSON scalar로 직렬화한다.
 
 ### 29.14 `graph`
 
@@ -3388,8 +3358,8 @@ LLM이 색인에 없는 임의 동의어를 무제한 생성하는 것을 줄인
 ./scripts/kip graph neighbors \
   --node-id ent_project_a \
   --predicate amends,approves,evidences \
-  --status approved \
-  --depth 2
+  --direction both \
+  --limit 100
 
 ./scripts/kip graph path \
   --from ent_person_1 \
@@ -3397,15 +3367,16 @@ LLM이 색인에 없는 임의 동의어를 무제한 생성하는 것을 줄인
   --max-depth 4
 ```
 
-Graph response는 항상 다음을 포함한다.
+`neighbors`는 approved-only `GraphEdge` 목록을 반환한다. `path`는 node ID,
+assertion ID, predicate, depth를 담은 `GraphPath` 목록을 반환한다. Current
+edge에는 `subgraph`, caller-selected status, 또는 neighbor depth option이 없다.
 
-- canonical node IDs
-- assertion IDs
-- predicate ontology version
-- evidence summary
-- valid time
-- source scope
-- backend metadata
+Graph edge는 다음을 포함한다.
+
+- assertion, subject, predicate, optional entity/value object
+- status and validity interval
+- ontology version
+- evidence unit IDs
 
 ### 29.15 `explain`
 
@@ -3415,58 +3386,43 @@ Graph response는 항상 다음을 포함한다.
 
 반환:
 
-- normalized assertion
-- ontology definition
-- evidence units
-- origin and derivation run
-- review actor/time
-- valid and recorded time
-- superseding/revoking assertion
-- current projection state
+- current `ApprovedAssertion`
+- exact `EvidenceRead` entries
+- optional source candidate
+
+Ontology definition, review actor/time, projection state를 별도 top-level field로
+합성하는 것은 현재 `AssertionExplanation` 계약이 아니다.
 
 ### 29.16 `review`
 
 ```bash
-./scripts/kip review list --kind relation --status proposed --limit 50
-./scripts/kip review show --candidate-id cand_...
-./scripts/kip review approve --candidate-id cand_... --actor reviewer_1
-./scripts/kip review edit-approve \
-  --candidate-id cand_... \
-  --predicate amends \
-  --object-id ldoc_... \
-  --actor reviewer_1
+./scripts/kip review list --status proposed --limit 50
+./scripts/kip review approve cand_... --note "근거 확인"
+./scripts/kip review reject cand_... --note "관계 불일치"
 ```
 
-Review write는 optimistic concurrency token을 요구한다.
-
-```json
-{
-  "candidate_id": "cand_...",
-  "expected_version": 4,
-  "decision": "approve",
-  "actor_id": "reviewer_1"
-}
-```
+Current commands are `list`, `propose`, `approve`, and `reject`. `show`는
+`get candidate CANDIDATE_ID`로 수행한다. Public `edit-approve`, `revoke`, actor
+option, optimistic concurrency token은 아직 없다. Reviewer identity는 verified
+`RequestContext`/role에서 와야 하며 caller가 actor 문자열을 선택하지 않는다.
 
 ### 29.17 Pagination
 
-- cursor는 opaque, signed 또는 server-generated string이다.
+현재 list/search edges는 bounded `limit`만 사용하고 cursor를 반환하지 않는다.
+다음은 데이터 규모가 cursor를 요구할 때의 목표 계약이다.
+
+- cursor는 opaque, signed 또는 server-generated string이어야 한다.
 - offset pagination은 소형 admin query 외에는 사용하지 않는다.
 - cursor는 workspace, filter hash, sort order를 포함하거나 참조해야 한다.
-- result set이 변경되면 cursor expiration을 명시한다.
+- result set이 변경되면 cursor expiration을 명시해야 한다.
 
 ### 29.18 Timeout and cancellation
 
-| Command class | Default timeout |
-|---|---:|
-| exact/search/get | 10s |
-| context/read | 30s |
-| xlsx-read | 60s |
-| graph path | 20s |
-| sync trigger | job enqueue 10s |
-| rebuild | asynchronous job |
-
-CLI는 SIGINT를 받아 in-flight query를 취소한다. 장기 job은 job ID를 반환하며 polling한다.
+Model/HTTP adapters have explicit configuration-backed timeouts and selected
+sync/rebuild commands can enqueue durable jobs. CLI interruption exits `130`.
+The former per-command timeout table is a target, not a current universal CLI
+deadline contract; adding one requires cancellation and adapter propagation
+tests rather than documentation alone.
 
 ---
 
@@ -3478,26 +3434,19 @@ CLI는 SIGINT를 받아 in-flight query를 취소한다. 장기 job은 job ID를
 AGENTS.md
 CLAUDE.md
 skills/
-├── knowledge-retrieval/
+├── knowledge-fabric/
 │   ├── SKILL.md
+│   ├── agents/openai.yaml
 │   ├── scripts/kip.sh
 │   └── references/
-│       ├── retrieval-workflow.md
-│       ├── evidence-locators.md
-│       └── answer-policy.md
-├── knowledge-sync/
-│   ├── SKILL.md
-│   └── references/
-│       ├── nas.md
-│       ├── slack.md
-│       ├── mail.md
-│       └── recovery.md
-└── ontology-curation/
+└── kip-setup/
     ├── SKILL.md
+    ├── agents/openai.yaml
     └── references/
-        ├── predicates.md
-        ├── review-policy.md
-        └── migration-policy.md
+
+.claude/skills/
+├── knowledge-fabric/  (portable tree와 byte-identical mirror)
+└── kip-setup/          (portable tree와 byte-identical mirror)
 ```
 
 ### 30.2 `CLAUDE.md`
@@ -3909,12 +3858,19 @@ Operator must inspect a dry-run report before overriding.
 ### 33.6 Projection rebuild
 
 ```bash
-./scripts/kip projection rebuild --name lexical --workspace ws_company
-./scripts/kip projection rebuild --name vector --space emb_... --shadow
-./scripts/kip projection rebuild --name graph --backend neo4j --shadow
+./scripts/kip --workspace company projection rebuild --name lexical
+./scripts/kip --workspace company projection rebuild --name semantic
+./scripts/kip --workspace company projection rebuild --name graph
 ```
 
-Rebuild stages:
+Current lexical rebuild recreates its disposable projection. Semantic rebuild
+creates or resumes the configured shadow space; public CLI에는 `--space`나
+`--shadow` option이 없고 activation은 fingerprint-matched report를 요구하는
+별도 `projection activate` command다. PostgreSQL graph baseline은 canonical
+approved assertions를 직접 query하므로 Neo4j shadow selection은 current
+rebuild option이 아니다.
+
+Target rebuild stages:
 
 ```text
 create shadow generation
@@ -4337,7 +4293,11 @@ Reflect the R1 design:
 
 ### 36.9 Golden retrieval dataset
 
-At least 50 pilot questions, then 100+ full rollout questions.
+Public CI always runs at least 100 deterministic positive search contracts plus
+ACL-negative cases. Pilot adoption also requires 30-50 reviewed private
+questions; broad rollout requires 100+ reviewed private questions and a frozen
+holdout. Portable cases protect contracts but never substitute for corpus
+quality evidence.
 
 Categories:
 
@@ -4745,7 +4705,7 @@ Deliverables:
 - embedding provider port
 - embedding space metadata
 - pgvector exact search
-- optional HNSW generation
+- production-reference HNSW migration and exact-search comparison
 - RRF fusion
 - A/B report
 
@@ -4844,6 +4804,9 @@ Acceptance:
 - adapters pass contract suites
 - errors are typed and surfaced through CLI envelope
 - no real secrets in repository or fixtures
+- affected PRD/TRD, public contracts, operations, security, status, guide,
+  example configuration, and ADR documents match the implementation; any
+  remaining target gap is explicit
 
 ### 39.2 Data integrity
 
@@ -4925,26 +4888,36 @@ All of the following must pass:
 
 ## 40. Architecture decision records
 
+Only ADRs that exist under `docs/adr/` are authoritative. Number gaps do not
+stand for implicit accepted decisions.
+
 | ADR | Decision | Status |
 |---|---|---|
-| ADR-001 | PostgreSQL 18 is the canonical operational database | Accepted |
-| ADR-002 | pgvector is a versioned, disposable semantic projection | Accepted |
-| ADR-003 | Neo4j is optional and never canonical | Accepted |
-| ADR-004 | Ontology is an external versioned contract | Accepted |
-| ADR-005 | Assertions are stored separately from graph projections | Accepted |
-| ADR-006 | PostgreSQL native lexical search is the baseline | Accepted |
-| ADR-007 | Korean tokenization is an application adapter | Accepted |
-| ADR-008 | XLSX uses shallow-all/deep-candidate retrieval | Accepted |
-| ADR-009 | HWP uses parser broker and paired-PDF evidence | Accepted |
-| ADR-010 | Source revisions are immutable | Accepted |
-| ADR-017 | hwp-hwpx-parser is the native HWP primary with broker fallback | Accepted |
-| ADR-011 | CLI/JSON is the baseline agent interface | Accepted |
-| ADR-012 | Frontend, REST, and MCP are optional edge adapters | Accepted |
-| ADR-013 | Slack and mail ACLs propagate to all derived knowledge | Accepted |
-| ADR-014 | Model and Graphify outputs are candidates only | Accepted |
-| ADR-015 | Local CAS is baseline; object storage is replaceable | Accepted |
-| ADR-016 | SQLite is a future portable profile, not v3 baseline | Accepted |
-| ADR-031 | Guarded HWP re-extraction and local RapidFuzz reranking | Accepted |
+| ADR-001 | PostgreSQL is canonical | Accepted |
+| ADR-002 | CLI, REST, and MCP are edge adapters | Accepted |
+| ADR-003 | Neo4j is optional and non-canonical | Accepted |
+| ADR-004 | XLSX uses shallow indexing and deep reads | Accepted |
+| ADR-005 | Local-first hybrid retrieval is evaluation-gated | Accepted |
+| ADR-017 | Native hwp-hwpx-parser is the HWP primary | Accepted |
+| ADR-018 | Jina Hugging Face reranker remains an opt-in shadow adapter | Accepted |
+| ADR-019 | Evidence-first quality control plane | Accepted |
+| ADR-020 | Trusted identity and expiring ACL snapshots | Accepted |
+| ADR-021 | Canonical classification and atomic model egress | Accepted |
+| ADR-022 | Provider-neutral structured generation | Accepted |
+| ADR-023 | Verified generated-answer orchestration | Accepted |
+| ADR-024 | Typed ontology relation candidates | Accepted |
+| ADR-025 | Reviewed ontology mining jobs | Accepted |
+| ADR-026 | Approved graph answer context | Accepted |
+| ADR-027 | Materialize ontology changes as reviewed assertion candidates | Accepted |
+| ADR-028 | Persist redacted RAG decisions and export bounded telemetry | Accepted |
+| ADR-029 | Bind end-to-end RAG gates to reviewed immutable datasets | Accepted |
+| ADR-030 | Seal complete backups and preserve rebuildable lexical input | Accepted |
+| ADR-031 | Guarded HWP re-extraction and local lexical reranking | Accepted |
+| ADR-032 | Consent-based interaction memory and staged ontology discovery | Accepted |
+| ADR-033 | Retrieval and authorization hardening | Accepted |
+| ADR-034 | Promote the candidate-local BM25 reranker | Accepted |
+| ADR-035 | Version semantic inputs and resume projection rebuilds | Accepted |
+| ADR-036 | Fix retrieval stage order and gate corpus regressions | Accepted |
 
 ---
 

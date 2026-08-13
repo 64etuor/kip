@@ -20,6 +20,24 @@
       "title": "Limit",
       "type": "integer"
     },
+    "mode": {
+      "anyOf": [
+        {
+          "enum": [
+            "lexical",
+            "vector",
+            "hybrid",
+            "reranked"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Mode"
+    },
     "project_ids": {
       "items": {
         "type": "string"

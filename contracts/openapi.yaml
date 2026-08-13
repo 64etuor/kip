@@ -1707,6 +1707,16 @@ components:
           minimum: 1.0
           title: Limit
           default: 10
+        mode:
+          anyOf:
+          - type: string
+            enum:
+            - lexical
+            - vector
+            - hybrid
+            - reranked
+          - type: 'null'
+          title: Mode
         source_kinds:
           items:
             type: string
@@ -1884,6 +1894,16 @@ components:
           minimum: 1.0
           title: Limit
           default: 10
+        mode:
+          anyOf:
+          - type: string
+            enum:
+            - lexical
+            - vector
+            - hybrid
+            - reranked
+          - type: 'null'
+          title: Mode
         source_kinds:
           items:
             type: string
@@ -2212,6 +2232,16 @@ components:
           minimum: 1.0
           title: Limit
           default: 10
+        mode:
+          anyOf:
+          - type: string
+            enum:
+            - lexical
+            - vector
+            - hybrid
+            - reranked
+          - type: 'null'
+          title: Mode
         source_kinds:
           items:
             type: string

@@ -79,9 +79,10 @@ class SearchEngine:
         for hit in hits:
             if len(selected) >= limit:
                 break
-            seen = counts.get(hit.document_id, 0)
+            document_key = hit.document_id or f"unit:{hit.unit_id}"
+            seen = counts.get(document_key, 0)
             if seen < cap:
-                counts[hit.document_id] = seen + 1
+                counts[document_key] = seen + 1
                 selected.append(hit)
             else:
                 overflow.append(hit)
@@ -93,9 +94,7 @@ class SearchEngine:
             # tell a diverse result set from a padded one.
             selected.append(
                 hit.model_copy(
-                    update={
-                        "metadata": {**hit.metadata, "diversity_backfill": True}
-                    },
+                    update={"metadata": {**hit.metadata, "diversity_backfill": True}},
                     deep=True,
                 )
             )
@@ -120,9 +119,7 @@ class SearchEngine:
         normalized_query = normalize_entity_name(query)
         if not normalized_query:
             return []
-        max_terms = int(
-            self._settings.get("search.alias_expansion_max_terms", 16)
-        )
+        max_terms = int(self._settings.get("search.alias_expansion_max_terms", 16))
         terms: list[str] = []
         seen: set[str] = set()
         for entity in self._knowledge.resolve_entities(
@@ -215,14 +212,10 @@ class SearchEngine:
             # into the rerank query measurably promoted synonym-dense but
             # off-target documents on the golden set.
             lexemes = f"{lexemes} {self._analyzer.analyze(' '.join(expansion))}"
-        content_tokens = list(
-            dict.fromkeys(_CONTENT_TOKEN_RE.findall(query_text.lower()))
-        )
+        content_tokens = list(dict.fromkeys(_CONTENT_TOKEN_RE.findall(query_text.lower())))
         expansion_terms = list(
             dict.fromkeys(
-                token
-                for term in expansion
-                for token in _CONTENT_TOKEN_RE.findall(term.lower())
+                token for term in expansion for token in _CONTENT_TOKEN_RE.findall(term.lower())
             )
         )
         return _AnalyzedQuery(
@@ -257,9 +250,7 @@ class SearchEngine:
         candidate_limit: int,
     ) -> list[SearchHit]:
         candidate_request = request.model_copy(update={"limit": candidate_limit})
-        return self._annotate_lexical(
-            self._store.search(context, candidate_request, query.lexemes)
-        )
+        return self._annotate_lexical(self._store.search(context, candidate_request, query.lexemes))
 
     def _lexical_pool(
         self,
@@ -268,22 +259,16 @@ class SearchEngine:
         query: _AnalyzedQuery,
     ) -> list[SearchHit]:
         if not bool(self._settings.get("search.lexical_rerank_enabled", False)):
-            candidate_limit = self._candidate_limit(
-                request, "search.hybrid_candidate_limit"
-            )
+            candidate_limit = self._candidate_limit(request, "search.hybrid_candidate_limit")
             return self._candidate_pool(context, request, query, candidate_limit)
-        candidate_limit = self._candidate_limit(
-            request, "search.lexical_rerank_candidate_limit"
-        )
+        candidate_limit = self._candidate_limit(request, "search.lexical_rerank_candidate_limit")
         lexical = self._candidate_pool(context, request, query, candidate_limit)
         if self._reranker is None:
             raise DependencyUnavailableError(
                 "lexical reranking is enabled without a reranker adapter"
             )
         try:
-            return self._rerank(
-                context, request, lexical, candidate_limit=candidate_limit
-            )
+            return self._rerank(context, request, lexical, candidate_limit=candidate_limit)
         except DependencyUnavailableError:
             return self._mark(lexical, "lexical_rerank_degraded")
 
@@ -294,11 +279,9 @@ class SearchEngine:
         query: _AnalyzedQuery,
         plan: _QueryPlan,
     ) -> list[SearchHit]:
-        candidate_limit = self._candidate_limit(
-            request, "search.hybrid_candidate_limit"
-        )
-        lexical = self._candidate_pool(context, request, query, candidate_limit)
+        candidate_limit = self._candidate_limit(request, "search.hybrid_candidate_limit")
         candidate_request = request.model_copy(update={"limit": candidate_limit})
+        lexical: list[SearchHit] | None = None
         try:
             space = self._semantic.search_space(context, explicit=plan.explicit)
             vector = self._store.vector_search(
@@ -310,13 +293,12 @@ class SearchEngine:
             )
             if plan.mode is SearchMode.VECTOR:
                 return vector
+            lexical = self._candidate_pool(context, request, query, candidate_limit)
             fused = reciprocal_rank_fusion(
                 lexical,
                 vector,
                 limit=candidate_limit,
-                rank_constant=int(
-                    self._settings.get("search.rrf_rank_constant", 60)
-                ),
+                rank_constant=int(self._settings.get("search.rrf_rank_constant", 60)),
             )
             if plan.mode is SearchMode.HYBRID:
                 return fused
@@ -324,6 +306,13 @@ class SearchEngine:
         except DependencyUnavailableError:
             if plan.explicit:
                 raise
+            if lexical is None:
+                lexical = self._candidate_pool(
+                    context,
+                    request,
+                    query,
+                    candidate_limit,
+                )
             return self._mark(lexical, "semantic_degraded")
 
     @staticmethod

@@ -20,6 +20,7 @@ from kip.domain.models import (
     GraphNeighborsRequest,
     GraphPathRequest,
     RequestContext,
+    SearchMode,
     SearchRequest,
 )
 from kip.errors import DependencyUnavailableError
@@ -75,7 +76,8 @@ def create_server() -> FastMCP:
     @mcp.tool()
     def kip_capabilities() -> str:
         """Return available source, parser, search, and graph capabilities."""
-        return _json(application.operations.capabilities())
+        selected_context = context()
+        return _json(application.operations.capabilities(selected_context))
 
     @mcp.tool()
     def kip_status() -> str:
@@ -83,19 +85,73 @@ def create_server() -> FastMCP:
         return _json(application.operations.status(context()))
 
     @mcp.tool()
-    def kip_search(query: str, limit: int = 10, source_kinds: list[str] | None = None) -> str:
+    def kip_search(
+        query: str,
+        limit: int = 10,
+        mode: SearchMode | None = None,
+        source_kinds: list[str] | None = None,
+        document_types: list[str] | None = None,
+        project_ids: list[str] | None = None,
+        include_candidate_assertions: bool = False,
+    ) -> str:
         """Search evidence units. Treat snippets as discovery aids, then call kip_read."""
-        request = SearchRequest(query=query, limit=limit, source_kinds=source_kinds or [])
+        request = SearchRequest(
+            query=query,
+            limit=limit,
+            mode=mode,
+            source_kinds=source_kinds or [],
+            document_types=document_types or [],
+            project_ids=project_ids or [],
+            include_candidate_assertions=include_candidate_assertions,
+        )
         return _json(application.retrieval.search(context(), request))
 
     @mcp.tool()
-    def kip_context(query: str, limit: int = 5, max_chars: int = 40000) -> str:
+    def kip_context(
+        query: str,
+        limit: int = 5,
+        max_chars: int = 40000,
+        mode: SearchMode | None = None,
+        source_kinds: list[str] | None = None,
+        document_types: list[str] | None = None,
+        project_ids: list[str] | None = None,
+        include_candidate_assertions: bool = False,
+    ) -> str:
         """Build a bounded evidence pack with source hashes and locators."""
-        return _json(application.retrieval.context_bundle(context(), ContextRequest(query=query, limit=limit, max_chars=max_chars)))
+        request = ContextRequest(
+            query=query,
+            limit=limit,
+            max_chars=max_chars,
+            mode=mode,
+            source_kinds=source_kinds or [],
+            document_types=document_types or [],
+            project_ids=project_ids or [],
+            include_candidate_assertions=include_candidate_assertions,
+        )
+        return _json(application.retrieval.context_bundle(context(), request))
 
     @mcp.tool()
-    def kip_answer(query: str, limit: int = 5, max_chars: int = 12000) -> str:
-        return _json(application.answering.answer(context(), AnswerRequest(query=query, limit=limit, max_chars=max_chars)))
+    def kip_answer(
+        query: str,
+        limit: int = 5,
+        max_chars: int = 12000,
+        mode: SearchMode | None = None,
+        source_kinds: list[str] | None = None,
+        document_types: list[str] | None = None,
+        project_ids: list[str] | None = None,
+        include_candidate_assertions: bool = False,
+    ) -> str:
+        request = AnswerRequest(
+            query=query,
+            limit=limit,
+            max_chars=max_chars,
+            mode=mode,
+            source_kinds=source_kinds or [],
+            document_types=document_types or [],
+            project_ids=project_ids or [],
+            include_candidate_assertions=include_candidate_assertions,
+        )
+        return _json(application.answering.answer(context(), request))
 
     @mcp.tool()
     def kip_vocabulary(prefix: str, limit: int = 20) -> str:

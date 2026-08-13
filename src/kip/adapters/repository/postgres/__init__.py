@@ -22,11 +22,15 @@ class PostgresRepository:
         *,
         statement_timeout_ms: int = 15000,
         pool_max_size: int = 10,
+        hnsw_ef_search: int = 200,
+        hnsw_max_scan_tuples: int = 100_000,
     ) -> None:
         self.database = PostgresDatabase(
             database_url,
             statement_timeout_ms=statement_timeout_ms,
             pool_max_size=pool_max_size,
+            hnsw_ef_search=hnsw_ef_search,
+            hnsw_max_scan_tuples=hnsw_max_scan_tuples,
         )
         self.ingestion = PostgresIngestionStore(self.database)
         self.retrieval = PostgresRetrievalStore(self.database)

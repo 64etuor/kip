@@ -157,9 +157,13 @@ class IngestResult(StrictModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+SearchMode = Literal["lexical", "vector", "hybrid", "reranked"]
+
+
 class SearchRequest(StrictModel):
     query: str = Field(min_length=1)
     limit: int = Field(default=10, ge=1, le=100)
+    mode: SearchMode | None = None
     source_kinds: list[str] = Field(default_factory=list)
     document_types: list[str] = Field(default_factory=list)
     project_ids: list[str] = Field(default_factory=list)
@@ -294,6 +298,8 @@ class OntologyAnswerContext(StrictModel):
 AnswerRefusalReason = Literal[
     "no_admissible_evidence",
     "no_fresh_evidence",
+    "answer_not_present",
+    "clarification_required",
     "exact_xlsx_read_required",
     "insufficient_decision_evidence",
     "model_egress_denied",
@@ -444,6 +450,15 @@ class Capabilities(StrictModel):
     repository: str
     lexical_search: bool
     semantic_search: bool
+    semantic_search_configured: bool = False
+    semantic_projection_status: Literal[
+        "disabled",
+        "missing",
+        "shadow",
+        "active",
+        "stale",
+        "incompatible",
+    ] = "disabled"
     graph_backend: str
     api: bool
     mcp: bool

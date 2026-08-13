@@ -5,10 +5,8 @@ import re
 from datetime import UTC, datetime
 from time import perf_counter
 
-from kip.application.answers import (
-    assemble_extractive_answer,
-    prepare_answer_evidence,
-)
+from kip.application.answer_adequacy import prepare_answer_evidence
+from kip.application.answers import assemble_extractive_answer
 from kip.application.citations import assemble_generated_answer
 from kip.application.egress import EgressPolicyUseCases
 from kip.application.evidence import EvidenceUseCases
@@ -87,9 +85,7 @@ class AnsweringUseCases:
             and egress.policy.provider is not None
             and generator.provider != egress.policy.provider.value
         ):
-            raise ConfigurationError(
-                "generation adapter provider does not match the egress policy"
-            )
+            raise ConfigurationError("generation adapter provider does not match the egress policy")
 
     def answer(
         self,
@@ -141,9 +137,7 @@ class AnsweringUseCases:
                 continue
             fresh.append(item)
             seen_ids.add(item.unit.id)
-        had_stale_evidence = (
-            had_stale_evidence or ontology_bundle.had_stale_evidence
-        )
+        had_stale_evidence = had_stale_evidence or ontology_bundle.had_stale_evidence
         prepared = prepare_answer_evidence(
             request,
             fresh,
@@ -153,9 +147,7 @@ class AnsweringUseCases:
                 if ontology_bundle.context is not None
                 else []
             ),
-            apply_lexical_gate=not (
-                self._enabled and self._generator is not None
-            ),
+            apply_lexical_gate=not (self._enabled and self._generator is not None),
         )
         if prepared.refusal is not None:
             if not _context_is_cited(
@@ -163,9 +155,7 @@ class AnsweringUseCases:
                 {item.unit_id for item in prepared.refusal.citations},
             ):
                 return prepared.refusal
-            return prepared.refusal.model_copy(
-                update={"ontology_context": ontology_bundle.context}
-            )
+            return prepared.refusal.model_copy(update={"ontology_context": ontology_bundle.context})
         extractive = assemble_extractive_answer(
             request,
             prepared.evidence,
@@ -207,9 +197,7 @@ class AnsweringUseCases:
                 )
             validate_generation_result(
                 result,
-                allowed_evidence_ids=tuple(
-                    item.id for item in generation_request.evidence
-                ),
+                allowed_evidence_ids=tuple(item.id for item in generation_request.evidence),
                 max_claims=generation_request.max_claims,
             )
             return assemble_generated_answer(
@@ -283,14 +271,10 @@ class AnsweringUseCases:
                     revision=generation.model.revision,
                 )
             )
-            usage = QueryTraceUsage.model_validate(
-                generation.usage.model_dump(mode="json")
-            )
+            usage = QueryTraceUsage.model_validate(generation.usage.model_dump(mode="json"))
         outcome: TraceOutcome = "failed"
         if response is not None:
-            outcome = "refused" if response.refused else (
-                "degraded" if warnings else "succeeded"
-            )
+            outcome = "refused" if response.refused else ("degraded" if warnings else "succeeded")
         self._telemetry.record(
             context,
             QueryTrace(
@@ -313,27 +297,20 @@ class AnsweringUseCases:
                     else []
                 ),
                 ontology_assertion_ids=(
-                    [
-                        edge.assertion_id
-                        for edge in response.ontology_context.edges
-                    ]
-                    if response is not None
-                    and response.ontology_context is not None
+                    [edge.assertion_id for edge in response.ontology_context.edges]
+                    if response is not None and response.ontology_context is not None
                     else []
                 ),
                 acl_policy_version=(
-                    context.acl_snapshot.version
-                    if context.acl_snapshot is not None
-                    else None
+                    context.acl_snapshot.version if context.acl_snapshot is not None else None
                 ),
                 models=models,
                 warnings=warnings,
                 usage=usage,
-                refusal_reason=(
-                    response.refusal_reason if response is not None else None
-                ),
+                refusal_reason=(response.refusal_reason if response is not None else None),
             ),
         )
+
     def _generation_request(
         self,
         request: AnswerRequest,
@@ -408,8 +385,7 @@ def _generation_relations(
             evidence_ids=tuple(edge.evidence_unit_ids),
         )
         for edge in context.edges
-        if edge.evidence_unit_ids
-        and set(edge.evidence_unit_ids).issubset(evidence_ids)
+        if edge.evidence_unit_ids and set(edge.evidence_unit_ids).issubset(evidence_ids)
     )
 
 
@@ -417,9 +393,7 @@ def _context_is_cited(
     context: OntologyAnswerContext | None,
     citation_ids: set[str],
 ) -> bool:
-    return context is not None and set(context.evidence_unit_ids).issubset(
-        citation_ids
-    )
+    return context is not None and set(context.evidence_unit_ids).issubset(citation_ids)
 
 
 _TRACE_CODE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")

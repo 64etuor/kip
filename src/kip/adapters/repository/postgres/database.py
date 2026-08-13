@@ -110,17 +110,25 @@ class PostgresDatabase:
         *,
         statement_timeout_ms: int = 15000,
         pool_max_size: int = 10,
+        hnsw_ef_search: int = 200,
+        hnsw_max_scan_tuples: int = 100_000,
     ) -> None:
+        if hnsw_ef_search <= 0 or hnsw_max_scan_tuples <= 0:
+            raise ValidationError("HNSW scan bounds must be positive")
         self.database_url = database_url
         self.statement_timeout_ms = statement_timeout_ms
         self.pool_max_size = pool_max_size
+        self.hnsw_ef_search = hnsw_ef_search
+        self.hnsw_max_scan_tuples = hnsw_max_scan_tuples
         self._pool: Any = None
         self._pool_lock = threading.Lock()
         try:
             import psycopg  # noqa: F401
             import psycopg_pool  # noqa: F401
         except ImportError as exc:
-            raise DependencyUnavailableError("Install the postgres extra: pip install '.[postgres]'") from exc
+            raise DependencyUnavailableError(
+                "Install the postgres extra: pip install '.[postgres]'"
+            ) from exc
 
     def _connection_pool(self) -> Any:
         if self._pool is None:
@@ -181,9 +189,14 @@ class PostgresDatabase:
         from psycopg.rows import dict_row
 
         applied: list[str] = []
-        with psycopg.connect(self.database_url, row_factory=dict_row, autocommit=True) as connection:
+        with psycopg.connect(
+            self.database_url, row_factory=dict_row, autocommit=True
+        ) as connection:
             with connection.cursor() as cursor:
-                cursor.execute("SELECT set_config('statement_timeout', %s, false)", (str(self.statement_timeout_ms),))
+                cursor.execute(
+                    "SELECT set_config('statement_timeout', %s, false)",
+                    (str(self.statement_timeout_ms),),
+                )
             for path in sorted(migrations_dir.glob("*.sql")):
                 if path.name.startswith("9"):
                     continue
@@ -191,7 +204,10 @@ class PostgresDatabase:
                 checksum = hashlib.sha256(path.read_bytes()).hexdigest()
                 with connection.cursor() as cursor:
                     try:
-                        cursor.execute("SELECT checksum FROM kip.schema_migrations WHERE version = %s", (version,))
+                        cursor.execute(
+                            "SELECT checksum FROM kip.schema_migrations WHERE version = %s",
+                            (version,),
+                        )
                         row = cursor.fetchone()
                     except psycopg.errors.UndefinedTable:
                         row = None
@@ -223,7 +239,12 @@ class PostgresDatabase:
                 VALUES (%s, %s, 'agent', %s, %s)
                 ON CONFLICT (id) DO NOTHING
                 """,
-                (context.principal_id, context.workspace, context.principal_id, context.principal_id),
+                (
+                    context.principal_id,
+                    context.workspace,
+                    context.principal_id,
+                    context.principal_id,
+                ),
             )
 
     @staticmethod
@@ -433,16 +454,9 @@ class PostgresDatabase:
         if snapshot.scopes != packet.source_object.acl_scopes:
             raise ValidationError("source ACL scopes must match the ACL snapshot")
         if any(unit.acl_snapshot_id != snapshot.id for unit in packet.units):
-            raise ValidationError(
-                "every content unit must reference the source ACL snapshot"
-            )
-        if any(
-            unit.classification != packet.source_object.classification
-            for unit in packet.units
-        ):
-            raise ValidationError(
-                "every content unit must match the source data classification"
-            )
+            raise ValidationError("every content unit must reference the source ACL snapshot")
+        if any(unit.classification != packet.source_object.classification for unit in packet.units):
+            raise ValidationError("every content unit must match the source data classification")
 
         with self._connection(context) as connection:
             self._ensure_workspace_and_principal(connection, context)
@@ -453,7 +467,9 @@ class PostgresDatabase:
                     (context.workspace, packet.source_object.id),
                 )
                 existing_object = cursor.fetchone()
-                old_revision_id = existing_object["current_revision_id"] if existing_object else None
+                old_revision_id = (
+                    existing_object["current_revision_id"] if existing_object else None
+                )
                 if old_revision_id:
                     cursor.execute(
                         "SELECT sha256 FROM source.revisions WHERE workspace_id=%s AND id=%s",
@@ -720,7 +736,9 @@ class PostgresDatabase:
                                     [
                                         packet.artifact.file_name,
                                         packet.logical_document.title,
-                                        str(packet.source_object.metadata.get("document_number", "")),
+                                        str(
+                                            packet.source_object.metadata.get("document_number", "")
+                                        ),
                                         str(packet.logical_document.metadata.get("project_id", "")),
                                     ],
                                 )
@@ -1024,7 +1042,9 @@ class PostgresDatabase:
             warnings=list(packet.extraction.warnings),
         )
 
-    def search(self, context: RequestContext, request: SearchRequest, lexemes: str) -> list[SearchHit]:
+    def search(
+        self, context: RequestContext, request: SearchRequest, lexemes: str
+    ) -> list[SearchHit]:
         websearch_query = _websearch_or_query(lexemes)
         inner_conditions = ["l.workspace_id=%s"]
         inner_condition_params: list[Any] = [context.workspace]
@@ -1080,7 +1100,7 @@ class PostgresDatabase:
                       + similarity(l.title, %s) * 2
                     ) AS score
                 FROM search.lexical_units l
-                WHERE {' AND '.join(inner_conditions)}
+                WHERE {" AND ".join(inner_conditions)}
                   AND (
                         l.identifier_text ILIKE '%%' || %s || '%%'
                      OR l.title ILIKE '%%' || %s || '%%'
@@ -1101,7 +1121,7 @@ class PostgresDatabase:
             JOIN source.revisions r ON r.id=a.revision_id
             JOIN source.objects o ON o.id=r.object_id AND o.current_revision_id=r.id
             LEFT JOIN content.logical_documents d ON d.id=m.document_id
-            WHERE {' AND '.join(outer_conditions)}
+            WHERE {" AND ".join(outer_conditions)}
             ORDER BY m.score DESC, m.unit_id
             LIMIT %s
             ) q
@@ -1134,9 +1154,7 @@ class PostgresDatabase:
         with self._connection(context) as connection, connection.cursor() as cursor:
             # Preserve the historical similarity cutoff for the trigram %%
             # operator, which reads this transaction-local GUC.
-            cursor.execute(
-                "SELECT set_config('pg_trgm.similarity_threshold', '0.15', true)"
-            )
+            cursor.execute("SELECT set_config('pg_trgm.similarity_threshold', '0.15', true)")
             cursor.execute(sql, all_params)
             rows = cursor.fetchall()
         return [
@@ -1245,9 +1263,7 @@ class PostgresDatabase:
             row = cursor.fetchone()
             connection.commit()
         if row is None:
-            raise DependencyUnavailableError(
-                "PostgreSQL did not return the saved embedding space"
-            )
+            raise DependencyUnavailableError("PostgreSQL did not return the saved embedding space")
         return self._embedding_space(row)
 
     def active_embedding_space(self, context: RequestContext) -> EmbeddingSpace | None:
@@ -1369,33 +1385,58 @@ class PostgresDatabase:
     ) -> list[SearchHit]:
         if len(query_embedding) != 1024:
             raise ValidationError("the PostgreSQL semantic projection requires 1024 dimensions")
-        conditions = [
-            "v.workspace_id=%s",
-            "v.space_id=%s",
+        eligibility_conditions = [
+            "u.id=v.unit_id",
             "v.source_hash=r.sha256",
             "(cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])",
             "kip.acl_snapshot_is_fresh(u.acl_snapshot_id)",
         ]
-        condition_params: list[Any] = [
-            context.workspace,
-            space_id,
-            context.acl_scopes,
-        ]
+        eligibility_params: list[Any] = [context.acl_scopes]
         if request.source_kinds:
-            conditions.append("l.source_kind = ANY(%s::text[])")
-            condition_params.append(request.source_kinds)
+            eligibility_conditions.append("l.source_kind = ANY(%s::text[])")
+            eligibility_params.append(request.source_kinds)
         if request.document_types:
-            conditions.append("d.document_type = ANY(%s::text[])")
-            condition_params.append(request.document_types)
+            eligibility_conditions.append("d.document_type = ANY(%s::text[])")
+            eligibility_params.append(request.document_types)
         if request.project_ids:
-            conditions.append("coalesce(d.metadata->>'project_id','') = ANY(%s::text[])")
-            condition_params.append(request.project_ids)
+            eligibility_conditions.append(
+                "coalesce(d.metadata->>'project_id','') = ANY(%s::text[])"
+            )
+            eligibility_params.append(request.project_ids)
         vector = _vector_literal(query_embedding)
         sql = f"""
+            WITH nearest AS MATERIALIZED (
+                SELECT
+                    v.unit_id,
+                    v.embedding <=> %s::vector AS distance
+                FROM search.embeddings_1024 v
+                WHERE v.workspace_id=%s
+                  AND v.space_id=%s
+                  AND EXISTS (
+                      SELECT 1
+                      FROM content.units u
+                      JOIN search.lexical_units l ON l.unit_id=u.id
+                      JOIN content.artifacts a ON a.id=l.artifact_id
+                      JOIN source.revisions r ON r.id=a.revision_id
+                      JOIN source.objects o
+                        ON o.id=r.object_id AND o.current_revision_id=r.id
+                      LEFT JOIN content.logical_documents d
+                        ON d.id=l.document_id
+                      WHERE {" AND ".join(eligibility_conditions)}
+                      OFFSET 0
+                  )
+                ORDER BY v.embedding <=> %s::vector
+                LIMIT %s
+            )
             SELECT
-                q.*,
+                l.unit_id,l.document_id,l.artifact_id,l.source_kind,l.title,
+                left(regexp_replace(l.body, '\\s+', ' ', 'g'), 500) AS snippet,
+                1 - n.distance AS score,
+                u.locator,o.canonical_uri AS source_uri,l.source_sha256,
+                l.source_modified_at,a.file_name,d.document_type,
+                r.source_modified_at AS revision_modified_at,
                 coalesce(
-                    q.revision_modified_at >= (
+                    r.source_modified_at >= (
                         SELECT max(r2.source_modified_at)
                         FROM content.document_artifacts da2
                         JOIN content.artifacts a2 ON a2.id=da2.artifact_id
@@ -1403,33 +1444,38 @@ class PostgresDatabase:
                         JOIN source.objects o2
                           ON o2.id=r2.object_id AND o2.current_revision_id=r2.id
                         WHERE da2.workspace_id=%s
-                          AND da2.document_id=q.document_id
+                          AND da2.document_id=l.document_id
                     ),
                     true
                 ) AS is_latest
-            FROM (
-            SELECT
-                l.unit_id,l.document_id,l.artifact_id,l.source_kind,l.title,
-                left(regexp_replace(l.body, '\\s+', ' ', 'g'), 500) AS snippet,
-                1 - (v.embedding <=> %s::vector) AS score,
-                u.locator,o.canonical_uri AS source_uri,l.source_sha256,
-                l.source_modified_at,a.file_name,d.document_type,
-                r.source_modified_at AS revision_modified_at
-            FROM search.embeddings_1024 v
-            JOIN content.units u ON u.id=v.unit_id
+            FROM nearest n
+            JOIN content.units u ON u.id=n.unit_id
             JOIN search.lexical_units l ON l.unit_id=u.id
             JOIN content.artifacts a ON a.id=l.artifact_id
             JOIN source.revisions r ON r.id=a.revision_id
             JOIN source.objects o ON o.id=r.object_id AND o.current_revision_id=r.id
             LEFT JOIN content.logical_documents d ON d.id=l.document_id
-            WHERE {' AND '.join(conditions)}
-            ORDER BY v.embedding <=> %s::vector, l.unit_id
-            LIMIT %s
-            ) q
-            ORDER BY q.score DESC, q.unit_id
+            ORDER BY n.distance, n.unit_id
         """
-        params = [context.workspace, vector, *condition_params, vector, limit]
+        params = [
+            vector,
+            context.workspace,
+            space_id,
+            *eligibility_params,
+            vector,
+            limit,
+            context.workspace,
+        ]
         with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT set_config('hnsw.ef_search', %s, true),"
+                " set_config('hnsw.iterative_scan', 'strict_order', true),"
+                " set_config('hnsw.max_scan_tuples', %s, true)",
+                (
+                    str(self.hnsw_ef_search),
+                    str(self.hnsw_max_scan_tuples),
+                ),
+            )
             cursor.execute(sql, params)
             rows = cursor.fetchall()
         return [
@@ -1480,7 +1526,9 @@ class PostgresDatabase:
             "space_status": {str(row["id"]): str(row["status"]) for row in rows},
         }
 
-    def vocabulary(self, context: RequestContext, prefix: str, limit: int = 20) -> list[VocabularyItem]:
+    def vocabulary(
+        self, context: RequestContext, prefix: str, limit: int = 20
+    ) -> list[VocabularyItem]:
         normalized = prefix.strip().lower()
         if not normalized:
             raise ValidationError("vocabulary prefix must not be blank")
@@ -1544,7 +1592,9 @@ class PostgresDatabase:
                 frequencies[term] = int(row["df"]) if row else 0
         return frequencies
 
-    def get_content_units(self, context: RequestContext, unit_ids: Sequence[str]) -> list[ContentUnit]:
+    def get_content_units(
+        self, context: RequestContext, unit_ids: Sequence[str]
+    ) -> list[ContentUnit]:
         if not unit_ids:
             return []
         with self._connection(context) as connection, connection.cursor() as cursor:
@@ -1626,22 +1676,38 @@ class PostgresDatabase:
         if not row:
             raise NotFoundError(f"artifact not found: {artifact_id}")
         artifact = Artifact(
-            id=row["id"], revision_id=row["revision_id"], file_name=row["file_name"],
-            extension=row["extension"], media_type=row["media_type"], byte_size=row["byte_size"],
-            sha256=row["sha256"], source_path=row["source_path"], cas_uri=row["cas_uri"],
-            representation_role=row["representation_role"], metadata=row["metadata"] or {},
+            id=row["id"],
+            revision_id=row["revision_id"],
+            file_name=row["file_name"],
+            extension=row["extension"],
+            media_type=row["media_type"],
+            byte_size=row["byte_size"],
+            sha256=row["sha256"],
+            source_path=row["source_path"],
+            cas_uri=row["cas_uri"],
+            representation_role=row["representation_role"],
+            metadata=row["metadata"] or {},
         )
         document = None
         if row["document_id"]:
             document = LogicalDocument(
-                id=row["document_id"], stable_key=row["stable_key"], title=row["document_title"],
-                document_type=row["document_type"], family_key=row["family_key"], lifecycle=row["lifecycle"],
+                id=row["document_id"],
+                stable_key=row["stable_key"],
+                title=row["document_title"],
+                document_type=row["document_type"],
+                family_key=row["family_key"],
+                lifecycle=row["lifecycle"],
                 metadata=row["document_metadata"] or {},
             )
         source_object = SourceObject(
-            id=row["object_id"], system_id=row["system_id"], system_name=row["system_name"],
-            system_kind=row["system_kind"], external_id=row["external_id"], object_type=row["object_type"],
-            canonical_uri=row["canonical_uri"], acl_scopes=list(row["object_acl_scopes"] or []),
+            id=row["object_id"],
+            system_id=row["system_id"],
+            system_name=row["system_name"],
+            system_kind=row["system_kind"],
+            external_id=row["external_id"],
+            object_type=row["object_type"],
+            canonical_uri=row["canonical_uri"],
+            acl_scopes=list(row["object_acl_scopes"] or []),
             classification=row["object_data_classification"],
             acl_snapshot=AclSnapshot(
                 id=row["acl_snapshot_id"],
@@ -1655,12 +1721,19 @@ class PostgresDatabase:
             metadata=row["object_metadata"] or {},
         )
         revision = SourceRevision(
-            id=row["revision_id"], object_id=row["object_id"], revision_key=row["revision_key"],
-            sha256=row["revision_sha256"], size_bytes=row["revision_size_bytes"],
-            source_modified_at=row["source_modified_at"], raw_object_uri=row["raw_object_uri"],
-            is_tombstone=row["is_tombstone"], metadata=row["revision_metadata"] or {},
+            id=row["revision_id"],
+            object_id=row["object_id"],
+            revision_key=row["revision_key"],
+            sha256=row["revision_sha256"],
+            size_bytes=row["revision_size_bytes"],
+            source_modified_at=row["source_modified_at"],
+            raw_object_uri=row["raw_object_uri"],
+            is_tombstone=row["is_tombstone"],
+            metadata=row["revision_metadata"] or {},
         )
-        return ArtifactView(artifact=artifact, document=document, source_object=source_object, revision=revision)
+        return ArtifactView(
+            artifact=artifact, document=document, source_object=source_object, revision=revision
+        )
 
     def get_document(self, context: RequestContext, document_id: str) -> dict[str, Any]:
         with self._connection(context) as connection, connection.cursor() as cursor:
@@ -1729,7 +1802,7 @@ class PostgresDatabase:
             SELECT a.*, coalesce(array_agg(e.content_unit_id) FILTER (WHERE e.content_unit_id IS NOT NULL), ARRAY[]::text[]) AS evidence_ids
             FROM knowledge.assertions a
             LEFT JOIN knowledge.assertion_evidence e ON e.assertion_id=a.id
-            WHERE {' AND '.join(conditions)}
+            WHERE {" AND ".join(conditions)}
             GROUP BY a.id
             ORDER BY a.created_at DESC
             LIMIT %s
@@ -1812,13 +1885,25 @@ class PostgresDatabase:
     @staticmethod
     def _graph_edge(row: dict[str, Any]) -> GraphEdge:
         return GraphEdge(
-            assertion_id=row["id"], subject_id=row["subject_id"], predicate=row["predicate"],
-            object_entity_id=row["object_entity_id"], object_value=row["object_value"], status=row["status"],
-            valid_from=row["valid_from"], valid_to=row["valid_to"], ontology_version=row["ontology_version"],
+            assertion_id=row["id"],
+            subject_id=row["subject_id"],
+            predicate=row["predicate"],
+            object_entity_id=row["object_entity_id"],
+            object_value=row["object_value"],
+            status=row["status"],
+            valid_from=row["valid_from"],
+            valid_to=row["valid_to"],
+            ontology_version=row["ontology_version"],
             evidence_unit_ids=list(row["evidence_ids"] or []),
         )
 
-    def enqueue_job(self, context: RequestContext, job_type: str, payload: dict[str, Any], idempotency_key: str | None = None) -> str:
+    def enqueue_job(
+        self,
+        context: RequestContext,
+        job_type: str,
+        payload: dict[str, Any],
+        idempotency_key: str | None = None,
+    ) -> str:
         public_id = new_id("job")
         with self._connection(context) as connection:
             self._ensure_workspace_and_principal(connection, context)
@@ -1853,9 +1938,7 @@ class PostgresDatabase:
                 row = cursor.fetchone()
             connection.commit()
         if row is None:
-            raise DependencyUnavailableError(
-                "PostgreSQL did not return the enqueued job"
-            )
+            raise DependencyUnavailableError("PostgreSQL did not return the enqueued job")
         return str(row["public_id"])
 
     def claim_job(self, context: RequestContext, worker_id: str) -> JobRecord | None:
@@ -1881,11 +1964,21 @@ class PostgresDatabase:
             connection.commit()
         if not row:
             return None
-        return JobRecord(id=row["public_id"], job_type=row["job_type"], payload=row["payload"], status=row["status"], attempts=row["attempts"], max_attempts=row["max_attempts"])
+        return JobRecord(
+            id=row["public_id"],
+            job_type=row["job_type"],
+            payload=row["payload"],
+            status=row["status"],
+            attempts=row["attempts"],
+            max_attempts=row["max_attempts"],
+        )
 
     def complete_job(self, context: RequestContext, job_id: str) -> None:
         with self._connection(context) as connection, connection.cursor() as cursor:
-            cursor.execute("UPDATE jobs.queue SET status='succeeded', updated_at=now() WHERE workspace_id=%s AND public_id=%s", (context.workspace, job_id))
+            cursor.execute(
+                "UPDATE jobs.queue SET status='succeeded', updated_at=now() WHERE workspace_id=%s AND public_id=%s",
+                (context.workspace, job_id),
+            )
             connection.commit()
 
     def fail_job(self, context: RequestContext, job_id: str, error: str) -> None:
@@ -1903,7 +1996,9 @@ class PostgresDatabase:
             )
             connection.commit()
 
-    def list_jobs(self, context: RequestContext, status: str | None = None, limit: int = 100) -> list[JobRecord]:
+    def list_jobs(
+        self, context: RequestContext, status: str | None = None, limit: int = 100
+    ) -> list[JobRecord]:
         with self._connection(context) as connection, connection.cursor() as cursor:
             if status:
                 cursor.execute(
@@ -1916,7 +2011,17 @@ class PostgresDatabase:
                     (context.workspace, limit),
                 )
             rows = cursor.fetchall()
-        return [JobRecord(id=row["public_id"], job_type=row["job_type"], payload=row["payload"], status=row["status"], attempts=row["attempts"], max_attempts=row["max_attempts"]) for row in rows]
+        return [
+            JobRecord(
+                id=row["public_id"],
+                job_type=row["job_type"],
+                payload=row["payload"],
+                status=row["status"],
+                attempts=row["attempts"],
+                max_attempts=row["max_attempts"],
+            )
+            for row in rows
+        ]
 
     def save_entity(
         self,
@@ -1953,8 +2058,7 @@ class PostgresDatabase:
                 collision = cursor.fetchone()
                 if collision is not None:
                     raise ConflictError(
-                        "entity name or alias already exists: "
-                        + str(collision["alias_normalized"])
+                        "entity name or alias already exists: " + str(collision["alias_normalized"])
                     )
                 cursor.execute(
                     """
@@ -2347,17 +2451,11 @@ class PostgresDatabase:
                 )
                 row = cursor.fetchone()
                 if row is None:
-                    raise NotFoundError(
-                        f"entity candidate not found: {candidate_id}"
-                    )
+                    raise NotFoundError(f"entity candidate not found: {candidate_id}")
                 candidate = self._entity_candidate(row)
                 if candidate.status != "proposed":
-                    raise ConflictError(
-                        f"entity candidate is already {candidate.status}"
-                    )
-                evidence_ids = [
-                    evidence.content_unit_id for evidence in candidate.evidence
-                ]
+                    raise ConflictError(f"entity candidate is already {candidate.status}")
+                evidence_ids = [evidence.content_unit_id for evidence in candidate.evidence]
                 cursor.execute(
                     """
                     SELECT id, acl_scopes
@@ -2382,9 +2480,7 @@ class PostgresDatabase:
                     }
                 ) or list(context.acl_scopes)
                 if not set(scopes).issubset(context.acl_scopes):
-                    raise AuthorizationError(
-                        "reviewer lacks one or more evidence scopes"
-                    )
+                    raise AuthorizationError("reviewer lacks one or more evidence scopes")
                 entity = KnowledgeEntity(
                     id=stable_entity_id(candidate.fingerprint),
                     entity_type=candidate.entity_type,
@@ -2411,8 +2507,7 @@ class PostgresDatabase:
                 collision = cursor.fetchone()
                 if collision is not None:
                     raise ConflictError(
-                        "entity name or alias already exists: "
-                        + str(collision["alias_normalized"])
+                        "entity name or alias already exists: " + str(collision["alias_normalized"])
                     )
                 cursor.execute(
                     """
@@ -2512,9 +2607,7 @@ class PostgresDatabase:
             row = cursor.fetchone()
             connection.commit()
         if row is None:
-            raise NotFoundError(
-                f"proposed entity candidate not found: {candidate_id}"
-            )
+            raise NotFoundError(f"proposed entity candidate not found: {candidate_id}")
         return self._entity_candidate(row)
 
     @staticmethod
@@ -2675,23 +2768,21 @@ class PostgresDatabase:
             rows = cursor.fetchall()
         return [self._approved_assertion(row) for row in rows]
 
-    def save_candidate(self, context: RequestContext, candidate: AssertionCandidate) -> AssertionCandidate:
+    def save_candidate(
+        self, context: RequestContext, candidate: AssertionCandidate
+    ) -> AssertionCandidate:
         fingerprint = candidate.fingerprint
         if fingerprint is None:
             payload = candidate.model_dump(
                 mode="json",
                 exclude={"fingerprint"},
             )
-            fingerprint = "legacy:sha256:" + hashlib.sha256(
-                _json(payload).encode()
-            ).hexdigest()
+            fingerprint = "legacy:sha256:" + hashlib.sha256(_json(payload).encode()).hexdigest()
             candidate = candidate.model_copy(update={"fingerprint": fingerprint})
         with self._connection(context) as connection:
             self._ensure_workspace_and_principal(connection, context)
             with connection.cursor() as cursor:
-                evidence_ids = [
-                    evidence.content_unit_id for evidence in candidate.evidence
-                ]
+                evidence_ids = [evidence.content_unit_id for evidence in candidate.evidence]
                 if evidence_ids:
                     cursor.execute(
                         """
@@ -2707,9 +2798,7 @@ class PostgresDatabase:
                         (context.workspace, evidence_ids, context.acl_scopes),
                     )
                     if len(cursor.fetchall()) != len(set(evidence_ids)):
-                        raise NotFoundError(
-                            "one or more candidate evidence units are unavailable"
-                        )
+                        raise NotFoundError("one or more candidate evidence units are unavailable")
                 cursor.execute(
                     """
                     INSERT INTO knowledge.assertion_candidates(
@@ -2735,12 +2824,26 @@ class PostgresDatabase:
                         migrates_assertion_ids=EXCLUDED.migrates_assertion_ids
                     """,
                     (
-                        candidate.id, context.workspace, candidate.subject_id, candidate.predicate, candidate.object_entity_id,
-                        _json(candidate.object_value) if candidate.object_value is not None else None, candidate.status, candidate.origin,
-                        candidate.confidence, candidate.ontology_version, _json(candidate.evidence), candidate.review_note,
-                        candidate.fingerprint, candidate.valid_from, candidate.valid_to,
+                        candidate.id,
+                        context.workspace,
+                        candidate.subject_id,
+                        candidate.predicate,
+                        candidate.object_entity_id,
+                        _json(candidate.object_value)
+                        if candidate.object_value is not None
+                        else None,
+                        candidate.status,
+                        candidate.origin,
+                        candidate.confidence,
+                        candidate.ontology_version,
+                        _json(candidate.evidence),
+                        candidate.review_note,
+                        candidate.fingerprint,
+                        candidate.valid_from,
+                        candidate.valid_to,
                         _json(candidate.derivation) if candidate.derivation is not None else None,
-                        candidate.review_risk, candidate.contradicts_assertion_ids,
+                        candidate.review_risk,
+                        candidate.contradicts_assertion_ids,
                         candidate.migrates_assertion_ids,
                     ),
                 )
@@ -2767,9 +2870,7 @@ class PostgresDatabase:
                             raise NotFoundError(
                                 "one or more candidate evidence units are unavailable"
                             )
-                        source_revision_sha256 = (
-                            source_revision_sha256 or evidence_row["sha256"]
-                        )
+                        source_revision_sha256 = source_revision_sha256 or evidence_row["sha256"]
                         locator = locator or evidence_row["locator"]
                     cursor.execute(
                         """
@@ -2795,7 +2896,9 @@ class PostgresDatabase:
             connection.commit()
         return candidate
 
-    def list_candidates(self, context: RequestContext, status: str = "proposed", limit: int = 100) -> list[AssertionCandidate]:
+    def list_candidates(
+        self, context: RequestContext, status: str = "proposed", limit: int = 100
+    ) -> list[AssertionCandidate]:
         with self._connection(context) as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -2869,11 +2972,19 @@ class PostgresDatabase:
     @staticmethod
     def _candidate(row: dict[str, Any]) -> AssertionCandidate:
         return AssertionCandidate(
-            id=row["id"], subject_id=row["subject_id"], predicate=row["predicate"],
-            object_entity_id=row["object_entity_id"], object_value=row["object_value"], status=row["status"],
-            origin=row["origin"], confidence=row["confidence"], ontology_version=row["ontology_version"],
-            evidence=row["evidence"] or [], review_note=row.get("review_note"),
-            fingerprint=row.get("fingerprint"), valid_from=row.get("valid_from"),
+            id=row["id"],
+            subject_id=row["subject_id"],
+            predicate=row["predicate"],
+            object_entity_id=row["object_entity_id"],
+            object_value=row["object_value"],
+            status=row["status"],
+            origin=row["origin"],
+            confidence=row["confidence"],
+            ontology_version=row["ontology_version"],
+            evidence=row["evidence"] or [],
+            review_note=row.get("review_note"),
+            fingerprint=row.get("fingerprint"),
+            valid_from=row.get("valid_from"),
             valid_to=row.get("valid_to"),
             derivation=(
                 RelationDerivation.model_validate(row["derivation"])
@@ -2885,7 +2996,9 @@ class PostgresDatabase:
             migrates_assertion_ids=list(row.get("migrates_assertion_ids") or []),
         )
 
-    def approve_candidate(self, context: RequestContext, candidate_id: str, reviewer_id: str, note: str | None = None) -> ApprovedAssertion:
+    def approve_candidate(
+        self, context: RequestContext, candidate_id: str, reviewer_id: str, note: str | None = None
+    ) -> ApprovedAssertion:
         with self._connection(context) as connection:
             self._ensure_workspace_and_principal(connection, context)
             with connection.cursor() as cursor:
@@ -2926,9 +3039,7 @@ class PostgresDatabase:
                     raise ConflictError(f"candidate is already {candidate.status}")
                 if candidate.predicate in _HIGH_RISK_PREDICATES and not candidate.evidence:
                     raise ValidationError(f"predicate {candidate.predicate} requires evidence")
-                evidence_unit_ids = [
-                    evidence.content_unit_id for evidence in candidate.evidence
-                ]
+                evidence_unit_ids = [evidence.content_unit_id for evidence in candidate.evidence]
                 derived_scopes: set[str] = set()
                 evidence_rows: list[dict[str, Any]] = []
                 if evidence_unit_ids:
@@ -2957,10 +3068,7 @@ class PostgresDatabase:
                         derived_scopes.update(evidence_row["acl_scopes"] or [])
                 assertion_scopes = sorted(derived_scopes) or list(context.acl_scopes)
                 assertion_snapshot_ids = sorted(
-                    {
-                        str(evidence_row["acl_snapshot_id"])
-                        for evidence_row in evidence_rows
-                    }
+                    {str(evidence_row["acl_snapshot_id"]) for evidence_row in evidence_rows}
                 )
                 if not set(assertion_scopes).issubset(set(context.acl_scopes)):
                     raise AuthorizationError("reviewer lacks one or more evidence scopes")
@@ -2975,11 +3083,21 @@ class PostgresDatabase:
                     ) VALUES (%s,%s,%s,%s,%s,%s::jsonb,'active',%s,%s,%s,%s,%s,%s,%s)
                     """,
                     (
-                        assertion_id, context.workspace, candidate.subject_id, candidate.predicate,
-                        candidate.object_entity_id, _json(candidate.object_value) if candidate.object_value is not None else None,
-                        candidate.ontology_version, candidate.id, assertion_scopes,
-                        assertion_snapshot_ids, reviewer_id,
-                        candidate.valid_from, candidate.valid_to,
+                        assertion_id,
+                        context.workspace,
+                        candidate.subject_id,
+                        candidate.predicate,
+                        candidate.object_entity_id,
+                        _json(candidate.object_value)
+                        if candidate.object_value is not None
+                        else None,
+                        candidate.ontology_version,
+                        candidate.id,
+                        assertion_scopes,
+                        assertion_snapshot_ids,
+                        reviewer_id,
+                        candidate.valid_from,
+                        candidate.valid_to,
                     ),
                 )
                 for evidence in candidate.evidence:
@@ -3010,15 +3128,23 @@ class PostgresDatabase:
                 )
             connection.commit()
         return ApprovedAssertion(
-            id=assertion_id, subject_id=candidate.subject_id, predicate=candidate.predicate,
-            object_entity_id=candidate.object_entity_id, object_value=candidate.object_value,
-            ontology_version=candidate.ontology_version, source_candidate_id=candidate.id,
-            acl_scopes=assertion_scopes, evidence_unit_ids=evidence_unit_ids,
+            id=assertion_id,
+            subject_id=candidate.subject_id,
+            predicate=candidate.predicate,
+            object_entity_id=candidate.object_entity_id,
+            object_value=candidate.object_value,
+            ontology_version=candidate.ontology_version,
+            source_candidate_id=candidate.id,
+            acl_scopes=assertion_scopes,
+            evidence_unit_ids=evidence_unit_ids,
             evidence_acl_snapshot_ids=assertion_snapshot_ids,
-            valid_from=candidate.valid_from, valid_to=candidate.valid_to,
+            valid_from=candidate.valid_from,
+            valid_to=candidate.valid_to,
         )
 
-    def reject_candidate(self, context: RequestContext, candidate_id: str, reviewer_id: str, note: str | None = None) -> AssertionCandidate:
+    def reject_candidate(
+        self, context: RequestContext, candidate_id: str, reviewer_id: str, note: str | None = None
+    ) -> AssertionCandidate:
         with self._connection(context) as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -3217,21 +3343,55 @@ class PostgresDatabase:
                 result["deleted_units"] = deleted_units
                 connection.commit()
         if projection in {"graph", "all"}:
-            result["graph"] = "canonical assertions are queried directly; optional graph projection unchanged"
+            result["graph"] = (
+                "canonical assertions are queried directly; optional graph projection unchanged"
+            )
         return result
 
     def export_canonical(self, context: RequestContext, output: Path) -> dict[str, Any]:
         output.parent.mkdir(parents=True, exist_ok=True)
         exports = [
             ("workspace", "SELECT * FROM kip.workspaces WHERE slug=%s", (context.workspace,)),
-            ("source_system", "SELECT * FROM source.systems WHERE workspace_id=%s ORDER BY id", (context.workspace,)),
-            ("source_object", "SELECT * FROM source.objects WHERE workspace_id=%s ORDER BY id", (context.workspace,)),
-            ("source_revision", "SELECT * FROM source.revisions WHERE workspace_id=%s ORDER BY id", (context.workspace,)),
-            ("logical_document", "SELECT * FROM content.logical_documents WHERE workspace_id=%s ORDER BY id", (context.workspace,)),
-            ("artifact", "SELECT * FROM content.artifacts WHERE workspace_id=%s ORDER BY id", (context.workspace,)),
-            ("content_unit", "SELECT * FROM content.units WHERE workspace_id=%s ORDER BY id", (context.workspace,)),
-            ("assertion_candidate", "SELECT * FROM knowledge.assertion_candidates WHERE workspace_id=%s ORDER BY id", (context.workspace,)),
-            ("assertion", "SELECT * FROM knowledge.assertions WHERE workspace_id=%s ORDER BY id", (context.workspace,)),
+            (
+                "source_system",
+                "SELECT * FROM source.systems WHERE workspace_id=%s ORDER BY id",
+                (context.workspace,),
+            ),
+            (
+                "source_object",
+                "SELECT * FROM source.objects WHERE workspace_id=%s ORDER BY id",
+                (context.workspace,),
+            ),
+            (
+                "source_revision",
+                "SELECT * FROM source.revisions WHERE workspace_id=%s ORDER BY id",
+                (context.workspace,),
+            ),
+            (
+                "logical_document",
+                "SELECT * FROM content.logical_documents WHERE workspace_id=%s ORDER BY id",
+                (context.workspace,),
+            ),
+            (
+                "artifact",
+                "SELECT * FROM content.artifacts WHERE workspace_id=%s ORDER BY id",
+                (context.workspace,),
+            ),
+            (
+                "content_unit",
+                "SELECT * FROM content.units WHERE workspace_id=%s ORDER BY id",
+                (context.workspace,),
+            ),
+            (
+                "assertion_candidate",
+                "SELECT * FROM knowledge.assertion_candidates WHERE workspace_id=%s ORDER BY id",
+                (context.workspace,),
+            ),
+            (
+                "assertion",
+                "SELECT * FROM knowledge.assertions WHERE workspace_id=%s ORDER BY id",
+                (context.workspace,),
+            ),
         ]
         count = 0
         with self._connection(context) as connection, output.open("w", encoding="utf-8") as handle:
@@ -3241,4 +3401,8 @@ class PostgresDatabase:
                     for row in cursor:
                         handle.write(_json({"type": record_type, "data": dict(row)}) + "\n")
                         count += 1
-        return {"output": str(output), "records": count, "generated_at": datetime.now(UTC).isoformat()}
+        return {
+            "output": str(output),
+            "records": count,
+            "generated_at": datetime.now(UTC).isoformat(),
+        }

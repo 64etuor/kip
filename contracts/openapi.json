@@ -87,6 +87,23 @@
             "title": "Max Chars",
             "type": "integer"
           },
+          "mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "lexical",
+                  "vector",
+                  "hybrid",
+                  "reranked"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          },
           "project_ids": {
             "items": {
               "type": "string"
@@ -329,6 +346,23 @@
             "minimum": 1000.0,
             "title": "Max Chars",
             "type": "integer"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "lexical",
+                  "vector",
+                  "hybrid",
+                  "reranked"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
           },
           "project_ids": {
             "items": {
@@ -771,6 +805,23 @@
             "minimum": 1.0,
             "title": "Limit",
             "type": "integer"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "lexical",
+                  "vector",
+                  "hybrid",
+                  "reranked"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
           },
           "project_ids": {
             "items": {

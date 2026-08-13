@@ -98,6 +98,10 @@ def build_container(
             selected.database_url,
             statement_timeout_ms=selected.database_statement_timeout_ms,
             pool_max_size=selected.database_pool_max_size,
+            hnsw_ef_search=int(selected.get("search.hnsw_ef_search", 200)),
+            hnsw_max_scan_tuples=int(
+                selected.get("search.hnsw_max_scan_tuples", 100_000)
+            ),
         )
     parsers = ParserRegistry.from_settings(selected)
     sources = ConfiguredSourceCatalog(selected)
@@ -233,7 +237,6 @@ def build_container(
     retrieval = RetrievalUseCases(
         selected,
         selected_repository.retrieval,
-        selected_repository.operations,
         evidence,
         analyzer,
         selected_embedding,

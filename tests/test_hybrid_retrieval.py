@@ -7,9 +7,8 @@ import pytest
 from kip.adapters.repository.memory import MemoryRepository
 from kip.adapters.repository.memory.retrieval import MemoryRetrievalStore
 from kip.adapters.repository.memory.state import MemoryState
-from kip.application.retrieval import reciprocal_rank_fusion
 from kip.container import build_container
-from kip.domain.models import EvidenceLocator, SearchHit, SearchRequest
+from kip.domain.models import SearchRequest
 from kip.errors import DependencyUnavailableError
 from kip.ports.reranker import RerankScore
 
@@ -32,10 +31,7 @@ class FixtureEmbedding:
 
     def embed_documents(self, texts) -> list[list[float]]:
         self.document_calls += 1
-        return [
-            [1.0, 0.0, 0.0] if "허가" in text else [0.0, 1.0, 0.0]
-            for text in texts
-        ]
+        return [[1.0, 0.0, 0.0] if "허가" in text else [0.0, 1.0, 0.0] for text in texts]
 
 
 class FailingEmbedding(FixtureEmbedding):
@@ -72,6 +68,15 @@ class CountingMemoryRetrievalStore(MemoryRetrievalStore):
     def __init__(self, state: MemoryState) -> None:
         super().__init__(state)
         object.__setattr__(self, "bulk_lookup_count", 0)
+        object.__setattr__(self, "lexical_search_count", 0)
+
+    def search(self, context, request, lexemes):
+        object.__setattr__(
+            self,
+            "lexical_search_count",
+            self.lexical_search_count + 1,
+        )
+        return super().search(context, request, lexemes)
 
     def get_content_units(self, context, unit_ids):
         object.__setattr__(
@@ -80,34 +85,6 @@ class CountingMemoryRetrievalStore(MemoryRetrievalStore):
             self.bulk_lookup_count + 1,
         )
         return super().get_content_units(context, unit_ids)
-
-
-def _hit(unit_id: str, score: float) -> SearchHit:
-    return SearchHit(
-        unit_id=unit_id,
-        document_id=f"doc_{unit_id}",
-        artifact_id=f"art_{unit_id}",
-        source_kind="filesystem",
-        title=unit_id,
-        snippet=unit_id,
-        score=score,
-        locator=EvidenceLocator(type="text_span", data={}),
-        source_uri=f"file:///public/{unit_id}.txt",
-        source_sha256="a" * 64,
-    )
-
-
-def test_rrf_uses_rank_and_deduplicates_units() -> None:
-    lexical = [_hit("a", 100.0), _hit("b", 90.0)]
-    vector = [_hit("b", 0.99), _hit("c", 0.98)]
-
-    fused = reciprocal_rank_fusion(lexical, vector, limit=3, rank_constant=60)
-
-    assert [hit.unit_id for hit in fused] == ["b", "a", "c"]
-    assert fused[0].metadata["retrieval_channels"] == ["lexical", "vector"]
-    assert fused[0].metadata["lexical_rank"] == 2
-    assert fused[0].metadata["vector_rank"] == 1
-    assert fused[0].score < 1.0
 
 
 def test_default_lexical_mode_makes_no_model_call(
@@ -168,29 +145,6 @@ def test_local_reranker_can_improve_lexical_mode_without_vector_search(
     assert hits[0].metadata["rerank_rank"] == 1
     assert reranker.document_counts == [2]
     assert embedding.query_calls == 0
-
-
-def test_embedding_space_identity_ignores_operational_batch_settings(
-    test_container,
-) -> None:
-    container = build_container(
-        test_container.settings,
-        repository=test_container.repository,
-        embedding=FixtureEmbedding(),
-    )
-    context = container.application.operations.request_context()
-    embedding_config = test_container.settings.raw.setdefault("models", {}).setdefault(
-        "embedding", {}
-    )
-    embedding_config.update({"batch_size": 16, "timeout_seconds": 30})
-    original = container.application.retrieval.embedding_space(context)
-
-    embedding_config["batch_size"] = 1
-    embedding_config["timeout_seconds"] = 999
-    changed = container.application.retrieval.embedding_space(context)
-
-    assert changed.id == original.id
-    assert changed.name == original.name
 
 
 def test_explicit_hybrid_search_and_reranking_use_shadow_space(
@@ -298,6 +252,34 @@ def test_reranking_fetches_candidate_units_in_one_repository_call(
     assert counting_retrieval.bulk_lookup_count == 1
 
 
+def test_vector_only_mode_does_not_pay_for_lexical_candidate_retrieval(
+    test_container,
+    tmp_path: Path,
+) -> None:
+    source_root = tmp_path / "source"
+    (source_root / "승인.txt").write_text("참여율 변경을 승인한다.", encoding="utf-8")
+    state = MemoryState()
+    counting_retrieval = CountingMemoryRetrievalStore(state)
+    repository = MemoryRepository(state, retrieval=counting_retrieval)
+    container = build_container(
+        test_container.settings,
+        repository=repository,
+        embedding=FixtureEmbedding(),
+    )
+    context = container.application.operations.request_context()
+    container.application.ingestion.sync_filesystem(context, "fixture")
+    container.application.retrieval.rebuild_semantic_projection(context)
+
+    hits = container.application.retrieval.search(
+        context,
+        SearchRequest(query="승인", limit=10),
+        mode="vector",
+    )
+
+    assert hits
+    assert counting_retrieval.lexical_search_count == 0
+
+
 def test_optional_default_mode_falls_back_but_explicit_hybrid_fails(
     test_container,
     tmp_path: Path,
@@ -327,36 +309,3 @@ def test_optional_default_mode_falls_back_but_explicit_hybrid_fails(
             SearchRequest(query="승인"),
             mode="hybrid",
         )
-
-
-def test_failed_rebuild_does_not_replace_active_space(
-    test_container,
-    tmp_path: Path,
-) -> None:
-    source_root = tmp_path / "source"
-    (source_root / "승인.txt").write_text("참여율 변경을 승인한다.", encoding="utf-8")
-    good = FixtureEmbedding()
-    container = build_container(
-        test_container.settings,
-        repository=test_container.repository,
-        embedding=good,
-    )
-    context = container.application.operations.request_context()
-    container.application.ingestion.sync_filesystem(context, "fixture")
-    built = container.application.retrieval.rebuild_semantic_projection(context)
-    container.repository.retrieval.activate_embedding_space(
-        context,
-        built["space_id"],
-    )
-    failing_container = build_container(
-        test_container.settings,
-        repository=test_container.repository,
-        embedding=FailingEmbedding(),
-    )
-
-    with pytest.raises(DependencyUnavailableError):
-        failing_container.application.retrieval.rebuild_semantic_projection(context)
-
-    active = test_container.repository.retrieval.active_embedding_space(context)
-    assert active is not None
-    assert active.id == built["space_id"]

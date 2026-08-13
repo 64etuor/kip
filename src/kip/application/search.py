@@ -29,7 +29,6 @@ from kip.domain.telemetry import (
 from kip.ports.embedding import EmbeddingPort
 from kip.ports.evidence import EvidenceReaderPort
 from kip.ports.knowledge import KnowledgeStore
-from kip.ports.operations import OperationsStore
 from kip.ports.reranker import RerankerPort
 from kip.ports.retrieval import RetrievalStore
 from kip.ports.text_analyzer import TextAnalyzerPort
@@ -41,7 +40,6 @@ class RetrievalUseCases:
         self,
         settings: Settings,
         store: RetrievalStore,
-        operations: OperationsStore,
         evidence: EvidenceReaderPort,
         analyzer: TextAnalyzerPort,
         embedding: EmbeddingPort,
@@ -55,7 +53,6 @@ class RetrievalUseCases:
         self._semantic = SemanticProjectionUseCases(
             settings,
             store,
-            operations,
             embedding,
         )
         self._search = SearchEngine(
@@ -102,7 +99,11 @@ class RetrievalUseCases:
         started_at = datetime.now(UTC)
         started = perf_counter()
         try:
-            hits = self._search.search(context, request, mode=mode)
+            hits = self._search.search(
+                context,
+                request,
+                mode=mode if mode is not None else request.mode,
+            )
         except Exception:
             self._record_search_trace(
                 context,

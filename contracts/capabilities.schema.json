@@ -35,8 +35,26 @@
       "title": "Repository",
       "type": "string"
     },
+    "semantic_projection_status": {
+      "default": "disabled",
+      "enum": [
+        "disabled",
+        "missing",
+        "shadow",
+        "active",
+        "stale",
+        "incompatible"
+      ],
+      "title": "Semantic Projection Status",
+      "type": "string"
+    },
     "semantic_search": {
       "title": "Semantic Search",
+      "type": "boolean"
+    },
+    "semantic_search_configured": {
+      "default": false,
+      "title": "Semantic Search Configured",
       "type": "boolean"
     },
     "warnings": {

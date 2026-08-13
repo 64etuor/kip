@@ -30,6 +30,7 @@ from kip.domain.models import (
     GraphPathRequest,
     RequestContext,
     SearchHit,
+    SearchMode,
     SearchRequest,
 )
 from kip.errors import KipError, NotFoundError, ValidationError, error_code
@@ -39,6 +40,7 @@ from kip.evaluation.reviews import load_review_bundle
 from kip.evaluation.runner import (
     compare_variants,
     load_dataset,
+    requires_stale_enrichment,
     run_evaluation,
     validate_activation_report,
 )
@@ -62,7 +64,9 @@ jobs_app = typer.Typer(no_args_is_help=True, help="Inspect durable jobs")
 api_app = typer.Typer(no_args_is_help=True, help="Run the optional REST adapter")
 worker_app = typer.Typer(no_args_is_help=True, help="Run background jobs")
 get_app = typer.Typer(no_args_is_help=True, help="Get canonical objects")
-projection_app = typer.Typer(no_args_is_help=True, help="Inspect and rebuild disposable projections")
+projection_app = typer.Typer(
+    no_args_is_help=True, help="Inspect and rebuild disposable projections"
+)
 export_app = typer.Typer(no_args_is_help=True, help="Export portable canonical bundles")
 evaluate_app = typer.Typer(no_args_is_help=True, help="Measure retrieval quality")
 quality_app = typer.Typer(no_args_is_help=True, help="Evaluate version-pinned candidates")
@@ -114,10 +118,17 @@ def command_loads_models(subcommand: str | None) -> bool:
     }
 
 
+def _is_command_line_parameter(ctx: typer.Context, name: str) -> bool:
+    source = ctx.get_parameter_source(name)
+    return source is not None and source.name == "COMMANDLINE"
+
+
 @app.callback()
 def root(
     ctx: typer.Context,
-    config: Path | None = typer.Option(None, "--config", envvar="KIP_CONFIG", help="TOML configuration path"),
+    config: Path | None = typer.Option(
+        None, "--config", envvar="KIP_CONFIG", help="TOML configuration path"
+    ),
     workspace: str | None = typer.Option(None, "--workspace", envvar="KIP_WORKSPACE"),
     principal: str = typer.Option("principal_local", "--principal", envvar="KIP_PRINCIPAL_ID"),
     acl_scope: list[str] | None = typer.Option(None, "--acl-scope", help="Repeatable access scope"),
@@ -147,8 +158,10 @@ def root(
         settings,
         load_models=command_loads_models(ctx.invoked_subcommand),
     )
+    explicit_repeated_scopes = _is_command_line_parameter(ctx, "acl_scope")
+    explicit_csv_scopes = _is_command_line_parameter(ctx, "acl_scopes")
     selected_scopes = list(acl_scope or [])
-    if acl_scopes:
+    if not explicit_repeated_scopes and acl_scopes:
         selected_scopes.extend(item.strip() for item in acl_scopes.split(",") if item.strip())
     selected_roles = list(role or [])
     if roles:
@@ -156,7 +169,11 @@ def root(
     request_context = container.application.operations.request_context(
         workspace=workspace,
         principal_id=principal,
-        acl_scopes=list(dict.fromkeys(selected_scopes)) or None,
+        acl_scopes=(
+            list(dict.fromkeys(selected_scopes))
+            if selected_scopes or explicit_repeated_scopes or explicit_csv_scopes
+            else None
+        ),
         roles=selected_roles or None,
     )
     ctx.obj = Runtime(container, request_context)
@@ -222,6 +239,14 @@ def _split_csv(value: str) -> list[str]:
     return list(dict.fromkeys(item.strip() for item in value.split(",") if item.strip()))
 
 
+def _validated_search_mode(value: str | None) -> SearchMode | None:
+    match value:
+        case None | "lexical" | "vector" | "hybrid" | "reranked":
+            return value
+        case _:
+            raise ValidationError(f"unsupported search mode: {value}")
+
+
 def _enabled_filesystem_sources(runtime: Runtime) -> list[str]:
     names: list[str] = []
     for source in runtime.container.settings.get("sources.filesystem", []) or []:
@@ -282,14 +307,23 @@ def _sync_one(
             ("imap", runtime.container.settings.get("sources.imap.enabled", False)),
         ]:
             if enabled:
-                results.append(_sync_one(runtime, name, enqueue=enqueue, dry_run=dry_run, since=since))
+                results.append(
+                    _sync_one(runtime, name, enqueue=enqueue, dry_run=dry_run, since=since)
+                )
         return results
     if enqueue:
         if dry_run:
             raise ValidationError("--enqueue and --dry-run cannot be combined")
-        return {"source": selected, "job_id": runtime.container.application.ingestion.enqueue_sync(runtime.context, selected)}
+        return {
+            "source": selected,
+            "job_id": runtime.container.application.ingestion.enqueue_sync(
+                runtime.context, selected
+            ),
+        }
     if selected in _enabled_filesystem_sources(runtime):
-        return runtime.container.application.ingestion.sync_filesystem(runtime.context, selected, dry_run=dry_run)
+        return runtime.container.application.ingestion.sync_filesystem(
+            runtime.context, selected, dry_run=dry_run
+        )
     if dry_run:
         raise ValidationError("--dry-run is currently supported only for filesystem sources")
     if selected == "slack":
@@ -304,7 +338,10 @@ def _sync_one(
 @app.command()
 def capabilities(ctx: typer.Context) -> None:
     """Report available parsers, connectors, projections, and edge adapters."""
-    _run(ctx, lambda runtime: runtime.container.application.operations.capabilities())
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.operations.capabilities(runtime.context),
+    )
 
 
 @app.command()
@@ -312,9 +349,7 @@ def status(ctx: typer.Context) -> None:
     """Report canonical and projection counts."""
     _run(
         ctx,
-        lambda runtime: runtime.container.application.operations.status(
-            runtime.context
-        ),
+        lambda runtime: runtime.container.application.operations.status(runtime.context),
     )
 
 
@@ -324,7 +359,7 @@ def doctor(ctx: typer.Context) -> None:
 
     def action(runtime: Runtime) -> Any:
         settings = runtime.container.settings
-        capabilities = runtime.container.application.operations.capabilities()
+        capabilities = runtime.container.application.operations.capabilities(runtime.context)
         checks: list[dict[str, Any]] = []
         checks.append(
             {
@@ -389,11 +424,17 @@ def search(
     query: str | None = typer.Argument(None),
     query_option: str | None = typer.Option(None, "--query"),
     limit: int = typer.Option(10, min=1, max=100),
+    mode: str | None = typer.Option(None, "--mode"),
     source_kind: list[str] | None = typer.Option(None, "--source-kind"),
     document_type: list[str] | None = typer.Option(None, "--document-type"),
     project_id: list[str] | None = typer.Option(None, "--project-id"),
+    include_candidate_assertions: bool = typer.Option(
+        False,
+        "--include-candidate-assertions",
+    ),
 ) -> None:
     """Search exact identifiers and lexical evidence units."""
+
     def action(runtime: Runtime) -> Any:
         selected_query = query_option or query
         if not selected_query:
@@ -401,11 +442,14 @@ def search(
         request = SearchRequest(
             query=selected_query,
             limit=limit,
+            mode=_validated_search_mode(mode),
             source_kinds=_split_values(source_kind),
             document_types=_split_values(document_type),
             project_ids=_split_values(project_id),
+            include_candidate_assertions=include_candidate_assertions,
         )
         return runtime.container.application.retrieval.search(runtime.context, request)
+
     _run(ctx, action)
 
 
@@ -417,6 +461,7 @@ def vocab(
     limit: int = typer.Option(20, min=1, max=100),
 ) -> None:
     """Inspect terms that actually exist in the lexical projection."""
+
     def action(runtime: Runtime) -> Any:
         selected = term or prefix
         if not selected:
@@ -433,9 +478,17 @@ def context_command(
     query_option: str | None = typer.Option(None, "--query"),
     limit: int = typer.Option(5, min=1, max=30),
     max_chars: int = typer.Option(40000, min=1000, max=200000),
+    mode: str | None = typer.Option(None, "--mode"),
     source_kind: list[str] | None = typer.Option(None, "--source-kind"),
+    document_type: list[str] | None = typer.Option(None, "--document-type"),
+    project_id: list[str] | None = typer.Option(None, "--project-id"),
+    include_candidate_assertions: bool = typer.Option(
+        False,
+        "--include-candidate-assertions",
+    ),
 ) -> None:
     """Build a bounded evidence bundle for an AI agent or application."""
+
     def action(runtime: Runtime) -> Any:
         selected_query = query_option or query
         if not selected_query:
@@ -444,9 +497,14 @@ def context_command(
             query=selected_query,
             limit=limit,
             max_chars=max_chars,
+            mode=_validated_search_mode(mode),
             source_kinds=_split_values(source_kind),
+            document_types=_split_values(document_type),
+            project_ids=_split_values(project_id),
+            include_candidate_assertions=include_candidate_assertions,
         )
         return runtime.container.application.retrieval.context_bundle(runtime.context, request)
+
     _run(ctx, action)
 
 
@@ -457,6 +515,14 @@ def answer(
     query_option: str | None = typer.Option(None, "--query"),
     limit: int = typer.Option(5, min=1, max=20),
     max_chars: int = typer.Option(12000, min=1000, max=40000),
+    mode: str | None = typer.Option(None, "--mode"),
+    source_kind: list[str] | None = typer.Option(None, "--source-kind"),
+    document_type: list[str] | None = typer.Option(None, "--document-type"),
+    project_id: list[str] | None = typer.Option(None, "--project-id"),
+    include_candidate_assertions: bool = typer.Option(
+        False,
+        "--include-candidate-assertions",
+    ),
 ) -> None:
     def action(runtime: Runtime) -> Any:
         selected_query = query_option or query
@@ -464,7 +530,16 @@ def answer(
             raise ValidationError("provide QUERY or --query")
         return runtime.container.application.answering.answer(
             runtime.context,
-            AnswerRequest(query=selected_query, limit=limit, max_chars=max_chars),
+            AnswerRequest(
+                query=selected_query,
+                limit=limit,
+                max_chars=max_chars,
+                mode=_validated_search_mode(mode),
+                source_kinds=_split_values(source_kind),
+                document_types=_split_values(document_type),
+                project_ids=_split_values(project_id),
+                include_candidate_assertions=include_candidate_assertions,
+            ),
         )
 
     _run(ctx, action)
@@ -537,7 +612,12 @@ def get_assertion(ctx: typer.Context, assertion_id: str = typer.Argument(...)) -
 @app.command()
 def explain(ctx: typer.Context, assertion_id: str = typer.Option(..., "--assertion-id")) -> None:
     """Explain an approved assertion with its exact evidence units."""
-    _run(ctx, lambda runtime: runtime.container.application.knowledge.explain_assertion(runtime.context, assertion_id))
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.knowledge.explain_assertion(
+            runtime.context, assertion_id
+        ),
+    )
 
 
 @sync_app.command("all")
@@ -552,7 +632,9 @@ def sync_all(
 @sync_app.command("run")
 def sync_run(
     ctx: typer.Context,
-    source: str = typer.Option(..., "--source", help="Configured source name, nas, slack, mail, or all"),
+    source: str = typer.Option(
+        ..., "--source", help="Configured source name, nas, slack, mail, or all"
+    ),
     mode: str = typer.Option("incremental", "--mode", help="Starter supports incremental mode"),
     since: str | None = typer.Option(None, "--since", help="Optional Slack oldest timestamp"),
     enqueue: bool = typer.Option(False, "--enqueue"),
@@ -576,7 +658,9 @@ def sync_filesystem(
     ctx: typer.Context,
     source: str = typer.Option(..., "--source"),
     dry_run: bool = typer.Option(False, "--dry-run"),
-    enqueue: bool = typer.Option(False, "--enqueue", help="Create a durable worker job instead of running now"),
+    enqueue: bool = typer.Option(
+        False, "--enqueue", help="Create a durable worker job instead of running now"
+    ),
 ) -> None:
     _run(ctx, lambda runtime: _sync_one(runtime, source, enqueue=enqueue, dry_run=dry_run))
 
@@ -751,11 +835,11 @@ def review_propose(
             confidence=confidence,
             ontology_version=ontology_version,
             evidence=[
-                CandidateEvidence(content_unit_id=value)
-                for value in (evidence_unit_id or [])
+                CandidateEvidence(content_unit_id=value) for value in (evidence_unit_id or [])
             ],
         )
         return runtime.container.application.knowledge.create_candidate(runtime.context, candidate)
+
     _run(ctx, action)
 
 
@@ -765,7 +849,12 @@ def review_approve(
     candidate_id: str = typer.Argument(...),
     note: str | None = typer.Option(None),
 ) -> None:
-    _run(ctx, lambda runtime: runtime.container.application.knowledge.review_approve(runtime.context, candidate_id, note))
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.knowledge.review_approve(
+            runtime.context, candidate_id, note
+        ),
+    )
 
 
 @review_app.command("reject")
@@ -774,7 +863,12 @@ def review_reject(
     candidate_id: str = typer.Argument(...),
     note: str | None = typer.Option(None),
 ) -> None:
-    _run(ctx, lambda runtime: runtime.container.application.knowledge.review_reject(runtime.context, candidate_id, note))
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.knowledge.review_reject(
+            runtime.context, candidate_id, note
+        ),
+    )
 
 
 @jobs_app.command("list")
@@ -837,7 +931,9 @@ def projection_rebuild(
             )
             return {"projection": name, "job_id": job_id}
         if name in {"semantic", "vector"}:
-            return runtime.container.application.retrieval.rebuild_semantic_projection(runtime.context)
+            return runtime.container.application.retrieval.rebuild_semantic_projection(
+                runtime.context
+            )
         return runtime.container.application.operations.rebuild_projection(
             runtime.context,
             name,
@@ -869,7 +965,9 @@ def projection_verify(ctx: typer.Context, name: str = typer.Option("lexical", "-
                 "note": "the baseline queries canonical PostgreSQL assertions directly",
             }
         if name in {"semantic", "vector"}:
-            return runtime.container.application.retrieval.verify_semantic_projection(runtime.context)
+            return runtime.container.application.retrieval.verify_semantic_projection(
+                runtime.context
+            )
         raise ValidationError(f"unsupported projection verification: {name}")
 
     _run(ctx, action)
@@ -901,7 +999,9 @@ def projection_activate(
             configuration=runtime.container.settings.raw,
             code_root=runtime.container.settings.project_root,
         )
-        space = runtime.container.application.retrieval.activate_semantic_projection(runtime.context)
+        space = runtime.container.application.retrieval.activate_semantic_projection(
+            runtime.context
+        )
         return {
             "projection": "semantic",
             "status": space.status,
@@ -932,7 +1032,9 @@ def rebuild(
             )
             return {"projection": projection, "job_id": job_id}
         if projection in {"semantic", "vector"}:
-            return runtime.container.application.retrieval.rebuild_semantic_projection(runtime.context)
+            return runtime.container.application.retrieval.rebuild_semantic_projection(
+                runtime.context
+            )
         return runtime.container.application.operations.rebuild_projection(
             runtime.context,
             projection,
@@ -1013,9 +1115,7 @@ def evaluate_run(
                         update={
                             "metadata": {
                                 **hit.metadata,
-                                "source_changed_since_index": (
-                                    evidence.source_changed_since_index
-                                ),
+                                "source_changed_since_index": (evidence.source_changed_since_index),
                             }
                         },
                         deep=True,
@@ -1033,7 +1133,7 @@ def evaluate_run(
             code_root=runtime.container.settings.project_root,
             review_bundle=load_review_bundle(reviews) if reviews is not None else None,
             warmup_passes=warmup_passes,
-            enrich=enrich_case,
+            enrich=(enrich_case if requires_stale_enrichment(loaded) else None),
         )
         paths = write_report(report, output_dir)
         for variant, result in report["variants"].items():
@@ -1133,10 +1233,12 @@ def ontology_context(
 ) -> None:
     _run(
         ctx,
-        lambda runtime: runtime.container.application.ontology_context.build(
-            runtime.context,
-            query,
-        ).context,
+        lambda runtime: (
+            runtime.container.application.ontology_context.build(
+                runtime.context,
+                query,
+            ).context
+        ),
     )
 
 
@@ -1321,11 +1423,7 @@ def telemetry_traces(
 @telemetry_app.command("prune")
 def telemetry_prune(ctx: typer.Context) -> None:
     def action(runtime: Runtime) -> Any:
-        return {
-            "deleted": runtime.container.application.telemetry.prune(
-                runtime.context
-            )
-        }
+        return {"deleted": runtime.container.application.telemetry.prune(runtime.context)}
 
     _run(ctx, action)
 
@@ -1375,7 +1473,7 @@ def interaction_clarify(
                     "allow_freeform": allow_freeform,
                     "allow_multiple": allow_multiple,
                     "preference_key": preference_key,
-                }
+                },
             ),
         )
 
@@ -1475,7 +1573,7 @@ def interaction_feedback(
                     "request_id": request_id,
                     "outcome": outcome,
                     "reason_codes": reason_code or [],
-                }
+                },
             ),
         ),
     )
@@ -1517,7 +1615,7 @@ def ontology_discovery_propose(
                     "definition": definition,
                     "target_symbol": target_symbol,
                     "confirmed": True,
-                }
+                },
             ),
         )
 
@@ -1532,10 +1630,12 @@ def ontology_discovery_list(
 ) -> None:
     _run(
         ctx,
-        lambda runtime: runtime.container.application.interactions.list_ontology_discovery_candidates(
-            runtime.context,
-            status=status,
-            limit=limit,
+        lambda runtime: (
+            runtime.container.application.interactions.list_ontology_discovery_candidates(
+                runtime.context,
+                status=status,
+                limit=limit,
+            )
         ),
     )
 
@@ -1549,13 +1649,15 @@ def ontology_discovery_review(
 ) -> None:
     _run(
         ctx,
-        lambda runtime: runtime.container.application.interactions.review_ontology_discovery_candidate(
-            runtime.context,
-            candidate_id,
-            _validated_interaction_input(
-                OntologyDiscoveryReview,
-                {"action": action, "note": note},
-            ),
+        lambda runtime: (
+            runtime.container.application.interactions.review_ontology_discovery_candidate(
+                runtime.context,
+                candidate_id,
+                _validated_interaction_input(
+                    OntologyDiscoveryReview,
+                    {"action": action, "note": note},
+                ),
+            )
         ),
     )
 

@@ -82,6 +82,8 @@ rerank_candidate_limit = 40
 lexical_rerank_enabled = true
 lexical_rerank_candidate_limit = 40
 rrf_rank_constant = 60
+hnsw_ef_search = 200
+hnsw_max_scan_tuples = 100000
 
 [models.embedding]
 enabled = false
@@ -90,16 +92,16 @@ model = "kip-qwen3-embedding-0.6b"
 revision = "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
 dimensions = 1024
 batch_size = 4
+max_document_chars = 4000
 timeout_seconds = 120
 query_instruction = "Retrieve relevant Korean evidence for this query: "
 space_name = "qwen3-embedding-0.6b-1024"
 
 [models.reranker]
 enabled = true
-backend = "bm25"  # promoted 2026-08-11 on the reviewed NL set; rapidfuzz remains the fallback backend
+backend = "bm25"
 max_document_chars = 8000
 baseline_weight = 0.15
-# backend = "bm25"   # candidate-local Okapi BM25 shadow candidate (no model)
 # bm25_k1 = 1.2
 # bm25_b = 0.75
 base_url = "http://127.0.0.1:7997"

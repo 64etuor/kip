@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from kip.adapters.repository.postgres.database import PostgresDatabase
+from kip.adapters.repository.postgres.semantic_projection import (
+    PostgresSemanticProjectionStore,
+)
+from kip.domain.embedding import EmbeddingProjectionProgress
 from kip.domain.json_types import JsonObject
 from kip.domain.models import (
     ContentUnit,
@@ -20,6 +24,14 @@ from kip.domain.models import (
 @dataclass(frozen=True, slots=True)
 class PostgresRetrievalStore:
     database: PostgresDatabase
+    semantic_projection: PostgresSemanticProjectionStore = field(init=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "semantic_projection",
+            PostgresSemanticProjectionStore(self.database),
+        )
 
     def search(
         self,
@@ -34,6 +46,26 @@ class PostgresRetrievalStore:
         context: RequestContext,
     ) -> list[EmbeddableUnit]:
         return self.database.list_embeddable_units(context)
+
+    def list_pending_embeddable_units(
+        self,
+        context: RequestContext,
+        space_id: str,
+    ) -> list[EmbeddableUnit]:
+        return self.semantic_projection.list_pending_embeddable_units(
+            context,
+            space_id,
+        )
+
+    def embedding_projection_progress(
+        self,
+        context: RequestContext,
+        space_id: str | None,
+    ) -> EmbeddingProjectionProgress:
+        return self.semantic_projection.embedding_projection_progress(
+            context,
+            space_id,
+        )
 
     def save_embedding_space(
         self,

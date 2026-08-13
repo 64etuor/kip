@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
+from kip.application.semantic import SemanticProjectionUseCases
 from kip.domain.json_types import JsonObject
 from kip.domain.models import (
     Capabilities,
@@ -50,29 +52,74 @@ class OperationsUseCases:
         return RequestContext(
             workspace=selected_workspace,
             principal_id=principal_id,
-            acl_scopes=acl_scopes or [f"workspace:{selected_workspace}"],
+            acl_scopes=(
+                acl_scopes
+                if acl_scopes is not None
+                else [f"workspace:{selected_workspace}"]
+            ),
             roles=list(dict.fromkeys(roles or [])),
             request_id=request_id or new_id("req"),
         )
 
-    def capabilities(self) -> Capabilities:
+    def capabilities(
+        self,
+        context: RequestContext | None = None,
+    ) -> Capabilities:
         warnings: list[str] = []
         if self._settings.database_url.startswith("memory://"):
             warnings.append(
                 "memory repository is non-durable and intended only for tests or demos"
             )
-        semantic_enabled = bool(
+        semantic_configured = bool(
             self._settings.get("search.semantic_enabled", False)
         )
-        if semantic_enabled and self._embedding.name == "disabled":
+        selected_context = context or self.request_context()
+        projection_status: Literal[
+            "disabled",
+            "missing",
+            "shadow",
+            "active",
+            "stale",
+            "incompatible",
+        ] = "disabled"
+        semantic_ready = False
+        if semantic_configured and self._embedding.name != "disabled":
+            verification = SemanticProjectionUseCases(
+                self._settings,
+                self._retrieval_store,
+                self._embedding,
+            ).verify(selected_context)
+            raw_status = str(verification.get("status", "missing"))
+            status_map: dict[
+                str,
+                Literal["missing", "shadow", "active", "incompatible"],
+            ] = {
+                "missing": "missing",
+                "shadow": "shadow",
+                "active": "active",
+            }
+            projection_status = status_map.get(raw_status, "incompatible")
+            if projection_status == "active" and verification.get("ok") is not True:
+                projection_status = "stale"
+            semantic_ready = (
+                projection_status == "active"
+                and verification.get("ok") is True
+                and verification.get("active") is True
+            )
+        if semantic_configured and self._embedding.name == "disabled":
             warnings.append(
                 "semantic search is enabled but no embedding adapter is configured"
+            )
+        elif semantic_configured and not semantic_ready:
+            warnings.append(
+                "semantic search is configured but no compatible complete active space is ready"
             )
         return Capabilities(
             repository=self._store.name,
             lexical_search=True,
-            semantic_search=semantic_enabled
-            and self._embedding.name != "disabled",
+            semantic_search=semantic_ready,
+            semantic_search_configured=semantic_configured,
+            semantic_projection_status=projection_status,
             graph_backend=str(self._settings.get("graph.backend", "postgres")),
             api=True,
             mcp=True,

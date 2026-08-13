@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Protocol
 
+from kip.domain.embedding import EmbeddingProjectionProgress
 from kip.domain.json_types import JsonObject
 from kip.domain.models import (
     ContentUnit,
@@ -25,6 +26,18 @@ class RetrievalStore(Protocol):
     ) -> list[SearchHit]: ...
 
     def list_embeddable_units(self, context: RequestContext) -> list[EmbeddableUnit]: ...
+
+    def list_pending_embeddable_units(
+        self,
+        context: RequestContext,
+        space_id: str,
+    ) -> list[EmbeddableUnit]: ...
+
+    def embedding_projection_progress(
+        self,
+        context: RequestContext,
+        space_id: str | None,
+    ) -> EmbeddingProjectionProgress: ...
 
     def save_embedding_space(
         self,

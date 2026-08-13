@@ -7,6 +7,7 @@ from kip.adapters.repository.memory.evidence import MemoryEvidenceStore
 from kip.adapters.repository.memory.lexical import MemoryLexicalStore
 from kip.adapters.repository.memory.semantic import MemorySemanticStore
 from kip.adapters.repository.memory.state import MemoryState
+from kip.domain.embedding import EmbeddingProjectionProgress
 from kip.domain.json_types import JsonObject
 from kip.domain.models import (
     ContentUnit,
@@ -45,6 +46,42 @@ class MemoryRetrievalStore:
         context: RequestContext,
     ) -> list[EmbeddableUnit]:
         return self.lexical.list_embeddable_units(context)
+
+    def list_pending_embeddable_units(
+        self,
+        context: RequestContext,
+        space_id: str,
+    ) -> list[EmbeddableUnit]:
+        units = self.list_embeddable_units(context)
+        return [
+            unit
+            for unit in units
+            if (
+                (record := self.state.embeddings.get((space_id, unit.unit_id)))
+                is None
+                or record.source_hash != unit.source_hash
+            )
+        ]
+
+    def embedding_projection_progress(
+        self,
+        context: RequestContext,
+        space_id: str | None,
+    ) -> EmbeddingProjectionProgress:
+        units = self.list_embeddable_units(context)
+        indexed = sum(
+            1
+            for unit in units
+            if (
+                record := self.state.embeddings.get((space_id or "", unit.unit_id))
+            )
+            is not None
+            and record.source_hash == unit.source_hash
+        )
+        return EmbeddingProjectionProgress(
+            content_units=len(units),
+            indexed_units=indexed,
+        )
 
     def save_embedding_space(
         self,

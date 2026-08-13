@@ -6,16 +6,50 @@ from typing import Final
 from pydantic import TypeAdapter
 
 from kip.domain.json_types import JsonObject
-from kip.domain.models import EmbeddingRecord, EmbeddingSpace, RequestContext
+from kip.domain.models import (
+    EmbeddableUnit,
+    EmbeddingRecord,
+    EmbeddingSpace,
+    RequestContext,
+)
 from kip.errors import ConfigurationError, ConflictError, DependencyUnavailableError
 from kip.ids import stable_id
 from kip.ports.embedding import EmbeddingPort
-from kip.ports.operations import OperationsStore
 from kip.ports.retrieval import RetrievalStore
 from kip.settings import Settings
 
-_INT_MAP: Final = TypeAdapter(dict[str, int])
 _STR_MAP: Final = TypeAdapter(dict[str, str])
+_DOCUMENT_PROJECTION: Final = "head_tail_v1"
+_TRUNCATION_MARKER: Final = "\n…\n"
+
+
+def _embedding_text(unit: EmbeddableUnit, max_chars: int) -> str:
+    title = unit.title.strip()
+    prefix = f"{title}\n" if title else ""
+    if len(prefix) >= max_chars:
+        return prefix[:max_chars]
+    body_budget = max_chars - len(prefix)
+    body = unit.body_normalized
+    if len(body) <= body_budget:
+        return prefix + body
+    if body_budget <= len(_TRUNCATION_MARKER):
+        return prefix + body[:body_budget]
+    sampled_chars = body_budget - len(_TRUNCATION_MARKER)
+    head_chars = (sampled_chars + 1) // 2
+    tail_chars = sampled_chars - head_chars
+    tail = body[-tail_chars:] if tail_chars else ""
+    return (
+        prefix
+        + body[:head_chars]
+        + _TRUNCATION_MARKER
+        + tail
+    )
+
+
+def _embedding_input_length(unit: EmbeddableUnit, max_chars: int) -> int:
+    title_chars = len(unit.title.strip())
+    separator_chars = 1 if title_chars else 0
+    return min(title_chars + separator_chars + len(unit.body_normalized), max_chars)
 
 
 class SemanticProjectionUseCases:
@@ -23,22 +57,28 @@ class SemanticProjectionUseCases:
         self,
         settings: Settings,
         store: RetrievalStore,
-        operations: OperationsStore,
         embedding: EmbeddingPort,
     ) -> None:
         self._settings = settings
         self._store = store
-        self._operations = operations
         self._embedding = embedding
 
     def embedding_space(self, context: RequestContext) -> EmbeddingSpace:
         configured = dict(self._settings.get("models.embedding", {}) or {})
-        space_name = str(
+        base_space_name = str(
             configured.get("space_name")
             or f"{self._embedding.model}-{self._embedding.revision}-"
             f"{self._embedding.dimensions}"
         )
-        configuration: dict[str, str] = {"space_name": space_name}
+        max_document_chars = self._max_document_chars()
+        space_name = (
+            f"{base_space_name}-c{max_document_chars}-ht1"
+        )
+        configuration: dict[str, str] = {
+            "space_name": space_name,
+            "max_document_chars": str(max_document_chars),
+            "document_projection": _DOCUMENT_PROJECTION,
+        }
         if configured.get("document_instruction"):
             configuration["document_instruction"] = str(
                 configured["document_instruction"]
@@ -80,15 +120,20 @@ class SemanticProjectionUseCases:
             context,
             self.embedding_space(context),
         )
-        units = self._store.list_embeddable_units(context)
+        units = self._store.list_pending_embeddable_units(context, space.id)
         batch_size = int(self._settings.get("models.embedding.batch_size", 16))
-        indexed = 0
+        max_document_chars = self._max_document_chars()
+        units.sort(
+            key=lambda unit: (
+                _embedding_input_length(unit, max_document_chars),
+                unit.unit_id,
+            )
+        )
+        newly_indexed = 0
         for offset in range(0, len(units), batch_size):
             batch = units[offset : offset + batch_size]
             texts = [
-                "\n".join(
-                    part for part in (unit.title, unit.body_normalized) if part
-                )
+                _embedding_text(unit, max_document_chars)
                 for unit in batch
             ]
             embeddings = self._embedding.embed_documents(texts)
@@ -96,7 +141,7 @@ class SemanticProjectionUseCases:
                 raise DependencyUnavailableError(
                     "embedding response count does not match semantic rebuild batch"
                 )
-            indexed += self._store.upsert_embeddings(
+            newly_indexed += self._store.upsert_embeddings(
                 context,
                 space.id,
                 [
@@ -108,6 +153,7 @@ class SemanticProjectionUseCases:
                     for unit, embedding in zip(batch, embeddings, strict=True)
                 ],
             )
+        progress = self._store.embedding_projection_progress(context, space.id)
         return {
             "projection": "semantic",
             "status": "shadow",
@@ -116,10 +162,21 @@ class SemanticProjectionUseCases:
             "model": space.model,
             "revision": space.revision,
             "dimensions": space.dimensions,
-            "indexed_units": indexed,
-            "content_units": len(units),
-            "in_sync": indexed == len(units),
+            "indexed_units": progress.indexed_units,
+            "content_units": progress.content_units,
+            "newly_indexed_units": newly_indexed,
+            "in_sync": progress.indexed_units == progress.content_units,
         }
+
+    def _max_document_chars(self) -> int:
+        configured = int(
+            self._settings.get("models.embedding.max_document_chars", 4000)
+        )
+        if configured < 1:
+            raise ConfigurationError(
+                "embedding max_document_chars must be positive"
+            )
+        return configured
 
     def activate(
         self,
@@ -141,34 +198,36 @@ class SemanticProjectionUseCases:
         *,
         space_id: str | None = None,
     ) -> JsonObject:
-        content_units = self._operations.status(context).content_units
-        if self._embedding.name == "disabled" and space_id is None:
+        selected = space_id
+        if selected is None and self._embedding.name != "disabled":
+            selected = self.embedding_space(context).id
+        progress = self._store.embedding_projection_progress(context, selected)
+        if selected is None:
             return {
                 "projection": "semantic",
                 "ok": False,
                 "status": "disabled",
                 "space_id": None,
                 "indexed_units": 0,
-                "content_units": content_units,
+                "content_units": progress.content_units,
             }
-        selected = space_id or self.embedding_space(context).id
         semantic = self._store.semantic_status(context)
-        vector_counts = _INT_MAP.validate_python(
-            semantic.get("space_vectors", {})
-        )
         space_statuses = _STR_MAP.validate_python(
             semantic.get("space_status", {})
         )
-        indexed = vector_counts.get(selected, 0)
+        indexed = progress.indexed_units
         status = space_statuses.get(selected, "missing")
         return {
             "projection": "semantic",
-            "ok": status in {"shadow", "active"} and indexed == content_units,
+            "ok": (
+                status in {"shadow", "active"}
+                and indexed == progress.content_units
+            ),
             "status": status,
             "space_id": selected,
             "indexed_units": indexed,
-            "content_units": content_units,
-            "in_sync": indexed == content_units,
+            "content_units": progress.content_units,
+            "in_sync": indexed == progress.content_units,
             "active": status == "active",
         }
 

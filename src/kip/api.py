@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hmac
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
@@ -43,7 +43,7 @@ from kip.ids import new_id
 from kip.settings import Settings
 
 
-def _serializable_errors(errors: list[Any]) -> list[dict[str, Any]]:
+def _serializable_errors(errors: Sequence[Any]) -> list[dict[str, Any]]:
     """Strip values pydantic cannot JSON-encode from validation errors.
 
     Custom field validators put the raising exception object in `ctx`, and
@@ -55,11 +55,7 @@ def _serializable_errors(errors: list[Any]) -> list[dict[str, Any]]:
         if not isinstance(error, dict):
             cleaned.append({"msg": str(error)})
             continue
-        item = {
-            key: value
-            for key, value in error.items()
-            if key not in {"ctx", "input", "url"}
-        }
+        item = {key: value for key, value in error.items() if key not in {"ctx", "input", "url"}}
         context = error.get("ctx")
         if isinstance(context, dict):
             item["ctx"] = {key: str(value) for key, value in context.items()}
@@ -83,15 +79,21 @@ def create_app(container: Container | None = None) -> FastAPI:
     ) -> Response:
         length = request.headers.get("content-length")
         if length and int(length) > selected.settings.max_request_bytes:
-            return JSONResponse(status_code=413, content={"detail": "request body exceeds configured limit"})
+            return JSONResponse(
+                status_code=413, content={"detail": "request body exceeds configured limit"}
+            )
         return await call_next(request)
 
-    def error_envelope(request: Request, code: str, message: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
+    def error_envelope(
+        request: Request, code: str, message: str, details: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         context = _error_context(selected, request)
         return Envelope(
             ok=False,
             error=ErrorInfo(code=code, message=message, details=details or {}),
-            meta=EnvelopeMeta(request_id=context.request_id or new_id("req"), workspace=context.workspace),
+            meta=EnvelopeMeta(
+                request_id=context.request_id or new_id("req"), workspace=context.workspace
+            ),
         ).model_dump(mode="json")
 
     @app.exception_handler(HTTPException)
@@ -132,7 +134,9 @@ def create_app(container: Container | None = None) -> FastAPI:
         envelope = Envelope(
             ok=False,
             error=ErrorInfo(code=error_code(exc), message=str(exc)),
-            meta=EnvelopeMeta(request_id=context.request_id or new_id("req"), workspace=context.workspace),
+            meta=EnvelopeMeta(
+                request_id=context.request_id or new_id("req"), workspace=context.workspace
+            ),
         )
         return JSONResponse(
             status_code=http_status(exc),
@@ -205,7 +209,9 @@ def create_app(container: Container | None = None) -> FastAPI:
         return Envelope(
             ok=True,
             data=data.model_dump(mode="json") if hasattr(data, "model_dump") else data,
-            meta=EnvelopeMeta(request_id=context.request_id or new_id("req"), workspace=context.workspace),
+            meta=EnvelopeMeta(
+                request_id=context.request_id or new_id("req"), workspace=context.workspace
+            ),
         )
 
     @app.get("/healthz")
@@ -216,7 +222,7 @@ def create_app(container: Container | None = None) -> FastAPI:
     def capabilities(
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
-        return ok(selected.application.operations.capabilities(), context)
+        return ok(selected.application.operations.capabilities(context), context)
 
     @app.get("/v1/status", response_model=Envelope)
     def status(
@@ -331,7 +337,9 @@ def create_app(container: Container | None = None) -> FastAPI:
         data = (
             {"job_id": selected.application.ingestion.enqueue_sync(context, source_name)}
             if enqueue
-            else selected.application.ingestion.sync_filesystem(context, source_name, dry_run=dry_run)
+            else selected.application.ingestion.sync_filesystem(
+                context, source_name, dry_run=dry_run
+            )
         )
         return ok(data, context)
 
@@ -340,7 +348,13 @@ def create_app(container: Container | None = None) -> FastAPI:
         source_name: str,
         context: RequestContext = Depends(admin_context),
     ) -> Envelope:
-        return ok({"source": source_name, "job_id": selected.application.ingestion.enqueue_sync(context, source_name)}, context)
+        return ok(
+            {
+                "source": source_name,
+                "job_id": selected.application.ingestion.enqueue_sync(context, source_name),
+            },
+            context,
+        )
 
     @app.get("/v1/jobs", response_model=Envelope)
     def jobs(
@@ -647,7 +661,9 @@ def create_app(container: Container | None = None) -> FastAPI:
         note: str | None = None,
         context: RequestContext = Depends(admin_context),
     ) -> Envelope:
-        return ok(selected.application.knowledge.review_approve(context, candidate_id, note), context)
+        return ok(
+            selected.application.knowledge.review_approve(context, candidate_id, note), context
+        )
 
     @app.post("/v1/review/candidates/{candidate_id}/reject", response_model=Envelope)
     def reject(
@@ -655,7 +671,9 @@ def create_app(container: Container | None = None) -> FastAPI:
         note: str | None = None,
         context: RequestContext = Depends(admin_context),
     ) -> Envelope:
-        return ok(selected.application.knowledge.review_reject(context, candidate_id, note), context)
+        return ok(
+            selected.application.knowledge.review_reject(context, candidate_id, note), context
+        )
 
     return app
 

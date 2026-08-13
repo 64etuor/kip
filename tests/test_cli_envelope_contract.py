@@ -68,6 +68,7 @@ def test_rest_rejects_a_blank_query_with_a_serializable_envelope(test_container)
 def test_error_code_mapping_is_shared_across_edges():
     from pydantic import ValidationError as PydanticValidationError
 
+    from kip.domain.models import SearchRequest
     from kip.errors import (
         AuthorizationError,
         ConflictError,
@@ -76,7 +77,6 @@ def test_error_code_mapping_is_shared_across_edges():
         error_code,
         http_status,
     )
-    from kip.domain.models import SearchRequest
 
     assert error_code(NotFoundError("x")) == "not_found"
     assert error_code(ConflictError("x")) == "conflict"

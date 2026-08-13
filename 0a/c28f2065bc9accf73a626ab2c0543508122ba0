@@ -1,0 +1,21 @@
+docs/plans/2026-08-14-korean-ocr-design.md
+  s_0a82dff8111859::t_205b1dee0e386b 1-56
+docs/plans/2026-08-14-korean-ocr.md
+  s_0a82dff8111859::t_205b1dee0e386b 1-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "0ac28f2065bc9accf73a626ab2c0543508122ba0",
+  "prompts": {},
+  "sessions": {
+    "s_0a82dff8111859": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ffab6-fa6b-7b01-a65b-c23d6e5b4a2a",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

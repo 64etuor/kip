@@ -1839,7 +1839,7 @@ Weight는 fixture 평가로 조정한다.
 | Adapter | Strength | Role |
 |---|---|---|
 | `hwp-hwpx-parser` | pure Python, light dependency, tables/notes/memos | measured reference primary |
-| `kordoc` | HWP3/HWP5/HWPX, PDF/Office, structured blocks, broad coverage | installed, disabled-by-default command fallback |
+| `kordoc` | HWP3/HWP5/HWPX, PDF/Office, structured blocks, broad coverage | default PDF/PPTX OCR runtime; disabled HWP command fallback |
 | `unhwp` | Rust, HWP5/HWPX, structured Markdown/JSON, streaming | optional command fallback |
 | paired PDF | page locator and visual fallback | evidence fallback |
 
@@ -1946,25 +1946,72 @@ HWP parser 구조와 paired PDF 페이지를 매핑할 수 있으면 dual locato
 
 다음 중 하나면 OCR candidate다.
 
-- page text chars below threshold
-- image coverage above threshold
-- text object absent
-- parser reports image-only
-- expected language ratio abnormal
+- whitespace를 제외한 text character가 20개 미만
+- private-use character 비율이 20% 이상
+- C0/C1 control character 비율이 5% 이상
+- Unicode replacement character 비율이 5% 이상
 
-### 19.3 Derived OCR artifact
+### 19.3 Korean OCR candidate enrichment
 
-OCR은 원본을 수정하지 않는다.
+OCR은 원본을 수정하거나 native unit을 대체하지 않는다. 활성화된 경우
+`PdfParser`가 후보가 하나 이상인 원본 PDF를 Kordoc 4.7.3 PP-OCRv5 Korean
+adapter에 한 번 전달한다. 후보 page의 non-empty text/table block만
+`pdf_ocr` unit으로 추가하며 page와 pixel bbox를 보존한다. Kordoc의 image
+reference block은 lexical evidence가 아니므로 제외한다.
 
 ```text
-Original PDF artifact
-  └─ Derived OCR artifact
-       └─ OCR extraction
+Original PDF artifact (read-only)
+  └─ immutable composite ExtractionRun
+       ├─ pdf_page units (PyMuPDF)
+       └─ pdf_ocr units (Kordoc PP-OCRv5 Korean)
 ```
+
+`parser_name=pymupdf+kordoc-ppocrv5-korean`이 provenance를 기록한다. OCR
+failure와 low-confidence warning은 native page를 지우지 않고 extraction을
+`partial`로 만든다. Reference bootstrap과 production image는 Kordoc 4.7.3과
+SHA-256 검증된 PP-OCRv5 Korean cache를 설치하고, runtime registry는 executable과 별도
+`--version` probe가 모두 정확히 4.7.3인지 확인하며 `npm`/`npx` 실행을
+거부한다. Production은 사전 검증된 model cache와 `KORDOC_OFFLINE=1`을
+사용한다. 기존 설치의 사용자 `config/kip.toml`은 자동 변경하지 않는다.
 
 ### 19.4 Structured parser escalation
 
 표 또는 다단 layout이 검색/답변에 중요하면 후보 문서만 Docling 또는 동등 adapter로 재처리한다. 전체 corpus에 정밀 parser를 무조건 적용하지 않는다.
+
+### 19.5 PPTX structural extraction
+
+PPTX는 `python-pptx` object model과 read-only OOXML package scan을 결합한다.
+각 의미 있는 shape를 독립 `ContentUnit`으로 만들고 시각적 `top,left` 순서를
+검색용 reading order로 사용하되 원본 z-order는 별도 metadata로 보존한다.
+
+| Unit | Preserved structure |
+|---|---|
+| `pptx_text` | paragraph level, runs, bold/italic/font size, external hyperlink |
+| `pptx_table` | exact grid, row/column index, merge origin, row/column span |
+| `pptx_chart` | stored title, categories, series names and cached values |
+| `pptx_image` | filename, MIME type, SHA-256, byte size, alt text; image bytes are not copied into the unit |
+| `pptx_notes` | slide ID and speaker-notes text |
+| `pptx_comment` | legacy author, timestamp, comment index |
+| `pptx_diagram` | SmartArt diagram-data text and OOXML part path |
+
+Shape locators contain `slide`, `slide_id`, `shape_id`, `group_path`, and
+`bbox_emu`. Hidden slides remain searchable but carry `hidden_slide=true`.
+Malformed optional comment or diagram parts produce `partial` extraction and a
+`PARTIAL_PARSE` warning while valid primary slide content remains available.
+
+Default PPTX OCR walks pictures inside nested groups, skips images smaller
+than 96x48 pixels, deduplicates by source SHA-256, and enforces configurable
+image-count, per-image, and total-byte budgets. One Kordoc process receives the
+eligible batch. Each non-empty OCR block becomes a `pptx_ocr` unit for every
+source occurrence, preserving `slide`, `slide_id`, `shape_id`, `group_path`,
+`bbox_emu`, `ocr_bbox_px`, and `image_sha256`.
+
+The adapter never executes VBA, follows external relationships, recalculates
+linked data, expands embedded OLE/package objects, or transcribes embedded
+media. It records external, embedded-object, and unique media-part counts;
+omissions cause explicit `SKIPPED_OLE` or `SKIPPED_MEDIA` warnings. OCR is a
+default candidate enrichment in reference profiles; media transcription, modern
+threaded-comment support, and legacy binary `.ppt` require separate adapters.
 
 ---
 
@@ -2050,6 +2097,18 @@ ZIP-level parser가 읽는 파일:
 현재 deep reader는 별도 `--values` option 없이 formula workbook과
 data-only workbook을 모두 열어 각 cell의 `value`와 `cached_value`를 함께
 반환한다. `sheet`와 `range`는 필수이며 default preview mode는 없다.
+결과 matrix는 값이 없는 셀과 used-range 밖의 셀도 채워 요청 range와
+동일한 좌표·행·열 shape를 유지한다. Formula source는 `formula`,
+`formula_kind` (`normal`, `array`, `data_table`, `unknown`), `formula_ref`,
+`formula_attributes`로 분리하고 cached value로 source formula를 덮지 않는다.
+
+Python `date`, `datetime`, `time`은 ISO 8601 문자열, `timedelta`는 ISO 8601
+duration 문자열로 변환한다. 날짜/시간 계열은 원래 의미 확인을 위해
+`excel_serial`/`cached_excel_serial`과 `number_format`을 함께 반환한다.
+잘못된 OOXML numeric token이 non-finite float로 해석되면 JSON `null`로
+조용히 변환하지 않고 `NaN`, `Infinity`, `-Infinity` 문자열과
+`non_finite_number` type marker로 보존한다. `display_value`는 원본 형식을
+대체하지 않는 best-effort 표시 문자열이다.
 
 ### 20.6 Large sheet policy
 
@@ -2951,6 +3010,7 @@ I. Context pack with evidence metadata
 | PDF | exact page and adjacent context |
 | HWP | section/paragraph/table or paired PDF page |
 | XLSX | exact sheet/range typed read |
+| PPTX | exact slide/shape, speaker notes, comment, or OOXML diagram part |
 | Slack | message, thread root, selected surrounding replies |
 | Mail | exact message body/MIME part and thread headers |
 
@@ -3346,11 +3406,21 @@ Document/source/revision/raw 선택은 이 command의 public option이 아니다
 제약:
 
 - `sheet`와 `range`는 필수다. Range 없는 preview mode는 현재 없다.
-- row/column upper bound를 적용한다.
+- 정방향 range, Excel 최대 경계(`XFD1048576`), 요청당 100,000 cells
+  upper bound를 적용한다.
+- used range와 무관하게 요청한 직사각형 shape와 모든 cell coordinate를
+  반환한다.
 - formula와 cached calculated value를 구분한다.
+- normal/array/data-table formula source와 reference/attributes를 JSON-safe
+  metadata로 반환하며 formula engine을 실행하지 않는다.
 - merged cells, hidden rows/columns, filtered rows를 metadata로 반환한다.
+  `row_filtered=true`는 worksheet AutoFilter의 header 아래 범위 안에서
+  OOXML상 hidden인 row를 뜻한다.
 - 날짜 serial과 number format을 함께 반환하고 Python `date`, `datetime`,
-  `time` 값은 versioned envelope 경계에서 ISO 8601 JSON scalar로 직렬화한다.
+  `time` 값은 ISO 8601, `timedelta`는 ISO 8601 duration JSON scalar로
+  adapter boundary에서 직렬화한다.
+- non-finite numeric 값은 JSON null이 아니라 명시적인 문자열과 type
+  marker로 반환한다.
 
 ### 29.14 `graph`
 
@@ -4918,6 +4988,8 @@ stand for implicit accepted decisions.
 | ADR-034 | Promote the candidate-local BM25 reranker | Accepted |
 | ADR-035 | Version semantic inputs and resume projection rebuilds | Accepted |
 | ADR-036 | Fix retrieval stage order and gate corpus regressions | Accepted |
+| ADR-041 | Structured PPTX extraction preserves presentation evidence | Accepted |
+| ADR-042 | Korean OCR enriches candidate pages and presentation images | Accepted |
 
 ---
 

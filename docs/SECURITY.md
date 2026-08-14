@@ -10,6 +10,17 @@
 - The local model sidecar binds only to loopback and disables Infinity and
   Hugging Face telemetry in the provided launcher.
 
+## Spreadsheet parsing boundary
+
+- XLSX/XLSM deep reads open the source read-only, do not preserve VBA, disable
+  external-link loading, and never invoke a formula engine.
+- ZIP expansion limits are checked before parsing. Requested ranges must be
+  forward, remain inside Excel worksheet bounds, and contain no more than
+  100,000 cells so an exact-range request cannot create an unbounded response.
+- Formula objects and Python-native date/time/duration values are normalized at
+  the parser boundary before strict JSON validation. Cached formula values stay
+  explicitly labeled because they may be stale.
+
 ## Model egress
 
 - Source data classification is canonical ingestion state, not a request or
@@ -134,6 +145,17 @@
 - Reject path traversal and files outside configured roots.
 - Do not follow symlinks unless explicitly enabled.
 - Enforce file-size, ZIP entry-count, decompression-ratio, and timeout limits.
+- PPTX parsing reads OOXML locally, never executes VBA or fetches external
+  relationships, and records rather than expands embedded OLE/package objects.
+- Default PDF/PPTX OCR accepts only an installed Kordoc 4.7.3 binary with an
+  exact version probe. Bootstrap or the image-build stage is the only package
+  and model download boundary; runtime `npm`/`npx` execution is rejected,
+  production preloads SHA-256-verified PP-OCRv5 Korean files, and indexing sets
+  `KORDOC_OFFLINE=1`.
+- PPTX OCR writes selected image bytes only to a private temporary directory,
+  removes it after the batch, deduplicates by SHA-256, and enforces image count,
+  per-image bytes, total bytes, and minimum dimensions. OCR failure never
+  replaces native extraction or mutates a source file.
 - Store parser stderr as sanitized diagnostics, not as user-visible content.
 - Fetch public evaluation files only through the explicit government-host
   manifest, enforce the 25 MiB limit, PDF signature, and pinned SHA-256, and

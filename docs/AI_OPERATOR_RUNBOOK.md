@@ -49,7 +49,7 @@ name = "onedrive-personal"
 root = "/absolute/path/to/OneDrive-root"
 enabled = true
 read_only = true
-include_extensions = [".md", ".txt", ".pdf", ".xlsx", ".xlsm", ".hwp", ".hwpx", ".docx", ".csv"]
+include_extensions = [".md", ".txt", ".pdf", ".pptx", ".xlsx", ".xlsm", ".hwp", ".hwpx", ".docx", ".csv"]
 acl_scope = "workspace:default"
 ```
 
@@ -57,13 +57,13 @@ Use the actual local OneDrive root, not a path copied from another machine. Veri
 
 ```bash
 test -d "/absolute/path/to/OneDrive-root"
-find "/absolute/path/to/OneDrive-root" -type f \( -iname '*.hwp' -o -iname '*.hwpx' -o -iname '*.xlsx' -o -iname '*.xlsm' \) -print | head
+find "/absolute/path/to/OneDrive-root" -type f \( -iname '*.hwp' -o -iname '*.hwpx' -o -iname '*.pptx' -o -iname '*.xlsx' -o -iname '*.xlsm' \) -print | head
 ./scripts/kip doctor
 ```
 
 The current reference local profile uses the `onedrive-personal` source and excludes common generated/cache trees (`.Trash`, `.git`, `.omc`, `node_modules`, `__pycache__`, `.venv`, `build`, and `dist`). Keep the scope explicit when a different OneDrive folder is intended.
 
-For the first parser-focused audit, the local profile may intentionally narrow `include_extensions` to `.hwp`, `.hwpx`, `.xlsx`, `.xlsm`, and `.docx`. This keeps large unrelated Markdown/PDF/code trees from hiding format failures. Report the exact scope and counts; do not interpret a scoped cycle as full OneDrive coverage.
+For the first parser-focused audit, the local profile may intentionally narrow `include_extensions` to `.hwp`, `.hwpx`, `.pptx`, `.xlsx`, `.xlsm`, and `.docx`. This keeps large unrelated Markdown/PDF/code trees from hiding format failures. Report the exact scope and counts; do not interpret a scoped cycle as full OneDrive coverage.
 
 ## Semantic setup (optional but required for semantic RAG claims)
 
@@ -131,6 +131,22 @@ shadow pass and inspect every count and warning before the separate activation:
 Activation is document-atomic and rechecks source hash, revision, ACL,
 classification, and quality. It preserves the previous extraction and never
 writes to OneDrive.
+
+## Korean OCR validation
+
+Korean OCR is enabled in new reference installations. Run
+`./scripts/install-kordoc.sh`, confirm `./scripts/doctor.sh` passes and every
+PP-OCR file is `verified: true` in `./scripts/kordoc models --status`. The
+launcher indexes offline. Never configure `npm` or `npx` as the OCR command.
+Existing local configurations retain their current value until explicitly
+upgraded.
+
+Validate at least one image-only PDF and one screenshot-heavy PPTX through the
+normal sync/search path. Record native and OCR unit counts, page/slide/shape
+locators, OCR bounding boxes, warnings, elapsed time, and source SHA/mtime
+before and after. Treat `OCR_LOW_CONF` as a review requirement and compare
+material Korean claims to rendered ground truth; a non-empty OCR result alone
+is not a quality pass.
 
 ## Local lexical reranker comparison
 

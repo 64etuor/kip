@@ -1,6 +1,14 @@
 # syntax=docker/dockerfile:1.18@sha256:dabfc0969b935b2080555ace70ee69a5261af8a8f1b4df97b9e7fbcf6722eddf
 ARG BUILDKIT_SBOM_SCAN_STAGE=true
 ARG PYTHON_IMAGE=python:3.12-slim@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36
+ARG NODE_IMAGE=node:22-trixie-slim@sha256:db8a96a63e5264607ada2d206758876ebbed6a12be2ada7517793cbfb0c2a29c
+
+FROM ${NODE_IMAGE} AS kordoc
+ARG KORDOC_VERSION=4.7.3
+ENV KORDOC_MODEL_CACHE=/opt/kordoc-models
+RUN npm install --global --omit=dev "kordoc@${KORDOC_VERSION}" && \
+    test "$(kordoc --version)" = "$KORDOC_VERSION" && \
+    kordoc check-ocr-models
 
 FROM ${PYTHON_IMAGE} AS builder
 ARG BUILDKIT_SBOM_SCAN_STAGE=true
@@ -23,7 +31,10 @@ LABEL org.opencontainers.image.title="KIP Knowledge Fabric" \
       org.opencontainers.image.revision="${VCS_REF}" \
       org.opencontainers.image.source="${SOURCE_URL}" \
       org.opencontainers.image.licenses="MIT"
-ENV PATH=/opt/venv/bin:$PATH \
+ENV PATH=/app/scripts:/opt/venv/bin:$PATH \
+    KIP_KORDOC_PACKAGE_DIR=/opt/kordoc \
+    KORDOC_MODEL_CACHE=/opt/kordoc-models \
+    KORDOC_OFFLINE=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 RUN groupadd --system --gid 10001 kip && \
@@ -31,6 +42,9 @@ RUN groupadd --system --gid 10001 kip && \
     python -m venv /opt/venv
 WORKDIR /app
 COPY --from=builder /wheels /wheels
+COPY --from=kordoc /usr/local/bin/node /usr/local/bin/node
+COPY --from=kordoc /usr/local/lib/node_modules/kordoc /opt/kordoc
+COPY --from=kordoc /opt/kordoc-models /opt/kordoc-models
 RUN /opt/venv/bin/pip install --no-cache-dir --no-index /wheels/* && \
     rm -rf /wheels
 COPY config ./config

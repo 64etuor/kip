@@ -196,6 +196,49 @@ def _config_payload(plan: SetupPlan) -> dict[str, object]:
             "context_max_chars": 40000,
         },
         "models": {"generation": model},
+        "parsers": {
+            "parser_timeout_seconds": 120,
+            "minimum_quality_score": 0.70,
+            "shadow_parse_critical_documents": True,
+            "ocr": {
+                "timeout_seconds": 120,
+                "kordoc": {
+                    "enabled": True,
+                    "argv": ["kordoc", "--format", "json", "--ocr", "--silent"],
+                    "version_argv": ["kordoc", "--version"],
+                    "expected_version": "4.7.3",
+                },
+                "pptx": {
+                    "max_images": 128,
+                    "max_image_bytes": 20 * 1024 * 1024,
+                    "max_total_bytes": 100 * 1024 * 1024,
+                    "min_width_px": 96,
+                    "min_height_px": 48,
+                },
+            },
+            "hwp": {
+                "order": ["hwp-hwpx-parser", "kordoc", "unhwp", "paired_pdf"],
+                "hwp-hwpx-parser": {
+                    "enabled": True,
+                    "max_chars_per_unit": 4000,
+                },
+                "kordoc": {
+                    "enabled": False,
+                    "argv": ["kordoc", "{input}", "--format", "json"],
+                },
+                "unhwp": {
+                    "enabled": False,
+                    "argv": [
+                        "unhwp",
+                        "convert",
+                        "{input}",
+                        "-o",
+                        "{output_dir}",
+                        "--all",
+                    ],
+                },
+            },
+        },
         "sources": {"filesystem": sources},
         "operations": {
             "backup_path": "/var/lib/kip/backups",

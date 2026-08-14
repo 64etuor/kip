@@ -2,7 +2,7 @@ name: upstream-watch
 
 on:
   schedule:
-    - cron: "0 20 * * 1"
+    - cron: "0 0 * * *"
   workflow_dispatch:
 
 permissions:
@@ -25,33 +25,7 @@ jobs:
           set -euo pipefail
           report="$(mktemp)"
           trap 'rm -f "$report"' EXIT
-
-          current_kordoc="$(sed -nE 's/.*kordoc@([^" ]+).*/\1/p' config/kip.example.toml | head -1)"
-          latest_kordoc="$(curl --fail --silent --show-error --retry 3 https://registry.npmjs.org/kordoc/latest | jq -r '.version')"
-          if [[ -n "$current_kordoc" && "$current_kordoc" != "$latest_kordoc" ]]; then
-            printf -- "- \`kordoc\`: \`%s\` -> \`%s\`\n" "$current_kordoc" "$latest_kordoc" >> "$report"
-          fi
-
-          while IFS='|' read -r label repository pinned; do
-            latest="$(curl --fail --silent --show-error --retry 3 "https://huggingface.co/api/models/$repository" | jq -r '.sha')"
-            if [[ -n "$pinned" && "$pinned" != "$latest" ]]; then
-              printf -- "- \`%s\`: \`%s\` -> \`%s\`\n" "$label" "$pinned" "$latest" >> "$report"
-            fi
-          done < <(python - <<'PY'
-          pairs = (
-              ("Qwen/Qwen3-Embedding-0.6B", "KIP_EMBEDDING_REVISION"),
-              ("BAAI/bge-reranker-v2-m3", "KIP_RERANKER_REVISION"),
-          )
-          values = {}
-          with open(".env.example", encoding="utf-8") as stream:
-              for line in stream:
-                  key, separator, value = line.strip().partition("=")
-                  if separator:
-                      values[key] = value
-          for repository, key in pairs:
-              print(f"{repository}|{repository}|{values[key]}")
-          PY
-          )
+          ./scripts/check-upstream-updates.sh > "$report"
 
           marker="<!-- kip-upstream-watch -->"
           if [[ ! -s "$report" ]]; then

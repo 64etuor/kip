@@ -13,6 +13,7 @@ from kip.domain.knowledge import (
     EntityCandidate,
     RelationDerivation,
 )
+from kip.domain.xlsx import XlsxCell
 
 
 class StrictModel(BaseModel):
@@ -535,7 +536,7 @@ class XlsxRangeRead(StrictModel):
     source_uri: str
     sheet: str
     cell_range: str
-    cells: list[list[dict[str, Any]]]
+    cells: list[list[XlsxCell]]
     indexed_source_sha256: str
     current_source_sha256: str
     source_changed_since_index: bool

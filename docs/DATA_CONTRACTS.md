@@ -51,6 +51,32 @@ Channel ranks, `is_latest`, diversity backfill, and degradation markers live in
 metadata. Array order is result rank. The snippet and score remain discovery
 data, never final evidence.
 
+## XLSX exact-range boundary
+
+`XlsxRangeRead.cells` is a rectangular matrix of the generated `XlsxCell`
+contract. The matrix always has the same rows, columns, and coordinates as the
+requested range, including blank cells beyond the workbook's used range. A
+request must run from top-left to bottom-right, remain within `XFD1048576`, and
+contain at most 100,000 cells.
+
+Each cell carries JSON-only `value` and `cached_value` fields plus independent
+`value_type` and `cached_value_type` markers. Date, datetime, and time values
+use ISO 8601 strings; durations use ISO 8601 duration strings. Their
+`excel_serial`/`cached_excel_serial` values and `number_format` preserve the
+workbook representation needed for exact interpretation. Non-finite numeric
+tokens use `NaN`, `Infinity`, or `-Infinity` strings with the
+`non_finite_number` marker so a JSON serializer cannot silently turn evidence
+into `null`.
+
+Formula source stays separate from cached output through `formula`,
+`formula_kind`, `formula_ref`, and JSON-safe `formula_attributes`; normal,
+array, and data-table formulas are represented without leaking Python object
+reprs. `display_value` is best-effort display text, not a replacement for
+`value`, `number_format`, or the cached-value freshness caveat. Per-cell layout
+metadata includes hidden/filtered row state, hidden column state, and merged
+range/master identity. A filtered row means an OOXML-hidden data row inside the
+worksheet AutoFilter range; OOXML does not record a stronger causal label.
+
 ## Canonical source sequence
 
 ```text
@@ -61,6 +87,40 @@ SourceObject -> SourceRevision -> Artifact -> ExtractionRun -> ContentUnit
 lexical projection. It is stored with the extraction because normalized body
 text alone cannot reproduce Korean n-grams, title tokens, and stable source
 identifiers. The `search.lexical_units` row remains a disposable projection.
+
+## PPTX evidence boundary
+
+PPTX extraction emits `pptx_text`, `pptx_table`, `pptx_chart`, `pptx_image`,
+`pptx_notes`, `pptx_comment`, `pptx_diagram`, and optional `pptx_ocr` units. Shape locators use
+`type=pptx_shape` with a one-based slide number, source slide and shape IDs,
+nested group IDs, and `bbox_emu`. Notes use `pptx_notes`; comments use
+`pptx_comment`; SmartArt data uses `pptx_part` with the package part path.
+
+All unit and extraction metadata is `JsonObject`. OOXML timestamps cross the
+boundary as ISO 8601 strings, images as hashes and metadata rather than bytes,
+and chart values as JSON numbers or null. Hidden-slide state, source z-order,
+derived reading order, merge ownership, text runs, and optional-part warnings
+remain explicit. External relationship targets are recorded only as existing
+run hyperlinks or aggregate counts and are never fetched.
+
+`pptx_ocr` locators use `type=pptx_ocr` and carry the source slide, slide ID,
+shape ID, nested group path, EMU geometry, and Kordoc pixel bounding box. Their
+metadata carries the source image SHA-256, OCR adapter, block type, and
+JSON-safe structured block fields. Identical picture bytes are recognized once
+but produce one unit per source shape occurrence so every citation reopens the
+right slide object.
+
+PDF OCR preserves every native `pdf_page` unit and appends `pdf_ocr` units only
+for quality candidates. A `pdf_ocr` locator contains the one-based page and
+pixel bounding box. Extraction metadata exposes candidate reasons, adapter and
+version, OCR block/page counts, and post-OCR text coverage. OCR image-reference
+blocks and empty bodies do not cross the evidence boundary.
+
+Command-parser blocks such as Kordoc output preserve table/image/list/span/link,
+footnote, style, and child fields in `ContentUnit.metadata`. Deterministic table
+text and image placeholders make non-paragraph blocks searchable without
+discarding their structured payload. Structured parser warnings become stable
+strings containing code, optional page, and message.
 
 `SourceObject.acl_snapshot` records the source ACL provider, version, captured
 time, expiry, and canonical scopes. `ContentUnit.acl_snapshot_id` pins each

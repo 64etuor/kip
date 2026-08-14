@@ -53,6 +53,22 @@ parser_timeout_seconds = 120
 minimum_quality_score = 0.70
 shadow_parse_critical_documents = true
 
+[parsers.ocr]
+timeout_seconds = 120
+
+[parsers.ocr.kordoc]
+enabled = true
+argv = ["kordoc", "--format", "json", "--ocr", "--silent"]
+version_argv = ["kordoc", "--version"]
+expected_version = "4.7.3"
+
+[parsers.ocr.pptx]
+max_images = 128
+max_image_bytes = 20971520
+max_total_bytes = 104857600
+min_width_px = 96
+min_height_px = 48
+
 [parsers.hwp]
 order = ["hwp-hwpx-parser", "kordoc", "unhwp", "paired_pdf"]
 
@@ -74,7 +90,7 @@ root = "/sources/nas"
 enabled = true
 read_only = true
 settle_seconds = 2
-include_extensions = [".md", ".txt", ".pdf", ".xlsx", ".hwp", ".hwpx", ".docx", ".csv"]
+include_extensions = [".md", ".txt", ".pdf", ".pptx", ".xlsx", ".hwp", ".hwpx", ".docx", ".csv"]
 exclude_globs = ["**/.DS_Store", "**/~$*", "**/.~lock.*"]
 acl_scope = "workspace:default"
 

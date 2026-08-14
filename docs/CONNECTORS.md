@@ -40,6 +40,12 @@ Validate command fallbacks against the exact installed version before enabling
 them. The broker records parser/version/output hash. A failed or below-threshold
 candidate never replaces the successful active extraction.
 
+Kordoc-compatible JSON blocks retain structured `table`, `imageData`, `spans`,
+`footnoteText`, list, link, style, and child metadata instead of reducing every
+block to its `text` field. Tables additionally render deterministic TSV search
+text, images emit a filename placeholder, and structured warnings retain code
+and page context.
+
 When an existing index must adopt a new HWP parser, prepare the entire source in
 non-mutating shadow mode first. Activation is a separate operator action:
 
@@ -55,6 +61,36 @@ projection, and commits each document atomically. It never writes to the source
 file or changes source access policy.
 
 Keep production parser versions pinned. Upgrade a pin only after the parser conformance corpus and shadow-extraction comparison pass; do not use `@latest` in scheduled indexing.
+
+## PPTX parser
+
+Install `python-pptx` through the pinned `extractors` extra and add `.pptx` to
+the filesystem source. The in-process adapter emits shape-level evidence for
+text, merged tables, chart caches, image metadata, nested groups, notes,
+comments, and SmartArt. It preserves exact slide/shape coordinates and never
+fetches external relationships or executes macros. Optional OOXML failures are
+visible as partial warnings; embedded objects are counted but not expanded.
+Legacy `.ppt`, media transcription, and modern threaded comments require a
+separate evaluated adapter.
+
+## Local Korean OCR adapter
+
+PDF and PPTX parsers share the default Kordoc 4.7.3 adapter in new reference
+installations. Bootstrap installs the exact runtime and model cache:
+
+```bash
+./scripts/install-kordoc.sh
+./scripts/kordoc models --status
+```
+
+The launcher sets `KORDOC_OFFLINE=1` for indexing. The registry requires
+`argv`, `version_argv`, and `expected_version = "4.7.3"`, and rejects `npm` or
+`npx` as the runtime command. PDF OCR runs only when native text quality crosses
+a candidate signal. PPTX OCR batches eligible pictures, deduplicates identical
+bytes, and applies count and byte budgets from `[parsers.ocr.pptx]`. Both paths
+append located candidate units and preserve native units on failure.
+Existing local configurations retain their explicit enabled/disabled value and
+must be upgraded deliberately.
 
 ## Slack
 

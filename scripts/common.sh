@@ -4,6 +4,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PROJECT_ROOT
 export KIP_PROJECT_ROOT="${KIP_PROJECT_ROOT:-$PROJECT_ROOT}"
+export PATH="$PROJECT_ROOT/scripts:$PATH"
 
 if [[ -f "$PROJECT_ROOT/.env" && "${KIP_SKIP_DOTENV:-0}" != "1" ]]; then
   KIP_DOTENV_PYTHON="$PROJECT_ROOT/.venv/bin/python"

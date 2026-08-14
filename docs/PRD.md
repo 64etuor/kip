@@ -303,7 +303,7 @@ KIP v3 기준 릴리스는 다음을 포함한다.
 | PDF | 페이지 단위 추출, 스캔 감지, OCR adapter |
 | XLSX/XLSM | shallow index + candidate deep read |
 | DOCX | 제목·문단·표 단위 추출 |
-| PPTX | 슬라이드 단위 추출 |
+| PPTX | shape 단위 구조 추출 + 슬라이드/도형 locator |
 | CSV/TSV | 헤더·행 샘플·필요 시 전체 구조 읽기 |
 | Markdown/Text | 제목 구간 또는 블록 단위 추출 |
 | EML/MIME | 헤더·본문·첨부파일·thread 관계 |
@@ -451,24 +451,38 @@ Agent 흐름:
 
 - **FR-PDF-001 MUST**: PDF는 페이지 단위 content unit을 생성해야 한다.
 - **FR-PDF-002 MUST**: 텍스트가 없는 페이지를 스캔 가능성으로 표시해야 한다.
-- **FR-PDF-003 MUST**: OCR 결과는 원본 PDF와 별도 extraction으로 저장해야 한다.
+- **FR-PDF-003 MUST**: OCR 결과는 native page를 대체하지 않는 `pdf_ocr` content unit으로 저장하고 composite parser identity를 남겨야 한다.
 - **FR-PDF-004 MUST**: OCR이 원본 파일을 덮어쓰지 않아야 한다.
 - **FR-PDF-005 SHOULD**: 표·다단 구조가 중요한 후보 문서는 정밀 parser로 재처리할 수 있어야 한다.
+- **FR-PDF-006 MUST**: OCR 실패는 native page unit을 보존하고 extraction warning으로 드러나야 한다.
+- **FR-PDF-007 MUST**: 한국어 OCR runtime과 모델은 정확한 버전으로 설치·검증되어야 하며 정상 indexing 중 실행 코드를 내려받지 않아야 한다.
 
-### 9.7 XLSX two-tier retrieval
+### 9.7 PPTX structural extraction
+
+- **FR-PPTX-001 MUST**: PPTX의 텍스트, 표, 차트, 이미지 참조, 그룹 도형, 발표자 노트를 서로 구분되는 content unit으로 구조화해야 한다.
+- **FR-PPTX-002 MUST**: 모든 shape unit은 slide 번호·slide ID·shape ID·group path·EMU 좌표를 보존해야 한다.
+- **FR-PPTX-003 MUST**: 표 병합 범위, 차트의 저장된 category/series/value, 텍스트 run과 hyperlink를 보존해야 한다.
+- **FR-PPTX-004 MUST**: 숨김 슬라이드, 전환·animation 존재, legacy comment, SmartArt text, 생략된 embedded object와 media를 metadata 또는 warning으로 표시해야 한다.
+- **FR-PPTX-005 MUST**: 매크로를 실행하거나 외부 relationship을 fetch하지 않아야 하며 원본을 수정하지 않아야 한다.
+- **FR-PPTX-006 SHOULD**: OCR, audio/video transcription, OLE 내부 전개는 native shape parser를 대체하지 않는 별도 candidate adapter로 제공해야 한다.
+- **FR-PPTX-007 MUST**: PPTX 이미지 OCR은 이미지 hash로 중복 인식을 억제하고 count·개별 byte·총 byte·최소 크기 제한을 적용해야 한다.
+- **FR-PPTX-008 MUST**: `pptx_ocr` unit은 원본 slide·shape·group·EMU geometry와 OCR pixel bbox를 함께 보존해야 한다.
+
+### 9.8 XLSX two-tier retrieval
 
 - **FR-XLSX-001 MUST**: 전체 XLSX는 shallow index를 생성해야 한다.
 - **FR-XLSX-002 MUST**: shallow index에는 파일 경로, 시트명, 시트 dimension, shared strings 전문, 주요 헤더가 포함돼야 한다.
 - **FR-XLSX-003 MUST**: shared strings를 소수 키워드로 압축하지 않아야 한다.
 - **FR-XLSX-004 MUST**: shallow index 크기 상한은 설정 가능해야 하며 잘림 여부를 표시해야 한다.
-- **FR-XLSX-005 MUST**: 후보 파일은 원본에서 시트·셀 범위를 정밀하게 읽을 수 있어야 한다.
-- **FR-XLSX-006 MUST**: 숫자, 날짜, 수식 결과, 합계는 shallow index가 아니라 live range read를 사용해야 한다.
+- **FR-XLSX-005 MUST**: 후보 파일은 원본에서 시트·셀 범위를 정밀하게 읽고, 값이 없는 셀도 포함해 요청한 직사각형과 같은 좌표·행·열 shape를 반환해야 한다.
+- **FR-XLSX-006 MUST**: 숫자, 날짜, 시간, duration, 수식·캐시 결과, 합계는 shallow index가 아니라 live range read를 사용해야 하며 public 응답은 strict JSON scalar만 포함해야 한다.
 - **FR-XLSX-007 MUST**: deep read는 원본을 읽기 전용으로 열어야 한다.
 - **FR-XLSX-008 MUST**: 대형 시트는 dimension에 따라 헤더와 제한 행을 우선 읽어야 한다.
 - **FR-XLSX-009 MUST**: agent 답변은 파일, 시트, 범위를 명시해야 한다.
 - **FR-XLSX-010 SHOULD**: 반복 집계가 필요한 표는 별도 tabular projection으로 변환할 수 있어야 한다.
+- **FR-XLSX-011 MUST**: deep read는 Excel worksheet 경계, 정방향 range, bounded cell count를 검증하고 formula source와 cached value를 구분해야 한다.
 
-### 9.8 Lexical search
+### 9.9 Lexical search
 
 - **FR-LEX-001 MUST**: exact identifier search를 제공해야 한다.
 - **FR-LEX-002 MUST**: title, document number, project, organization, author, date, source type 필터를 제공해야 한다.
@@ -481,7 +495,7 @@ Agent 흐름:
 - **FR-LEX-009 MUST**: 검색 projection은 canonical content에서 재구축할 수 있어야 한다.
 - **FR-LEX-010 SHOULD**: lexical backend를 PGroonga, Tantivy, OpenSearch 등으로 교체할 수 있어야 한다.
 
-### 9.9 Semantic search and pgvector
+### 9.10 Semantic search and pgvector
 
 - **FR-VEC-001 MUST**: embedding은 canonical fact가 아니라 projection으로 취급해야 한다.
 - **FR-VEC-002 MUST**: embedding model, version, dimension, input hash, normalization을 저장해야 한다.
@@ -495,7 +509,7 @@ Agent 흐름:
   scan 설정을 가져야 한다. 승격 전 exact-search 비교로 recall trade-off를
   측정해야 한다.
 
-### 9.10 Entity and identity
+### 9.11 Entity and identity
 
 - **FR-ENT-001 MUST**: Person, Organization, Project, Document, Communication, Requirement, Decision, Task, Event를 최소 entity type으로 지원해야 한다.
 - **FR-ENT-002 MUST**: entity는 여러 source identifier를 가질 수 있어야 한다.
@@ -504,7 +518,7 @@ Agent 흐름:
 - **FR-ENT-005 MUST**: entity merge와 split 이력을 보존해야 한다.
 - **FR-ENT-006 MUST**: source object 삭제가 canonical entity를 자동 삭제하지 않아야 한다.
 
-### 9.11 Ontology and assertions
+### 9.12 Ontology and assertions
 
 - **FR-ONT-001 MUST**: 온톨로지는 versioned YAML 또는 동등한 외부 계약으로 관리해야 한다.
 - **FR-ONT-002 MUST**: ontology release는 entity type, predicate, domain, range, inverse, risk, review policy를 정의해야 한다.
@@ -517,7 +531,7 @@ Agent 흐름:
 - **FR-ONT-009 MUST**: assertion의 접근범위는 근거의 접근범위보다 넓어질 수 없어야 한다.
 - **FR-ONT-010 SHOULD**: ontology migration은 rename, split, merge, deprecate를 명시해야 한다.
 
-### 9.12 Graph capability
+### 9.13 Graph capability
 
 - **FR-GRF-001 MUST**: baseline은 PostgreSQL assertion table과 recursive query로 graph traversal을 제공해야 한다.
 - **FR-GRF-002 MUST**: agent에게 raw SQL, Cypher, vendor graph ID를 노출하지 않아야 한다.
@@ -530,7 +544,7 @@ Agent 흐름:
 - **FR-GRF-009 SHOULD**: graph projection은 approved semantic assertion과 선택된 deterministic source relation만 포함해야 한다.
 - **FR-GRF-010 MAY**: Neo4j, Apache AGE 또는 다른 graph backend를 adapter로 추가할 수 있어야 한다.
 
-### 9.13 Agent-facing interface
+### 9.14 Agent-facing interface
 
 - **FR-AGT-001 MUST**: 모든 공개 명령은 versioned JSON을 stdout으로 반환해야 한다.
 - **FR-AGT-002 MUST**: 진단 로그는 stderr로 분리해야 한다.
@@ -543,7 +557,7 @@ Agent 흐름:
 - **FR-AGT-009 MUST**: context pack은 크기 제한과 source diversity 제한을 지원해야 한다.
 - **FR-AGT-010 SHOULD**: MCP adapter를 추가해도 CLI contract가 기준으로 남아야 한다.
 
-### 9.14 Review workflow
+### 9.15 Review workflow
 
 - **FR-REV-001 MUST**: relation/fact/entity merge candidate를 목록화해야 한다.
 - **FR-REV-002 MUST**: 후보마다 근거 위치와 생성 방법을 보여줘야 한다.
@@ -552,7 +566,7 @@ Agent 흐름:
 - **FR-REV-005 MUST**: 승인 취소와 supersession을 지원해야 한다.
 - **FR-REV-006 SHOULD**: 초기에는 Markdown review queue로 동작할 수 있어야 한다.
 
-### 9.15 Security and privacy
+### 9.16 Security and privacy
 
 - **FR-SEC-001 MUST**: PostgreSQL은 localhost 또는 승인된 private network에만 노출해야 한다.
 - **FR-SEC-002 MUST**: source content를 untrusted input으로 취급해야 한다.
@@ -565,7 +579,7 @@ Agent 흐름:
 - **FR-SEC-009 MUST**: 첨부파일 parser는 파일 크기, 압축폭탄, 경로 traversal 제한을 적용해야 한다.
 - **FR-SEC-010 SHOULD**: 민감 source별 retention과 redaction policy를 지원해야 한다.
 
-### 9.16 Operations and portability
+### 9.17 Operations and portability
 
 - **FR-OPS-001 MUST**: 증분 sync와 full rebuild를 분리해야 한다.
 - **FR-OPS-002 MUST**: 동시 sync 중복 실행을 막아야 한다.
@@ -787,6 +801,7 @@ Agent는 다음을 지켜야 한다.
 | PostgreSQL 운영 부담 | 개인 환경에서 복잡성 증가 | Docker Compose, localhost bind, 자동 backup, one-command doctor |
 | 한국어 FTS 품질 부족 | 검색 누락 | tokenization adapter + vocabulary + pg_trgm + golden query |
 | HWP parser 품질 편차 | 본문·표 누락 | parser broker, paired PDF, shadow extraction, benchmark |
+| PPTX 구조 손실 | 표·차트·노트가 평문에 섞임 | shape locator, typed metadata, OOXML 보조 파트, 실제 corpus gate |
 | Slack API 제한 | backfill 지연 | internal app, cursor sync, export ZIP, rate-aware scheduler |
 | Apple Mail 자동화 권한 | sync 실패 | Automation permission doctor, IMAP/provider fallback |
 | 민감 메일 노출 | 보안 사고 | account/mailbox allowlist, RLS, workspace separation |
@@ -853,6 +868,11 @@ KIP v3 baseline은 다음을 모두 만족해야 인수된다.
 | ADR-035 | Version semantic inputs and resume projection rebuilds | Accepted |
 | ADR-036 | Fix retrieval stage order and gate corpus regressions | Accepted |
 | ADR-037 | Align the production search contract and readiness gates | Accepted |
+| ADR-038 | Make the ontology curation loop reviewable end to end | Accepted |
+| ADR-039 | Reconcile filesystem deletions with a complete-scan grace policy | Accepted |
+| ADR-040 | Make guided setup end in a runnable deployment | Accepted |
+| ADR-041 | Structured PPTX extraction preserves presentation evidence | Accepted |
+| ADR-042 | Korean OCR enriches candidate pages and presentation images | Accepted |
 
 ---
 

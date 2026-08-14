@@ -8,10 +8,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from pydantic import TypeAdapter
+
+from kip.adapters.parsers.structured_blocks import format_external_warning, render_external_block
+from kip.domain.json_types import JsonObject
 from kip.domain.models import ContentUnit, EvidenceLocator, ExtractionRun
 from kip.domain.text import normalize_text
 from kip.errors import ParserError
 from kip.ids import new_id, sha256_bytes, stable_id
+
+_JSON_OBJECT: TypeAdapter[JsonObject] = TypeAdapter(JsonObject)
 
 
 @dataclass(slots=True)
@@ -26,14 +32,18 @@ class HwpParserBroker:
     name = "hwp-broker"
     version = "1.0"
 
-    def __init__(self, configs: list[CommandParserConfig], paired_pdf_parser: Any | None = None) -> None:
+    def __init__(
+        self, configs: list[CommandParserConfig], paired_pdf_parser: Any | None = None
+    ) -> None:
         self.configs = [config for config in configs if config.enabled]
         self.paired_pdf_parser = paired_pdf_parser
 
     def supports(self, path: Path) -> bool:
         return path.suffix.lower() in {".hwp", ".hwpx"}
 
-    def parse(self, path: Path, *, artifact_id: str, document_id: str, acl_scopes: list[str]) -> tuple[ExtractionRun, list[ContentUnit]]:
+    def parse(
+        self, path: Path, *, artifact_id: str, document_id: str, acl_scopes: list[str]
+    ) -> tuple[ExtractionRun, list[ContentUnit]]:
         failures: list[str] = []
         successful: list[tuple[float, ExtractionRun, list[ContentUnit]]] = []
         for config in self.configs:
@@ -42,7 +52,11 @@ class HwpParserBroker:
                 continue
             try:
                 extraction, units = self._run_command_parser(
-                    config, path, artifact_id=artifact_id, document_id=document_id, acl_scopes=acl_scopes
+                    config,
+                    path,
+                    artifact_id=artifact_id,
+                    document_id=document_id,
+                    acl_scopes=acl_scopes,
                 )
                 successful.append((extraction.quality_score or 0.0, extraction, units))
             except Exception as exc:
@@ -72,7 +86,15 @@ class HwpParserBroker:
             return Path(command).exists()
         return shutil.which(command) is not None
 
-    def _run_command_parser(self, config: CommandParserConfig, path: Path, *, artifact_id: str, document_id: str, acl_scopes: list[str]) -> tuple[ExtractionRun, list[ContentUnit]]:
+    def _run_command_parser(
+        self,
+        config: CommandParserConfig,
+        path: Path,
+        *,
+        artifact_id: str,
+        document_id: str,
+        acl_scopes: list[str],
+    ) -> tuple[ExtractionRun, list[ContentUnit]]:
         with tempfile.TemporaryDirectory(prefix="kip-hwp-") as temp:
             output_dir = Path(temp)
             argv = [
@@ -101,9 +123,8 @@ class HwpParserBroker:
             units: list[ContentUnit] = []
             total_text = ""
             for ordinal, block in enumerate(blocks):
-                text = str(block.get("text") or block.get("markdown") or block.get("content") or "")
-                if not text.strip() and block.get("rows"):
-                    text = json.dumps(block.get("rows"), ensure_ascii=False)
+                rendered = render_external_block(_JSON_OBJECT.validate_python(block))
+                text = rendered.body
                 if not text.strip():
                     continue
                 total_text += text + "\n"
@@ -128,7 +149,7 @@ class HwpParserBroker:
                         lexical_text=normalized,
                         locator=EvidenceLocator(type="hwp_structure", data=locator_data),
                         acl_scopes=acl_scopes,
-                        metadata={"style": block.get("style"), "href": block.get("href")},
+                        metadata=rendered.metadata,
                     )
                 )
             if not units:
@@ -138,11 +159,13 @@ class HwpParserBroker:
                 id=extraction_id,
                 artifact_id=artifact_id,
                 parser_name=config.name,
-                parser_version=str(metadata.get("parserVersion") or payload.get("version") or "unknown"),
+                parser_version=str(
+                    metadata.get("parserVersion") or payload.get("version") or "unknown"
+                ),
                 status="partial" if payload.get("warnings") else "succeeded",
                 quality_score=quality,
                 output_hash=sha256_bytes(total_text.encode("utf-8")),
-                warnings=[str(item) for item in payload.get("warnings", [])],
+                warnings=[format_external_warning(item) for item in payload.get("warnings", [])],
                 metadata={"document_metadata": metadata},
             )
             return extraction, units
@@ -189,4 +212,13 @@ class HwpParserBroker:
         hangul_ratio = hangul / max(1, len(text))
         printable_ratio = printable / max(1, len(text))
         warning_penalty = min(0.3, len(payload.get("warnings", [])) * 0.03)
-        return max(0.0, min(1.0, 0.4 * base + 0.3 * printable_ratio + 0.3 * min(1.0, hangul_ratio * 3) - warning_penalty))
+        return max(
+            0.0,
+            min(
+                1.0,
+                0.4 * base
+                + 0.3 * printable_ratio
+                + 0.3 * min(1.0, hangul_ratio * 3)
+                - warning_penalty,
+            ),
+        )

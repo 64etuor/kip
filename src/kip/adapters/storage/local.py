@@ -9,11 +9,11 @@ from typing import Final
 from pydantic import TypeAdapter
 
 from kip.adapters.parsers.xlsx_read import read_xlsx_range
-from kip.domain.json_types import JsonObject
+from kip.domain.xlsx import XlsxCell
 from kip.errors import NotFoundError
 from kip.ids import sha256_bytes
 
-_CELL_MATRIX: Final = TypeAdapter(list[list[JsonObject]])
+_CELL_MATRIX: Final = TypeAdapter(list[list[XlsxCell]])
 
 
 def _sha256_file(path: Path) -> str:
@@ -64,6 +64,6 @@ class LocalSourceFileInspector:
 
 @dataclass(frozen=True, slots=True)
 class LocalWorkbookReader:
-    def read(self, path: Path, sheet: str, cell_range: str) -> list[list[JsonObject]]:
+    def read(self, path: Path, sheet: str, cell_range: str) -> list[list[XlsxCell]]:
         result = read_xlsx_range(path, sheet, cell_range)
         return _CELL_MATRIX.validate_python(result["cells"])

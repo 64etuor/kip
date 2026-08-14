@@ -18,6 +18,7 @@ fi
 . .venv/bin/activate
 python -m pip install --upgrade pip setuptools wheel
 python -m pip install -e '.[postgres,api,identity,extractors,mcp,telemetry,dev]'
+"$SCRIPT_DIR/install-kordoc.sh"
 mkdir -p var/cas var/backups var/log
 python scripts/create_sample_xlsx.py
 python scripts/generate_contracts.py

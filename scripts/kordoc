@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+package_dir="${KIP_KORDOC_PACKAGE_DIR:-$PROJECT_ROOT/var/kordoc/node_modules/kordoc}"
+model_cache="${KORDOC_MODEL_CACHE:-$PROJECT_ROOT/var/kordoc-models}"
+cli="$package_dir/dist/cli.js"
+
+if [[ ! -f "$cli" ]]; then
+  printf 'Kordoc 4.7.3 is not installed; run ./scripts/bootstrap.sh\n' >&2
+  exit 69
+fi
+
+export KORDOC_MODEL_CACHE="$model_cache"
+export KORDOC_OFFLINE="${KORDOC_OFFLINE:-1}"
+exec node "$cli" "$@"

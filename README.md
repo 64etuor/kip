@@ -1,6 +1,6 @@
 # KIP Knowledge Fabric Starter Kit v3.2
 
-KIP is an agent-first, evidence-first foundation for indexing and retrieving company knowledge from NAS files, HWP/HWPX, PDF, XLSX, Slack, and email. It supports two equal entry paths:
+KIP is an agent-first, evidence-first foundation for indexing and retrieving company knowledge from NAS files, HWP/HWPX, PDF, PPTX, XLSX, Slack, and email. It supports two equal entry paths:
 
 - **Agent/terminal path:** stable CLI commands that emit versioned JSON.
 - **Application path:** REST/OpenAPI and optional MCP adapters backed by the same services.
@@ -19,6 +19,9 @@ Do not infer current readiness from PRD/TRD target language alone.
 - NAS and connector sources are read-only.
 - HWP/HWPX uses the measured native `hwp-hwpx-parser` adapter first, with replaceable command and paired-PDF fallbacks.
 - XLSX uses shallow-all / deep-candidate retrieval.
+- PPTX preserves slide/shape structure, tables, chart caches, image metadata,
+  notes, comments, SmartArt text, and exact geometry without executing macros or
+  fetching external relationships.
 - CLI, REST, and MCP use the same application layer.
 - Search, graph, and embeddings are replaceable projections.
 
@@ -55,9 +58,9 @@ Credential 원문은 질문, state, plan, 생성 파일에 넣지 않는다. `en
 환경별 결정, AI 변경 계약, 실제 자료 인수 테스트, 자동 업데이트 알림과
 승격/rollback 기준을 한 경로로 묶는다.
 
-Prerequisites: Python 3.12+ and Docker with Compose. Node.js is needed only if
-an operator explicitly installs and enables a Kordoc command fallback; normal
-indexing never downloads parser packages at runtime.
+Prerequisites: Python 3.12+, Node.js 18+, and Docker with Compose. Bootstrap
+installs the pinned Kordoc OCR runtime and verifies the Korean model cache;
+normal indexing never downloads parser packages or models at runtime.
 
 ```bash
 cp .env.example .env
@@ -163,6 +166,29 @@ The first command is non-mutating shadow work. The second retains the previous
 extraction and swaps the active PostgreSQL/lexical state per document only
 after revision, hash, ACL, classification, and quality checks. See
 `docs/CONNECTORS.md`.
+
+### PPTX
+
+The pinned `extractors` extra installs `python-pptx`. Filesystem sources that
+include `.pptx` emit shape-level evidence with exact slide/shape locators;
+merged tables, chart caches, image hashes/alt text, groups, speaker notes,
+legacy comments, and SmartArt text remain structured. Embedded OLE, media
+transcription, modern threaded comments, and legacy `.ppt` are explicit
+limitations rather than silent text loss. The reference profiles enable local
+Korean OCR for scanned PDF candidates and PPTX pictures:
+
+```bash
+./scripts/install-kordoc.sh
+./scripts/kordoc models --status
+KORDOC_OFFLINE=1 ./scripts/kip sync run --source company-nas
+```
+
+Bootstrap and the production image verify every PP-OCRv5 Korean file before
+indexing. KIP requires exact Kordoc 4.7.3, rejects runtime `npm`/`npx` commands,
+bounds PPTX image batches, and keeps native evidence when OCR fails. Recognition
+output is candidate evidence; review low-confidence warnings before making
+material claims. Existing deployments keep their current `config/kip.toml`;
+rerun bootstrap and opt in explicitly when upgrading an older configuration.
 
 ### Slack
 

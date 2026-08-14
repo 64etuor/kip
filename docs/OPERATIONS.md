@@ -420,6 +420,77 @@ recoverable history. A rejected, failed, changed, stale, or unauthorized
 candidate leaves the old active extraction intact. Normal search and
 incremental sync never trigger this workflow.
 
+## XLSX exact-range reads
+
+Use `xlsx-read` only after the workbook has been indexed and keep freshness
+checking enabled for material claims:
+
+```bash
+./scripts/kip xlsx-read ARTIFACT_ID --sheet "정산" --range "A1:F40"
+```
+
+The response shape exactly matches the requested rectangle, including blank
+cells. Reads reject reversed ranges, coordinates beyond `XFD1048576`, and
+requests above 100,000 cells; split a rejected large request into explicit,
+reviewable ranges. Date/time values are ISO 8601 strings, durations are ISO
+8601 duration strings, and Excel serials plus number formats remain adjacent.
+Formula source and cached values are separate, and KIP does not recalculate the
+workbook. Treat a cached result as workbook state that may be stale, not as a
+fresh calculation.
+
+## PPTX parser validation
+
+Install the pinned extractor extra and include `.pptx` in the intended
+filesystem source. Before enabling it for an existing corpus, run unit/contract
+fixtures and a read-only sample that contains Korean text, merged tables,
+charts, images, groups, notes, hidden slides, and comments. Confirm exact
+slide/shape locators, source hash immutability, warnings, and sync/search
+behavior. A `partial` result preserves valid slide evidence but requires review
+of each `PARTIAL_PARSE`, `SKIPPED_OLE`, or `SKIPPED_MEDIA` warning. KIP does not
+execute macros, fetch external links, transcribe media, expand OLE, or parse
+legacy `.ppt`.
+
+### Local Korean OCR setup
+
+OCR is enabled in new reference configurations. Bootstrap installs the exact
+reviewed runtime and pre-warms its Korean models:
+
+```bash
+./scripts/install-kordoc.sh
+./scripts/kordoc --version
+./scripts/kordoc models --status
+```
+
+The version must be exactly `4.7.3`; the `ppocr` group must report `allReady`
+and each detector, recognizer, and dictionary file must report `verified`.
+The reference configuration resolves the checked-in offline launcher:
+
+```toml
+[parsers.ocr]
+timeout_seconds = 120
+
+[parsers.ocr.kordoc]
+enabled = true
+argv = ["kordoc", "--format", "json", "--ocr", "--silent"]
+version_argv = ["kordoc", "--version"]
+expected_version = "4.7.3"
+```
+
+The launcher and production image set `KORDOC_OFFLINE=1` after the verified
+cache is present. Do not use `npm`, `npx`, or `@latest` in parser argv. A missing
+binary, version drift, timeout, malformed JSON, or OCR failure makes the current
+extraction partial while retaining native PDF/PPTX units; it does not replace a
+previous active extraction.
+
+Existing deployments are not rewritten. To upgrade one, rerun
+`./scripts/install-kordoc.sh`, set `[parsers.ocr.kordoc].enabled = true` in its
+local `config/kip.toml`, and run `./scripts/doctor.sh` before a shadow sample.
+
+PPTX defaults accept at most 128 images, 20 MiB per image, 100 MiB total, and
+images at least 96x48 pixels. Adjust only after a read-only shadow sample. Check
+`ocr_unique_image_count`, `ocr_block_count`, `ocr_skipped_image_count`, exact
+page/shape locators, all warnings, and source SHA/mtime before activation.
+
 ## Local lexical reranking
 
 The starter profiles rerank at most 40 ACL-filtered lexical candidates with
@@ -451,7 +522,11 @@ the reviewed 19-case set.
 ## Dependency and model update watch
 
 Dependabot proposes Python, GitHub Actions, and Docker updates weekly. The
-scheduled `upstream-watch` workflow reports newer `kordoc` and Hugging Face
-model revisions in one GitHub issue. Both are discovery surfaces only: follow
-`STARTER_KIT_GUIDE.md` and the quality experiment workflow before changing a
-production pin or activating a projection.
+`upstream-watch` workflow runs daily at 09:00 KST and compares
+`parsers.ocr.kordoc.expected_version` plus the pinned Hugging Face embedding
+and reranker revisions with upstream. It creates or updates one GitHub issue
+when drift is detected and closes that issue after every watched pin matches
+again. Run `./scripts/check-upstream-updates.sh` for the same read-only check
+locally, or dispatch the workflow manually. Both are discovery surfaces only:
+follow `STARTER_KIT_GUIDE.md` and the quality experiment workflow before
+changing a production pin or activating a projection.

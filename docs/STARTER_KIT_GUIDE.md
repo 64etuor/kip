@@ -93,6 +93,16 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 - 활성화가 문서별 PostgreSQL transaction이고 이전 extraction과 unit을
   보존하는지, 동일 artifact에 active extraction이 하나뿐인지 검증한다.
 - 한글 PDF OCR 후보는 rendered page와 사람이 검토한 transcript로 CER/WER, 표 구조, locator fidelity를 별도 측정한다.
+- PPTX는 text-only 성공으로 판정하지 않는다. merged table, cached chart
+  data, image alt/hash, nested group, notes, hidden slide, comment/SmartArt,
+  정확한 slide/shape locator와 partial warning을 실제 조직 표본에서 확인한다.
+- 새 reference install은 `./scripts/bootstrap.sh`에서 `kordoc@4.7.3`과
+  PP-OCRv5 Korean cache를 설치·SHA 검증한다. `./scripts/doctor.sh`와
+  `./scripts/kordoc models --status`로 준비 상태를 확인하며, production
+  indexing은 offline launcher를 사용하고 `npx`를 parser argv로 사용하지 않는다.
+- OCR 운영 전 low-text PDF, 깨진 Korean font map, screenshot형 PPTX,
+  중복 이미지, 대형 이미지, 실패/timeout 표본을 shadow extraction으로
+  검증하고 원본 hash와 locator fidelity를 확인한다.
 
 ### Embedding 또는 reranker
 
@@ -138,7 +148,7 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 저장소에는 두 계층의 알림이 있다.
 
 - Dependabot: Python, GitHub Actions, Docker 업데이트를 매주 `dependencies`와 `quality-candidate` PR로 제안한다.
-- `upstream-watch`: 매주 `kordoc`와 pinned Hugging Face embedding/reranker revision을 비교하고 차이가 있으면 하나의 GitHub issue를 갱신한다. Actions의 `upstream-watch`를 수동 실행해 즉시 확인할 수도 있다.
+- `upstream-watch`: 매일 09:00 KST에 `parsers.ocr.kordoc.expected_version`과 pinned Hugging Face embedding/reranker revision을 upstream과 비교한다. 차이가 있으면 하나의 GitHub issue를 생성하거나 갱신하고, 다시 모두 일치하면 해당 issue를 닫는다. `./scripts/check-upstream-updates.sh`로 같은 읽기 전용 검사를 로컬에서 실행하거나 Actions의 `upstream-watch`를 수동 실행할 수도 있다.
 
 알림은 설치 또는 활성화가 아니다. 업데이트마다 다음을 수행한다.
 
@@ -157,7 +167,8 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 - 전체 source inventory와 indexed/failed/partial/unsupported 건수
 - 형식별 parser golden samples와 원본 불변 hash 비교
 - 최소 30-50개 reviewed private questions, ACL negative cases, stale/latest/near-duplicate cases
-- exact read와 XLSX original range 검증
+- exact read와 XLSX original range의 좌표 shape, JSON value/cache type,
+  formula, date serial/format, merge/filter metadata 검증
 - lexical/vector/hybrid/reranker 별 fingerprinted report
 - `evaluation/reports/onedrive-hwp-native-rapidfuzz-20260810/decision.json`과
   같은 corpus-local 라이브러리 채택/기각 결정 기록

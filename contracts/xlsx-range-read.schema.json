@@ -1,4 +1,241 @@
 {
+  "$defs": {
+    "JsonObject": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+    },
+    "JsonPrimitive": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "JsonValue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/JsonPrimitive"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "type": "object"
+        }
+      ]
+    },
+    "XlsxCell": {
+      "additionalProperties": false,
+      "properties": {
+        "cached_excel_serial": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cached Excel Serial"
+        },
+        "cached_value": {
+          "$ref": "#/$defs/JsonValue"
+        },
+        "cached_value_type": {
+          "$ref": "#/$defs/XlsxValueType"
+        },
+        "column_hidden": {
+          "title": "Column Hidden",
+          "type": "boolean"
+        },
+        "coordinate": {
+          "title": "Coordinate",
+          "type": "string"
+        },
+        "data_type": {
+          "title": "Data Type",
+          "type": "string"
+        },
+        "display_value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Display Value"
+        },
+        "excel_serial": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Excel Serial"
+        },
+        "formula": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Formula"
+        },
+        "formula_attributes": {
+          "$ref": "#/$defs/JsonObject"
+        },
+        "formula_kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/XlsxFormulaKind"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "formula_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Formula Ref"
+        },
+        "is_date": {
+          "title": "Is Date",
+          "type": "boolean"
+        },
+        "merge_master": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Merge Master"
+        },
+        "merge_range": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Merge Range"
+        },
+        "merged": {
+          "title": "Merged",
+          "type": "boolean"
+        },
+        "number_format": {
+          "title": "Number Format",
+          "type": "string"
+        },
+        "row_filtered": {
+          "title": "Row Filtered",
+          "type": "boolean"
+        },
+        "row_hidden": {
+          "title": "Row Hidden",
+          "type": "boolean"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue"
+        },
+        "value_type": {
+          "$ref": "#/$defs/XlsxValueType"
+        }
+      },
+      "required": [
+        "coordinate",
+        "value",
+        "cached_value",
+        "value_type",
+        "cached_value_type",
+        "display_value",
+        "data_type",
+        "number_format",
+        "is_date",
+        "excel_serial",
+        "cached_excel_serial",
+        "formula",
+        "formula_kind",
+        "formula_ref",
+        "formula_attributes",
+        "row_hidden",
+        "row_filtered",
+        "column_hidden",
+        "merged",
+        "merge_master",
+        "merge_range"
+      ],
+      "title": "XlsxCell",
+      "type": "object"
+    },
+    "XlsxFormulaKind": {
+      "enum": [
+        "normal",
+        "array",
+        "data_table",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "XlsxValueType": {
+      "enum": [
+        "blank",
+        "boolean",
+        "date",
+        "datetime",
+        "duration",
+        "error",
+        "formula",
+        "integer",
+        "non_finite_number",
+        "number",
+        "string",
+        "time",
+        "unsupported"
+      ],
+      "type": "string"
+    }
+  },
   "additionalProperties": false,
   "properties": {
     "artifact_id": {
@@ -12,8 +249,7 @@
     "cells": {
       "items": {
         "items": {
-          "additionalProperties": true,
-          "type": "object"
+          "$ref": "#/$defs/XlsxCell"
         },
         "type": "array"
       },

@@ -110,7 +110,7 @@ def create_server() -> FastMCP:
     def kip_context(
         query: str,
         limit: int = 5,
-        max_chars: int = 40000,
+        max_chars: int = 120000,
         mode: SearchMode | None = None,
         source_kinds: list[str] | None = None,
         document_types: list[str] | None = None,
@@ -134,7 +134,7 @@ def create_server() -> FastMCP:
     def kip_answer(
         query: str,
         limit: int = 5,
-        max_chars: int = 12000,
+        max_chars: int = 32000,
         mode: SearchMode | None = None,
         source_kinds: list[str] | None = None,
         document_types: list[str] | None = None,

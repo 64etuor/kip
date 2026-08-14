@@ -1864,10 +1864,10 @@ components:
           default: false
         max_chars:
           type: integer
-          maximum: 40000.0
+          maximum: 200000.0
           minimum: 1000.0
           title: Max Chars
-          default: 12000
+          default: 32000
       additionalProperties: false
       type: object
       required:
@@ -2096,7 +2096,7 @@ components:
           maximum: 200000.0
           minimum: 1000.0
           title: Max Chars
-          default: 40000
+          default: 120000
       additionalProperties: false
       type: object
       required:

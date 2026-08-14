@@ -21,8 +21,8 @@
       "type": "integer"
     },
     "max_chars": {
-      "default": 12000,
-      "maximum": 40000,
+      "default": 32000,
+      "maximum": 200000,
       "minimum": 1000,
       "title": "Max Chars",
       "type": "integer"

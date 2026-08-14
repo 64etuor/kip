@@ -81,8 +81,8 @@
             "type": "integer"
           },
           "max_chars": {
-            "default": 12000,
-            "maximum": 40000.0,
+            "default": 32000,
+            "maximum": 200000.0,
             "minimum": 1000.0,
             "title": "Max Chars",
             "type": "integer"
@@ -409,7 +409,7 @@
             "type": "integer"
           },
           "max_chars": {
-            "default": 40000,
+            "default": 120000,
             "maximum": 200000.0,
             "minimum": 1000.0,
             "title": "Max Chars",

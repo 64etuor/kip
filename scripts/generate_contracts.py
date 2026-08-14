@@ -82,6 +82,7 @@ from kip.evaluation.answers import (  # noqa: E402
     AnswerMetrics,
     AnswerReview,
 )
+from kip.evaluation.drafts import GoldenDraft, GoldenDraftReview  # noqa: E402
 from kip.evaluation.models import GoldenDataset  # noqa: E402
 from kip.evaluation.ontology import (  # noqa: E402
     OntologyMetrics,
@@ -167,6 +168,8 @@ MODELS = {
     "ontology-metrics": OntologyMetrics,
     "golden-dataset": GoldenDataset,
     "evaluation-review-bundle": EvaluationReviewBundle,
+    "golden-draft": GoldenDraft,
+    "golden-draft-review": GoldenDraftReview,
 }
 
 

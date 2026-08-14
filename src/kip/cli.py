@@ -34,6 +34,7 @@ from kip.domain.models import (
     SearchRequest,
 )
 from kip.errors import KipError, NotFoundError, ValidationError, error_code
+from kip.evaluation.drafts import promote_draft, record_draft_review_decision, validate_draft
 from kip.evaluation.models import GoldenCase
 from kip.evaluation.reporting import append_evolution_record, write_report
 from kip.evaluation.reviews import load_review_bundle
@@ -69,6 +70,10 @@ projection_app = typer.Typer(
 )
 export_app = typer.Typer(no_args_is_help=True, help="Export portable canonical bundles")
 evaluate_app = typer.Typer(no_args_is_help=True, help="Measure retrieval quality")
+evaluate_draft_app = typer.Typer(
+    no_args_is_help=True,
+    help="Judge-proposed golden case drafts (sample-audit gate before promotion)",
+)
 quality_app = typer.Typer(no_args_is_help=True, help="Evaluate version-pinned candidates")
 ontology_app = typer.Typer(no_args_is_help=True, help="Validate and migrate ontology releases")
 telemetry_app = typer.Typer(no_args_is_help=True, help="Inspect redacted RAG query traces")
@@ -93,6 +98,7 @@ app.add_typer(get_app, name="get")
 app.add_typer(projection_app, name="projection")
 app.add_typer(export_app, name="export")
 app.add_typer(evaluate_app, name="evaluate")
+evaluate_app.add_typer(evaluate_draft_app, name="draft")
 app.add_typer(quality_app, name="quality")
 app.add_typer(ontology_app, name="ontology")
 app.add_typer(telemetry_app, name="telemetry")
@@ -495,7 +501,7 @@ def context_command(
     query: str | None = typer.Argument(None),
     query_option: str | None = typer.Option(None, "--query"),
     limit: int = typer.Option(5, min=1, max=30),
-    max_chars: int = typer.Option(40000, min=1000, max=200000),
+    max_chars: int = typer.Option(120000, min=1000, max=200000),
     mode: str | None = typer.Option(None, "--mode"),
     source_kind: list[str] | None = typer.Option(None, "--source-kind"),
     document_type: list[str] | None = typer.Option(None, "--document-type"),
@@ -532,7 +538,7 @@ def answer(
     query: str | None = typer.Argument(None),
     query_option: str | None = typer.Option(None, "--query"),
     limit: int = typer.Option(5, min=1, max=20),
-    max_chars: int = typer.Option(12000, min=1000, max=40000),
+    max_chars: int = typer.Option(32000, min=1000, max=200000),
     mode: str | None = typer.Option(None, "--mode"),
     source_kind: list[str] | None = typer.Option(None, "--source-kind"),
     document_type: list[str] | None = typer.Option(None, "--document-type"),
@@ -1219,6 +1225,76 @@ def evaluate_compare(
     def action(runtime: Runtime) -> Any:
         payload = json.loads(report.read_text(encoding="utf-8"))
         return compare_variants(payload, baseline, candidate)
+
+    _run(ctx, action)
+
+
+@evaluate_draft_app.command("validate")
+def evaluate_draft_validate(
+    ctx: typer.Context,
+    draft: Path = typer.Option(..., "--draft", exists=True, dir_okay=False, readable=True),
+) -> None:
+    def action(runtime: Runtime) -> Any:
+        return validate_draft(draft)
+
+    _run(ctx, action)
+
+
+@evaluate_draft_app.command("review")
+def evaluate_draft_review(
+    ctx: typer.Context,
+    draft: Path = typer.Option(..., "--draft", exists=True, dir_okay=False, readable=True),
+    review: Path = typer.Option(..., "--review", dir_okay=False),
+    case_id: str = typer.Option(..., "--case-id"),
+    decision: str = typer.Option(..., "--action", help="approve|reject"),
+    reviewer: str = typer.Option(..., "--reviewer"),
+    note: str | None = typer.Option(None, "--note"),
+) -> None:
+    def action(runtime: Runtime) -> Any:
+        return record_draft_review_decision(
+            draft_path=draft,
+            review_path=review,
+            case_id=case_id,
+            action=decision,
+            reviewer=reviewer,
+            note=note,
+        )
+
+    _run(ctx, action)
+
+
+@evaluate_draft_app.command("promote")
+def evaluate_draft_promote(
+    ctx: typer.Context,
+    draft: Path = typer.Option(..., "--draft", exists=True, dir_okay=False, readable=True),
+    review: Path = typer.Option(..., "--review", exists=True, dir_okay=False, readable=True),
+    dataset: Path = typer.Option(..., "--dataset", dir_okay=False),
+    min_sample_rate: float = typer.Option(0.2, "--min-sample-rate", min=0.0, max=1.0),
+    lifecycle: str = typer.Option(
+        "reviewed", "--lifecycle", help="Canonical-authority lifecycle assigned to promoted cases"
+    ),
+    dataset_version: str | None = typer.Option(
+        None,
+        "--dataset-version",
+        help="Dataset/case version assigned by promotion; required for a fresh dataset "
+        "or when the target dataset has no non-draft version",
+    ),
+    source_revision: str | None = typer.Option(
+        None,
+        "--source-revision",
+        help="Source revision assigned by promotion; defaults to the draft's corpus_fingerprint",
+    ),
+) -> None:
+    def action(runtime: Runtime) -> Any:
+        return promote_draft(
+            draft_path=draft,
+            review_path=review,
+            dataset_path=dataset,
+            min_sample_rate=min_sample_rate,
+            lifecycle=lifecycle,
+            dataset_version=dataset_version,
+            source_revision=source_revision,
+        )
 
     _run(ctx, action)
 

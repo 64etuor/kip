@@ -62,8 +62,8 @@ class AnsweringUseCases:
         self._enabled = bool(raw.get("enabled", False))
         self._fallback_on_error = fallback
         try:
-            self._max_claims = int(str(raw.get("max_claims", 8)))
-            self._max_output_tokens = int(str(raw.get("max_output_tokens", 1024)))
+            self._max_claims = int(str(raw.get("max_claims", 16)))
+            self._max_output_tokens = int(str(raw.get("max_output_tokens", 4096)))
         except ValueError as error:
             raise ConfigurationError(
                 "generation claim and token limits must be integers"

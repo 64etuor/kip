@@ -1,0 +1,438 @@
+{
+  "$defs": {
+    "ExpectedAssertion": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "object_entity_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Object Entity Id"
+        },
+        "object_value": {
+          "default": null,
+          "title": "Object Value"
+        },
+        "predicate": {
+          "minLength": 1,
+          "title": "Predicate",
+          "type": "string"
+        },
+        "subject_id": {
+          "minLength": 1,
+          "title": "Subject Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "subject_id",
+        "predicate"
+      ],
+      "title": "ExpectedAssertion",
+      "type": "object"
+    },
+    "ExpectedEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        },
+        "type": {
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "ExpectedEvidence",
+      "type": "object"
+    },
+    "GoldenDraftCase": {
+      "additionalProperties": false,
+      "description": "A judge-proposed case: the golden case shape plus judge provenance.\n\nDrafts carry no ``status`` field — they are immutable proposals. A case\nonly becomes canonical truth through explicit human promotion.",
+      "properties": {
+        "acl_scopes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Acl Scopes",
+          "type": "array"
+        },
+        "category": {
+          "minLength": 1,
+          "title": "Category",
+          "type": "string"
+        },
+        "expected_assertions": {
+          "items": {
+            "$ref": "#/$defs/ExpectedAssertion"
+          },
+          "title": "Expected Assertions",
+          "type": "array"
+        },
+        "expected_claims": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Expected Claims",
+          "type": "array"
+        },
+        "expected_contradictions": {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "Expected Contradictions",
+          "type": "array"
+        },
+        "expected_documents": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Expected Documents",
+          "type": "array"
+        },
+        "expected_entity_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Expected Entity Ids",
+          "type": "array"
+        },
+        "expected_evidence": {
+          "items": {
+            "$ref": "#/$defs/ExpectedEvidence"
+          },
+          "title": "Expected Evidence",
+          "type": "array"
+        },
+        "expected_evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Expected Evidence Ids",
+          "type": "array"
+        },
+        "expected_latest": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Latest"
+        },
+        "expected_paths": {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "Expected Paths",
+          "type": "array"
+        },
+        "expected_refusal": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Refusal"
+        },
+        "expected_stale_warning": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Stale Warning"
+        },
+        "forbidden_assertions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Forbidden Assertions",
+          "type": "array"
+        },
+        "forbidden_documents": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Forbidden Documents",
+          "type": "array"
+        },
+        "forbidden_entity_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Forbidden Entity Ids",
+          "type": "array"
+        },
+        "forbidden_evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Forbidden Evidence Ids",
+          "type": "array"
+        },
+        "id": {
+          "maxLength": 128,
+          "minLength": 2,
+          "title": "Id",
+          "type": "string"
+        },
+        "judge_confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Judge Confidence",
+          "type": "number"
+        },
+        "lifecycle": {
+          "default": "draft",
+          "enum": [
+            "draft",
+            "reviewed",
+            "golden",
+            "challenge",
+            "canary"
+          ],
+          "title": "Lifecycle",
+          "type": "string"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        },
+        "principal": {
+          "minLength": 1,
+          "title": "Principal",
+          "type": "string"
+        },
+        "question": {
+          "minLength": 1,
+          "title": "Question",
+          "type": "string"
+        },
+        "rationale": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "recall_at": {
+          "default": 10,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Recall At",
+          "type": "integer"
+        },
+        "reviewer": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reviewer"
+        },
+        "source_revision": {
+          "anyOf": [
+            {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Revision"
+        },
+        "split": {
+          "default": "test",
+          "enum": [
+            "train",
+            "validation",
+            "test",
+            "canary"
+          ],
+          "title": "Split",
+          "type": "string"
+        },
+        "version": {
+          "default": "draft",
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "question",
+        "category",
+        "principal",
+        "expected_documents",
+        "judge_confidence",
+        "rationale"
+      ],
+      "title": "GoldenDraftCase",
+      "type": "object"
+    },
+    "JudgeProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "judge_kind": {
+          "enum": [
+            "external_agent",
+            "generation_model"
+          ],
+          "title": "Judge Kind",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        }
+      },
+      "required": [
+        "judge_kind"
+      ],
+      "title": "JudgeProvenance",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "cases": {
+      "items": {
+        "$ref": "#/$defs/GoldenDraftCase"
+      },
+      "minItems": 1,
+      "title": "Cases",
+      "type": "array"
+    },
+    "corpus_fingerprint": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Corpus Fingerprint"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
+    },
+    "judge": {
+      "$ref": "#/$defs/JudgeProvenance"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "kip.golden-draft.v1",
+      "default": "kip.golden-draft.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "name",
+    "judge",
+    "cases"
+  ],
+  "title": "GoldenDraft",
+  "type": "object"
+}

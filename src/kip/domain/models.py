@@ -226,7 +226,7 @@ class EmbeddingRecord(StrictModel):
 
 
 class ContextRequest(SearchRequest):
-    max_chars: int = Field(default=40000, ge=1000, le=200000)
+    max_chars: int = Field(default=120000, ge=1000, le=200000)
 
 
 class ContextItem(StrictModel):
@@ -244,7 +244,7 @@ class ContextBundle(StrictModel):
 
 
 class AnswerRequest(ContextRequest):
-    max_chars: int = Field(default=12000, ge=1000, le=40000)
+    max_chars: int = Field(default=32000, ge=1000, le=200000)
 
 
 class AnswerCitation(StrictModel):

@@ -1,6 +1,27 @@
 # Changelog
 
-## 3.3.0 - 2026-08-14
+## Unreleased
+
+- Added judge-proposed golden-dataset growth (ADR-045): an LLM judge
+  authors `kip.golden-draft.v1` case proposals with per-case confidence
+  and rationale; `kip evaluate draft validate/review/promote` runs the
+  human sample-audit and fail-closed promotion (refused below the minimum
+  sample rate, on any sampled rejection, or on ID collision) into a
+  reviewed golden dataset, with judge provenance recorded per case and
+  draft/review schemas published under `contracts/`. Canonical-authority
+  fields (`lifecycle`/`version`/`reviewer`/`source_revision`) cannot be
+  judge-proposed — a draft setting them is rejected — and are assigned at
+  promotion from explicit options and the auditing reviewer, so promoted
+  datasets satisfy `gate_eligible`. The judge generates; only
+  human-authorized promotion creates canonical truth.
+- Raised capacity defaults sized for older model context windows
+  (`docs/plans/2026-08-14-llm-capability-scaling.md`): context pack
+  40k -> 120k chars (item cap 8k -> 16k), answer evidence budget
+  12k -> 32k chars (ceiling 40k -> 200k), generation 8 -> 16 claims and
+  1024 -> 4096 output tokens, relation mining 50 -> 200 units /
+  120k -> 480k chars / 32 -> 128 entity and 64 -> 256 relation proposals,
+  ontology answer context 8 -> 16 entities and 50 -> 150 edges. All remain
+  config keys with unchanged code-side hard bounds.
 
 - Made ontology discovery approval materialize an additive release
   automatically (ADR-044): accepting an entity-type or predicate candidate

@@ -1,0 +1,78 @@
+{
+  "$defs": {
+    "DraftReviewDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "approve",
+            "reject"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "case_id": {
+          "minLength": 1,
+          "title": "Case Id",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "case_id",
+        "action"
+      ],
+      "title": "DraftReviewDecision",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "decisions": {
+      "items": {
+        "$ref": "#/$defs/DraftReviewDecision"
+      },
+      "title": "Decisions",
+      "type": "array"
+    },
+    "draft_fingerprint": {
+      "minLength": 1,
+      "title": "Draft Fingerprint",
+      "type": "string"
+    },
+    "draft_name": {
+      "minLength": 1,
+      "title": "Draft Name",
+      "type": "string"
+    },
+    "reviewer": {
+      "minLength": 1,
+      "title": "Reviewer",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "kip.golden-draft-review.v1",
+      "default": "kip.golden-draft-review.v1",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "draft_name",
+    "draft_fingerprint",
+    "reviewer"
+  ],
+  "title": "GoldenDraftReview",
+  "type": "object"
+}

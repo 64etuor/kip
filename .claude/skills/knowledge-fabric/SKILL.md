@@ -25,7 +25,7 @@ Do not assume a parser, source connector, semantic index, or graph projection is
    ```
 3. Build a bounded context pack only after narrowing candidates:
    ```bash
-   scripts/kip.sh context "질문" --limit 5 --max-chars 40000
+   scripts/kip.sh context "질문" --limit 5 --max-chars 120000
    ```
 4. Read each material evidence unit before answering:
    ```bash

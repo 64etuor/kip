@@ -24,7 +24,7 @@ max_file_bytes = 524288000
 
 [search]
 semantic_enabled = false
-context_max_chars = 40000
+context_max_chars = 120000
 korean_ngram_min = 2
 korean_ngram_max = 4
 lexical_rerank_enabled = true

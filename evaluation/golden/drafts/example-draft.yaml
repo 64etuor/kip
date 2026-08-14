@@ -1,0 +1,21 @@
+schema_version: kip.golden-draft.v1
+name: example-draft
+description: Minimal judge-proposed draft over the example.yaml smoke corpus.
+corpus_fingerprint: sha256:example
+judge:
+  judge_kind: generation_model
+  model: example-judge-v1
+  notes: Illustrative draft; not sample-audited or promoted.
+cases:
+  - id: EX-D001
+    question: 비공개 문서에 접근할 수 있나요
+    category: access_denied
+    principal: principal_public
+    acl_scopes:
+      - workspace:default
+    expected_documents: []
+    forbidden_documents:
+      - ldoc_forbidden_example
+    recall_at: 10
+    judge_confidence: 0.82
+    rationale: Mirrors the reviewed access_denied case EX-001 with a paraphrased question.

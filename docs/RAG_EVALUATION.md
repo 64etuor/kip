@@ -187,8 +187,20 @@ locator correctness, unsupported claims, and refusal appropriateness.
 Ontology metrics cover entity, relation, and evidence precision/recall,
 contradiction detection, path relevance/recall, temporal correctness,
 duplicates, orphans, and ACL leakage. A missing review or metric is `null`,
-never a pass. LLM-as-judge may run in shadow, but cannot create canonical truth
-or auto-promote a candidate.
+never a pass. LLM-as-judge cannot create canonical truth or auto-promote a
+candidate; since ADR-045 it is the sanctioned *generator* for dataset growth:
+a judge (an external agent or the generation model) authors
+`kip.golden-draft.v1` case proposals with per-case confidence and rationale,
+a human sample-audits them (`kip evaluate draft review`), and an explicit
+fail-closed promotion (`kip evaluate draft promote`, refused below the
+minimum sample rate or on any sampled rejection) merges the batch into a
+reviewed golden dataset with judge provenance recorded in each case's notes.
+A draft that tries to set canonical-authority fields (`lifecycle`,
+`version`, `reviewer`, `source_revision`) is rejected; promotion assigns
+them explicitly (`--lifecycle`/`--dataset-version`/`--source-revision`,
+`reviewer` taken from the sample audit), so promoted datasets satisfy
+`gate_eligible` and the recorded reviewer is always the auditing human.
+Canonicalization stays human-authorized; the judge only proposes.
 
 Datasets and cases declare `draft`, `reviewed`, `golden`, `challenge`, or
 `canary`, plus split, version, reviewer role, and source revision. Promotion

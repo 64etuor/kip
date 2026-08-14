@@ -197,7 +197,7 @@ def _config_payload(plan: SetupPlan, *, container: bool) -> dict[str, object]:
         "search": {
             "semantic_enabled": False,
             "default_mode": "reranked",
-            "context_max_chars": 40000,
+            "context_max_chars": 120000,
         },
         "models": {"generation": model},
         "parsers": {

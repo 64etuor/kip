@@ -1,0 +1,19 @@
+pyproject.toml
+  s_ad962c4c3ae8de::t_e489a192a270c0 88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "5e3cfb5a676226a5e4cadcb1c0e9a055fc439cdb",
+  "prompts": {},
+  "sessions": {
+    "s_ad962c4c3ae8de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7b5ac8f7-2921-4c40-a768-515e565b34b7",
+        "model": "claude-fable-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

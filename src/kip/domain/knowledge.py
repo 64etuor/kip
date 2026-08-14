@@ -173,12 +173,26 @@ class RelationMiningRequest(KnowledgeModel):
     max_relation_proposals: int = Field(default=64, ge=0, le=512)
 
 
+class MinedProposalSkip(KnowledgeModel):
+    """One invalid or duplicate mined proposal that was skipped, with a reason.
+
+    A skipped proposal never becomes a candidate; recording it keeps a single
+    bad proposal from failing the whole mining batch while preserving an
+    auditable per-proposal explanation.
+    """
+
+    kind: Literal["entity", "relation", "evidence_unit"]
+    reference: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+
+
 class RelationMiningResult(KnowledgeModel):
     entities: tuple[MinedEntityProposal, ...]
     relations: tuple[MinedRelationProposal, ...]
     model: ModelRevision
     usage: GenerationUsage
     provider_request_id: str | None = None
+    skipped: tuple[MinedProposalSkip, ...] = ()
 
 
 class EntityCandidate(KnowledgeModel):

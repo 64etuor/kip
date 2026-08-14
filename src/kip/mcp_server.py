@@ -173,9 +173,15 @@ def create_server() -> FastMCP:
         node_id: str,
         predicates: list[str] | None = None,
         direction: Literal["out", "in", "both"] = "both",
+        limit: int = 100,
     ) -> str:
         """Traverse approved assertion neighbors only."""
-        return _json(application.knowledge.graph_neighbors(context(), GraphNeighborsRequest(node_id=node_id, predicates=predicates or [], direction=direction)))
+        return _json(
+            application.knowledge.graph_neighbors(
+                context(),
+                GraphNeighborsRequest(node_id=node_id, predicates=predicates or [], direction=direction, limit=limit),
+            )
+        )
 
     @mcp.tool()
     def kip_graph_path(from_node_id: str, to_node_id: str, max_depth: int = 4, predicates: list[str] | None = None) -> str:
@@ -192,8 +198,18 @@ def create_server() -> FastMCP:
         return _json(application.ontology_rag.list_entities(context(), limit=limit))
 
     @mcp.tool()
-    def kip_ontology_context(query: str) -> str:
-        return _json(application.ontology_context.build(context(), query).context)
+    def kip_ontology_context(
+        query: str,
+        include_candidate_assertions: bool = False,
+    ) -> str:
+        """Build the approved ontology context; optionally list labeled proposed candidates."""
+        return _json(
+            application.ontology_context.build(
+                context(),
+                query,
+                include_candidates=include_candidate_assertions,
+            ).context
+        )
 
     @mcp.tool()
     def kip_ontology_entity_create(
@@ -229,20 +245,35 @@ def create_server() -> FastMCP:
         )
 
     @mcp.tool()
-    def kip_ontology_candidates(status: str = "proposed", limit: int = 100) -> str:
+    def kip_ontology_candidates(
+        status: str = "proposed",
+        limit: int = 100,
+        predicate: str | None = None,
+        subject_id: str | None = None,
+    ) -> str:
+        """List candidates for review with display names, labels, and evidence previews."""
         selected_context = context()
+        listing = application.knowledge.candidate_listing(
+            selected_context,
+            status,
+            limit,
+            predicate=predicate,
+            subject_id=subject_id,
+        )
         return _json(
             {
-                "entities": application.ontology_rag.list_entity_candidates(
-                    selected_context,
-                    status=status,
-                    limit=limit,
-                ),
-                "relations": application.knowledge.list_candidates(
-                    selected_context,
-                    status,
-                    limit,
-                ),
+                "entities": [
+                    item.model_dump(mode="json")
+                    for item in application.ontology_rag.list_entity_candidates(
+                        selected_context,
+                        status=status,
+                        limit=limit,
+                    )
+                ],
+                "relations": [
+                    item.model_dump(mode="json") for item in listing.items
+                ],
+                "relations_total": listing.total,
             }
         )
 
@@ -276,14 +307,33 @@ def create_server() -> FastMCP:
     def kip_ontology_relation_candidate_approve(
         candidate_id: str,
         note: str | None = None,
+        supersede_contradicted: bool = False,
     ) -> str:
+        """Approve a relation candidate; optionally supersede the assertions it contradicts."""
         return _json(
             application.knowledge.review_approve(
                 context(),
                 candidate_id,
                 note,
+                supersede_contradicted=supersede_contradicted,
             )
         )
+
+    @mcp.tool()
+    def kip_ontology_assertion_revoke(assertion_id: str, note: str) -> str:
+        """Revoke an approved assertion with a required note; it leaves approved-only surfaces."""
+        return _json(
+            application.knowledge.revoke_assertion(
+                context(),
+                assertion_id,
+                note,
+            )
+        )
+
+    @mcp.tool()
+    def kip_jobs(status: str | None = None, limit: int = 100) -> str:
+        """List durable jobs with status, last error, and recorded mining results."""
+        return _json(application.operations.list_jobs(context(), status, limit))
 
     @mcp.tool()
     def kip_ontology_relation_candidate_reject(
@@ -399,9 +449,21 @@ def create_server() -> FastMCP:
         label: str,
         definition: str,
         target_symbol: str | None = None,
+        parent: str | None = None,
+        domain: list[str] | None = None,
+        range: list[str] | None = None,
+        inverse: str | None = None,
+        risk: str | None = None,
+        review: str | None = None,
+        extraction: str | None = None,
         confirmed: bool = False,
     ) -> str:
-        """Submit a reviewed ontology-release candidate; this never changes the active ontology."""
+        """Submit a reviewed ontology-release candidate; this never changes the active ontology.
+
+        `parent` (entity_type) and `domain`/`range`/`inverse`/`risk`/`review`/
+        `extraction` (predicate) are optional; an approving reviewer's
+        materialization step fills in safe defaults for anything omitted.
+        """
         if not confirmed:
             raise ValueError("confirmed=true is required to propose ontology discovery")
         return _json(
@@ -414,6 +476,13 @@ def create_server() -> FastMCP:
                         "label": label,
                         "definition": definition,
                         "target_symbol": target_symbol,
+                        "parent": parent,
+                        "domain": domain,
+                        "range": range,
+                        "inverse": inverse,
+                        "risk": risk,
+                        "review": review,
+                        "extraction": extraction,
                         "confirmed": True,
                     }
                 ),

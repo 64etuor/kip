@@ -7,6 +7,28 @@ source "$SCRIPT_DIR/postgres-tools.sh"
 cd "$PROJECT_ROOT"
 umask 077
 
+RETAIN="${KIP_BACKUP_RETAIN:-7}"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --retain)
+      RETAIN="${2:-}"
+      shift 2
+      ;;
+    --retain=*)
+      RETAIN="${1#--retain=}"
+      shift
+      ;;
+    *)
+      printf 'unknown argument: %s\nusage: backup.sh [--retain N]\n' "$1" >&2
+      exit 2
+      ;;
+  esac
+done
+if ! [[ "$RETAIN" =~ ^[0-9]+$ ]] || (( RETAIN < 1 )); then
+  printf '%s\n' "--retain must be an integer >= 1" >&2
+  exit 2
+fi
+
 PY="$(python_cmd)"
 KIP_CLI="${KIP_CLI:-$SCRIPT_DIR/kip}"
 DATABASE_URL="$($PY "$SCRIPT_DIR/secret_value.py" KIP_DATABASE_URL)"
@@ -63,3 +85,22 @@ mv "$PARTIAL" "$FINAL"
 COMPLETE=1
 trap - EXIT
 printf '%s\n' "$FINAL"
+
+# Retention: keep the newest $RETAIN sealed backup sets. Only directories
+# whose name is a backup timestamp and that contain a sealed manifest are
+# candidates; .partial-* incident evidence and unrelated files are never
+# touched.
+sealed=()
+while IFS= read -r entry; do
+  name="$(basename "$entry")"
+  if [[ "$name" =~ ^[0-9]{8}T[0-9]{6}Z$ && -f "$entry/backup-manifest.json" ]]; then
+    sealed+=("$entry")
+  fi
+done < <(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d | sort)
+count=${#sealed[@]}
+if (( count > RETAIN )); then
+  for (( index = 0; index < count - RETAIN; index++ )); do
+    printf 'pruning expired backup: %s\n' "${sealed[$index]}" >&2
+    rm -rf "${sealed[$index]}"
+  done
+fi

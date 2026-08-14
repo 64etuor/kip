@@ -8,11 +8,13 @@ from kip.application.knowledge import KnowledgeUseCases
 from kip.application.ontology_rag import OntologyRagUseCases
 from kip.domain.knowledge import KnowledgeEntity
 from kip.domain.models import (
+    AssertionCandidate,
     EvidenceRead,
     GraphEdge,
     GraphNeighborsRequest,
     GraphPath,
     GraphPathRequest,
+    OntologyAnswerCandidate,
     OntologyAnswerContext,
     OntologyAnswerEdge,
     OntologyAnswerEntity,
@@ -51,6 +53,8 @@ class OntologyContextUseCases:
         self,
         context: RequestContext,
         query: str,
+        *,
+        include_candidates: bool = False,
     ) -> OntologyEvidenceContext:
         matched = self._ontology_rag.resolve_entities(
             context,
@@ -131,7 +135,12 @@ class OntologyContextUseCases:
             accepted_edges.append(edge)
             for item in edge_evidence:
                 evidence_by_id.setdefault(item.unit.id, item)
-        if not accepted_edges:
+        candidates = (
+            self._candidate_edges(context, matched)
+            if include_candidates
+            else []
+        )
+        if not accepted_edges and not candidates:
             return OntologyEvidenceContext(
                 context=None,
                 evidence=(),
@@ -187,10 +196,58 @@ class OntologyContextUseCases:
                     for path in accepted_paths
                 ],
                 evidence_unit_ids=evidence_ids,
+                candidates=candidates,
             ),
             evidence=tuple(evidence_by_id[item] for item in evidence_ids),
             had_stale_evidence=had_stale_evidence,
         )
+
+    def _candidate_edges(
+        self,
+        context: RequestContext,
+        matched: list[KnowledgeEntity],
+    ) -> list[OntologyAnswerCandidate]:
+        """Proposed candidates touching the matched entities.
+
+        Candidates are transparency data for explicit opt-in only: they are
+        clearly labeled `proposed`, never merged into approved edges, and
+        their evidence IDs never join the context evidence set, so they can
+        never satisfy answer evidence or citation requirements. The store
+        already hides candidates whose evidence the caller cannot read.
+        """
+        matched_ids = {entity.id for entity in matched}
+        selected: list[AssertionCandidate] = []
+        for candidate in self._knowledge.list_candidates(
+            context,
+            "proposed",
+            limit=self._edge_limit * 4,
+        ):
+            if (
+                candidate.subject_id in matched_ids
+                or (
+                    candidate.object_entity_id is not None
+                    and candidate.object_entity_id in matched_ids
+                )
+            ):
+                selected.append(candidate)
+            if len(selected) >= self._edge_limit:
+                break
+        return [
+            OntologyAnswerCandidate(
+                candidate_id=candidate.id,
+                subject_id=candidate.subject_id,
+                predicate=candidate.predicate,
+                object_entity_id=candidate.object_entity_id,
+                object_value=candidate.object_value,
+                confidence=candidate.confidence,
+                review_risk=candidate.review_risk,
+                ontology_version=candidate.ontology_version,
+                evidence_unit_ids=[
+                    item.content_unit_id for item in candidate.evidence
+                ],
+            )
+            for candidate in selected
+        ]
 
     def _paths(
         self,

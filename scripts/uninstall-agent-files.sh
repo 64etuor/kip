@@ -2,9 +2,12 @@
 set -euo pipefail
 mode="${1:-personal}"
 case "$mode" in
-  personal) target="$HOME/.claude/skills/knowledge-fabric" ;;
-  project) target="${2:-$PWD}/.claude/skills/knowledge-fabric" ;;
+  personal) skills_root="$HOME/.claude/skills" ;;
+  project) skills_root="${2:-$PWD}/.claude/skills" ;;
   *) printf 'Usage: %s [personal|project [target-project]]\n' "$0" >&2; exit 2 ;;
 esac
-rm -rf "$target"
-printf 'Removed %s\n' "$target"
+for skill in knowledge-fabric kip-setup; do
+  target="$skills_root/$skill"
+  rm -rf "$target"
+  printf 'Removed %s\n' "$target"
+done

@@ -20,6 +20,29 @@ def test_setup_answers_reject_secret_values_and_unknown_fields() -> None:
         SetupAnswers.model_validate({"workspace": "acme", "api_key": "secret"})
 
 
+def test_secret_reference_accepts_env_and_file_schemes() -> None:
+    env_reference = SecretReference.parse("env:KIP_DATABASE_URL")
+    file_reference = SecretReference.parse("file:/run/secrets/kip-model-key")
+
+    assert env_reference.display() == "env:KIP_DATABASE_URL"
+    assert file_reference.display() == "file:/run/secrets/kip-model-key"
+
+
+@pytest.mark.parametrize("scheme", ["keychain", "secret-manager"])
+def test_secret_reference_rejects_unresolvable_schemes_with_guidance(
+    scheme: str,
+) -> None:
+    with pytest.raises(ValueError, match="env:NAME or file:/absolute/path"):
+        SecretReference.parse(f"{scheme}:kip/openai")
+
+
+def test_secret_reference_validates_scheme_shape() -> None:
+    with pytest.raises(PydanticValidationError, match="environment variable"):
+        SecretReference.parse("env:not/a/variable")
+    with pytest.raises(PydanticValidationError, match="absolute path"):
+        SecretReference.parse("file:relative/path")
+
+
 def test_setup_answers_round_trip_uses_versioned_contract() -> None:
     answers = SetupAnswers(
         workspace="acme-rnd",
@@ -49,6 +72,7 @@ def test_source_answer_requires_canonical_directory(tmp_path: Path) -> None:
 
     assert answer.root == str(source.resolve())
     assert answer.read_only is True
+    assert ".pptx" in answer.include_extensions
     assert json.loads(answer.model_dump_json())["root"] == str(source.resolve())
 
 

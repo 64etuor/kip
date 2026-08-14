@@ -1,0 +1,421 @@
+{
+  "$defs": {
+    "AssertionCandidateView": {
+      "additionalProperties": false,
+      "description": "An `AssertionCandidate` enriched for human review.\n\nAll base candidate fields are preserved; the extra fields are additive\nread-model data (display names, ontology labels, evidence previews).",
+      "properties": {
+        "confidence": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "contradicts_assertion_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Contradicts Assertion Ids",
+          "type": "array"
+        },
+        "derivation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RelationDerivation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/CandidateEvidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "evidence_previews": {
+          "items": {
+            "$ref": "#/$defs/CandidateEvidencePreview"
+          },
+          "title": "Evidence Previews",
+          "type": "array"
+        },
+        "fingerprint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fingerprint"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "migrates_assertion_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Migrates Assertion Ids",
+          "type": "array"
+        },
+        "object_display_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Object Display Name"
+        },
+        "object_entity_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Object Entity Id"
+        },
+        "object_value": {
+          "default": null,
+          "title": "Object Value"
+        },
+        "ontology_version": {
+          "title": "Ontology Version",
+          "type": "string"
+        },
+        "origin": {
+          "title": "Origin",
+          "type": "string"
+        },
+        "predicate": {
+          "title": "Predicate",
+          "type": "string"
+        },
+        "predicate_description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Predicate Description"
+        },
+        "predicate_label_ko": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Predicate Label Ko"
+        },
+        "review_note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Review Note"
+        },
+        "review_risk": {
+          "default": "medium",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Review Risk",
+          "type": "string"
+        },
+        "status": {
+          "default": "proposed",
+          "enum": [
+            "proposed",
+            "approved",
+            "rejected",
+            "superseded"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "subject_display_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Subject Display Name"
+        },
+        "subject_id": {
+          "title": "Subject Id",
+          "type": "string"
+        },
+        "valid_from": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid From"
+        },
+        "valid_to": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Valid To"
+        }
+      },
+      "required": [
+        "id",
+        "subject_id",
+        "predicate",
+        "origin",
+        "ontology_version"
+      ],
+      "title": "AssertionCandidateView",
+      "type": "object"
+    },
+    "CandidateEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "content_unit_id": {
+          "minLength": 1,
+          "title": "Content Unit Id",
+          "type": "string"
+        },
+        "locator": {
+          "additionalProperties": true,
+          "title": "Locator",
+          "type": "object"
+        },
+        "quote_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Quote Hash"
+        },
+        "source_revision_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Revision Sha256"
+        }
+      },
+      "required": [
+        "content_unit_id"
+      ],
+      "title": "CandidateEvidence",
+      "type": "object"
+    },
+    "CandidateEvidencePreview": {
+      "additionalProperties": false,
+      "description": "ACL-safe inline preview of one candidate evidence reference.\n\n`snippet` is populated only when the requesting principal can already\nread the underlying unit; it is a discovery aid, never final evidence.",
+      "properties": {
+        "content_unit_id": {
+          "title": "Content Unit Id",
+          "type": "string"
+        },
+        "readable": {
+          "default": false,
+          "title": "Readable",
+          "type": "boolean"
+        },
+        "snippet": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Snippet"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        }
+      },
+      "required": [
+        "content_unit_id"
+      ],
+      "title": "CandidateEvidencePreview",
+      "type": "object"
+    },
+    "RelationDerivation": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "manual",
+            "deterministic",
+            "model",
+            "ontology_migration"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "revision": {
+          "minLength": 1,
+          "title": "Revision",
+          "type": "string"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "revision"
+      ],
+      "title": "RelationDerivation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "items": {
+      "items": {
+        "$ref": "#/$defs/AssertionCandidateView"
+      },
+      "title": "Items",
+      "type": "array"
+    },
+    "predicate": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Predicate"
+    },
+    "schema_version": {
+      "const": "kip.assertion-candidate-listing.v1",
+      "default": "kip.assertion-candidate-listing.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "default": "proposed",
+      "title": "Status",
+      "type": "string"
+    },
+    "subject_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Subject Id"
+    },
+    "total": {
+      "default": 0,
+      "title": "Total",
+      "type": "integer"
+    }
+  },
+  "title": "AssertionCandidateListing",
+  "type": "object"
+}

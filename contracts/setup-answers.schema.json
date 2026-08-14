@@ -76,8 +76,7 @@
         "scheme": {
           "enum": [
             "env",
-            "keychain",
-            "secret-manager"
+            "file"
           ],
           "title": "Scheme",
           "type": "string"

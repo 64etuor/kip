@@ -18,6 +18,9 @@ class EntityDefinition(OntologyModel):
     parent: str | None = None
     description: str | None = None
     abstract: bool = False
+    # Presentation metadata; never part of release-diff semantics.
+    label_ko: str | None = None
+    description_ko: str | None = None
 
 
 class PredicateDefinition(OntologyModel):
@@ -27,6 +30,10 @@ class PredicateDefinition(OntologyModel):
     risk: Literal["low", "medium", "high"]
     extraction: str
     review: Literal["not_required", "conditional", "required"]
+    # Presentation metadata; never part of release-diff semantics.
+    description: str | None = None
+    label_ko: str | None = None
+    description_ko: str | None = None
 
 
 class EntityFile(OntologyModel):

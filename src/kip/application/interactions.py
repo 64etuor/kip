@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from kip.domain.interactions import (
     ClarificationAnswer,
@@ -14,15 +15,19 @@ from kip.domain.interactions import (
     InteractionFeedback,
     OntologyDiscoveryCandidate,
     OntologyDiscoveryProposal,
+    OntologyDiscoveryRelease,
     OntologyDiscoveryReview,
     UserPreference,
     UserPreferenceWrite,
     validate_preference_key,
 )
 from kip.domain.models import RequestContext
-from kip.errors import AuthorizationError, ValidationError
+from kip.errors import AuthorizationError, ConflictError, ValidationError
 from kip.ids import stable_id
+from kip.ontology_discovery_release import materialize_ontology_release
 from kip.ports.interactions import InteractionStore
+
+_MATERIALIZED_KINDS = frozenset({"entity_type", "predicate"})
 
 
 class InteractionUseCases:
@@ -34,12 +39,14 @@ class InteractionUseCases:
         discovery_enabled: bool,
         domain_profile: str,
         clarification_ttl_seconds: int,
+        ontology_root: Path | None = None,
     ) -> None:
         self._store = store
         self._enabled = enabled
         self._discovery_enabled = discovery_enabled
         self._domain_profile = domain_profile
         self._clarification_ttl = timedelta(seconds=clarification_ttl_seconds)
+        self._ontology_root = ontology_root
 
     @property
     def enabled(self) -> bool:
@@ -151,10 +158,23 @@ class InteractionUseCases:
         if not self._discovery_enabled:
             raise ValidationError("ontology discovery is disabled")
         selected_now = now or datetime.now(UTC)
+        # Every store adapter now persists the full spec (`parent`, `domain`,
+        # `range`, `inverse`, `risk`, `review`, `extraction`) losslessly, in
+        # addition to `target_symbol`. `target_symbol` is kept as a separate,
+        # independently persisted legacy/implicit hint for backward
+        # compatibility: for `entity_type`, mirror the explicit `parent` hint
+        # into it too so a parent-shaped hint is still visible to any
+        # consumer that only reads `target_symbol`; see
+        # `ontology_discovery_release.py` for how the two are reconciled at
+        # materialization time.
+        effective_target_symbol = proposal.target_symbol
+        if proposal.kind == "entity_type" and proposal.parent is not None:
+            effective_target_symbol = proposal.parent
         fingerprint = _discovery_fingerprint(
             self._domain_profile,
             context.principal_id,
             proposal,
+            effective_target_symbol,
         )
         return self._store.save_ontology_discovery_candidate(
             context,
@@ -165,7 +185,14 @@ class InteractionUseCases:
                 symbol=proposal.symbol,
                 label=proposal.label,
                 definition=proposal.definition,
-                target_symbol=proposal.target_symbol,
+                target_symbol=effective_target_symbol,
+                parent=proposal.parent,
+                domain=proposal.domain,
+                range=proposal.range,
+                inverse=proposal.inverse,
+                risk=proposal.risk,
+                review=proposal.review,
+                extraction=proposal.extraction,
                 fingerprint=fingerprint,
                 created_at=selected_now,
                 updated_at=selected_now,
@@ -203,12 +230,34 @@ class InteractionUseCases:
         # role is never masked by the feature being disabled.
         self._require_admin(context)
         self._require_enabled()
-        return self._store.review_ontology_discovery_candidate(
+        selected_now = now or datetime.now(UTC)
+        release: OntologyDiscoveryRelease | None = None
+        if review.action == "accept":
+            candidate = self._store.get_ontology_discovery_candidate(context, candidate_id)
+            if candidate.status != "proposed":
+                raise ConflictError("ontology discovery candidate has already been reviewed")
+            if candidate.kind in _MATERIALIZED_KINDS:
+                if self._ontology_root is None:
+                    raise ValidationError(
+                        "ontology discovery release requires an ontology contract"
+                    )
+                # Materialize before persisting the status change: if this
+                # raises, the candidate must stay "proposed" and no file is
+                # touched (materializer is shadow-validated + atomic).
+                release = materialize_ontology_release(
+                    self._ontology_root,
+                    self._domain_profile,
+                    candidate,
+                )
+        reviewed = self._store.review_ontology_discovery_candidate(
             context,
             candidate_id,
             review,
-            now=now or datetime.now(UTC),
+            now=selected_now,
         )
+        if release is not None:
+            reviewed = reviewed.model_copy(update={"release": release})
+        return reviewed
 
     def prune_expired_clarifications(
         self,
@@ -239,13 +288,14 @@ def _discovery_fingerprint(
     domain_profile: str,
     principal_id: str,
     proposal: OntologyDiscoveryProposal,
+    effective_target_symbol: str | None,
 ) -> str:
     payload = {
         "domain_profile": domain_profile,
         "principal_id": principal_id,
         "kind": proposal.kind,
         "symbol": proposal.symbol,
-        "target_symbol": proposal.target_symbol,
+        "target_symbol": effective_target_symbol,
     }
     encoded = json.dumps(
         payload,

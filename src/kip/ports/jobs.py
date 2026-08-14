@@ -17,6 +17,13 @@ class JobStore(Protocol):
 
     def claim_job(self, context: RequestContext, worker_id: str) -> JobRecord | None: ...
 
+    def record_job_result(
+        self,
+        context: RequestContext,
+        job_id: str,
+        result: JsonObject,
+    ) -> None: ...
+
     def complete_job(self, context: RequestContext, job_id: str) -> None: ...
 
     def fail_job(self, context: RequestContext, job_id: str, error: str) -> None: ...

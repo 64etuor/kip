@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from openpyxl import Workbook
 
 from kip.adapters.identity.api_key import ApiKeyIdentityAdapter
+from kip.adapters.repository.memory import MemoryRepository
 from kip.api import create_app
 from kip.container import build_container
 from kip.domain.models import AssertionCandidate, SearchRequest
@@ -284,6 +285,145 @@ def test_rest_explains_approved_assertion_with_evidence(test_container):
     assert payload["evidence"][0]["unit"]["id"] == unit_id
 
 
+def test_rest_proposes_candidate_matching_cli_review_propose_fields(test_container):
+    admin_headers = {
+        "X-KIP-API-Key": "test-key",
+        "X-KIP-Admin-Key": "test-admin",
+        "X-KIP-Workspace": "default",
+        "X-KIP-ACL-Scopes": "workspace:default",
+    }
+    client = TestClient(create_app(test_container))
+
+    response = client.post(
+        "/v1/review/candidates",
+        headers=admin_headers,
+        json={
+            "subject_id": "doc_new",
+            "predicate": "amends",
+            "object_entity_id": "doc_old",
+            "origin": "test",
+            "ontology_version": "core/1.0.0",
+        },
+    )
+
+    assert response.status_code == 200
+    created = response.json()["data"]
+    assert created["subject_id"] == "doc_new"
+    assert created["predicate"] == "amends"
+    assert created["object_entity_id"] == "doc_old"
+    assert created["origin"] == "test"
+    assert created["status"] == "proposed"
+    assert created["id"].startswith("cand_")
+
+    fetched = client.get(f"/v1/review/candidates/{created['id']}", headers=admin_headers)
+    assert fetched.status_code == 200
+    assert fetched.json()["data"]["id"] == created["id"]
+
+
+def test_rest_propose_candidate_requires_admin_key(test_container):
+    client = TestClient(create_app(test_container))
+    headers = {
+        "X-KIP-API-Key": "test-key",
+        "X-KIP-Workspace": "default",
+        "X-KIP-ACL-Scopes": "workspace:default",
+    }
+
+    response = client.post(
+        "/v1/review/candidates",
+        headers=headers,
+        json={
+            "subject_id": "doc_new",
+            "predicate": "amends",
+            "object_entity_id": "doc_old",
+            "origin": "test",
+            "ontology_version": "core/1.0.0",
+        },
+    )
+
+    assert response.status_code == 403
+
+
+def test_rest_propose_candidate_rejects_invalid_payload(test_container):
+    client = TestClient(create_app(test_container))
+    headers = {
+        "X-KIP-API-Key": "test-key",
+        "X-KIP-Admin-Key": "test-admin",
+        "X-KIP-Workspace": "default",
+        "X-KIP-ACL-Scopes": "workspace:default",
+    }
+
+    response = client.post(
+        "/v1/review/candidates",
+        headers=headers,
+        json={
+            "subject_id": "doc_new",
+            "object_entity_id": "doc_old",
+            "origin": "test",
+            "ontology_version": "core/1.0.0",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "request_validation_error"
+
+
+def test_rest_propose_candidate_omits_ontology_version_without_a_loaded_catalog(
+    test_container,
+):
+    client = TestClient(create_app(test_container))
+    headers = {
+        "X-KIP-API-Key": "test-key",
+        "X-KIP-Admin-Key": "test-admin",
+        "X-KIP-Workspace": "default",
+        "X-KIP-ACL-Scopes": "workspace:default",
+    }
+
+    response = client.post(
+        "/v1/review/candidates",
+        headers=headers,
+        json={
+            "subject_id": "doc_new",
+            "predicate": "amends",
+            "object_entity_id": "doc_old",
+            "origin": "test",
+        },
+    )
+
+    assert response.status_code == 422
+    assert "ontology_version" in response.json()["error"]["message"]
+
+
+def test_rest_propose_candidate_defaults_ontology_version_to_the_active_catalog(
+    test_container,
+):
+    settings = replace(
+        test_container.settings,
+        project_root=Path(__file__).resolve().parents[1],
+    )
+    ontology_container = build_container(settings, repository=test_container.repository)
+    client = TestClient(create_app(ontology_container))
+    headers = {
+        "X-KIP-API-Key": "test-key",
+        "X-KIP-Admin-Key": "test-admin",
+        "X-KIP-Workspace": "default",
+        "X-KIP-ACL-Scopes": "workspace:default",
+    }
+
+    response = client.post(
+        "/v1/review/candidates",
+        headers=headers,
+        json={
+            "subject_id": "doc_new",
+            "predicate": "amends",
+            "object_entity_id": "doc_old",
+            "origin": "test",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["ontology_version"] == "core/1.0.0"
+
+
 def test_rest_exposes_shared_ontology_entity_and_mining_contracts(test_container):
     settings = replace(
         test_container.settings,
@@ -328,3 +468,37 @@ def test_rest_exposes_shared_ontology_entity_and_mining_contracts(test_container
     assert mining.status_code == 422
     assert mining.json()["error"]["code"] == "validation_error"
     assert "relation miner" in mining.json()["error"]["message"]
+
+
+def test_readyz_reports_ready_when_repository_answers(test_container):
+    client = TestClient(create_app(test_container))
+
+    liveness = client.get("/healthz")
+    readiness = client.get("/readyz")
+
+    assert liveness.status_code == 200
+    assert liveness.json() == {"status": "ok"}
+    assert readiness.status_code == 200
+    assert readiness.json() == {"status": "ready", "checks": {"repository": "ok"}}
+
+
+def test_readyz_fails_closed_when_repository_is_unreachable(test_container):
+    class _FailingOperations:
+        def ping(self) -> None:
+            raise RuntimeError("database unreachable")
+
+    repository = MemoryRepository()
+    repository.operations = _FailingOperations()  # type: ignore[assignment]
+    container = build_container(test_container.settings, repository=repository)
+    client = TestClient(create_app(container))
+
+    readiness = client.get("/readyz")
+    liveness = client.get("/healthz")
+
+    assert readiness.status_code == 503
+    assert readiness.json() == {
+        "status": "unavailable",
+        "checks": {"repository": "failed"},
+    }
+    # Liveness must stay green: a broken database is not a process failure.
+    assert liveness.status_code == 200

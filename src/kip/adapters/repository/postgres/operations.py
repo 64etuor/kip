@@ -14,6 +14,9 @@ class PostgresOperationsStore:
     database: PostgresDatabase
     name: ClassVar[str] = "postgresql"
 
+    def ping(self) -> None:
+        self.database.ping()
+
     def migrate(self, migrations_dir: Path) -> list[str]:
         return self.database.migrate(migrations_dir)
 

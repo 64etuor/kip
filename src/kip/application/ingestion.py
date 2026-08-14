@@ -15,6 +15,7 @@ from kip.domain.models import (
     SyncSummary,
 )
 from kip.errors import KipError, ValidationError
+from kip.ids import stable_id
 from kip.ports.evidence import EvidenceStore, SourceFileInspectorPort
 from kip.ports.ingestion import (
     ContentAddressedStorePort,
@@ -40,7 +41,9 @@ class IngestionUseCases:
         evidence: EvidenceStore,
         *,
         minimum_quality_score: float,
+        deletion_grace_scans: int = 2,
     ) -> None:
+        self._store = store
         self._jobs = jobs
         self._sources = sources
         self._files = FileIngestionWorkflow(
@@ -52,6 +55,7 @@ class IngestionUseCases:
         )
         self._events = EventIngestionWorkflow(store, analyzer, content_store)
         self._minimum_quality_score = minimum_quality_score
+        self._deletion_grace_scans = deletion_grace_scans
 
     def ingest_file(
         self,
@@ -84,8 +88,18 @@ class IngestionUseCases:
         source = self._sources.filesystem(source_name)
         scope = source.acl_scope or f"workspace:{context.workspace}"
         summary = SyncSummary(source=source_name)
+        system_id = stable_id("srcsys", context.workspace, source_name)
+        seen_object_ids: set[str] = set()
+        # If source.scan() raises (unavailable mount, walk failure), the
+        # exception propagates before any reconciliation: a failed or partial
+        # scan never marks absences and never tombstones.
         for record in source.scan():
             summary.scanned += 1
+            # A scanned file counts as seen even when its ingest fails: the
+            # file exists, so it must never move toward deletion.
+            seen_object_ids.add(
+                stable_id("srcobj", system_id, record.relative_path)
+            )
             if dry_run:
                 summary.skipped += 1
                 continue
@@ -106,7 +120,59 @@ class IngestionUseCases:
                 )
                 continue
             self._record_result(summary, result)
+        if not dry_run:
+            self._reconcile_filesystem_deletions(
+                context,
+                summary,
+                system_id=system_id,
+                scope=scope,
+                seen_object_ids=seen_object_ids,
+            )
         return summary
+
+    def _reconcile_filesystem_deletions(
+        self,
+        context: RequestContext,
+        summary: SyncSummary,
+        *,
+        system_id: str,
+        scope: str,
+        seen_object_ids: set[str],
+    ) -> None:
+        """Apply the deletion grace policy after a complete, successful scan.
+
+        An object absent from `deletion_grace_scans` consecutive complete
+        scans is soft-tombstoned; a reappearing object clears its absence
+        mark. An entirely empty scan is treated as a possibly unavailable
+        mount and never contributes absence evidence.
+        """
+        if not seen_object_ids:
+            summary.warnings.append(
+                "scan saw no files; skipping deletion reconciliation "
+                "(a source outage must not be interpreted as deletion)"
+            )
+            return
+        scan_context = context.model_copy(
+            update={"acl_scopes": sorted(set(context.acl_scopes).union([scope]))}
+        )
+        absences = self._store.reconcile_scan_absences(
+            scan_context,
+            system_id,
+            seen_object_ids,
+        )
+        for absence in absences:
+            summary.absent += 1
+            if absence.absent_scan_count < self._deletion_grace_scans:
+                continue
+            try:
+                self._files.tombstone_absent(scan_context, absence)
+            except (KipError, OSError) as exc:
+                summary.failed += 1
+                summary.warnings.append(
+                    f"{absence.external_id}: {type(exc).__name__}: {exc}"
+                )
+                continue
+            summary.tombstoned += 1
 
     def reextract_filesystem(
         self,

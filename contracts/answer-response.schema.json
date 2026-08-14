@@ -268,9 +268,97 @@
       "title": "ModelRevision",
       "type": "object"
     },
+    "OntologyAnswerCandidate": {
+      "additionalProperties": false,
+      "description": "A proposed, unreviewed assertion candidate shown for transparency only.\n\nCandidates are never facts: `status` is always \"proposed\", they carry no\napproved evidence, and they must never satisfy answer evidence\nrequirements or citations.",
+      "properties": {
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        },
+        "evidence_unit_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Unit Ids",
+          "type": "array"
+        },
+        "object_entity_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Object Entity Id"
+        },
+        "object_value": {
+          "default": null,
+          "title": "Object Value"
+        },
+        "ontology_version": {
+          "title": "Ontology Version",
+          "type": "string"
+        },
+        "predicate": {
+          "title": "Predicate",
+          "type": "string"
+        },
+        "review_risk": {
+          "default": "medium",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Review Risk",
+          "type": "string"
+        },
+        "status": {
+          "const": "proposed",
+          "default": "proposed",
+          "title": "Status",
+          "type": "string"
+        },
+        "subject_id": {
+          "title": "Subject Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "subject_id",
+        "predicate",
+        "ontology_version"
+      ],
+      "title": "OntologyAnswerCandidate",
+      "type": "object"
+    },
     "OntologyAnswerContext": {
       "additionalProperties": false,
       "properties": {
+        "candidates": {
+          "items": {
+            "$ref": "#/$defs/OntologyAnswerCandidate"
+          },
+          "title": "Candidates",
+          "type": "array"
+        },
         "edges": {
           "items": {
             "$ref": "#/$defs/OntologyAnswerEdge"

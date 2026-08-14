@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 
 from kip.adapters.repository.memory.state import MemoryState
@@ -10,6 +11,7 @@ from kip.domain.models import (
     DocumentPacket,
     IngestResult,
     RequestContext,
+    SourceObjectAbsence,
 )
 from kip.errors import ConflictError, ValidationError
 
@@ -77,6 +79,39 @@ class MemoryIngestionStore:
         ):
             return None
         return packet.revision.id
+
+    def reconcile_scan_absences(
+        self,
+        context: RequestContext,
+        system_id: str,
+        seen_object_ids: AbstractSet[str],
+    ) -> list[SourceObjectAbsence]:
+        absences: list[SourceObjectAbsence] = []
+        for object_id, revision_id in self.state.current_revision_by_object.items():
+            packet = self.state.packets_by_revision.get(revision_id)
+            if (
+                packet is None
+                or packet.workspace_id != context.workspace
+                or packet.source_object.system_id != system_id
+            ):
+                continue
+            if object_id in seen_object_ids:
+                # A reappearing object clears its absence mark.
+                self.state.absent_scan_counts.pop(object_id, None)
+                continue
+            if packet.revision.is_tombstone:
+                continue
+            count = self.state.absent_scan_counts.get(object_id, 0) + 1
+            self.state.absent_scan_counts[object_id] = count
+            absences.append(
+                SourceObjectAbsence(
+                    object_id=object_id,
+                    external_id=packet.source_object.external_id,
+                    artifact_id=packet.artifact.id,
+                    absent_scan_count=count,
+                )
+            )
+        return absences
 
     def ingest_packet(
         self,

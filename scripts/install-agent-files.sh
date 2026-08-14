@@ -6,19 +6,22 @@ source "$SCRIPT_DIR/common.sh"
 mode="${1:-personal}"
 case "$mode" in
   personal)
-    target="$HOME/.claude/skills/knowledge-fabric"
+    skills_root="$HOME/.claude/skills"
     ;;
   project)
-    target="${2:-$PWD}/.claude/skills/knowledge-fabric"
+    skills_root="${2:-$PWD}/.claude/skills"
     ;;
   *)
     printf 'Usage: %s [personal|project [target-project]]\n' "$0" >&2
     exit 2
     ;;
 esac
-mkdir -p "$(dirname "$target")" "$HOME/.config/kip"
-rm -rf "$target"
-cp -R "$PROJECT_ROOT/skills/knowledge-fabric" "$target"
+mkdir -p "$skills_root" "$HOME/.config/kip"
+for skill in knowledge-fabric kip-setup; do
+  target="$skills_root/$skill"
+  rm -rf "$target"
+  cp -R "$PROJECT_ROOT/skills/$skill" "$target"
+  printf 'Installed %s Skill at %s\n' "$skill" "$target"
+done
 printf '%s\n' "$PROJECT_ROOT" > "$HOME/.config/kip/project-root"
-printf 'Installed knowledge-fabric Skill at %s\n' "$target"
 printf 'Recorded KIP root at %s\n' "$HOME/.config/kip/project-root"

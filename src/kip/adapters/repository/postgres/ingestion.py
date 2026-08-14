@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 
 from kip.adapters.repository.postgres.database import PostgresDatabase
 from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
-from kip.domain.models import DocumentPacket, IngestResult, RequestContext
+from kip.domain.models import (
+    DocumentPacket,
+    IngestResult,
+    RequestContext,
+    SourceObjectAbsence,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,3 +68,15 @@ class PostgresIngestionStore:
         packet: DocumentPacket,
     ) -> IngestResult:
         return self.database.replace_extraction(context, packet)
+
+    def reconcile_scan_absences(
+        self,
+        context: RequestContext,
+        system_id: str,
+        seen_object_ids: AbstractSet[str],
+    ) -> list[SourceObjectAbsence]:
+        return self.database.reconcile_scan_absences(
+            context,
+            system_id,
+            seen_object_ids,
+        )

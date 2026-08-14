@@ -247,6 +247,24 @@ def _validated_search_mode(value: str | None) -> SearchMode | None:
             raise ValidationError(f"unsupported search mode: {value}")
 
 
+def _resolve_ontology_version(runtime: Runtime, explicit: str | None) -> str:
+    """Resolve `--ontology-version`, defaulting to the loaded catalog's version.
+
+    `validate_candidate` enforces strict equality with the active catalog
+    version, so a stale hardcoded default goes wrong the moment the ontology
+    is released past its initial version. Each CLI invocation is a fresh
+    process, so this always reflects the on-disk ontology files.
+    """
+    if explicit is not None:
+        return explicit
+    ontology = runtime.container.ontology
+    if ontology is None:
+        raise ValidationError(
+            "--ontology-version is required when no ontology contract is loaded"
+        )
+    return ontology.version
+
+
 def _enabled_filesystem_sources(runtime: Runtime) -> list[str]:
     names: list[str] = []
     for source in runtime.container.settings.get("sources.filesystem", []) or []:
@@ -798,13 +816,18 @@ def review_list(
     ctx: typer.Context,
     status_value: str = typer.Option("proposed", "--status"),
     limit: int = typer.Option(100, min=1, max=1000),
+    predicate: str | None = typer.Option(None, "--predicate"),
+    subject_id: str | None = typer.Option(None, "--subject-id"),
 ) -> None:
+    """List candidates for review, ordered by risk then confidence."""
     _run(
         ctx,
-        lambda runtime: runtime.container.application.knowledge.list_candidates(
+        lambda runtime: runtime.container.application.knowledge.candidate_listing(
             runtime.context,
             status_value,
             limit,
+            predicate=predicate,
+            subject_id=subject_id,
         ),
     )
 
@@ -818,7 +841,9 @@ def review_propose(
     object_json: str | None = typer.Option(None, help="JSON literal for a value object"),
     evidence_unit_id: list[str] | None = typer.Option(None),
     origin: str = typer.Option("human"),
-    ontology_version: str = typer.Option("core/1.0.0"),
+    ontology_version: str | None = typer.Option(
+        None, help="Defaults to the active catalog version."
+    ),
     confidence: float | None = typer.Option(None),
 ) -> None:
     def action(runtime: Runtime) -> Any:
@@ -833,7 +858,7 @@ def review_propose(
             object_value=object_value,
             origin=origin,
             confidence=confidence,
-            ontology_version=ontology_version,
+            ontology_version=_resolve_ontology_version(runtime, ontology_version),
             evidence=[
                 CandidateEvidence(content_unit_id=value) for value in (evidence_unit_id or [])
             ],
@@ -848,11 +873,37 @@ def review_approve(
     ctx: typer.Context,
     candidate_id: str = typer.Argument(...),
     note: str | None = typer.Option(None),
+    supersede_contradicted: bool = typer.Option(
+        False,
+        "--supersede-contradicted",
+        help=(
+            "Also mark every assertion this candidate contradicts as "
+            "superseded by the newly approved assertion"
+        ),
+    ),
 ) -> None:
     _run(
         ctx,
         lambda runtime: runtime.container.application.knowledge.review_approve(
-            runtime.context, candidate_id, note
+            runtime.context,
+            candidate_id,
+            note,
+            supersede_contradicted=supersede_contradicted,
+        ),
+    )
+
+
+@review_app.command("revoke")
+def review_revoke(
+    ctx: typer.Context,
+    assertion_id: str = typer.Argument(...),
+    note: str = typer.Option(..., "--note", help="Required revocation reason"),
+) -> None:
+    """Revoke an approved assertion; it leaves all approved-only surfaces."""
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.knowledge.revoke_assertion(
+            runtime.context, assertion_id, note
         ),
     )
 
@@ -1230,6 +1281,11 @@ def ontology_entities(
 def ontology_context(
     ctx: typer.Context,
     query: str = typer.Argument(...),
+    include_candidate_assertions: bool = typer.Option(
+        False,
+        "--include-candidate-assertions",
+        help="Also list proposed (unapproved) candidates, clearly labeled",
+    ),
 ) -> None:
     _run(
         ctx,
@@ -1237,6 +1293,7 @@ def ontology_context(
             runtime.container.application.ontology_context.build(
                 runtime.context,
                 query,
+                include_candidates=include_candidate_assertions,
             ).context
         ),
     )
@@ -1287,19 +1344,25 @@ def ontology_candidates(
     ctx: typer.Context,
     status_value: str = typer.Option("proposed", "--status"),
     limit: int = typer.Option(100, min=1, max=1000),
+    predicate: str | None = typer.Option(None, "--predicate"),
+    subject_id: str | None = typer.Option(None, "--subject-id"),
 ) -> None:
     def action(runtime: Runtime) -> Any:
+        listing = runtime.container.application.knowledge.candidate_listing(
+            runtime.context,
+            status_value,
+            limit,
+            predicate=predicate,
+            subject_id=subject_id,
+        )
         return {
             "entities": runtime.container.application.ontology_rag.list_entity_candidates(
                 runtime.context,
                 status=status_value,
                 limit=limit,
             ),
-            "relations": runtime.container.application.knowledge.list_candidates(
-                runtime.context,
-                status_value,
-                limit,
-            ),
+            "relations": listing.items,
+            "relations_total": listing.total,
         }
 
     _run(ctx, action)
@@ -1599,6 +1662,21 @@ def ontology_discovery_propose(
     label: str = typer.Option(..., "--label"),
     definition: str = typer.Option(..., "--definition"),
     target_symbol: str | None = typer.Option(None, "--target-symbol"),
+    parent: str | None = typer.Option(
+        None, "--parent", help="entity_type only: the proposed parent type."
+    ),
+    domain_type: list[str] | None = typer.Option(
+        None, "--domain", help="predicate only: allowed subject types."
+    ),
+    range_type: list[str] | None = typer.Option(
+        None, "--range", help="predicate only: allowed object types."
+    ),
+    inverse: str | None = typer.Option(None, "--inverse", help="predicate only."),
+    risk: str | None = typer.Option(None, "--risk", help="predicate only: low|medium|high."),
+    review: str | None = typer.Option(
+        None, "--review", help="predicate only: not_required|conditional|required."
+    ),
+    extraction: str | None = typer.Option(None, "--extraction", help="predicate only."),
     confirmed: bool = typer.Option(False, "--confirmed"),
 ) -> None:
     def action(runtime: Runtime) -> Any:
@@ -1614,6 +1692,13 @@ def ontology_discovery_propose(
                     "label": label,
                     "definition": definition,
                     "target_symbol": target_symbol,
+                    "parent": parent,
+                    "domain": domain_type or None,
+                    "range": range_type or None,
+                    "inverse": inverse,
+                    "risk": risk,
+                    "review": review,
+                    "extraction": extraction,
                     "confirmed": True,
                 },
             ),

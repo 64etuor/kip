@@ -31,6 +31,7 @@ from kip.domain.knowledge import (
     stable_entity_candidate_id,
 )
 from kip.domain.models import (
+    AssertionCandidate,
     ContentUnit,
     DocumentPacket,
     EmbeddingRecord,
@@ -44,6 +45,7 @@ from kip.domain.models import (
 from kip.domain.telemetry import QueryTrace
 from kip.errors import NotFoundError, ValidationError
 from kip.ids import new_id, stable_id
+from kip.ontology import OntologyCatalog
 from kip.ontology_migration import OntologyMigration
 from kip.settings import Settings
 
@@ -56,8 +58,18 @@ def test_postgres_interactions_enforce_owner_scope_and_review_lifecycle(
 ) -> None:
     pytest.importorskip("psycopg")
     workspace = "test_" + uuid.uuid4().hex[:12]
+    real_root = Path(__file__).resolve().parents[2]
+    # Approving an `entity_type`/`predicate` discovery candidate now
+    # materializes it into the ontology tree the container was built from
+    # (see `kip.ontology_discovery_release`). This test approves one, so
+    # `project_root` must never point at the real repo checkout or it would
+    # mutate tracked ontology files on disk; copy just enough of the tree
+    # (ontology contracts + migrations) into a throwaway directory instead.
+    project_root = tmp_path / "repo"
+    shutil.copytree(real_root / "ontology", project_root / "ontology")
+    shutil.copytree(real_root / "migrations", project_root / "migrations")
     settings = Settings(
-        project_root=Path(__file__).resolve().parents[2],
+        project_root=project_root,
         config_path=tmp_path / "kip.toml",
         raw={
             "search": {"semantic_enabled": False},
@@ -138,6 +150,199 @@ def test_postgres_interactions_enforce_owner_scope_and_review_lifecycle(
         assert duplicate.id == first.id
         assert duplicate.occurrence_count == 2
         assert reviewed.status == "accepted_for_release"
+        assert reviewed.release is not None
+        assert reviewed.release.file == "domains/empty.yaml"
+    finally:
+        import psycopg
+
+        with (
+            psycopg.connect(str(URL), autocommit=True) as connection,
+            connection.cursor() as cursor,
+        ):
+            cursor.execute("DELETE FROM kip.workspaces WHERE slug=%s", (workspace,))
+
+
+def test_postgres_discovery_candidate_persists_predicate_spec_across_round_trip(
+    tmp_path: Path,
+) -> None:
+    # `OntologyDiscoveryProposal`/`OntologyDiscoveryCandidate` carry a full
+    # release spec (`parent`, `domain`, `range`, `inverse`, `risk`, `review`,
+    # `extraction`). Every value chosen below intentionally differs from the
+    # release-time fallback default (`domain`/`range` default to
+    # `["EvidenceObject"]`, `risk` defaults to "high", `review` to
+    # "required", `extraction` to "semantic") so that materializing with the
+    # fallback instead of the persisted spec would fail these assertions.
+    pytest.importorskip("psycopg")
+    workspace = "test_" + uuid.uuid4().hex[:12]
+    real_root = Path(__file__).resolve().parents[2]
+    project_root = tmp_path / "repo"
+    shutil.copytree(real_root / "ontology", project_root / "ontology")
+    shutil.copytree(real_root / "migrations", project_root / "migrations")
+    settings = Settings(
+        project_root=project_root,
+        config_path=tmp_path / "kip.toml",
+        raw={
+            "search": {"semantic_enabled": False},
+            "graph": {"backend": "memory"},
+            "sources": {"filesystem": []},
+            "interaction": {
+                "enabled": True,
+                "clarification_ttl_seconds": 3600,
+            },
+            "ontology": {
+                "domain_profile": "empty",
+                "adaptive_discovery": True,
+            },
+        },
+        environment="test",
+        workspace=workspace,
+        database_url=str(URL),
+        cas_path=tmp_path / "cas",
+    )
+    repository = PostgresRepository(str(URL))
+    container = build_container(settings, repository=repository)
+    repository.operations.migrate(settings.project_root / "migrations")
+    owner = container.application.operations.request_context(
+        workspace=workspace,
+        principal_id="principal_owner",
+        acl_scopes=[f"workspace:{workspace}"],
+    )
+    admin = owner.model_copy(update={"roles": ["admin"]})
+
+    try:
+        proposed = container.application.interactions.propose_ontology_discovery(
+            owner,
+            OntologyDiscoveryProposal(
+                kind="predicate",
+                symbol="funds_test_spec",
+                label="자금을 지원한다",
+                definition="한 조직이 다른 프로젝트에 자금을 지원한다.",
+                domain=["Organization"],
+                range=["Project"],
+                risk="medium",
+                review="conditional",
+                extraction="mixed",
+                confirmed=True,
+            ),
+        )
+
+        # Simulate reviewing after a process restart: fetch the candidate
+        # back through a fresh store round trip (a new list query against
+        # PostgreSQL) instead of reusing the in-process Python object built
+        # by `propose_ontology_discovery`, and assert the original spec
+        # survived, not defaults.
+        refetched = container.application.interactions.list_ontology_discovery_candidates(
+            admin,
+            status="proposed",
+            limit=10,
+        )
+        stored = next(candidate for candidate in refetched if candidate.id == proposed.id)
+        assert stored.domain == ["Organization"]
+        assert stored.range == ["Project"]
+        assert stored.inverse is None
+        assert stored.risk == "medium"
+        assert stored.review == "conditional"
+        assert stored.extraction == "mixed"
+
+        reviewed = container.application.interactions.review_ontology_discovery_candidate(
+            admin,
+            proposed.id,
+            OntologyDiscoveryReview(action="accept"),
+        )
+
+        assert reviewed.release is not None
+        assert reviewed.release.kind == "predicate"
+        assert reviewed.release.file == "core/predicates.yaml"
+        catalog = OntologyCatalog.load(project_root / "ontology", domain_profile="empty")
+        spec = catalog.predicate_specs["funds_test_spec"]
+        assert spec.domain == ("Organization",)
+        assert spec.range == ("Project",)
+        assert spec.risk == "medium"
+        assert spec.review == "conditional"
+        assert spec.extraction == "mixed"
+        # `review == "required"` is the fallback default; a "conditional"
+        # persisted spec must NOT show up in the required-review set.
+        assert "funds_test_spec" not in catalog.evidence_required_predicates()
+    finally:
+        import psycopg
+
+        with (
+            psycopg.connect(str(URL), autocommit=True) as connection,
+            connection.cursor() as cursor,
+        ):
+            cursor.execute("DELETE FROM kip.workspaces WHERE slug=%s", (workspace,))
+
+
+def test_postgres_discovery_candidate_preserves_an_invalid_parent_for_review_time_rejection(
+    tmp_path: Path,
+) -> None:
+    # `parent` is explicit, so an unknown parent must fail shadow validation
+    # at review time rather than being silently dropped to a root type (the
+    # `target_symbol` legacy-hint fallback path is lenient and would do
+    # exactly that if `parent` itself were not persisted losslessly).
+    pytest.importorskip("psycopg")
+    workspace = "test_" + uuid.uuid4().hex[:12]
+    real_root = Path(__file__).resolve().parents[2]
+    project_root = tmp_path / "repo"
+    shutil.copytree(real_root / "ontology", project_root / "ontology")
+    shutil.copytree(real_root / "migrations", project_root / "migrations")
+    settings = Settings(
+        project_root=project_root,
+        config_path=tmp_path / "kip.toml",
+        raw={
+            "search": {"semantic_enabled": False},
+            "graph": {"backend": "memory"},
+            "sources": {"filesystem": []},
+            "interaction": {
+                "enabled": True,
+                "clarification_ttl_seconds": 3600,
+            },
+            "ontology": {
+                "domain_profile": "empty",
+                "adaptive_discovery": True,
+            },
+        },
+        environment="test",
+        workspace=workspace,
+        database_url=str(URL),
+        cas_path=tmp_path / "cas",
+    )
+    repository = PostgresRepository(str(URL))
+    container = build_container(settings, repository=repository)
+    repository.operations.migrate(settings.project_root / "migrations")
+    owner = container.application.operations.request_context(
+        workspace=workspace,
+        principal_id="principal_owner",
+        acl_scopes=[f"workspace:{workspace}"],
+    )
+    admin = owner.model_copy(update={"roles": ["admin"]})
+
+    try:
+        proposed = container.application.interactions.propose_ontology_discovery(
+            owner,
+            OntologyDiscoveryProposal(
+                kind="entity_type",
+                symbol="contract",
+                label="계약",
+                definition="업무상 체결하는 계약을 표현한다.",
+                parent="no_such_entity_type",
+                confirmed=True,
+            ),
+        )
+
+        with pytest.raises(ValidationError, match="shadow validation"):
+            container.application.interactions.review_ontology_discovery_candidate(
+                admin,
+                proposed.id,
+                OntologyDiscoveryReview(action="accept"),
+            )
+
+        still_proposed = container.application.interactions.list_ontology_discovery_candidates(
+            admin,
+            status="proposed",
+        )
+        assert [candidate.id for candidate in still_proposed] == [proposed.id]
+        assert still_proposed[0].parent == "no_such_entity_type"
     finally:
         import psycopg
 
@@ -760,6 +965,458 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
         status = repository.operations.status(context)
         assert status.source_objects == 1
         assert status.content_units == 1
+    finally:
+        import psycopg
+
+        with (
+            psycopg.connect(str(URL), autocommit=True) as connection,
+            connection.cursor() as cursor,
+        ):
+            cursor.execute("DELETE FROM kip.workspaces WHERE slug=%s", (workspace,))
+
+
+def test_postgres_review_governance_lifecycle(tmp_path: Path):
+    pytest.importorskip("psycopg")
+    workspace = "test_" + uuid.uuid4().hex[:12]
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    (source_root / "공문.txt").write_text(
+        "A과제 참여율 변경을 승인 공문에 기록한다.",
+        encoding="utf-8",
+    )
+    settings = Settings(
+        project_root=Path(__file__).resolve().parents[2],
+        config_path=tmp_path / "kip.toml",
+        raw={
+            "search": {"semantic_enabled": False},
+            "sources": {
+                "filesystem": [
+                    {
+                        "name": "fixture",
+                        "root": str(source_root),
+                        "enabled": True,
+                        "settle_seconds": 0,
+                        "include_extensions": [".txt"],
+                        "acl_scope": f"workspace:{workspace}",
+                        "classification": "internal",
+                    }
+                ]
+            },
+            "parsers": {"hwp": {"order": ["paired_pdf"]}},
+        },
+        environment="test",
+        workspace=workspace,
+        database_url=str(URL),
+        cas_path=tmp_path / "cas",
+    )
+    repository = PostgresRepository(str(URL))
+    container = build_container(settings, repository=repository)
+    repository.operations.migrate(settings.project_root / "migrations")
+    context = container.application.operations.request_context(
+        workspace=workspace,
+        acl_scopes=[f"workspace:{workspace}"],
+    )
+    try:
+        container.application.ingestion.sync_filesystem(context, "fixture")
+        unit_id = container.application.retrieval.search(
+            context,
+            SearchRequest(query="참여율 변경 승인", limit=1),
+        )[0].unit_id
+        for entity_id, entity_type, name in (
+            ("ent_pg_letter", "OfficialLetter", "PG 승인 공문"),
+            ("ent_pg_decision", "ParticipationRateChange", "PG 참여율 변경"),
+            ("ent_pg_person", "Person", "PG 담당자"),
+        ):
+            container.application.ontology_rag.create_entity(
+                context,
+                KnowledgeEntity(
+                    id=entity_id,
+                    entity_type=entity_type,
+                    canonical_name=name,
+                    acl_scopes=[f"workspace:{workspace}"],
+                ),
+            )
+        knowledge = container.application.knowledge
+
+        def _proposal(predicate: str, object_entity_id: str, confidence: float):
+            return knowledge.create_candidate(
+                context,
+                AssertionCandidate(
+                    id=new_id("cand"),
+                    subject_id="ent_pg_letter",
+                    predicate=predicate,
+                    object_entity_id=object_entity_id,
+                    origin="human",
+                    confidence=confidence,
+                    ontology_version="core/1.0.0",
+                    evidence=[CandidateEvidence(content_unit_id=unit_id)],
+                ),
+            )
+
+        low = _proposal("authored_by", "ent_pg_person", 0.99)
+        high = _proposal("records_decision", "ent_pg_decision", 0.7)
+
+        listing = knowledge.candidate_listing(context)
+        assert listing.total == 2
+        assert [item.id for item in listing.items] == [high.id, low.id]
+        assert listing.items[0].subject_display_name == "PG 승인 공문"
+        assert listing.items[0].predicate_label_ko == "의사결정 기록"
+        preview = listing.items[0].evidence_previews[0]
+        assert preview.readable is True
+        assert preview.snippet is not None
+        filtered = knowledge.candidate_listing(context, predicate="authored_by")
+        assert filtered.total == 1
+
+        assertion = knowledge.review_approve(context, high.id)
+        revoked = knowledge.revoke_assertion(context, assertion.id, "근거 재검토")
+        assert revoked.status == "revoked"
+        assert revoked.revoked_by == context.principal_id
+        assert revoked.revocation_note == "근거 재검토"
+        assert repository.knowledge.graph_neighbors(
+            context,
+            GraphNeighborsRequest(node_id="ent_pg_letter"),
+            ontology_version="core/1.0.0",
+        ) == []
+
+        job_id = repository.jobs.enqueue_job(
+            context,
+            "ontology.mine",
+            {"workspace": workspace},
+            "governance-test",
+        )
+        repository.jobs.record_job_result(
+            context,
+            job_id,
+            {"skipped": [{"kind": "relation", "reference": "x", "reason": "y"}]},
+        )
+        job = next(
+            job
+            for job in repository.jobs.list_jobs(context)
+            if job.id == job_id
+        )
+        assert job.payload["result"]["skipped"][0]["reason"] == "y"
+    finally:
+        import psycopg
+
+        with (
+            psycopg.connect(str(URL), autocommit=True) as connection,
+            connection.cursor() as cursor,
+        ):
+            cursor.execute("DELETE FROM kip.workspaces WHERE slug=%s", (workspace,))
+
+
+def test_postgres_cross_scope_acl_denies_search_read_and_graph(tmp_path: Path):
+    # A prior audit found every other integration test in this module uses a
+    # single uniform ACL scope, so a regression in the RLS policies
+    # (migrations/0005_acl_scope_policies.sql) or the ACL predicates in
+    # database.py (search, get_content_units, graph_neighbors, graph_path)
+    # would go uncaught. This test ingests content under two distinct scopes
+    # in the same workspace and proves a single-scope principal never sees
+    # the other scope's units, reads, or graph assertions.
+    pytest.importorskip("psycopg")
+    workspace = "test_" + uuid.uuid4().hex[:12]
+    scope_alpha = f"workspace:{workspace}:alpha-team"
+    scope_beta = f"workspace:{workspace}:beta-team"
+    source_root = tmp_path / "source"
+    alpha_root = source_root / "alpha"
+    alpha_root.mkdir(parents=True)
+    beta_root = source_root / "beta"
+    beta_root.mkdir(parents=True)
+    (alpha_root / "공문.txt").write_text(
+        "알파팀 정산 보고서: 참여율 변경을 승인한다.", encoding="utf-8"
+    )
+    (beta_root / "공문.txt").write_text(
+        "베타팀 정산 보고서: 참여율 변경을 승인한다.", encoding="utf-8"
+    )
+    settings = Settings(
+        project_root=Path(__file__).resolve().parents[2],
+        config_path=tmp_path / "kip.toml",
+        raw={
+            "database": {"statement_timeout_ms": 15000},
+            "search": {"korean_ngram_min": 2, "korean_ngram_max": 4},
+            "sources": {
+                "filesystem": [
+                    {
+                        "name": "alpha",
+                        "root": str(alpha_root),
+                        "enabled": True,
+                        "settle_seconds": 0,
+                        "include_extensions": [".txt"],
+                        "acl_scope": scope_alpha,
+                        "classification": "internal",
+                    },
+                    {
+                        "name": "beta",
+                        "root": str(beta_root),
+                        "enabled": True,
+                        "settle_seconds": 0,
+                        "include_extensions": [".txt"],
+                        "acl_scope": scope_beta,
+                        "classification": "internal",
+                    },
+                ]
+            },
+            "parsers": {"hwp": {"order": ["paired_pdf"]}},
+        },
+        environment="test",
+        workspace=workspace,
+        database_url=str(URL),
+        cas_path=tmp_path / "cas",
+    )
+    repository = PostgresRepository(str(URL))
+    container = build_container(settings, repository=repository)
+    repository.operations.migrate(settings.project_root / "migrations")
+    owner_context = container.application.operations.request_context(
+        workspace=workspace,
+        principal_id="principal_owner",
+        acl_scopes=[scope_alpha, scope_beta],
+    )
+    alpha_context = container.application.operations.request_context(
+        workspace=workspace,
+        principal_id="principal_alpha_only",
+        acl_scopes=[scope_alpha],
+    )
+    try:
+        container.application.ingestion.sync_filesystem(owner_context, "alpha")
+        container.application.ingestion.sync_filesystem(owner_context, "beta")
+
+        # Both documents share the same lexical text, so an ACL regression
+        # that widened visibility would still surface the beta unit here.
+        owner_hits = container.application.retrieval.search(
+            owner_context, SearchRequest(query="정산 보고서", limit=10)
+        )
+        assert len(owner_hits) == 2
+        units_by_scope: dict[str, str] = {}
+        for hit in owner_hits:
+            unit = repository.evidence.get_content_unit(owner_context, hit.unit_id)
+            assert unit.acl_scopes
+            units_by_scope[unit.acl_scopes[0]] = unit.id
+        alpha_unit_id = units_by_scope[scope_alpha]
+        beta_unit_id = units_by_scope[scope_beta]
+        assert alpha_unit_id != beta_unit_id
+
+        # (a) search: a scope-A-only principal only ever sees scope-A units.
+        alpha_scope_hits = container.application.retrieval.search(
+            alpha_context, SearchRequest(query="정산 보고서", limit=10)
+        )
+        alpha_scope_hit_ids = {hit.unit_id for hit in alpha_scope_hits}
+        assert alpha_scope_hit_ids == {alpha_unit_id}
+        assert beta_unit_id not in alpha_scope_hit_ids
+
+        # (b) direct read of the scope-B unit is denied for the scope-A-only
+        # principal, while the scope-A unit remains readable.
+        with pytest.raises(NotFoundError):
+            repository.evidence.get_content_unit(alpha_context, beta_unit_id)
+        with pytest.raises(NotFoundError):
+            container.application.evidence.read_unit(alpha_context, beta_unit_id)
+        assert (
+            repository.evidence.get_content_unit(alpha_context, alpha_unit_id).id
+            == alpha_unit_id
+        )
+
+        # (c) graph traversal: one assertion per scope, both pointing at a
+        # scope-neutral shared entity. A scope-A-only principal must only
+        # ever observe the scope-A assertion in neighbors and path queries.
+        for entity_id, name in (
+            ("doc_alpha", "알파팀 공문"),
+            ("doc_beta", "베타팀 공문"),
+            ("doc_shared", "공유 협약"),
+        ):
+            container.application.ontology_rag.create_entity(
+                owner_context,
+                KnowledgeEntity(
+                    id=entity_id,
+                    entity_type="Document",
+                    canonical_name=name,
+                    acl_scopes=[],
+                ),
+            )
+        alpha_candidate = container.application.ontology_rag.propose_relation(
+            owner_context,
+            RelationProposal(
+                subject_id="doc_alpha",
+                predicate="amends",
+                object_entity_id="doc_shared",
+                ontology_version="core/1.0.0",
+                evidence_unit_ids=(alpha_unit_id,),
+                derivation=RelationDerivation(
+                    kind="manual",
+                    name="acl-cross-scope-test",
+                    revision="alpha-v1",
+                ),
+            ),
+        )
+        beta_candidate = container.application.ontology_rag.propose_relation(
+            owner_context,
+            RelationProposal(
+                subject_id="doc_beta",
+                predicate="amends",
+                object_entity_id="doc_shared",
+                ontology_version="core/1.0.0",
+                evidence_unit_ids=(beta_unit_id,),
+                derivation=RelationDerivation(
+                    kind="manual",
+                    name="acl-cross-scope-test",
+                    revision="beta-v1",
+                ),
+            ),
+        )
+        alpha_assertion = container.application.knowledge.review_approve(
+            owner_context, alpha_candidate.id
+        )
+        beta_assertion = container.application.knowledge.review_approve(
+            owner_context, beta_candidate.id
+        )
+        assert alpha_assertion.acl_scopes == [scope_alpha]
+        assert beta_assertion.acl_scopes == [scope_beta]
+
+        owner_neighbors = repository.knowledge.graph_neighbors(
+            owner_context,
+            GraphNeighborsRequest(node_id="doc_shared", direction="in"),
+        )
+        assert {edge.assertion_id for edge in owner_neighbors} == {
+            alpha_assertion.id,
+            beta_assertion.id,
+        }
+
+        alpha_neighbors = repository.knowledge.graph_neighbors(
+            alpha_context,
+            GraphNeighborsRequest(node_id="doc_shared", direction="in"),
+        )
+        assert {edge.assertion_id for edge in alpha_neighbors} == {alpha_assertion.id}
+
+        alpha_reachable_path = repository.knowledge.graph_path(
+            alpha_context,
+            GraphPathRequest(from_node_id="doc_alpha", to_node_id="doc_shared"),
+        )
+        assert [path.assertion_ids for path in alpha_reachable_path] == [
+            [alpha_assertion.id]
+        ]
+        beta_denied_path = repository.knowledge.graph_path(
+            alpha_context,
+            GraphPathRequest(from_node_id="doc_beta", to_node_id="doc_shared"),
+        )
+        assert beta_denied_path == []
+        beta_owner_path = repository.knowledge.graph_path(
+            owner_context,
+            GraphPathRequest(from_node_id="doc_beta", to_node_id="doc_shared"),
+        )
+        assert [path.assertion_ids for path in beta_owner_path] == [
+            [beta_assertion.id]
+        ]
+    finally:
+        import psycopg
+
+        with (
+            psycopg.connect(str(URL), autocommit=True) as connection,
+            connection.cursor() as cursor,
+        ):
+            cursor.execute("DELETE FROM kip.workspaces WHERE slug=%s", (workspace,))
+
+
+def test_postgres_filesystem_deletion_grace_reconciliation(tmp_path: Path):
+    pytest.importorskip("psycopg")
+    workspace = "test_" + uuid.uuid4().hex[:12]
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    keeper = source_root / "잔류문서.txt"
+    keeper.write_text("이 문서는 계속 보관한다.", encoding="utf-8")
+    target = source_root / "삭제대상.txt"
+    target.write_text("정산 증빙 제출기한은 2026년 8월 15일이다.", encoding="utf-8")
+    settings = Settings(
+        project_root=Path(__file__).resolve().parents[2],
+        config_path=tmp_path / "kip.toml",
+        raw={
+            "database": {"statement_timeout_ms": 15000},
+            "search": {"korean_ngram_min": 2, "korean_ngram_max": 4},
+            "sync": {"deletion_grace_scans": 2},
+            "sources": {
+                "filesystem": [
+                    {
+                        "name": "fixture",
+                        "root": str(source_root),
+                        "enabled": True,
+                        "settle_seconds": 0,
+                        "include_extensions": [".txt"],
+                        "acl_scope": f"workspace:{workspace}",
+                        "classification": "internal",
+                    }
+                ]
+            },
+            "parsers": {"hwp": {"order": ["paired_pdf"]}},
+        },
+        environment="test",
+        workspace=workspace,
+        database_url=str(URL),
+        cas_path=tmp_path / "cas",
+    )
+    repository = PostgresRepository(str(URL))
+    container = build_container(settings, repository=repository)
+    repository.operations.migrate(settings.project_root / "migrations")
+    context = container.application.operations.request_context(
+        workspace=workspace,
+        acl_scopes=[f"workspace:{workspace}"],
+    )
+    query = SearchRequest(query="정산 증빙 제출기한", limit=10)
+    try:
+        first = container.application.ingestion.sync_filesystem(context, "fixture")
+        assert first.inserted == 2
+        assert first.absent == 0
+        hits = container.application.retrieval.search(context, query)
+        assert hits
+        unit_id = hits[0].unit_id
+
+        target.unlink()
+        second = container.application.ingestion.sync_filesystem(context, "fixture")
+        # Regression: repeated syncs of unchanged files must not conflict on
+        # the refreshed configuration-owned ACL snapshot.
+        assert second.failed == 0, second.warnings
+        assert second.absent == 1
+        assert second.tombstoned == 0
+        # Grace window: still searchable after a single absence.
+        assert container.application.retrieval.search(context, query)
+
+        third = container.application.ingestion.sync_filesystem(context, "fixture")
+        assert third.failed == 0, third.warnings
+        assert third.absent == 1
+        assert third.tombstoned == 1
+        assert container.application.retrieval.search(context, query) == []
+        with pytest.raises(NotFoundError):
+            container.application.evidence.read_unit(context, unit_id)
+
+        import psycopg
+
+        with (
+            psycopg.connect(str(URL), autocommit=True) as connection,
+            connection.cursor() as cursor,
+        ):
+            cursor.execute(
+                """
+                SELECT r.is_tombstone, o.absent_scan_count,
+                       (SELECT count(*) FROM source.revisions h
+                        WHERE h.object_id=o.id) AS revisions
+                FROM source.objects o
+                JOIN source.revisions r ON r.id=o.current_revision_id
+                WHERE o.workspace_id=%s AND o.external_id=%s
+                """,
+                (workspace, "삭제대상.txt"),
+            )
+            row = cursor.fetchone()
+        assert row is not None
+        # Soft tombstone: current revision is a tombstone and prior revision
+        # history is preserved (original + tombstone).
+        assert row[0] is True
+        assert row[2] == 2
+
+        # A reappearing file is re-indexed and becomes searchable again.
+        target.write_text(
+            "정산 증빙 제출기한은 2026년 8월 15일이다.", encoding="utf-8"
+        )
+        fourth = container.application.ingestion.sync_filesystem(context, "fixture")
+        assert fourth.failed == 0, fourth.warnings
+        assert fourth.inserted + fourth.replaced == 1
+        assert fourth.absent == 0
+        assert container.application.retrieval.search(context, query)
     finally:
         import psycopg
 

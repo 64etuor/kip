@@ -8,20 +8,21 @@ target-to-current matrix and ordered gap register live in
 |---|---|---|
 | Root agent files | Ready | `AGENTS.md`, `CLAUDE.md`, `.mcp.json` included |
 | Canonical contracts | Ready | Pydantic models and generated JSON Schema |
-| Production distribution | Ready | Digest-pinned non-root image, read-only Compose profile, locked runtime/build inputs, wheel, image lock, SPDX SBOM, SLSA provenance, deterministic archive, private-data scan, and directory/archive verifier |
+| Production distribution | Ready | Digest-pinned non-root image, read-only Compose profile (with the one deliberate exception of the `${KIP_ONTOLOGY_PATH}` bind mounted read-write into the API for discovery auto-release, ADR-044), locked runtime/build inputs, wheel, image lock, SPDX SBOM, SLSA provenance, deterministic archive, private-data scan, and directory/archive verifier |
 | CI supply-chain gates | Ready | SHA-pinned actions, Python 3.12/3.13 matrix, contracts, architecture, Ruff, mypy, dependency audit, migrations, tests, 75% coverage, clean-wheel smoke, hardened-image smoke, candidate bundle, and tag-only GHCR publish with attestations |
-| Backup and recovery | Ready for operational adoption | Sealed PostgreSQL/CAS/config backup, `row_security=off` manifest, explicit empty-target restore, row/migration/extension/RLS/CAS comparison, projection rebuild, fingerprinted evaluation comparison, and checksummed drill receipt |
+| Backup and recovery | Ready for operational adoption | Sealed PostgreSQL/CAS/config backup, `row_security=off` manifest, explicit empty-target restore, row/migration/extension/RLS/CAS comparison, projection rebuild, fingerprinted evaluation comparison, and checksummed drill receipt. `--retain N` pruning (default 7), a redacted configuration snapshot with a seal-and-verify secret rescan, and a launchd daily schedule (`com.kip.backup`; the installer supports `--dry-run`) are included; a real sealed set was produced and checksum-verified on this host on 2026-08-13 (`var/backups/20260813T070625Z`) |
+| Host operations reporting | Ready for pilot | `scripts/ops-report.sh` summarizes failed jobs, oldest queue age, last sync progress age, disk free, newest backup age, and API health (`/readyz` with `/healthz` fallback) with tunable thresholds, `--json`, an optional `KIP_OPS_WEBHOOK` failure POST, and an optional launchd item; `install-launchd.sh` also guards against a double worker and renders a newsyslog rotation policy |
 | Memory repository | Ready | Used for tests and offline smoke checks |
 | PostgreSQL migrations | Ready as the production reference profile | Workspace, required-scope, ACL-snapshot freshness, and owner-bound `FORCE ROW LEVEL SECURITY` are included. Normal migration installs pgvector, the 1024d projection, and migration 0018's cosine HNSW index; semantic activation remains separate |
-| PostgreSQL repository | Pilot reference | Core ingest, search, exact read, ACL, job, assertion, export, and rebuild methods implemented; evidence and graph reads are ACL- and freshness-prefiltered; repository calls share a bounded connection pool (`database.pool_max_size`) |
+| PostgreSQL repository | Pilot reference | Core ingest, search, exact read, ACL, job, assertion, export, and rebuild methods implemented; evidence and graph reads are ACL- and freshness-prefiltered; repository calls share a bounded connection pool (`database.pool_max_size`). Re-syncing unchanged files no longer fails: configuration-owned ACL-snapshot timestamps refresh while snapshot identity fields stay strictly verified (previously every second `kip sync run` raised a per-file ConflictError) |
 | CLI | Ready for pilot | JSON-first commands; source-neutral `sync run`, top-level `xlsx-read`, projection and canonical export aliases; operator roles come only from explicit `--role`/`--roles`/`KIP_ROLES` and admin commands fail closed. Search exposes the full canonical request including mode and filters; explicit ACL options replace ambient scopes |
-| REST API | Ready for pilot | Read, exact evidence, assertion explain, connector event, sync, and review endpoints; trusted API-key or verified JWT identity; blocking handlers run synchronously in the server threadpool instead of on the event loop |
+| REST API | Ready for pilot | Read, exact evidence, assertion explain, connector event, sync, and review endpoints, including the versioned candidate listing, assertion revocation, and a `/readyz` readiness endpoint that round-trips the database (`/healthz` stays liveness-only); trusted API-key or verified JWT identity; blocking handlers run synchronously in the server threadpool instead of on the event loop |
 | Python SDK | Ready as a thin REST client | Capabilities, search, context, answer, evidence, graph, ontology, jobs, and review helpers delegate to REST. Search, context, and answer expose the canonical mode and filter set while omitted defaults stay absent from payloads |
 | Identity and ACL snapshots | Ready for pilot | JWT issuer/audience/JWKS verification, configured API-key principal, stale dynamic snapshot exclusion, and legacy identity-header rejection |
 | Data classification and model egress | Ready for pilot | Canonical source/unit classification, local loopback policy, remote provider/classification/retention/secret gates, and atomic denial decisions |
 | Structured generation adapters | Ready for pilot | Provider-neutral typed contract with bounded HTTP responses, explicit timeouts, pinned model revisions, request IDs, token accounting, citation-ID validation, and OpenAI Responses/Anthropic Messages adapters. Claims support a `disputed` certainty that must cite every disagreeing evidence unit, and the prompt instructs the model to surface source conflicts instead of picking one |
-| MCP | Ready for pilot | Optional stdio adapter shares the application services; guided setup selects the generated config, and real client discovery/search/graph/answer parity has been validated |
-| Filesystem connector | Ready for pilot | Read-only traversal with an mtime settle window; content hashes are lazy and unchanged files are skipped by size/mtime against the stored revision without being read |
+| MCP | Ready for pilot | Optional stdio adapter shares the application services; guided setup points `.mcp.json` at the host-path `config/kip.host.generated.toml`, `kip_jobs` and `kip_ontology_assertion_revoke` tools cover job results and review governance, and real client discovery/search/graph/answer parity has been validated |
+| Filesystem connector | Ready for pilot | Read-only traversal with an mtime settle window; content hashes are lazy and unchanged files are skipped by size/mtime against the stored revision without being read. Deletion is reconciled by a complete-scan grace policy (migration 0020, `[sync] deletion_grace_scans` default 2): absent files are soft-tombstoned through the shared ingest path, failed and empty scans never contribute deletion evidence, and reappearing files clear their absence mark and re-index; the sync summary reports `absent` and `tombstoned` counts |
 | XLSX shallow/deep | Ready for pilot | Shared-string shallow index and exact-shape `.xlsx`/`.xlsm` range reader; JSON-safe scalar/cached values, normal/array/data-table formulas, Excel serials/formats, merged cells, and hidden/filtered dimensions are explicit. Date/datetime/time use ISO 8601, durations use ISO 8601 duration strings, non-finite numerics stay labeled rather than becoming null, and dense validated ranges are capped at 100,000 cells |
 | PDF parser | Ready for pilot | PyMuPDF native pages plus default Kordoc 4.7.3 PP-OCRv5 Korean candidate enrichment in new reference installs. Bootstrap and the production image install the exact runtime, verify the model cache, and index offline. Low-text/private-use/control/replacement thresholds, page/bbox locators, exact version checks, and native fallback are implemented. A real scanned drawing recovered 2 OCR units and 864 characters with unchanged source SHA/size/mtime; low-confidence warnings still require review |
 | PPTX parser | Ready for retrieval pilot | `python-pptx` plus bounded OOXML scan and default Korean picture OCR in new reference installs; text, merged tables, sparse chart caches, image metadata/hash, nested groups, notes, legacy comments, SmartArt text, hidden slides, geometry, source z-order, and derived reading order are structured. A read-only SolarEdge `5_PROJECT` run parsed 55/55 PPTX files into 77,922 JSON-valid native units with zero source-stat changes. OCR QA added 28 located units from seven images in `GEN2 적용 예시.pptx` and 124 from thirteen images in `FAT문제점 및 차트들.pptx`, with unchanged sources and explicit low-confidence warnings. No legacy `.ppt`, media transcription, modern threaded comments, or OLE expansion |
@@ -35,7 +36,7 @@ target-to-current matrix and ordered gap register live in
 | Quality control plane | Ready for pilot | Version-pinned parser/embedding/reranker/retrieval experiment manifests and fail-closed, read-only promotion recommendations; manifest-driven orchestration is not yet a scheduler |
 | End-to-end RAG rubric | Ready for pilot | Deterministic claim/citation/refusal and entity/relation/evidence/contradiction/path/temporal/integrity metrics; missing reviews fail closed and the bundled ontology case is synthetic contract evidence only |
 | Query tracing and metrics | Ready for pilot | PostgreSQL/RLS canonical redacted traces, admin-only CLI/REST inspection, bounded retention pruning, non-fatal delivery, and optional OTLP/HTTP spans and metrics without content attributes |
-| Adaptive ontology and interaction memory | Ready for pilot | Empty starter profile, one-question setup selection, TTL owner-scoped clarifications, confirmed preferences, structured non-trace feedback, per-principal discovery candidates, PostgreSQL RLS, and CLI/REST/MCP parity; accepted candidates require a separate YAML release |
+| Adaptive ontology and interaction memory | Ready for pilot | Empty starter profile, one-question setup selection, TTL owner-scoped clarifications, confirmed preferences, structured non-trace feedback, per-principal discovery candidates, PostgreSQL RLS, and CLI/REST/MCP parity. Admin approval of an entity-type or predicate discovery candidate materializes an additive ontology release automatically (ADR-044): shadow-validated, comment-preserving, idempotent targeted YAML edits with a minor version bump and review-policy sync; auto-released predicates default to `review: required`/`risk: high`. Long-running API/worker/MCP processes report `catalog_refresh: "restart_required"` and pick up the release on restart; each CLI invocation sees it immediately. The shipped configurations enable `interaction.enabled` and `ontology.adaptive_discovery` by default |
 | Evidence-bounded answer | Ready for bounded pilot; broad quality gate pending | CLI/API/MCP/SDK share search, exact reopen, freshness, XLSX, egress, generation validation, citations, extractive fallback, and approved-graph context. Identifier, numeric, focused-fact, and short multi-document adequacy gates return typed `answer_not_present` or `clarification_required`; broader reviewed answer/citation/refusal coverage remains required |
 | Local embedding sidecar | Validated shadow | Infinity 0.0.77, Qwen3 0.6B 1024d, pinned revisions, MPS smoke passed; resumable projection uses current active ACL-fresh units and versioned bounded input. The private space is 30,565/30,565 complete; vector Recall@10/MRR is 0.947/0.822 with P95 133.75 ms and zero ACL leaks. It remains shadow only because stale-warning evidence is absent (`evaluation/reports/semantic-qwen3-all-modes-final-20260813/decision.md`) |
 | Local reranker | BM25 active; RapidFuzz fallback; model adapters shadow | RapidFuzz 3.14.5 reranks bounded ACL-filtered lexical candidates locally and passed the private OneDrive retrieval gate; BGE/Jina model adapters remain opt-in shadow candidates. A candidate-local Okapi BM25 backend (`models.reranker.backend = "bm25"`, word+bigram Korean tokens, no model or extension dependency) beat RapidFuzz on the 19-case grounded draft set (Recall@10 0.842 vs 0.684, MRR 0.639 vs 0.566, lower P95; see `evaluation/reports/reranker-ab-20260811/decision.md`) and was promoted on 2026-08-11 after the dataset was adversarially re-verified and versioned (`reviewed 1.0.0`, ADR-034); RapidFuzz remains the fallback backend |
@@ -43,7 +44,8 @@ target-to-current matrix and ordered gap register live in
 | pgvector and HNSW | Production-profile ready; semantic shadow disabled | PostgreSQL 18/pgvector 0.8.2, RLS/source-hash filtering, migration 0018 HNSW with bounded strict iterative scan, and a complete 30,565/30,565 private Qwen3 shadow space. EXPLAIN confirms the HNSW index path; activation is still quality-gated |
 | Hybrid retrieval | Complete shadow | ACL-prefiltered exact vector search, RRF, bounded reranking that preserves the un-reranked fused tail up to the request limit, explicit activation command. On the reviewed 19-case private set, vector-only Recall@10/MRR was 0.947/0.822, ahead of hybrid at 0.895/0.702 and reranked at 0.842/0.656 |
 | Alias query expansion | Active for the lexical path | Human-approved entity aliases (ACL-prefiltered `resolve_entities`) expand candidate retrieval only; reranking keeps the user's original wording. It lifted RapidFuzz on the grounded draft set and is aggregate-neutral-to-positive under the now-active BM25 backend; re-evaluate if candidate generation changes (`evaluation/reports/alias-expansion-20260811/decision.md`) |
-| Ontology contract | Ready for pilot | YAML entity inheritance and predicate contracts; ACL-bound mining jobs; strict structured-output validation; reviewed entities/relations; exact evidence; deterministic fingerprints; current approved-graph answers; and idempotent predicate migration materialization with source-assertion lineage |
+| Ontology contract | Ready for pilot | YAML entity inheritance and predicate contracts; collision-safe validation (ADR-043: a domain profile redefining a core entity type or predicate, or a `sources/*.yaml` object type with an unknown parent, fails `kip ontology validate` and container startup); ACL-bound mining jobs; strict structured-output validation; reviewed entities/relations; exact evidence; deterministic fingerprints; current approved-graph answers; and idempotent predicate migration materialization with source-assertion lineage. The curation loop is reviewable end to end (ADR-038): approved-entity-aware mining digests make the two-pass mine -> approve entities -> re-mine loop run, invalid/duplicate/stale proposals are skipped with per-proposal reasons on a durable `kip.ontology-mining-result.v1` job payload, evidence/review enforcement is derived from the catalog and pinned to `predicates.yaml` by a contract test, candidate listings ship as triage-ordered `kip.assertion-candidate-listing.v1` with Korean labels and ACL-gated snippets, audited revocation and supersede-on-approve exist (migration 0019), and `include_candidate_assertions` populates clearly-marked proposed candidates on ontology-context surfaces only |
+| Agent-guided setup | Ready for starter acceptance | Fail-fast Python 3.12+ bootstrap, `env:`/`file:`-only secret references rejected at answer time, runtime-readiness verify checks (python, docker, DB secret, source readability) that never flip `verified` on environmental failures, receipt `next_steps` and a configuration-only limitation entry, host-path MCP config, and `scripts/app-up.sh` layering `compose.generated.yaml` over the base Compose file; setup remains configuration-only until the next steps run |
 | Neo4j | Port only | Do not deploy before adoption gate |
 | Review UI | Not included | CLI/API review workflow only |
 | Starter-kit adoption guide | Ready | Environment decisions, AI change contract, real-corpus acceptance evidence, upgrade and handoff rules |
@@ -51,20 +53,38 @@ target-to-current matrix and ordered gap register live in
 
 ## Explicit pilot limitations
 
-- Release archives are deliberately not encrypted, scheduled, uploaded, or
-  retained by KIP. Production must provide an external secret manager,
-  encrypted off-host backup policy, identity-aware TLS edge, and alerting.
+- Backup archives are deliberately not encrypted or uploaded off-host by KIP.
+  Local daily scheduling (`com.kip.backup`) and `--retain` pruning now exist on
+  the macOS host, but production must still provide an external secret manager,
+  an encrypted off-host backup policy, an identity-aware TLS edge, and push
+  alerting; the only built-in alert path is the optional `ops-report.sh`
+  failure webhook (`KIP_OPS_WEBHOOK`).
 - Tag publishing requires repository permissions for GHCR packages, OIDC, and
   GitHub attestations. A locally verified candidate does not prove that the
   repository's tag-only publication path has run.
 - `compose.production.yaml` is a hardened reference, not an orchestrator or
-  secret manager. Operators must supply non-owner database login URLs, regular
-  secret files, immutable image digests, storage, TLS/IAP, and deployment-level
-  rollback and monitoring.
+  secret manager. It requires `${KIP_NAS_PATH}` bound read-only into both the
+  worker and the API (the API opens the live source tree for evidence
+  freshness and `xlsx-read`), targets `/readyz` for the API healthcheck, and
+  probes worker database connectivity; operators must still supply non-owner
+  database login URLs, regular secret files, immutable image digests, storage,
+  TLS/IAP, and deployment-level rollback, dashboards, and paging.
 - The default sync mode is incremental. HWP/HWPX has an explicit non-mutating
   `parser reextract` shadow command and a separate guarded `--activate` action.
   Generic all-format forced re-extraction and destructive source
   reconciliation are intentionally not exposed as one-step starter commands.
+- Filesystem deletion reconciliation is complete-scan-only and fail-safe: a
+  failed or aborted scan marks nothing, and a scan that sees zero files is
+  skipped with a warning, so empty scans never contribute deletion evidence —
+  a truly emptied source tree is never tombstoned automatically. Narrowing
+  `include_extensions` or `exclude_globs` tombstones now-out-of-scope content
+  after the grace window, so review collection-scope changes before syncing.
+  The TRD's additional sentinel-file, count-drop, and permission-ratio mount
+  guards beyond the empty-scan skip are not implemented.
+- The `sync_schedule` setup answer is declarative operational metadata only;
+  nothing schedules syncs automatically. Periodic execution comes from
+  `install-launchd.sh` (which uses its own interval setting) or an external
+  scheduler.
 - The PostgreSQL integration test is gated by `KIP_TEST_POSTGRES_URL`; CI or a local PostgreSQL service must run it before deployment.
 - Pgvector/HNSW is part of the supported PostgreSQL production reference
   profile. A future extension-free distribution would need a separate migration
@@ -94,9 +114,16 @@ target-to-current matrix and ordered gap register live in
   independent verification of the provider account setting.
 - The bundled remote generators disable ambient proxy discovery and require an
   explicit endpoint, immutable model revision, and environment-backed secret
-  reference. Keychain and external secret-manager resolution require a runtime
-  integration and fail closed in the reference container.
+  reference. `keychain:` and `secret-manager:` references are rejected at
+  setup answer time with guidance; only `env:` references resolve everywhere,
+  `file:` resolves only for the model credential, and the database URL and
+  bootstrap identity keys accept `env:` alone.
 - Optional HWP parser commands, Slack scopes, Apple Mail Automation permissions, and IMAP provider behavior must be validated against the target environment.
+- PPTX structural extraction and default Kordoc 4.7.3/PP-OCRv5 Korean image
+  OCR are local and non-executing in new reference installs. The runtime and
+  model cache are installed and verified before offline indexing. Audio/video transcription,
+  embedded OLE/package expansion, modern threaded comments, formula OCR, and
+  legacy binary `.ppt` remain unsupported.
 - Neo4j remains an adoption-gate adapter stub; canonical assertions are queried from PostgreSQL.
 - The current public pilot is small and lexically distinctive. Its
   `keep_disabled` semantic decision must not be generalized to a private corpus
@@ -167,3 +194,17 @@ natural-language answer or ontology cases; those dimensions remain explicitly
 unmeasured. See
 `evaluation/reports/onedrive-hwp-native-rapidfuzz-20260810/decision.json` and
 ADR-031.
+
+## Operations hardening evidence: 2026-08-13
+
+A real sealed backup set was produced on this host with retention pruning
+enabled: `var/backups/20260813T070625Z` (453 MiB), all `SHA256SUMS` entries
+verified OK, and the configuration snapshot passed the seal-and-verify secret
+redaction rescan. A live `ops-report.sh` run on the same host flagged the
+data volume at 99% used — below the 10% free-disk threshold — which is a real
+operator warning, not a tooling defect: free disk space before relying on the
+daily backup schedule. Semantic search remains shadow/disabled, Slack and
+mail connectors remain disabled reference adapters, and the active reranked
+lexical pipeline retains its multi-second golden-gate P95 (about 7.4 s on the
+2026-08-13 reviewed 19-case run), so retrieval latency is an open quality
+item, not a regression introduced by these operations changes.

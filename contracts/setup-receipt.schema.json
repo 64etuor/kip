@@ -85,9 +85,23 @@
       "title": "Limitations",
       "type": "array"
     },
+    "next_steps": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Next Steps",
+      "type": "array"
+    },
     "plan_fingerprint": {
       "title": "Plan Fingerprint",
       "type": "string"
+    },
+    "runtime_readiness": {
+      "items": {
+        "$ref": "#/$defs/SetupCheck"
+      },
+      "title": "Runtime Readiness",
+      "type": "array"
     },
     "schema_version": {
       "const": "kip.setup-receipt.v1",

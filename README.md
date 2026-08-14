@@ -1,4 +1,4 @@
-# KIP Knowledge Fabric Starter Kit v3.2
+# KIP Knowledge Fabric Starter Kit v3.3
 
 KIP is an agent-first, evidence-first foundation for indexing and retrieving company knowledge from NAS files, HWP/HWPX, PDF, PPTX, XLSX, Slack, and email. It supports two equal entry paths:
 
@@ -27,36 +27,47 @@ Do not infer current readiness from PRD/TRD target language alone.
 
 ## 2. Agent-guided setup
 
-새 배포에서는 설정 파일을 직접 추측해 편집하지 말고 AI agent에게 다음처럼
-명령한다.
+On a new deployment, do not hand-edit configuration files by guesswork.
+Instead, give an AI agent a single instruction:
 
 ```text
-KIP을 셋업해줘
+KIP을 셋업해줘   (set up KIP)
 ```
 
-Agent는 `skills/kip-setup/SKILL.md`를 따라 `kip setup inspect`가 반환한 질문을
-항상 하나씩 묻는다. 조직 workspace, 신원 검증, 수집할 각 폴더의 절대경로와
-확장자·제외 범위·등급·ACL, 모델 전송 정책, secret reference, CAS/backup,
-평가 dataset, 빈 starter 또는 example ontology profile, interaction-memory
-explicit consent, 온톨로지 reviewer를 모두 확정한다. 이어서 파일 수·용량·확장자
-분포·제외·symlink를 preview하고, 사용자가 plan fingerprint와 read-only mount를
-승인한 뒤에만 다음 파일을 원자적으로 생성·검증한다.
+Following `skills/kip-setup/SKILL.md`, the agent asks the questions returned by
+`kip setup inspect` strictly one at a time. It settles the organization
+workspace, identity verification, the absolute path of every folder to index
+with its extension/exclusion scope, classification, and ACL, the model egress
+policy, secret references, CAS/backup paths, the evaluation dataset, an empty
+starter or example ontology profile, explicit interaction-memory consent, and
+the ontology reviewers. It then previews file counts, sizes, extension
+distribution, exclusions, and symlinks, and only after the user approves the
+plan fingerprint and read-only mounts does it atomically generate and verify:
 
-- `config/kip.generated.toml`
+- `config/kip.generated.toml` (container paths, mounted by the compose override)
+- `config/kip.host.generated.toml` (host paths, used by the MCP adapter)
 - `compose.generated.yaml`
-- `.mcp.json` pointing at the generated runtime configuration
+- `.mcp.json` pointing at the generated host runtime configuration
 
-Credential 원문은 질문, state, plan, 생성 파일에 넣지 않는다. `env:`,
-`keychain:`, `secret-manager:` reference만 기록한다. 평가 dataset이 없으면
-설치 가능한 상태일 뿐 production 승격이 아님을 receipt에 남긴다. 전체 인수
-절차는 [`docs/STARTER_KIT_GUIDE.md`](docs/STARTER_KIT_GUIDE.md)에 있다.
+Raw credentials never enter questions, state, plans, or generated files. Only
+`env:` references the runtime can resolve are recorded (`file:` is also allowed
+for the model credential); `keychain:`/`secret-manager:` are rejected. When no
+evaluation dataset exists, the receipt records that the install is usable but
+not production-promoted.
+
+`setup apply`/`verify` only generate configuration. The deployment actually
+runs after `./scripts/migrate.sh`, `./scripts/app-up.sh` (which layers the
+generated compose override on the base file), `./scripts/kip sync run --source
+SOURCE`, and a search smoke test. The full acceptance procedure is in
+[`docs/STARTER_KIT_GUIDE.md`](docs/STARTER_KIT_GUIDE.md).
 
 ## 3. Quick start - local development
 
-다른 조직이나 저장소에 적용할 때는 먼저
-[`docs/STARTER_KIT_GUIDE.md`](docs/STARTER_KIT_GUIDE.md)를 따른다. 이 문서는
-환경별 결정, AI 변경 계약, 실제 자료 인수 테스트, 자동 업데이트 알림과
-승격/rollback 기준을 한 경로로 묶는다.
+When adopting this kit in another organization or repository, follow
+[`docs/STARTER_KIT_GUIDE.md`](docs/STARTER_KIT_GUIDE.md) first. It bundles the
+per-environment decisions, the AI change contract, real-corpus acceptance
+tests, and the update-notification and promotion/rollback criteria into a
+single path.
 
 Prerequisites: Python 3.12+, Node.js 18+, and Docker with Compose. Bootstrap
 installs the pinned Kordoc OCR runtime and verifies the Korean model cache;
@@ -112,9 +123,10 @@ curl -sS http://127.0.0.1:8080/v1/connectors/events \
   --data-binary @examples/connector/event.json
 ```
 
-인터넷 경계에서는 임의 workspace, principal, ACL header를 신뢰하지 않는다.
-API-key bootstrap은 설정에 고정된 단일 principal을 사용하고, 다중 사용자는
-검증된 JWT claim에서 workspace와 scope를 파생한다.
+At an internet boundary, arbitrary workspace, principal, and ACL headers are
+never trusted. API-key bootstrap uses the single principal pinned in
+configuration; multi-user deployments derive workspace and scopes from
+verified JWT claims.
 
 CLI, REST, MCP, and connector events all enter the same application service layer. Applications must not connect directly to PostgreSQL or an optional graph projection.
 
@@ -126,7 +138,7 @@ Claude Code loads root `CLAUDE.md`, which imports `AGENTS.md`. The project skill
 .claude/skills/knowledge-fabric/SKILL.md
 ```
 
-The root `.mcp.json` starts the optional stdio MCP adapter without embedding secrets in the file. Guided setup rewrites it atomically to select `config/kip.generated.toml` and preserves the previous file. `./scripts/bootstrap.sh` installs the MCP and identity runtimes. For a standalone package install, select the MCP extra explicitly:
+The root `.mcp.json` starts the optional stdio MCP adapter without embedding secrets in the file. Guided setup rewrites it atomically to select the host-path `config/kip.host.generated.toml` (the container-path `config/kip.generated.toml` is for the compose services) and preserves the previous file. `./scripts/bootstrap.sh` installs the MCP and identity runtimes. For a standalone package install, select the MCP extra explicitly:
 
 ```bash
 python -m pip install 'kip-knowledge-fabric[mcp]'
@@ -158,8 +170,8 @@ Parser binaries are not hidden inside Core. Existing HWP/HWPX indexes can be
 evaluated and promoted without a full source sync:
 
 ```bash
-./scripts/kip parser reextract --source company-nas
-./scripts/kip parser reextract --source company-nas --activate
+./scripts/kip parser reextract --source SOURCE_NAME
+./scripts/kip parser reextract --source SOURCE_NAME --activate
 ```
 
 The first command is non-mutating shadow work. The second retains the previous
@@ -202,7 +214,47 @@ The macOS host adapter uses JXA through `osascript`. It requires explicit Mail A
 
 Use an app password or organization-approved credential. The connector uses UID cursors and stores RFC Message-ID as the stable message identity where available.
 
-## 7. Deployment profiles
+## 7. Ontology curation loop
+
+Model, parser, and relation-miner outputs are candidates until a human approves
+them; nothing is silently promoted to a fact. The agent-mediated loop is:
+
+```bash
+./scripts/kip ontology mine --unit-id UNIT_ID    # propose candidates from indexed evidence
+./scripts/kip jobs list                          # mining job status, per-proposal skip reasons
+./scripts/kip review list                        # triaged listing: risk desc, confidence desc,
+                                                 # display names, Korean labels, evidence quotes
+./scripts/kip review approve CANDIDATE_ID        # --supersede-contradicted to resolve conflicts
+./scripts/kip review revoke ASSERTION_ID --note "reason"   # undo an approval
+```
+
+Relation candidates can only reference already-approved entities, so mining is
+two-pass: mine, approve entity candidates, mine again, approve relations
+(approving entities changes the mining digest, so the re-run is real). Approved
+entities expand search aliases; approved assertions feed `kip answer`/`kip
+context` with exact evidence and are dropped automatically when their source
+changes. The same operations are exposed over REST and MCP
+(`kip_jobs`, `kip_ontology_assertion_revoke`). See `docs/ONTOLOGY_GUIDE.md`.
+
+## 8. Operations
+
+- `GET /readyz` performs a real database round-trip (the production compose
+  healthcheck targets it); `/healthz` stays liveness-only.
+- `./scripts/ops-report.sh` checks failed jobs, queue age, last successful
+  sync, disk free, backup age, and API health in one command (`--json`,
+  `KIP_OPS_WEBHOOK` for failure notifications).
+- `./scripts/backup.sh --retain N` produces sealed, checksum-verified backups
+  with retention pruning; `./scripts/install-launchd.sh` schedules daily
+  backups, periodic sync, optional ops reports, and generates a newsyslog
+  rotation policy on macOS (`--dry-run` to preview).
+- Files deleted from a filesystem source are tombstoned only after they stay
+  absent for `[sync] deletion_grace_scans` consecutive complete scans
+  (default 2); failed or empty scans never trigger deletion, and reappearing
+  files re-index automatically.
+
+Details are in `docs/OPERATIONS.md` and `docs/AI_OPERATOR_RUNBOOK.md`.
+
+## 9. Deployment profiles
 
 | Profile | Contents |
 |---|---|
@@ -210,7 +262,7 @@ Use an app password or organization-approved credential. The connector uses UID 
 | Standard | Minimal + API, worker, HWP broker, Slack/Mail optional connectors |
 | Expanded | Standard + explicitly activated semantic retrieval, relation miner, optional Neo4j projection; review remains headless CLI/API |
 
-## 8. Important limitations of this starter
+## 10. Important limitations of this starter
 
 This is an implementation-ready starter, not a claim that every production
 adapter is complete. The filesystem, text, PDF, XLSX shallow/deep path, memory
@@ -234,11 +286,11 @@ document absent from the lexical candidate set.
 
 Run `./scripts/verify.sh` before modifying or deploying the project.
 
-Dependency PR과 parser/model upstream 알림은 후보 발견 기능이다. 어떤
-업데이트도 자동 활성화하지 않으며, shadow 평가와 사람의 승격 승인을
-거쳐야 한다.
+Dependency PRs and parser/model upstream notifications are candidate-discovery
+features. No update activates automatically; every one must pass shadow
+evaluation and human promotion approval.
 
-## 9. Reproducible RAG scorecard
+## 11. Reproducible RAG scorecard
 
 KIP includes a licensed Korean public pilot, an isolated local model sidecar,
 pgvector shadow spaces, lexical/vector/hybrid/reranked evaluation, and

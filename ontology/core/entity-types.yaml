@@ -1,28 +1,52 @@
 ontology: kip-core
 version: 1.0.0
+# `label_ko` / `description_ko` are presentation metadata only; adding or
+# editing them is a non-breaking metadata change (no release bump, no
+# migration manifest). Structural changes still require a new release.
 entity_types:
   Person:
     description: A human actor represented independently of source-specific identifiers.
+    label_ko: 인물
+    description_ko: 소스별 식별자와 무관하게 표현되는 사람 행위자.
   Organization:
     description: A company, institution, department, or team.
+    label_ko: 조직
+    description_ko: 회사, 기관, 부서 또는 팀.
   Project:
     description: A bounded body of work such as a research project.
+    label_ko: 과제
+    description_ko: 연구과제와 같이 범위가 한정된 업무 단위.
   EvidenceObject:
     abstract: true
     description: A source-backed object that can support an assertion.
+    label_ko: 근거 객체
+    description_ko: 어서션을 뒷받침할 수 있는 소스 기반 객체.
   Document:
     parent: EvidenceObject
+    label_ko: 문서
   Communication:
     parent: EvidenceObject
+    label_ko: 커뮤니케이션
   Conversation:
     parent: EvidenceObject
+    label_ko: 대화
   Requirement:
     description: A condition, obligation, or submission requirement.
+    label_ko: 요구사항
+    description_ko: 조건, 의무 또는 제출 요구사항.
   Decision:
     description: An approved or recorded choice.
+    label_ko: 의사결정
+    description_ko: 승인되었거나 기록된 결정.
   Task:
     description: An action expected from a responsible actor.
+    label_ko: 과업
+    description_ko: 책임 있는 행위자에게 기대되는 행동.
   Event:
     description: A time-bounded occurrence.
+    label_ko: 사건
+    description_ko: 시간 범위가 한정된 발생 사건.
   Concept:
     description: A reusable domain concept.
+    label_ko: 개념
+    description_ko: 재사용 가능한 도메인 개념.

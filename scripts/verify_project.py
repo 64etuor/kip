@@ -12,6 +12,14 @@ from kip.ontology import validate_ontology
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _skill_files(root: Path) -> dict[Path, bytes]:
+    return {
+        path.relative_to(root): path.read_bytes()
+        for path in root.rglob("*")
+        if path.is_file() and path.name != ".DS_Store"
+    }
+
+
 def require(condition: bool, message: str, errors: list[str]) -> None:
     if not condition:
         errors.append(message)
@@ -41,16 +49,8 @@ def main() -> int:
         require(project_skill_root.is_dir(), f"portable {skill_name} Skill is missing", errors)
         require(claude_skill_root.is_dir(), f"Claude {skill_name} Skill is missing", errors)
         if claude_skill_root.exists() and project_skill_root.exists():
-            project_files = {
-                path.relative_to(project_skill_root): path.read_bytes()
-                for path in project_skill_root.rglob("*")
-                if path.is_file()
-            }
-            claude_files = {
-                path.relative_to(claude_skill_root): path.read_bytes()
-                for path in claude_skill_root.rglob("*")
-                if path.is_file()
-            }
+            project_files = _skill_files(project_skill_root)
+            claude_files = _skill_files(claude_skill_root)
             require(
                 project_files == claude_files,
                 f"Claude and portable {skill_name} Skill trees diverged",

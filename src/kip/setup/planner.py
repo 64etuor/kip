@@ -152,6 +152,7 @@ def build_setup_plan(
         ontology_reviewers=answers.ontology_reviewers,
         generated_files=[
             "config/kip.generated.toml",
+            "config/kip.host.generated.toml",
             "compose.generated.yaml",
             ".mcp.json",
         ],
@@ -278,14 +279,14 @@ _QUESTIONS = {
     "identity_api_key_secret_ref": SetupQuestion(
         id="identity_api_key_secret_ref",
         prompt="bootstrap API key의 비밀 참조는 무엇인가요? 실제 값은 입력하지 마세요.",
-        answer_format="env:, keychain:, or secret-manager: reference",
+        answer_format="env: environment variable reference",
         example="env:KIP_API_KEY",
         why="bootstrap credential 원문을 셋업 상태와 생성 파일에서 분리합니다.",
     ),
     "identity_admin_key_secret_ref": SetupQuestion(
         id="identity_admin_key_secret_ref",
         prompt="bootstrap 관리 key의 별도 비밀 참조는 무엇인가요? 실제 값은 입력하지 마세요.",
-        answer_format="env:, keychain:, or secret-manager: reference",
+        answer_format="env: environment variable reference",
         example="env:KIP_ADMIN_KEY",
         why="일반 검색 credential과 관리 작업 credential을 분리합니다.",
     ),
@@ -335,14 +336,14 @@ _QUESTIONS = {
     "model_secret_ref": SetupQuestion(
         id="model_secret_ref",
         prompt="모델 API credential의 비밀 참조는 무엇인가요? 실제 값은 입력하지 마세요.",
-        answer_format="env:, keychain:, or secret-manager: reference",
+        answer_format="env: or file: reference",
         example="env:KIP_OPENAI_API_KEY",
         why="셋업 상태와 생성 파일에 credential 원문을 남기지 않습니다.",
     ),
     "database_secret_ref": SetupQuestion(
         id="database_secret_ref",
         prompt="PostgreSQL URL의 비밀 참조는 무엇인가요? 실제 URL은 입력하지 마세요.",
-        answer_format="env:, keychain:, or secret-manager: reference",
+        answer_format="env: environment variable reference",
         example="env:KIP_DATABASE_URL",
         why="canonical store credential을 설정 파일과 셋업 기록에서 분리합니다.",
     ),

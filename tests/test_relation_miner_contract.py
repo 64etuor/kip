@@ -119,7 +119,7 @@ def test_generator_relation_miner_returns_typed_entity_and_relation_proposals() 
 
 
 @pytest.mark.parametrize(
-    ("output", "match"),
+    ("output", "kind", "match"),
     [
         (
             {
@@ -136,6 +136,7 @@ def test_generator_relation_miner_returns_typed_entity_and_relation_proposals() 
                     }
                 ],
             },
+            "relation",
             "unknown ontology predicate",
         ),
         (
@@ -151,6 +152,7 @@ def test_generator_relation_miner_returns_typed_entity_and_relation_proposals() 
                 ],
                 "relations": [],
             },
+            "entity",
             "unknown ontology entity type",
         ),
         (
@@ -168,19 +170,45 @@ def test_generator_relation_miner_returns_typed_entity_and_relation_proposals() 
                     }
                 ],
             },
+            "relation",
             "unknown evidence",
+        ),
+        (
+            {
+                "entities": [],
+                "relations": [
+                    {
+                        "subject_entity_id": "ent_unapproved",
+                        "predicate": "records_decision",
+                        "object_entity_id": "ent_decision",
+                        "evidence_ids": ["unit_1"],
+                        "confidence": 0.9,
+                        "valid_from": None,
+                        "valid_to": None,
+                    }
+                ],
+            },
+            "relation",
+            "unknown existing entity",
         ),
     ],
 )
-def test_relation_miner_rejects_unknown_contract_values(
+def test_relation_miner_skips_unknown_contract_values_with_reasons(
     output: dict,
+    kind: str,
     match: str,
 ) -> None:
-    with pytest.raises(ValidationError, match=match):
-        _miner(RecordingStructuredGenerator(output)).mine(_request())
+    result = _miner(RecordingStructuredGenerator(output)).mine(_request())
+
+    assert result.entities == ()
+    assert result.relations == ()
+    assert len(result.skipped) == 1
+    skip = result.skipped[0]
+    assert skip.kind == kind
+    assert match in skip.reason
 
 
-def test_relation_miner_rejects_duplicate_proposals() -> None:
+def test_relation_miner_skips_duplicates_but_keeps_the_first_proposal() -> None:
     relation = {
         "subject_entity_id": "ent_document",
         "predicate": "records_decision",
@@ -194,7 +222,61 @@ def test_relation_miner_rejects_duplicate_proposals() -> None:
         {"entities": [], "relations": [relation, relation]}
     )
 
-    with pytest.raises(ValidationError, match="duplicate relation proposal"):
+    result = _miner(generator).mine(_request())
+
+    assert len(result.relations) == 1
+    assert len(result.skipped) == 1
+    assert result.skipped[0].reason == "duplicate relation proposal"
+
+
+def test_one_invalid_proposal_does_not_fail_the_whole_batch() -> None:
+    generator = RecordingStructuredGenerator(
+        {
+            "entities": [
+                {
+                    "entity_type": "InventedType",
+                    "canonical_name": "가짜",
+                    "aliases": [],
+                    "evidence_ids": ["unit_1"],
+                    "confidence": 0.9,
+                }
+            ],
+            "relations": [
+                {
+                    "subject_entity_id": "ent_document",
+                    "predicate": "records_decision",
+                    "object_entity_id": "ent_decision",
+                    "evidence_ids": ["unit_1"],
+                    "confidence": 0.91,
+                    "valid_from": None,
+                    "valid_to": None,
+                }
+            ],
+        }
+    )
+
+    result = _miner(generator).mine(_request())
+
+    assert len(result.relations) == 1
+    assert result.relations[0].predicate == "records_decision"
+    assert [skip.kind for skip in result.skipped] == ["entity"]
+
+
+def test_relation_miner_still_fails_closed_on_batch_contract_breaches() -> None:
+    relation = {
+        "subject_entity_id": "ent_document",
+        "predicate": "records_decision",
+        "object_entity_id": "ent_decision",
+        "evidence_ids": ["unit_1"],
+        "confidence": 0.9,
+        "valid_from": None,
+        "valid_to": None,
+    }
+    generator = RecordingStructuredGenerator(
+        {"entities": [], "relations": [dict(relation) for _ in range(65)]}
+    )
+
+    with pytest.raises(ValidationError, match="relation proposal count"):
         _miner(generator).mine(_request())
 
 

@@ -12,7 +12,9 @@ secrets/*
 !secrets/.gitkeep
 config/kip.toml
 config/kip.generated.toml*
+config/kip.host.generated.toml*
 compose.generated.yaml*
+.mcp.json.previous
 .kip/
 *.log
 .DS_Store
@@ -29,3 +31,5 @@ build/
 .playwright-cli/
 output/
 .debug-journal.md
+tmp/
+.claude/worktrees/

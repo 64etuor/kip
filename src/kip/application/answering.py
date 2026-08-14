@@ -120,7 +120,11 @@ class AnsweringUseCases:
         request: AnswerRequest,
     ) -> AnswerResponse:
         hits = self._retrieval.search(context, request)
-        ontology_bundle = self._ontology_context.build(context, request.query)
+        ontology_bundle = self._ontology_context.build(
+            context,
+            request.query,
+            include_candidates=request.include_candidate_assertions,
+        )
         fresh: list[EvidenceRead] = list(ontology_bundle.evidence)
         seen_ids = {item.unit.id for item in fresh}
         had_stale_evidence = False

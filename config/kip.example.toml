@@ -7,13 +7,9 @@ log_level = "INFO"
 url_env = "KIP_DATABASE_URL"
 statement_timeout_ms = 15000
 pool_max_size = 10
-pool_min = 1
-pool_max = 10
 
 [storage]
 cas_path = "./var/cas"
-snapshot_filesystem_sources = false
-snapshot_message_sources = true
 
 [api]
 host = "127.0.0.1"
@@ -51,9 +47,6 @@ clock_skew_seconds = 30
 allow_remote_model_egress = false
 follow_symlinks = false
 max_file_bytes = 524288000
-max_zip_entries = 100000
-max_zip_uncompressed_bytes = 2147483648
-max_zip_ratio = 200
 
 [telemetry]
 query_traces_enabled = true
@@ -67,7 +60,6 @@ endpoint = "http://127.0.0.1:4318"
 [search]
 semantic_enabled = false
 default_mode = "reranked"
-lexical_limit_default = 10
 context_max_chars = 40000
 context_item_max_chars = 8000
 alias_expansion_enabled = true
@@ -137,7 +129,7 @@ max_relation_proposals = 64
 
 [ontology]
 domain_profile = "empty"
-adaptive_discovery = false
+adaptive_discovery = true
 
 [ontology.answer_context]
 entity_limit = 8
@@ -148,13 +140,17 @@ max_depth = 4
 max_assertions = 10000
 
 [interaction]
-enabled = false
+enabled = true
 clarification_ttl_seconds = 3600
 
 [graph]
 backend = "postgres"
-max_depth_default = 4
-max_nodes_default = 500
+
+[sync]
+# Filesystem deletion grace policy: an indexed file is soft-tombstoned only
+# after this many CONSECUTIVE COMPLETE scans of its source confirm absence.
+# Failed or partial scans never count, and a reappearing file clears the mark.
+deletion_grace_scans = 2
 
 [parsers]
 parser_timeout_seconds = 120

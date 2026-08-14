@@ -41,8 +41,13 @@ services:
       start_period: 20s
     networks: [database]
     security_opt: ["no-new-privileges:true"]
-    pids_limit: 256
     shm_size: 1gb
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 4g
+          pids: 256
 
   migrate:
     <<: *app-security
@@ -60,7 +65,12 @@ services:
       postgres:
         condition: service_healthy
     networks: [database]
-    pids_limit: 256
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1g
+          pids: 256
 
   api:
     <<: *app-security
@@ -85,16 +95,38 @@ services:
     ports:
       - "127.0.0.1:${KIP_API_PORT:-8080}:8080"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3)"]
+      # /readyz performs a real database round-trip, so an API that cannot
+      # reach PostgreSQL reports unhealthy. /healthz remains liveness-only.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=3)"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      start_period: 30s
     volumes:
       - type: volume
         source: kip_cas
         target: /data/cas
         read_only: true
+      # The API must see the same source tree as the worker: evidence
+      # freshness checks and xlsx range reads open the live source path.
+      # Without this bind every unit looks stale and evidence is dropped.
+      - type: bind
+        source: ${KIP_NAS_PATH:?set the approved collection root}
+        target: /sources/nas
+        read_only: true
+        bind:
+          create_host_path: false
+      # Ontology auto-release (ADR-044): admin approval of a discovery
+      # candidate writes an additive release into the meaning contract.
+      # Mount the version-controlled host checkout read-write on the API
+      # (the admin review surface) so releases persist across restarts and
+      # stay reviewable through git history. The host directory must be
+      # writable by uid 10001.
+      - type: bind
+        source: ${KIP_ONTOLOGY_PATH:?set the version-controlled ontology checkout}
+        target: /app/ontology
+        bind:
+          create_host_path: false
     networks: [edge, database]
     deploy:
       resources:
@@ -128,9 +160,26 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      # Same ontology contract as the API, read-only: the worker validates
+      # mining against the catalog but never writes releases.
+      - type: bind
+        source: ${KIP_ONTOLOGY_PATH:?set the version-controlled ontology checkout}
+        target: /app/ontology
+        read_only: true
+        bind:
+          create_host_path: false
     networks: [database]
     tmpfs:
       - /tmp:size=1g,mode=1777,noexec,nosuid,nodev
+    healthcheck:
+      # DB liveness from inside the worker container: the worker has no
+      # listening port, so reachability of PostgreSQL with the worker's own
+      # credentials is the meaningful liveness signal.
+      test: ["CMD", "python", "-c", "import os, psycopg; psycopg.connect(open(os.environ['KIP_DATABASE_URL_FILE'], encoding='utf-8').read().strip(), connect_timeout=3).close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     deploy:
       resources:
         limits:

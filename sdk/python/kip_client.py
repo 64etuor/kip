@@ -235,14 +235,25 @@ class KipClient:
         )
 
     def list_review_candidates(
-        self, *, status: str = "proposed", limit: int = 100
-    ) -> list[dict[str, Any]]:
-        return _require_object_list(
+        self,
+        *,
+        status: str = "proposed",
+        limit: int = 100,
+        predicate: str | None = None,
+        subject_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Return the `kip.assertion-candidate-listing.v1` review listing."""
+        params: dict[str, Any] = {"status": status, "limit": limit}
+        if predicate is not None:
+            params["predicate"] = predicate
+        if subject_id is not None:
+            params["subject_id"] = subject_id
+        return _require_object(
             self._request(
                 "GET",
                 "/v1/review/candidates",
                 admin=True,
-                params={"status": status, "limit": limit},
+                params=params,
             )
         )
 
@@ -251,13 +262,30 @@ class KipClient:
         candidate_id: str,
         *,
         note: str | None = None,
+        supersede_contradicted: bool = False,
     ) -> dict[str, Any]:
+        params: dict[str, Any] = {}
+        if note is not None:
+            params["note"] = note
+        if supersede_contradicted:
+            params["supersede_contradicted"] = "true"
         return _require_object(
             self._request(
                 "POST",
                 f"/v1/review/candidates/{candidate_id}/approve",
                 admin=True,
-                params={"note": note} if note is not None else None,
+                params=params or None,
+            )
+        )
+
+    def revoke_assertion(self, assertion_id: str, *, note: str) -> dict[str, Any]:
+        """Revoke an approved assertion; a non-empty note is required."""
+        return _require_object(
+            self._request(
+                "POST",
+                f"/v1/review/assertions/{assertion_id}/revoke",
+                admin=True,
+                params={"note": note},
             )
         )
 

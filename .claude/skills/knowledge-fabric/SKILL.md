@@ -31,6 +31,8 @@ Do not assume a parser, source connector, semantic index, or graph projection is
    ```bash
    scripts/kip.sh read UNIT_ID
    ```
+   For a full stored record instead of an evidence unit, use
+   `scripts/kip.sh get artifact|document|candidate|assertion ID`.
 5. For XLSX numbers, formulas, dates, or totals, read the original workbook range:
    ```bash
    scripts/kip.sh xlsx-read ARTIFACT_ID --sheet "정산" --range "A1:F40"
@@ -56,9 +58,13 @@ Query only approved assertions unless the user explicitly asks to inspect candid
 ```bash
 scripts/kip.sh graph neighbors --node-id ENTITY_ID --predicate amends
 scripts/kip.sh graph path --from ENTITY_A --to ENTITY_B --max-depth 4
+scripts/kip.sh ontology entities --limit 100
+scripts/kip.sh ontology context "질문"
+scripts/kip.sh explain --assertion-id ASSERTION_ID
 ```
 
-Do not treat a graph edge as evidence by itself. Read its evidence unit before making a material claim. Read `references/ontology.md` before proposing or approving predicates.
+`explain` returns an assertion's predicate definition, review provenance, and
+cited evidence in one call. Do not treat a graph edge as evidence by itself. Read its evidence unit before making a material claim. Read `references/ontology.md` before proposing or approving predicates.
 
 ## Synchronization workflow
 
@@ -80,15 +86,90 @@ Parser, model, Graphify, and relation-miner outputs are candidates, not facts.
 
 ```bash
 scripts/kip.sh review list --status proposed
+scripts/kip.sh review propose --subject-id ENTITY_ID --predicate amends \
+  --object-entity-id ENTITY_ID --evidence-unit-id UNIT_ID
 scripts/kip.sh review approve CANDIDATE_ID --note "근거 확인"
 scripts/kip.sh review reject CANDIDATE_ID --note "관계 불충분"
+scripts/kip.sh review revoke ASSERTION_ID --note "근거 재검토 필요"
 ```
 
-High-risk predicates such as `amends`, `supersedes`, `approves`, and `evidences` require exact evidence.
+`review propose` records a human-origin candidate; it still enters the same
+review queue and is never auto-approved.
+
+`review list` is ordered by review risk then confidence and already includes
+subject/object display names, Korean predicate labels, and ACL-safe evidence
+snippets; filter with `--predicate` and `--subject-id`. Every predicate the
+ontology marks review-required or high-risk (`amends`, `supersedes`,
+`approves`, `evidences`, `responds_to`, `records_decision`) requires exact
+evidence. An approved assertion can be undone with `review revoke` (required
+note); revoked assertions leave all approved surfaces but stay auditable. A
+candidate that contradicts an active assertion can be approved with
+`--supersede-contradicted` to retire the contradicted assertion in the same
+step.
+
+## Ontology mining workflow (two passes)
+
+Mined relations can only reference already-approved entities, so run mining
+twice around entity review:
+
+1. `scripts/kip.sh ontology mine --unit-id UNIT_ID ...` — new entities become
+   candidates; relations naming them are skipped with per-proposal reasons.
+2. Approve entity candidates: `scripts/kip.sh ontology candidates` then
+   `scripts/kip.sh ontology entity-approve CANDIDATE_ID`.
+3. Re-run the same `ontology mine` command. Approving entities changes the
+   job digest, so the re-run executes instead of deduplicating; relations now
+   become reviewable candidates.
+4. Approve relation candidates through the review workflow above.
+
+Check job outcomes and per-proposal skip reasons with
+`scripts/kip.sh jobs list` (see `payload.result.skipped` and `last_error`).
+One bad proposal never fails the batch; stale evidence units are skipped
+fail-closed, never silently mined.
+
+To propose a NEW entity type or predicate (not a new instance), use the
+schema-discovery queue instead of mining:
+`scripts/kip.sh ontology discovery propose --kind predicate --symbol NAME
+--label ... --definition ... --confirmed`, then `ontology discovery list` and
+`ontology discovery review --candidate-id ID --action accept|reject`.
+Discovery is gated by `ontology.adaptive_discovery` (on in the shipped
+configuration) and review requires the admin role. Approving a discovery
+candidate materializes an additive ontology release automatically (new
+version, shadow-validated, collision-safe); auto-released predicates default
+to review-required, so assertions using them still need exact evidence and
+human review.
+
+## Interaction memory (consent-gated)
+
+Enabled in the shipped configuration (`interaction.enabled = true`; guided
+setup still records the consent decision, and `disabled` is supported).
+Commands fail cleanly when disabled.
+
+```bash
+scripts/kip.sh interaction clarify --reason ambiguous_term --prompt "질문"
+scripts/kip.sh interaction answer --question-id QID --option-id OPT
+scripts/kip.sh interaction preferences
+scripts/kip.sh interaction remember --key KEY --value VALUE --confirmed
+scripts/kip.sh interaction forget --key KEY
+scripts/kip.sh interaction feedback --outcome helpful --request-id RID
+```
+
+`--reason` is one of `ambiguous_term`, `scope_selection`, `preference`,
+`other`; `--outcome` is one of `helpful`, `not_helpful`,
+`needs_clarification`.
+
+Preferences shape presentation only; they never widen ACL scope or override
+evidence rules. `remember` requires explicit user confirmation.
 
 ## Application integration
 
 Use REST/OpenAPI for web or backend applications, MCP for compatible AI clients, and CLI JSON for local automation. All edges must call the same application services and preserve ACL semantics. Read `references/app-integration.md` before implementing a connector or application.
+
+The MCP connector exposes the read, answer, graph, ontology-review, and
+interaction surfaces as `kip_*` tools (e.g. `kip_search`, `kip_answer`,
+`kip_read`, `kip_xlsx_read`, `kip_graph_neighbors`, `kip_ontology_candidates`,
+`kip_clarify`). Sync, telemetry, and projection maintenance are deliberately
+NOT exposed over MCP; use the CLI or admin REST routes. The full tool list is
+in `docs/APP_INTEGRATION.md`.
 
 ## Non-negotiable rules
 

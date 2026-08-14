@@ -1,16 +1,29 @@
 ontology: kip-domain-research-project
 version: 1.0.0
+# `label_ko` / `description_ko` are presentation metadata only; adding or
+# editing them is a non-breaking metadata change (no release bump, no
+# migration manifest). Structural changes still require a new release.
 entity_types:
   ResearchProject:
     parent: Project
+    label_ko: 연구과제
+    description_ko: 정부 또는 기관 지원으로 수행되는 연구개발 과제.
   Agreement:
     parent: Document
+    label_ko: 협약서
+    description_ko: 과제 수행 조건을 규정하는 협약 문서.
   OfficialLetter:
     parent: Document
+    label_ko: 공문
+    description_ko: 기관 간 공식 발송·접수 문서.
   SettlementEvidence:
     parent: EvidenceObject
+    label_ko: 정산 증빙
+    description_ko: 비용 집행과 정산을 입증하는 증빙 자료.
   ParticipationRateChange:
     parent: Decision
+    label_ko: 참여율 변경
+    description_ko: 참여 연구원의 과제 참여율 변경 결정.
 controlled_values:
   document_type:
     - business_plan

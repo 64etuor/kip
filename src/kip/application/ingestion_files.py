@@ -12,14 +12,16 @@ from kip.domain.identity import AclSnapshot
 from kip.domain.models import (
     Artifact,
     DocumentPacket,
+    ExtractionRun,
     IngestResult,
     LogicalDocument,
     RequestContext,
     SourceObject,
+    SourceObjectAbsence,
     SourceRevision,
 )
 from kip.errors import ConflictError, ValidationError
-from kip.ids import stable_id
+from kip.ids import new_id, sha256_bytes, stable_id
 from kip.ports.evidence import EvidenceStore, SourceFileInspectorPort
 from kip.ports.ingestion import DiscoveredFile, IngestionStore, ParserRegistryPort
 from kip.ports.text_analyzer import TextAnalyzerPort
@@ -54,6 +56,12 @@ def _representation_role(extension: str) -> str:
         ".xlsx": "workbook",
         ".xlsm": "workbook",
         ".xls": "workbook",
+        ".pptx": "presentation",
+        ".pptm": "presentation",
+        ".ppsx": "presentation",
+        ".ppsm": "presentation",
+        ".potx": "presentation",
+        ".potm": "presentation",
     }.get(extension.lower(), "primary")
 
 
@@ -209,6 +217,84 @@ class FileIngestionWorkflow:
             acl_snapshot=current_source.acl_snapshot,
             classification=current_source.classification,
         )
+
+    def tombstone_absent(
+        self,
+        context: RequestContext,
+        absence: SourceObjectAbsence,
+    ) -> IngestResult:
+        """Soft-delete an object confirmed absent by the grace policy.
+
+        Reuses the event-connector deletion semantics: an immutable tombstone
+        revision with zero content units is ingested through the same
+        `ingest_packet` path, so the previous revision, extraction history,
+        and canonical rows are preserved while the object leaves the active
+        lexical/search projection. Nothing is hard-deleted and no source path
+        is written.
+        """
+        view = self._evidence.get_artifact(context, absence.artifact_id)
+        source_object = view.source_object
+        revision = view.revision
+        document = view.document
+        if source_object is None or revision is None or document is None:
+            raise ConflictError("source metadata missing for tombstone candidate")
+        if revision.is_tombstone:
+            return IngestResult(
+                status="unchanged",
+                source_object_id=source_object.id,
+                revision_id=revision.id,
+                artifact_id=view.artifact.id,
+                document_id=document.id,
+            )
+        tombstone_hash = sha256_bytes(f"tombstone:{revision.sha256}".encode())
+        revision_id = stable_id("rev", source_object.id, tombstone_hash)
+        artifact_id = stable_id("art", revision_id, view.artifact.file_name)
+        extraction_id = new_id("ext")
+        packet = DocumentPacket(
+            workspace_id=context.workspace,
+            source_object=source_object.model_copy(deep=True),
+            revision=SourceRevision(
+                id=revision_id,
+                object_id=source_object.id,
+                revision_key=tombstone_hash,
+                sha256=tombstone_hash,
+                size_bytes=0,
+                source_modified_at=None,
+                raw_object_uri=revision.raw_object_uri,
+                is_tombstone=True,
+                metadata={
+                    "tombstone_reason": "filesystem_absence",
+                    "tombstoned_revision_id": revision.id,
+                    "absent_scan_count": absence.absent_scan_count,
+                },
+            ),
+            logical_document=document.model_copy(deep=True),
+            artifact=Artifact(
+                id=artifact_id,
+                revision_id=revision_id,
+                file_name=view.artifact.file_name,
+                extension=view.artifact.extension,
+                media_type=view.artifact.media_type,
+                byte_size=0,
+                sha256=tombstone_hash,
+                source_path=None,
+                cas_uri=None,
+                representation_role=view.artifact.representation_role,
+                metadata={"tombstone": True},
+            ),
+            extraction=ExtractionRun(
+                id=extraction_id,
+                artifact_id=artifact_id,
+                parser_name="filesystem-tombstone",
+                parser_version="1.0",
+                status="succeeded",
+                quality_score=1.0,
+                output_hash=tombstone_hash,
+                metadata={"operation": "delete"},
+            ),
+            units=[],
+        )
+        return self._store.ingest_packet(context, packet)
 
     def activate_reextraction(
         self,

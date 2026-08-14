@@ -6,13 +6,10 @@ log_level = "INFO"
 [database]
 url_env = "KIP_DATABASE_URL"
 statement_timeout_ms = 15000
-pool_min = 1
-pool_max = 10
+pool_max_size = 10
 
 [storage]
 cas_path = "/data/cas"
-snapshot_filesystem_sources = false
-snapshot_message_sources = true
 
 [api]
 host = "0.0.0.0"
@@ -24,13 +21,9 @@ max_request_bytes = 10485760
 allow_remote_model_egress = false
 follow_symlinks = false
 max_file_bytes = 524288000
-max_zip_entries = 100000
-max_zip_uncompressed_bytes = 2147483648
-max_zip_ratio = 200
 
 [search]
 semantic_enabled = false
-lexical_limit_default = 10
 context_max_chars = 40000
 korean_ngram_min = 2
 korean_ngram_max = 4
@@ -45,8 +38,14 @@ baseline_weight = 0.15
 
 [graph]
 backend = "postgres"
-max_depth_default = 4
-max_nodes_default = 500
+
+[ontology]
+domain_profile = "research-project"
+adaptive_discovery = true
+
+[interaction]
+enabled = true
+clarification_ttl_seconds = 3600
 
 [parsers]
 parser_timeout_seconds = 120

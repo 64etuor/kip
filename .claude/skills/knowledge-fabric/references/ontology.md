@@ -10,4 +10,8 @@ Before adding a predicate:
 4. Require evidence and human review for legal, financial, approval, amendment, supersession, satisfaction, or violation predicates.
 5. Write an ontology migration when changing meaning, not merely spelling.
 
+Evidence enforcement is derived from the loaded catalog: any predicate with `review: required` or `risk: high` in `ontology/core/predicates.yaml` cannot be approved without exact evidence. Korean labels (`label_ko`, `description_ko`) are presentation metadata and never change meaning.
+
+Approval is reversible: `review revoke` transitions an active assertion to `revoked` with a required note, removing it from all approved-only surfaces while keeping the audit record. Candidates that contradict an active assertion record the conflict; approving with `--supersede-contradicted` retires the contradicted assertion as `superseded`.
+
 Graph databases are optional read projections. Approved assertions and their evidence remain canonical in PostgreSQL.

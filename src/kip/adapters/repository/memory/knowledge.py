@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Final, assert_never
+from typing import assert_never
 
 from kip.adapters.repository.memory.acl import assertion_is_visible, unit_is_visible
 from kip.adapters.repository.memory.state import MemoryState
@@ -26,16 +27,24 @@ from kip.domain.models import (
 )
 from kip.errors import ConflictError, NotFoundError, ValidationError
 from kip.ids import new_id
+from kip.ontology import FALLBACK_EVIDENCE_REQUIRED_PREDICATES
 
-_HIGH_RISK_PREDICATES: Final = {
-    "amends",
-    "supersedes",
-    "approves",
-    "authorizes",
-    "evidences",
-    "satisfies",
-    "violates",
-}
+_REVIEW_RISK_ORDER = {"high": 0, "medium": 1, "low": 2}
+
+
+def _evidence_required(candidate: AssertionCandidate) -> bool:
+    """Fail-closed evidence gate applied at approval time.
+
+    The application layer enforces the catalog-derived rule
+    (review == "required" or risk == "high"); this store-level check is a
+    defense-in-depth floor using the candidate's own recorded review risk
+    plus the fallback predicate set pinned to `ontology/core/predicates.yaml`
+    by a contract test.
+    """
+    return (
+        candidate.review_risk == "high"
+        or candidate.predicate in FALLBACK_EVIDENCE_REQUIRED_PREDICATES
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -315,18 +324,51 @@ class MemoryKnowledgeStore:
             raise NotFoundError(f"candidate not found: {candidate_id}")
         return candidate.model_copy(deep=True)
 
+    def _visible_candidates(
+        self,
+        context: RequestContext,
+        status: str,
+        predicate: str | None,
+        subject_id: str | None,
+    ) -> list[AssertionCandidate]:
+        return [
+            candidate
+            for candidate in self.state.candidates.values()
+            if candidate.status == status
+            and (predicate is None or candidate.predicate == predicate)
+            and (subject_id is None or candidate.subject_id == subject_id)
+            and _candidate_evidence_is_visible(self.state, candidate.evidence, context)
+        ]
+
     def list_candidates(
         self,
         context: RequestContext,
         status: str = "proposed",
         limit: int = 100,
+        *,
+        predicate: str | None = None,
+        subject_id: str | None = None,
     ) -> list[AssertionCandidate]:
-        return [
-            candidate.model_copy(deep=True)
-            for candidate in self.state.candidates.values()
-            if candidate.status == status
-            and _candidate_evidence_is_visible(self.state, candidate.evidence, context)
-        ][:limit]
+        selected = self._visible_candidates(context, status, predicate, subject_id)
+        selected.sort(
+            key=lambda item: (
+                _REVIEW_RISK_ORDER.get(item.review_risk, 1),
+                # Confidence descending, unknown confidence last.
+                -(item.confidence if item.confidence is not None else -1.0),
+                item.id,
+            )
+        )
+        return [candidate.model_copy(deep=True) for candidate in selected[:limit]]
+
+    def count_candidates(
+        self,
+        context: RequestContext,
+        status: str = "proposed",
+        *,
+        predicate: str | None = None,
+        subject_id: str | None = None,
+    ) -> int:
+        return len(self._visible_candidates(context, status, predicate, subject_id))
 
     def approve_candidate(
         self,
@@ -334,14 +376,36 @@ class MemoryKnowledgeStore:
         candidate_id: str,
         reviewer_id: str,
         note: str | None = None,
+        *,
+        supersede_assertion_ids: Sequence[str] = (),
     ) -> ApprovedAssertion:
         candidate = self.get_candidate(context, candidate_id)
         if candidate.status != "proposed":
             raise ConflictError(f"candidate is already {candidate.status}")
-        if candidate.predicate in _HIGH_RISK_PREDICATES and not candidate.evidence:
+        if _evidence_required(candidate) and not candidate.evidence:
             raise ValidationError(
                 f"predicate {candidate.predicate} requires evidence"
             )
+        unknown_supersedes = sorted(
+            set(supersede_assertion_ids) - set(candidate.contradicts_assertion_ids)
+        )
+        if unknown_supersedes:
+            raise ValidationError(
+                "supersede targets must be contradicted by the candidate: "
+                + ", ".join(unknown_supersedes)
+            )
+        superseded: list[ApprovedAssertion] = []
+        for superseded_id in supersede_assertion_ids:
+            target = self.state.assertions.get(superseded_id)
+            if (
+                target is None
+                or target.status != "active"
+                or not assertion_is_visible(self.state, target, context)
+            ):
+                raise ConflictError(
+                    f"assertion is not active or not visible: {superseded_id}"
+                )
+            superseded.append(target)
         evidence_unit_ids = [item.content_unit_id for item in candidate.evidence]
         derived_scopes: set[str] = set()
         evidence_snapshot_ids: set[str] = set()
@@ -374,7 +438,38 @@ class MemoryKnowledgeStore:
             deep=True,
         )
         self.state.assertions[assertion.id] = assertion
+        for target in superseded:
+            self.state.assertions[target.id] = target.model_copy(
+                update={"status": "superseded", "superseded_by": assertion.id},
+                deep=True,
+            )
         return assertion.model_copy(deep=True)
+
+    def revoke_assertion(
+        self,
+        context: RequestContext,
+        assertion_id: str,
+        reviewer_id: str,
+        note: str,
+    ) -> ApprovedAssertion:
+        assertion = self.state.assertions.get(assertion_id)
+        if assertion is None or not assertion_is_visible(
+            self.state, assertion, context
+        ):
+            raise NotFoundError(f"assertion not found: {assertion_id}")
+        if assertion.status != "active":
+            raise ConflictError(f"assertion is already {assertion.status}")
+        revoked = assertion.model_copy(
+            update={
+                "status": "revoked",
+                "revoked_at": datetime.now(UTC),
+                "revoked_by": reviewer_id,
+                "revocation_note": note,
+            },
+            deep=True,
+        )
+        self.state.assertions[assertion_id] = revoked
+        return revoked.model_copy(deep=True)
 
     def reject_candidate(
         self,

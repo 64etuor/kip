@@ -130,6 +130,74 @@
         "title": "AnswerRequest",
         "type": "object"
       },
+      "CandidateProposal": {
+        "additionalProperties": false,
+        "description": "POST /v1/review/candidates body, mirroring the CLI `review propose` fields.",
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "evidence_unit_id": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Unit Id",
+            "type": "array"
+          },
+          "object_entity_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Entity Id"
+          },
+          "object_value": {
+            "title": "Object Value"
+          },
+          "ontology_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ontology Version"
+          },
+          "origin": {
+            "default": "human",
+            "title": "Origin",
+            "type": "string"
+          },
+          "predicate": {
+            "title": "Predicate",
+            "type": "string"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject_id",
+          "predicate"
+        ],
+        "title": "CandidateProposal",
+        "type": "object"
+      },
       "ClarificationAnswer": {
         "additionalProperties": false,
         "properties": {
@@ -690,6 +758,46 @@
             "title": "Definition",
             "type": "string"
           },
+          "domain": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 8,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "extraction": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction"
+          },
+          "inverse": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inverse"
+          },
           "kind": {
             "enum": [
               "entity_type",
@@ -705,6 +813,66 @@
             "minLength": 1,
             "title": "Label",
             "type": "string"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          },
+          "range": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 8,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Range"
+          },
+          "review": {
+            "anyOf": [
+              {
+                "enum": [
+                  "not_required",
+                  "conditional",
+                  "required"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review"
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk"
           },
           "symbol": {
             "maxLength": 64,
@@ -950,6 +1118,23 @@
           }
         },
         "summary": "Healthz"
+      }
+    },
+    "/readyz": {
+      "get": {
+        "description": "Readiness: liveness plus a real round-trip to the canonical store.\n\nContainer orchestration and ops probes use this endpoint; /healthz\nstays process-liveness only. Any repository failure fails closed with\n503 and no internal detail.",
+        "operationId": "readyz_readyz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Readyz"
       }
     },
     "/v1/admin/interactions/clarifications/expired": {
@@ -3024,6 +3209,86 @@
         "summary": "Ontology Mining Job"
       }
     },
+    "/v1/review/assertions/{assertion_id}/revoke": {
+      "post": {
+        "operationId": "revoke_assertion_v1_review_assertions__assertion_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assertion_id",
+            "required": true,
+            "schema": {
+              "title": "Assertion Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "note",
+            "required": true,
+            "schema": {
+              "title": "Note",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-kip-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-kip-admin-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Admin-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Assertion"
+      }
+    },
     "/v1/review/candidates": {
       "get": {
         "operationId": "candidates_v1_review_candidates_get",
@@ -3046,6 +3311,38 @@
               "default": 100,
               "title": "Limit",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "predicate",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Predicate"
+            }
+          },
+          {
+            "in": "query",
+            "name": "subject_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Subject Id"
             }
           },
           {
@@ -3104,6 +3401,76 @@
           }
         },
         "summary": "Candidates"
+      },
+      "post": {
+        "operationId": "propose_candidate_v1_review_candidates_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-kip-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-kip-admin-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Kip-Admin-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CandidateProposal"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Propose Candidate"
       }
     },
     "/v1/review/candidates/{candidate_id}": {
@@ -3204,6 +3571,16 @@
                 }
               ],
               "title": "Note"
+            }
+          },
+          {
+            "in": "query",
+            "name": "supersede_contradicted",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Supersede Contradicted",
+              "type": "boolean"
             }
           },
           {

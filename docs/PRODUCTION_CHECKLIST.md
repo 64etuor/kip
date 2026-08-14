@@ -41,6 +41,14 @@ The default Compose profile is a local pilot profile. Before serving multiple us
 ## Sources
 
 - Mount NAS read-only and add a source-outage guard before any absence reconciliation.
+- Set `${KIP_NAS_PATH}` for `compose.production.yaml`; it is bind-mounted
+  read-only into both the worker and the API. The API needs the live source
+  tree for evidence freshness checks and `xlsx-read`; without it every unit
+  reports stale and evidence is dropped.
+- Set `${KIP_ONTOLOGY_PATH}` to the version-controlled ontology checkout; it
+  is bind-mounted read-write into the API (discovery auto-release, ADR-044)
+  and read-only into the worker. The directory must be writable by uid
+  10001, and releases should be reviewed through git history.
 - Use Slack conversation allowlists and confirm token scopes.
 - Use Apple Mail/IMAP account and mailbox allowlists.
 - Separate personal and company mail into different workspaces or deployments.
@@ -73,9 +81,22 @@ The default Compose profile is a local pilot profile. Before serving multiple us
 - Never deploy a branch candidate or a `local/kip` image reference. Use one
   immutable image digest for migration, API, and worker.
 - Test restore into a new empty database and absent or empty CAS path.
+- Schedule the daily sealed backup with retention (`install-launchd.sh
+  --retain N` on the macOS host, or an equivalent scheduler) and verify at
+  least one real backup sealed and checksum-verified on the target host.
 - Keep encrypted off-host backups under an explicit retention policy, and
   preserve the checksummed restore-drill receipt with measured RPO/RTO.
 - Monitor failed jobs, extraction failure rate, stale-source warnings, queue age, and search latency.
+- Run `ops-report.sh` on a schedule (installer flag `--with-ops-report`) and
+  route its failing summaries (`KIP_OPS_WEBHOOK`) to a named owner. It covers
+  failed jobs, queue age, sync progress age, disk free, backup age, and API
+  health.
+- Activate log rotation for launchd job logs: install the generated
+  `var/newsyslog.kip.conf` into `/etc/newsyslog.d/kip.conf`.
+- Keep the container healthchecks meaningful: postgres `pg_isready`, API
+  `/readyz` (a real database round-trip; `/healthz` is liveness only), and
+  the worker's PostgreSQL-connectivity probe. Never run a host launchd worker
+  and a Compose worker against the same queue.
 - Pin production image digests and schedule upgrades.
 - Enable Dependabot and `upstream-watch`, create the `dependencies` and
   `quality-candidate` labels, and route notifications to a named owner.

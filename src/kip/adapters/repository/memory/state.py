@@ -30,6 +30,8 @@ class MemoryState:
         self.packets_by_revision: dict[str, DocumentPacket] = {}
         self.extraction_packets: dict[str, DocumentPacket] = {}
         self.current_revision_by_object: dict[str, str] = {}
+        # Consecutive complete filesystem scans that confirmed absence.
+        self.absent_scan_counts: dict[str, int] = {}
         self.units: dict[str, ContentUnit] = {}
         self.artifacts: dict[str, ArtifactView] = {}
         self.documents: dict[str, JsonObject] = {}

@@ -1,6 +1,11 @@
 {
   "additionalProperties": false,
   "properties": {
+    "absent": {
+      "default": 0,
+      "title": "Absent",
+      "type": "integer"
+    },
     "failed": {
       "default": 0,
       "title": "Failed",
@@ -29,6 +34,11 @@
     "source": {
       "title": "Source",
       "type": "string"
+    },
+    "tombstoned": {
+      "default": 0,
+      "title": "Tombstoned",
+      "type": "integer"
     },
     "unchanged": {
       "default": 0,

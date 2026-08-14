@@ -9,8 +9,17 @@ A connector discovers immutable source revisions and emits canonical source even
 - Mount read-only.
 - Use path relative to configured source root as the external ID.
 - Wait for file size and mtime to settle before hashing.
-- Do not treat an unavailable mount as mass deletion.
+- Do not treat an unavailable mount as mass deletion. A failed or aborted scan
+  never contributes deletion evidence, and a scan that sees zero files skips
+  deletion reconciliation entirely.
 - Hash content for revision identity.
+- Deletion is reconciled per complete scan with a grace policy
+  (`[sync] deletion_grace_scans`, default 2): an indexed file absent from that
+  many consecutive complete scans is soft-deleted through the same immutable
+  tombstone-revision path used by event connectors. Prior revisions and
+  approved assertions are preserved; a reappearing file clears its absence
+  mark and is re-indexed. See `docs/OPERATIONS.md` "Filesystem deletion grace
+  policy" for the operational details.
 
 ## HWP/HWPX parser broker
 

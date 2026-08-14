@@ -203,3 +203,32 @@ def test_mcp_exposes_the_same_clarification_service(tmp_path: Path, monkeypatch)
     assert "kip_clarify" in tools
     payload = json.loads(result[0][0].text)
     assert payload["schema_version"] == "kip.clarification.v1"
+
+
+def test_mcp_ontology_discovery_propose_threads_the_optional_parent_field(
+    tmp_path: Path, monkeypatch
+) -> None:
+    container = _container(tmp_path)
+    monkeypatch.setattr("kip.mcp_server.build_container", lambda: container)
+    server = create_server()
+
+    async def invoke() -> object:
+        return await server.call_tool(
+            "kip_ontology_discovery_propose",
+            {
+                "kind": "entity_type",
+                "symbol": "contract",
+                "label": "계약",
+                "definition": "업무상 체결하는 계약을 표현한다.",
+                "parent": "Document",
+                "confirmed": True,
+            },
+        )
+
+    result = asyncio.run(invoke())
+
+    payload = json.loads(result[0][0].text)
+    assert payload["schema_version"] == "kip.ontology-discovery-candidate.v1"
+    assert payload["kind"] == "entity_type"
+    assert payload["parent"] == "Document"
+    assert payload["target_symbol"] == "Document"

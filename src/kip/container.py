@@ -74,6 +74,7 @@ class Container:
     relation_miner: RelationMinerPort | None
     identity: IdentityResolverPort
     trace_exporters: tuple[QueryTraceExporter, ...]
+    ontology: OntologyCatalog | None
 
 
 def build_container(
@@ -391,6 +392,7 @@ def build_container(
             minimum=60,
             maximum=86_400,
         ),
+        ontology_root=ontology_root if ontology_root.is_dir() else None,
     )
     application = Application(
         ingestion=IngestionUseCases(
@@ -409,6 +411,14 @@ def build_container(
                 default=0.70,
                 minimum=0.0,
                 maximum=1.0,
+            ),
+            deletion_grace_scans=_bounded_integer(
+                _table(selected, "sync"),
+                "sync",
+                "deletion_grace_scans",
+                default=2,
+                minimum=1,
+                maximum=100,
             ),
         ),
         retrieval=retrieval,
@@ -449,6 +459,7 @@ def build_container(
         relation_miner=selected_relation_miner,
         identity=selected_identity,
         trace_exporters=selected_trace_exporters,
+        ontology=ontology,
     )
 
 
@@ -619,6 +630,13 @@ def _build_egress_policy(settings: Settings) -> EgressPolicy:
         secret_reference=str(raw.get("secret_ref", "")).strip() or None,
         base_url=str(raw.get("base_url", "")).strip() or None,
     )
+
+
+def _table(settings: Settings, section: str) -> dict[str, object]:
+    raw = settings.get(section, {}) or {}
+    if not isinstance(raw, dict):
+        raise ConfigurationError(f"{section} must be a table")
+    return raw
 
 
 def _bounded_integer(

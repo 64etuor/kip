@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import pytest
+import yaml
 
 from kip.errors import ValidationError
 from kip.ontology import OntologyCatalog, validate_ontology
@@ -44,3 +46,19 @@ def test_release_composition_uses_the_selected_domain_profile() -> None:
     # Then migration tooling sees only the core kernel and selected profile
     assert "Document" in release.entities
     assert "OfficialLetter" not in release.entities
+
+
+def test_release_load_rejects_a_domain_profile_that_shadows_a_core_entity_type(
+    tmp_path: Path,
+) -> None:
+    # Given a domain profile that redefines a core entity type
+    copied = tmp_path / "ontology"
+    shutil.copytree(ROOT / "ontology", copied)
+    domain_path = copied / "domains/research-project.yaml"
+    payload = yaml.safe_load(domain_path.read_text(encoding="utf-8"))
+    payload["entity_types"]["Person"] = {"description": "Shadowed by the domain profile."}
+    domain_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    # When/Then release composition fails closed instead of silently overriding core meaning
+    with pytest.raises(ValidationError, match="redefines core entity type"):
+        OntologyRelease.load(copied, domain_profile="research-project")

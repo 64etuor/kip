@@ -17,6 +17,10 @@ class MemoryOperationsStore:
     state: MemoryState
     name: ClassVar[str] = "memory"
 
+    def ping(self) -> None:
+        # The in-memory store is reachable whenever the process is alive.
+        return None
+
     def migrate(self, migrations_dir: Path) -> list[str]:
         return [path.name for path in sorted(migrations_dir.glob("*.sql"))]
 

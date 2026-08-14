@@ -68,6 +68,9 @@ services:
     volumes:
       - kip_cas:/data/cas
       - ${KIP_NAS_PATH:-./sample-data}:/sources/nas:ro
+      # Ontology auto-release (ADR-044) writes additive releases; the API is
+      # the admin review surface, so it mounts the checkout read-write.
+      - ${KIP_ONTOLOGY_PATH:-./ontology}:/app/ontology
     read_only: true
     init: true
     cap_drop:
@@ -98,6 +101,9 @@ services:
     volumes:
       - kip_cas:/data/cas
       - ${KIP_NAS_PATH:-./sample-data}:/sources/nas:ro
+      # Same ontology contract as the API, read-only: the worker never
+      # writes releases.
+      - ${KIP_ONTOLOGY_PATH:-./ontology}:/app/ontology:ro
     read_only: true
     init: true
     cap_drop:

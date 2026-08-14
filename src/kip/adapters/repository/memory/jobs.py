@@ -57,6 +57,17 @@ class MemoryJobStore:
             return job.model_copy(deep=True)
         return None
 
+    def record_job_result(
+        self,
+        context: RequestContext,
+        job_id: str,
+        result: JsonObject,
+    ) -> None:
+        job = self.state.jobs.get(job_id)
+        if not job:
+            raise NotFoundError(f"job not found: {job_id}")
+        job.payload["result"] = deepcopy(result)
+
     def complete_job(self, context: RequestContext, job_id: str) -> None:
         job = self.state.jobs.get(job_id)
         if not job:
@@ -77,7 +88,10 @@ class MemoryJobStore:
         limit: int = 100,
     ) -> list[JobRecord]:
         result = [
-            job.model_copy(deep=True)
+            job.model_copy(
+                update={"last_error": self.state.job_errors.get(job.id)},
+                deep=True,
+            )
             for job in self.state.jobs.values()
             if not status or job.status == status
         ]

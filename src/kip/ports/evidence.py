@@ -5,6 +5,7 @@ from typing import Protocol
 
 from kip.domain.json_types import JsonObject
 from kip.domain.models import ArtifactView, ContentUnit, EvidenceRead, RequestContext
+from kip.domain.xlsx import XlsxCell
 
 
 class EvidenceStore(Protocol):
@@ -26,7 +27,7 @@ class SourceFileInspectorPort(Protocol):
 
 
 class WorkbookReaderPort(Protocol):
-    def read(self, path: Path, sheet: str, cell_range: str) -> list[list[JsonObject]]: ...
+    def read(self, path: Path, sheet: str, cell_range: str) -> list[list[XlsxCell]]: ...
 
 
 class EvidenceReaderPort(Protocol):

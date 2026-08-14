@@ -338,6 +338,38 @@
       "title": "GenerationUsage",
       "type": "object"
     },
+    "MinedProposalSkip": {
+      "additionalProperties": false,
+      "description": "One invalid or duplicate mined proposal that was skipped, with a reason.\n\nA skipped proposal never becomes a candidate; recording it keeps a single\nbad proposal from failing the whole mining batch while preserving an\nauditable per-proposal explanation.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "entity",
+            "relation",
+            "evidence_unit"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "reference": {
+          "minLength": 1,
+          "title": "Reference",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "reference",
+        "reason"
+      ],
+      "title": "MinedProposalSkip",
+      "type": "object"
+    },
     "ModelRevision": {
       "additionalProperties": false,
       "properties": {
@@ -458,6 +490,13 @@
       "default": "kip.ontology-mining.v1",
       "title": "Schema Version",
       "type": "string"
+    },
+    "skipped": {
+      "items": {
+        "$ref": "#/$defs/MinedProposalSkip"
+      },
+      "title": "Skipped",
+      "type": "array"
     },
     "usage": {
       "$ref": "#/$defs/GenerationUsage"

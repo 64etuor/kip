@@ -4,8 +4,10 @@ from __future__ import annotations
 import argparse
 import gzip
 import hashlib
+import io
 import json
 import os
+import re
 import shutil
 import stat
 import sys
@@ -29,6 +31,18 @@ CONFIG_PATHS = (
     "deploy/sql/roles.sql.template",
     "migrations",
     "ontology",
+)
+REDACTED_VALUE = "[REDACTED]"
+REDACTABLE_CONFIG_SUFFIXES = (".toml", ".yaml", ".yml")
+_SECRET_KEY_PATTERN = re.compile(
+    r"(?i)(?:password|passwd|secret|token|credential|api_key|apikey|access_key|private_key)"
+)
+_REFERENCE_KEY_SUFFIXES = ("_env", "_file")
+_ASSIGNMENT_PATTERN = re.compile(
+    r'^(?P<prefix>\s*(?P<key>[A-Za-z0-9_.-]+)\s*[=:]\s*)"(?P<value>[^"]*)"(?P<suffix>\s*(?:#.*)?)$'
+)
+_URL_CREDENTIAL_PATTERN = re.compile(
+    r"(?P<scheme>[a-z][a-z0-9+.-]*://[^/:@\s\"']+):(?P<password>[^@\s\"']+)@"
 )
 REQUIRED_PAYLOADS = frozenset(
     {
@@ -117,6 +131,67 @@ def _tar_writer(path: Path, epoch: int) -> Iterator[tarfile.TarFile]:
         yield archive
 
 
+def _is_reference_value(value: str) -> bool:
+    return value.startswith(("env:", "file:")) or value == REDACTED_VALUE
+
+
+def _is_reference_key(key: str) -> bool:
+    return key.lower().endswith(_REFERENCE_KEY_SUFFIXES)
+
+
+def redact_config_text(text: str) -> tuple[str, int]:
+    """Redact literal secret values from a configuration document.
+
+    The configuration convention stores secrets as ``env:``/``file:``
+    references or ``*_env``/``*_file`` indirection keys; those are preserved.
+    A quoted literal value assigned to a secret-looking key, and any URL
+    userinfo password, are replaced with ``[REDACTED]``.
+    """
+    redacted = 0
+    lines: list[str] = []
+    for line in text.splitlines(keepends=True):
+        body = line.rstrip("\r\n")
+        newline = line[len(body) :]
+        match = _ASSIGNMENT_PATTERN.match(body)
+        if match:
+            key = match.group("key")
+            value = match.group("value")
+            if (
+                _SECRET_KEY_PATTERN.search(key)
+                and not _is_reference_key(key)
+                and not _is_reference_value(value)
+                and value
+            ):
+                body = f'{match.group("prefix")}"{REDACTED_VALUE}"{match.group("suffix")}'
+                redacted += 1
+                lines.append(body + newline)
+                continue
+        body, url_count = _URL_CREDENTIAL_PATTERN.subn(rf"\g<scheme>:{REDACTED_VALUE}@", body)
+        redacted += url_count
+        lines.append(body + newline)
+    return "".join(lines), redacted
+
+
+def _contains_literal_secret(text: str) -> str | None:
+    """Return a description of the first literal secret found, if any."""
+    for number, line in enumerate(text.splitlines(), start=1):
+        match = _ASSIGNMENT_PATTERN.match(line)
+        if match:
+            key = match.group("key")
+            value = match.group("value")
+            if (
+                _SECRET_KEY_PATTERN.search(key)
+                and not _is_reference_key(key)
+                and not _is_reference_value(value)
+                and value
+            ):
+                return f"line {number}: literal value for secret key {key!r}"
+        cleaned = _URL_CREDENTIAL_PATTERN.search(line)
+        if cleaned and cleaned.group("password") != REDACTED_VALUE:
+            return f"line {number}: URL contains embedded credentials"
+    return None
+
+
 def _add_file(archive: tarfile.TarFile, source: Path, relative: str, epoch: int) -> None:
     metadata = source.stat()
     info = tarfile.TarInfo(relative)
@@ -129,6 +204,18 @@ def _add_file(archive: tarfile.TarFile, source: Path, relative: str, epoch: int)
     info.mtime = epoch
     with source.open("rb") as stream:
         archive.addfile(info, stream)
+
+
+def _add_bytes(archive: tarfile.TarFile, payload: bytes, relative: str, epoch: int) -> None:
+    info = tarfile.TarInfo(relative)
+    info.size = len(payload)
+    info.mode = 0o600
+    info.uid = 0
+    info.gid = 0
+    info.uname = "root"
+    info.gname = "root"
+    info.mtime = epoch
+    archive.addfile(info, io.BytesIO(payload))
 
 
 def snapshot_cas(source: Path, archive_path: Path, manifest_path: Path) -> dict[str, Any]:
@@ -275,19 +362,31 @@ def snapshot_config(root: Path, archive_path: Path) -> dict[str, Any]:
     if not selected:
         raise BackupError("configuration snapshot has no files")
     created = _created_at()
+    redacted_values = 0
     try:
         with _tar_writer(archive_path, int(created.timestamp())) as archive:
             for path in sorted(set(selected)):
-                _add_file(
-                    archive,
-                    path,
-                    path.relative_to(root).as_posix(),
-                    int(created.timestamp()),
-                )
+                relative = path.relative_to(root).as_posix()
+                if relative.startswith("config/") and path.suffix in REDACTABLE_CONFIG_SUFFIXES:
+                    try:
+                        text = path.read_text(encoding="utf-8")
+                    except UnicodeError as error:
+                        raise BackupError(
+                            f"configuration file is not valid UTF-8: {relative}"
+                        ) from error
+                    text, count = redact_config_text(text)
+                    redacted_values += count
+                    _add_bytes(archive, text.encode(), relative, int(created.timestamp()))
+                else:
+                    _add_file(archive, path, relative, int(created.timestamp()))
     except Exception:
         archive_path.unlink(missing_ok=True)
         raise
-    return {"file_count": len(set(selected)), "status": "created"}
+    return {
+        "file_count": len(set(selected)),
+        "redacted_values": redacted_values,
+        "status": "created",
+    }
 
 
 def _verify_config_archive(path: Path) -> None:
@@ -299,6 +398,21 @@ def _verify_config_archive(path: Path) -> None:
                 if not member.isfile() or member.issym() or member.islnk() or relative in seen:
                     raise BackupError("configuration archive contains an unsafe member")
                 seen.add(relative)
+                if relative.startswith("config/") and relative.endswith(REDACTABLE_CONFIG_SUFFIXES):
+                    stream = archive.extractfile(member)
+                    if stream is None:
+                        raise BackupError("configuration archive member is unreadable")
+                    try:
+                        text = stream.read().decode("utf-8")
+                    except UnicodeError as error:
+                        raise BackupError(
+                            f"configuration archive member is not UTF-8: {relative}"
+                        ) from error
+                    finding = _contains_literal_secret(text)
+                    if finding is not None:
+                        raise BackupError(
+                            f"configuration snapshot contains a literal secret ({relative}, {finding})"
+                        )
     except (OSError, tarfile.TarError) as error:
         raise BackupError("configuration archive is invalid") from error
     if "VERSION" not in seen or not any(name.startswith("ontology/") for name in seen):
@@ -364,9 +478,7 @@ def seal_backup(root: Path) -> dict[str, Any]:
         },
     }
     _write_json(root / "backup-manifest.json", manifest)
-    checksum_files = {
-        path.relative_to(root).as_posix(): path for path in _regular_files(root)
-    }
+    checksum_files = {path.relative_to(root).as_posix(): path for path in _regular_files(root)}
     sums = "".join(
         f"{_sha256(path)}  {relative}\n" for relative, path in sorted(checksum_files.items())
     )

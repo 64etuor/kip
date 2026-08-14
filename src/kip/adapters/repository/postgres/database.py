@@ -6,6 +6,7 @@ import json
 import math
 import threading
 from collections.abc import Sequence
+from collections.abc import Set as AbstractSet
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
@@ -48,6 +49,7 @@ from kip.domain.models import (
     SearchHit,
     SearchRequest,
     SourceObject,
+    SourceObjectAbsence,
     SourceRevision,
     StatusReport,
     VocabularyItem,
@@ -60,16 +62,26 @@ from kip.errors import (
     ValidationError,
 )
 from kip.ids import new_id, stable_id
+from kip.ontology import FALLBACK_EVIDENCE_REQUIRED_PREDICATES
 
-_HIGH_RISK_PREDICATES = {
-    "amends",
-    "supersedes",
-    "approves",
-    "authorizes",
-    "evidences",
-    "satisfies",
-    "violates",
-}
+_REVIEW_RISK_ORDER_SQL = (
+    "CASE review_risk WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END"
+)
+
+
+def _evidence_required(candidate: AssertionCandidate) -> bool:
+    """Fail-closed evidence gate applied at approval time.
+
+    The application layer enforces the catalog-derived rule
+    (review == "required" or risk == "high"); this store-level check is a
+    defense-in-depth floor using the candidate's own recorded review risk
+    plus the fallback predicate set pinned to `ontology/core/predicates.yaml`
+    by a contract test.
+    """
+    return (
+        candidate.review_risk == "high"
+        or candidate.predicate in FALLBACK_EVIDENCE_REQUIRED_PREDICATES
+    )
 
 
 def _json(value: Any) -> str:
@@ -184,6 +196,12 @@ class PostgresDatabase:
                     )
             yield connection
 
+    def ping(self) -> None:
+        """Readiness probe: a real round-trip using the pooled connection."""
+        with self._connection() as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+
     def migrate(self, migrations_dir: Path) -> list[str]:
         import psycopg
         from psycopg.rows import dict_row
@@ -287,12 +305,32 @@ class PostgresDatabase:
             stored["workspace_id"] != workspace
             or stored["provider"] != snapshot.provider
             or stored["snapshot_version"] != snapshot.version
-            or stored["captured_at"] != snapshot.captured_at
-            or stored["expires_at"] != snapshot.expires_at
             or stored["configuration_owned"] != snapshot.configuration_owned
             or list(stored["scopes"] or []) != snapshot.scopes
         ):
             raise ConflictError("ACL snapshot ID was reused with different contents")
+        if (
+            stored["captured_at"] != snapshot.captured_at
+            or stored["expires_at"] != snapshot.expires_at
+        ):
+            if not snapshot.configuration_owned:
+                raise ConflictError(
+                    "ACL snapshot ID was reused with different contents"
+                )
+            # Configuration-owned snapshots regenerate `captured_at` on every
+            # scan while their identity (id embeds the policy version) and
+            # scopes stay fixed; they are always fresh regardless of
+            # `captured_at`, so refreshing the timestamps is an audit update,
+            # not an access-policy change. Without this, every re-sync of an
+            # unchanged file failed with a snapshot-reuse conflict.
+            cursor.execute(
+                """
+                UPDATE source.acl_snapshots
+                SET captured_at=%s, expires_at=%s
+                WHERE id=%s
+                """,
+                (snapshot.captured_at, snapshot.expires_at, snapshot.id),
+            )
 
     def upsert_acl_snapshot(
         self,
@@ -444,6 +482,70 @@ class PostgresDatabase:
                 (context.workspace, source_object_id, sha256),
             )
             return cursor.fetchone() is not None
+
+    def reconcile_scan_absences(
+        self,
+        context: RequestContext,
+        system_id: str,
+        seen_object_ids: AbstractSet[str],
+    ) -> list[SourceObjectAbsence]:
+        seen = sorted(seen_object_ids)
+        with self._connection(context) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE source.objects
+                    SET absent_scan_count=0, absent_since=NULL
+                    WHERE workspace_id=%s AND system_id=%s
+                      AND id = ANY(%s) AND absent_scan_count <> 0
+                    """,
+                    (context.workspace, system_id, seen),
+                )
+                cursor.execute(
+                    """
+                    UPDATE source.objects o
+                    SET absent_scan_count = o.absent_scan_count + 1,
+                        absent_since = COALESCE(o.absent_since, now())
+                    FROM source.revisions r
+                    WHERE o.workspace_id=%s AND o.system_id=%s
+                      AND r.id = o.current_revision_id
+                      AND NOT r.is_tombstone
+                      AND NOT (o.id = ANY(%s))
+                    RETURNING o.id, o.external_id, o.absent_scan_count,
+                              o.current_revision_id
+                    """,
+                    (context.workspace, system_id, seen),
+                )
+                marked = cursor.fetchall()
+                artifact_by_revision: dict[str, str] = {}
+                if marked:
+                    cursor.execute(
+                        """
+                        SELECT id, revision_id
+                        FROM content.artifacts
+                        WHERE workspace_id=%s AND revision_id = ANY(%s)
+                        ORDER BY created_at
+                        """,
+                        (
+                            context.workspace,
+                            [row["current_revision_id"] for row in marked],
+                        ),
+                    )
+                    for artifact in cursor.fetchall():
+                        artifact_by_revision.setdefault(
+                            artifact["revision_id"], artifact["id"]
+                        )
+            connection.commit()
+        return [
+            SourceObjectAbsence(
+                object_id=row["id"],
+                external_id=row["external_id"],
+                artifact_id=artifact_by_revision[row["current_revision_id"]],
+                absent_scan_count=row["absent_scan_count"],
+            )
+            for row in marked
+            if row["current_revision_id"] in artifact_by_revision
+        ]
 
     def ingest_packet(self, context: RequestContext, packet: DocumentPacket) -> IngestResult:
         if packet.workspace_id != context.workspace:
@@ -2002,12 +2104,12 @@ class PostgresDatabase:
         with self._connection(context) as connection, connection.cursor() as cursor:
             if status:
                 cursor.execute(
-                    "SELECT public_id,job_type,payload,status,attempts,max_attempts FROM jobs.queue WHERE workspace_id=%s AND status=%s ORDER BY id DESC LIMIT %s",
+                    "SELECT public_id,job_type,payload,status,attempts,max_attempts,last_error FROM jobs.queue WHERE workspace_id=%s AND status=%s ORDER BY id DESC LIMIT %s",
                     (context.workspace, status, limit),
                 )
             else:
                 cursor.execute(
-                    "SELECT public_id,job_type,payload,status,attempts,max_attempts FROM jobs.queue WHERE workspace_id=%s ORDER BY id DESC LIMIT %s",
+                    "SELECT public_id,job_type,payload,status,attempts,max_attempts,last_error FROM jobs.queue WHERE workspace_id=%s ORDER BY id DESC LIMIT %s",
                     (context.workspace, limit),
                 )
             rows = cursor.fetchall()
@@ -2019,9 +2121,31 @@ class PostgresDatabase:
                 status=row["status"],
                 attempts=row["attempts"],
                 max_attempts=row["max_attempts"],
+                last_error=row["last_error"],
             )
             for row in rows
         ]
+
+    def record_job_result(
+        self,
+        context: RequestContext,
+        job_id: str,
+        result: dict[str, Any],
+    ) -> None:
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE jobs.queue
+                SET payload = payload || jsonb_build_object('result', %s::jsonb),
+                    updated_at = now()
+                WHERE workspace_id=%s AND public_id=%s
+                """,
+                (_json(result), context.workspace, job_id),
+            )
+            updated = cursor.rowcount
+            connection.commit()
+        if not updated:
+            raise NotFoundError(f"job not found: {job_id}")
 
     def save_entity(
         self,
@@ -2896,43 +3020,97 @@ class PostgresDatabase:
             connection.commit()
         return candidate
 
+    @staticmethod
+    def _candidate_filter_sql(
+        context: RequestContext,
+        status: str,
+        predicate: str | None,
+        subject_id: str | None,
+    ) -> tuple[str, list[Any]]:
+        conditions = [
+            "workspace_id=%s",
+            "status=%s",
+            """NOT EXISTS (
+                SELECT 1
+                FROM jsonb_array_elements(
+                    knowledge.assertion_candidates.evidence
+                ) item
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM content.units unit
+                    WHERE unit.workspace_id=%s
+                      AND unit.id=item->>'content_unit_id'
+                      AND (
+                          cardinality(unit.acl_scopes)=0
+                          OR unit.acl_scopes <@ %s::text[]
+                      )
+                      AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                )
+            )""",
+        ]
+        params: list[Any] = [
+            context.workspace,
+            status,
+            context.workspace,
+            context.acl_scopes,
+        ]
+        if predicate is not None:
+            conditions.append("predicate=%s")
+            params.append(predicate)
+        if subject_id is not None:
+            conditions.append("subject_id=%s")
+            params.append(subject_id)
+        return " AND ".join(conditions), params
+
     def list_candidates(
-        self, context: RequestContext, status: str = "proposed", limit: int = 100
+        self,
+        context: RequestContext,
+        status: str = "proposed",
+        limit: int = 100,
+        *,
+        predicate: str | None = None,
+        subject_id: str | None = None,
     ) -> list[AssertionCandidate]:
+        where, params = self._candidate_filter_sql(
+            context, status, predicate, subject_id
+        )
         with self._connection(context) as connection, connection.cursor() as cursor:
             cursor.execute(
-                """
+                f"""
                 SELECT * FROM knowledge.assertion_candidates
-                WHERE workspace_id=%s AND status=%s
-                  AND NOT EXISTS (
-                      SELECT 1
-                      FROM jsonb_array_elements(
-                          knowledge.assertion_candidates.evidence
-                      ) item
-                      WHERE NOT EXISTS (
-                          SELECT 1 FROM content.units unit
-                          WHERE unit.workspace_id=%s
-                            AND unit.id=item->>'content_unit_id'
-                            AND (
-                                cardinality(unit.acl_scopes)=0
-                                OR unit.acl_scopes <@ %s::text[]
-                            )
-                            AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
-                      )
-                  )
-                ORDER BY created_at
+                WHERE {where}
+                ORDER BY {_REVIEW_RISK_ORDER_SQL},
+                         confidence DESC NULLS LAST,
+                         created_at,
+                         id
                 LIMIT %s
                 """,
-                (
-                    context.workspace,
-                    status,
-                    context.workspace,
-                    context.acl_scopes,
-                    limit,
-                ),
+                (*params, limit),
             )
             rows = cursor.fetchall()
         return [self._candidate(row) for row in rows]
+
+    def count_candidates(
+        self,
+        context: RequestContext,
+        status: str = "proposed",
+        *,
+        predicate: str | None = None,
+        subject_id: str | None = None,
+    ) -> int:
+        where, params = self._candidate_filter_sql(
+            context, status, predicate, subject_id
+        )
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                f"SELECT count(*) FROM knowledge.assertion_candidates WHERE {where}",
+                params,
+            )
+            row = cursor.fetchone()
+        if row is None:
+            raise DependencyUnavailableError(
+                "PostgreSQL did not return the candidate count"
+            )
+        return int(row["count"])
 
     def get_candidate(self, context: RequestContext, candidate_id: str) -> AssertionCandidate:
         with self._connection(context) as connection, connection.cursor() as cursor:
@@ -2997,7 +3175,13 @@ class PostgresDatabase:
         )
 
     def approve_candidate(
-        self, context: RequestContext, candidate_id: str, reviewer_id: str, note: str | None = None
+        self,
+        context: RequestContext,
+        candidate_id: str,
+        reviewer_id: str,
+        note: str | None = None,
+        *,
+        supersede_assertion_ids: Sequence[str] = (),
     ) -> ApprovedAssertion:
         with self._connection(context) as connection:
             self._ensure_workspace_and_principal(connection, context)
@@ -3037,8 +3221,17 @@ class PostgresDatabase:
                 candidate = self._candidate(row)
                 if candidate.status != "proposed":
                     raise ConflictError(f"candidate is already {candidate.status}")
-                if candidate.predicate in _HIGH_RISK_PREDICATES and not candidate.evidence:
+                if _evidence_required(candidate) and not candidate.evidence:
                     raise ValidationError(f"predicate {candidate.predicate} requires evidence")
+                unknown_supersedes = sorted(
+                    set(supersede_assertion_ids)
+                    - set(candidate.contradicts_assertion_ids)
+                )
+                if unknown_supersedes:
+                    raise ValidationError(
+                        "supersede targets must be contradicted by the candidate: "
+                        + ", ".join(unknown_supersedes)
+                    )
                 evidence_unit_ids = [evidence.content_unit_id for evidence in candidate.evidence]
                 derived_scopes: set[str] = set()
                 evidence_rows: list[dict[str, Any]] = []
@@ -3126,6 +3319,28 @@ class PostgresDatabase:
                     """,
                     (reviewer_id, note, context.workspace, candidate_id),
                 )
+                for superseded_id in supersede_assertion_ids:
+                    cursor.execute(
+                        """
+                        UPDATE knowledge.assertions
+                        SET status='superseded', superseded_by=%s
+                        WHERE workspace_id=%s AND id=%s AND status='active'
+                          AND (
+                              cardinality(acl_scopes)=0
+                              OR acl_scopes <@ %s::text[]
+                          )
+                        """,
+                        (
+                            assertion_id,
+                            context.workspace,
+                            superseded_id,
+                            context.acl_scopes,
+                        ),
+                    )
+                    if not cursor.rowcount:
+                        raise ConflictError(
+                            f"assertion is not active or not visible: {superseded_id}"
+                        )
             connection.commit()
         return ApprovedAssertion(
             id=assertion_id,
@@ -3215,6 +3430,42 @@ class PostgresDatabase:
             raise NotFoundError(f"assertion not found: {assertion_id}")
         return self._approved_assertion(row)
 
+    def revoke_assertion(
+        self,
+        context: RequestContext,
+        assertion_id: str,
+        reviewer_id: str,
+        note: str,
+    ) -> ApprovedAssertion:
+        with self._connection(context) as connection:
+            self._ensure_workspace_and_principal(connection, context)
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT status FROM knowledge.assertions
+                    WHERE workspace_id=%s AND id=%s
+                      AND (cardinality(acl_scopes)=0 OR acl_scopes <@ %s::text[])
+                    FOR UPDATE
+                    """,
+                    (context.workspace, assertion_id, context.acl_scopes),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise NotFoundError(f"assertion not found: {assertion_id}")
+                if row["status"] != "active":
+                    raise ConflictError(f"assertion is already {row['status']}")
+                cursor.execute(
+                    """
+                    UPDATE knowledge.assertions
+                    SET status='revoked', revoked_at=now(), revoked_by=%s,
+                        revocation_note=%s
+                    WHERE workspace_id=%s AND id=%s
+                    """,
+                    (reviewer_id, note, context.workspace, assertion_id),
+                )
+            connection.commit()
+        return self.get_assertion(context, assertion_id)
+
     @staticmethod
     def _approved_assertion(row: dict[str, Any]) -> ApprovedAssertion:
         return ApprovedAssertion(
@@ -3231,6 +3482,10 @@ class PostgresDatabase:
             acl_scopes=row["acl_scopes"] or [],
             evidence_unit_ids=row["evidence_unit_ids"] or [],
             evidence_acl_snapshot_ids=row["evidence_acl_snapshot_ids"] or [],
+            revoked_at=row.get("revoked_at"),
+            revoked_by=row.get("revoked_by"),
+            revocation_note=row.get("revocation_note"),
+            superseded_by=row.get("superseded_by"),
         )
 
     def status(self, context: RequestContext) -> StatusReport:

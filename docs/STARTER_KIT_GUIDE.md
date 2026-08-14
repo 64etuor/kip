@@ -19,30 +19,48 @@
 
 ## 2. 복제 후 60분 인수 경로
 
-1. AI agent에게 “KIP을 셋업해줘”라고 요청해 `kip-setup` Skill을 시작한다.
-2. `setup inspect`가 반환한 질문에 매번 하나씩 답한다. Agent가 먼저
+1. `./scripts/bootstrap.sh`를 실행한다. Python 3.12+가 없으면 여기서 명확히
+   실패하므로 먼저 설치한다. bootstrap 전에는 `./scripts/kip`가 시스템
+   python으로 떨어져 어떤 setup 명령도 실행되지 않는다.
+2. AI agent에게 “KIP을 셋업해줘”라고 요청해 `kip-setup` Skill을 시작한다.
+3. `setup inspect`가 반환한 질문에 매번 하나씩 답한다. Agent가 먼저
    identity mode를 묻고, `proxy_jwt`이면 issuer/audience/JWKS/admin group을,
    `api_key`이면 API/admin key secret reference를 이어서 묻는다. credential은
-   값이 아니라 secret reference만 제공한다.
+   값이 아니라 secret reference만 제공한다. 런타임이 해석할 수 있는 것은
+   `env:NAME`과 (모델 credential에 한해) `file:/absolute/path`뿐이며,
+   `keychain:`/`secret-manager:`는 CLI가 거부한다.
    원격 생성 모델을 고르면 허용 분류, provider retention 정책, credential
    reference를 각각 별도 질문으로 확인한다.
-3. `setup preview`의 파일 수, 용량, 확장자, 제외 건수와 symlink 건수를 확인한다.
-4. `setup plan`의 source scope, read-only mount, egress, ontology profile,
+4. `setup preview`의 source 이름, 분류, ACL scope, 파일 수, 용량, 확장자,
+   제외 건수와 symlink 건수를 확인한다.
+5. `setup plan`의 source scope, read-only mount, egress, ontology profile,
    interaction-memory consent, reviewer, warning과 fingerprint를 승인한다.
-5. agent가 `setup apply`와 `setup verify`를 마치고 redacted receipt를 제시하게 한다.
-6. `./scripts/bootstrap.sh`, `./scripts/dev-up.sh`, `./scripts/migrate.sh`, `./scripts/doctor.sh`를 실행한다.
-7. sample source로 `sync -> search -> context -> read -> xlsx-read`를 완료한다.
-8. 실제 source는 `sync run --dry-run`으로 다시 범위와 건수를 확인한다.
-9. 기존 HWP/HWPX index가 있으면 `parser reextract --source SOURCE`로 shadow
-   결과를 검토하고, 별도 승인 후에만 `--activate`를 실행한다.
-10. `docs/AI_OPERATOR_RUNBOOK.md`의 real-corpus cycle을 수행하고 결과를 새 audit 문서로 보존한다.
-11. `./scripts/verify.sh`가 통과한 뒤에만 파일럿 사용자에게 연다.
+6. agent가 `setup apply`와 `setup verify`를 마치고 redacted receipt를
+   제시하게 한다. receipt의 `runtime_readiness` 실패 항목과 `limitations`를
+   먼저 해결한다. apply/verify는 설정 파일만 생성하며 아직 아무것도 색인되지
+   않는다.
+7. receipt의 `next_steps`대로 `./scripts/migrate.sh`와 `./scripts/app-up.sh`를
+   실행한다. `app-up.sh`는 `compose.generated.yaml`을 base `compose.yaml` 위에
+   겹쳐 승인된 source mount와 생성 config를 적용한다. 필요하면
+   `./scripts/doctor.sh`로 환경을 점검한다.
+8. sample source로 `sync -> search -> context -> read -> xlsx-read`를 완료한다.
+9. 실제 source는 `sync run --dry-run`으로 다시 범위와 건수를 확인한다.
+10. 기존 HWP/HWPX index가 있으면 `parser reextract --source SOURCE`로 shadow
+    결과를 검토하고, 별도 승인 후에만 `--activate`를 실행한다.
+11. `docs/AI_OPERATOR_RUNBOOK.md`의 real-corpus cycle을 수행하고 결과를 새 audit 문서로 보존한다.
+12. `./scripts/verify.sh`가 통과한 뒤에만 파일럿 사용자에게 연다.
 
 셋업 state와 plan은 versioned JSON contract이며 중단 후 재개할 수 있다. Agent는
 TOML, Compose, `.mcp.json`을 직접 편집하지 않는다. 셋업 state machine이
-`config/kip.generated.toml`, `compose.generated.yaml`, 생성 config를 선택하는
-`.mcp.json`을 함께 쓴다. 기존 generated file은 apply 때
+컨테이너용 `config/kip.generated.toml`, 호스트 경로용
+`config/kip.host.generated.toml`, `compose.generated.yaml`, 그리고 호스트
+config를 선택하는 `.mcp.json`을 함께 쓴다. 기존 generated file은 apply 때
 `.previous`로 한 세대 보존되고, answer가 바뀐 stale plan은 쓰기 전에 거부된다.
+
+`sync_schedule` 답변은 생성 config에 declarative 운영 메타데이터로만
+기록된다. 이 값이 자동으로 sync를 예약하지는 않는다. 주기 실행이 필요하면
+`scripts/install-launchd.sh`를 사용하며, launchd installer는 자체 interval
+설정을 따른다.
 
 복사 직후 성공 기준은 서버가 뜨는 것이 아니다. 허용된 principal로 검색한 근거를 exact read할 수 있고, 허용되지 않은 principal에게 동일 문서와 graph path가 보이지 않으며, 원본 해시가 변하지 않아야 한다.
 

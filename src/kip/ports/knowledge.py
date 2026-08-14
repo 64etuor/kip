@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Protocol
 
 from kip.domain.knowledge import EntityCandidate, KnowledgeEntity
@@ -123,7 +124,19 @@ class KnowledgeStore(Protocol):
         context: RequestContext,
         status: str = "proposed",
         limit: int = 100,
+        *,
+        predicate: str | None = None,
+        subject_id: str | None = None,
     ) -> list[AssertionCandidate]: ...
+
+    def count_candidates(
+        self,
+        context: RequestContext,
+        status: str = "proposed",
+        *,
+        predicate: str | None = None,
+        subject_id: str | None = None,
+    ) -> int: ...
 
     def approve_candidate(
         self,
@@ -131,6 +144,8 @@ class KnowledgeStore(Protocol):
         candidate_id: str,
         reviewer_id: str,
         note: str | None = None,
+        *,
+        supersede_assertion_ids: Sequence[str] = (),
     ) -> ApprovedAssertion: ...
 
     def reject_candidate(
@@ -145,6 +160,14 @@ class KnowledgeStore(Protocol):
         self,
         context: RequestContext,
         assertion_id: str,
+    ) -> ApprovedAssertion: ...
+
+    def revoke_assertion(
+        self,
+        context: RequestContext,
+        assertion_id: str,
+        reviewer_id: str,
+        note: str,
     ) -> ApprovedAssertion: ...
 
     def graph_neighbors(

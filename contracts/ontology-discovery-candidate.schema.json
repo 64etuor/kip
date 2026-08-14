@@ -1,4 +1,63 @@
 {
+  "$defs": {
+    "OntologyDiscoveryRelease": {
+      "additionalProperties": false,
+      "description": "Result of materializing an accepted discovery candidate into the ontology tree.",
+      "properties": {
+        "catalog_refresh": {
+          "enum": [
+            "applied",
+            "restart_required"
+          ],
+          "title": "Catalog Refresh",
+          "type": "string"
+        },
+        "file": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "File",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "entity_type",
+            "predicate",
+            "controlled_value",
+            "alias"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "kip.ontology-release.v1",
+          "default": "kip.ontology-release.v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "symbol": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Symbol",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "symbol",
+        "file",
+        "version",
+        "catalog_refresh"
+      ],
+      "title": "OntologyDiscoveryRelease",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
   "properties": {
     "created_at": {
@@ -12,11 +71,39 @@
       "title": "Definition",
       "type": "string"
     },
+    "domain": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Domain"
+    },
     "domain_profile": {
       "maxLength": 64,
       "minLength": 1,
       "title": "Domain Profile",
       "type": "string"
+    },
+    "extraction": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Extraction"
     },
     "fingerprint": {
       "maxLength": 128,
@@ -29,6 +116,19 @@
       "minLength": 1,
       "title": "Id",
       "type": "string"
+    },
+    "inverse": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Inverse"
     },
     "kind": {
       "enum": [
@@ -51,6 +151,62 @@
       "minimum": 1,
       "title": "Occurrence Count",
       "type": "integer"
+    },
+    "parent": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent"
+    },
+    "range": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Range"
+    },
+    "release": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OntologyDiscoveryRelease"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "review": {
+      "anyOf": [
+        {
+          "enum": [
+            "not_required",
+            "conditional",
+            "required"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Review"
     },
     "review_note": {
       "anyOf": [
@@ -90,6 +246,23 @@
       ],
       "default": null,
       "title": "Reviewed By"
+    },
+    "risk": {
+      "anyOf": [
+        {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Risk"
     },
     "schema_version": {
       "const": "kip.ontology-discovery-candidate.v1",

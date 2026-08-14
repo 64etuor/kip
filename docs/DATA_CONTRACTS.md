@@ -140,6 +140,34 @@ admitted evidence IDs, denied evidence IDs, and a typed denial reason.
 `allowed=false` prohibits a generator call even when an admitted subset is
 non-empty.
 
+## Sync summary boundary
+
+`SyncSummary` is the read model an inline synchronization run returns through
+the standard envelope (`kip sync run` / `kip sync all` without `--enqueue`,
+and REST `POST /v1/sync/filesystem/{source}` with `enqueue=false`); enqueued
+sync runs return a `job_id` instead. It carries the `source` name plus per-run
+counters and bounded `warnings` strings:
+
+- `scanned`: source files or connector events the run observed.
+- `inserted` / `replaced` / `unchanged`: ingest outcomes per object; a repeated
+  identical revision is `unchanged`, never a duplicate row.
+- `failed`: objects whose ingest raised, each with a recorded warning.
+- `skipped`: objects observed but not ingested (dry-run scans).
+- `absent`: active indexed objects a complete filesystem scan did not see;
+  each increments that object's consecutive-absence counter. Only a complete,
+  successful, non-dry-run scan contributes absence evidence, and a scan that
+  sees zero files skips reconciliation with a warning instead of marking
+  anything.
+- `tombstoned`: objects whose consecutive absence reached
+  `[sync] deletion_grace_scans` and were soft-deleted through the shared
+  tombstone-revision path; prior revisions and approved assertions are
+  preserved, and nothing in the source tree is written.
+
+`absent` and `tombstoned` implement the filesystem deletion grace policy
+(ADR-039); event connectors report `0` for both because deletions arrive as
+explicit tombstone events. Counters are additive per run and are operational
+telemetry, not evidence.
+
 ## Generated answer boundary
 
 `GenerationRequest` contains a query plus bounded exact evidence bodies,
@@ -178,11 +206,27 @@ versioned derivation. The application reopens those units and materializes
 
 `RelationMiningRequest` contains exact evidence bodies, visible existing
 entities, the active ontology version, and bounded proposal counts.
-`RelationMiningResult` contains only typed entity and relation proposals plus a
-pinned model revision and token usage. The adapter rejects unknown types,
-predicates, entity IDs, evidence IDs, domain/range violations, duplicates, and
-malformed intervals before persistence. Source text remains a data field and
-cannot alter the system instruction.
+`RelationMiningResult` contains typed entity and relation proposals plus a
+pinned model revision, token usage, and per-proposal `skipped` records
+(`MinedProposalSkip`: kind, reference, reason). Unknown types, predicates,
+entity IDs, evidence IDs, domain/range violations, duplicates, and malformed
+intervals are skipped with a recorded reason instead of failing the whole
+batch; batch-level contract breaches (wrong ontology version, malformed
+output shape, proposal counts over the configured limits, model revision
+mismatch) still fail closed. Stale evidence units are excluded per unit and
+reported as `evidence_unit` skips — a stale unit is never silently mined.
+Source text remains a data field and cannot alter the system instruction.
+
+`OntologyMiningSummary` (`kip.ontology-mining.v1`) additively carries the
+same `skipped` list. When mining runs as a durable job, the summary IDs and
+skip reasons are recorded into the job payload under `result`
+(`kip.ontology-mining-result.v1`) so `kip jobs list`, REST `/v1/jobs`, and
+the MCP `kip_jobs` tool can surface them; `JobRecord` additively exposes
+`last_error` for failed runs. The mining job idempotency digest includes a
+hash of the caller-visible approved entity set, so approving entity
+candidates makes a re-mine of the same units a new job (the mine ->
+approve entities -> mine again loop) instead of deduplicating onto the
+finished one.
 
 Model-discovered entities first become `EntityCandidate` records with their own
 stable `ecand_` IDs and exact evidence. Human approval creates a separate
@@ -197,6 +241,47 @@ ID. A changed source or miner revision creates a different review candidate.
 Overlapping active assertions with a different object are recorded as explicit
 contradictions; no candidate is silently promoted or used as a fact.
 
+A candidate's `review_risk` is normalized from the active catalog at
+proposal time, and approval derives the evidence requirement from the loaded
+ontology (`review == "required"` or `risk == "high"`), never from a
+hardcoded predicate list; stores keep a fail-closed floor pinned to
+`ontology/core/predicates.yaml` by a contract test.
+
+## Candidate review listing
+
+`AssertionCandidateListing` is `kip.assertion-candidate-listing.v1`, the read
+model returned by `kip review list`, REST `GET /v1/review/candidates`, and
+the `relations` section of `kip ontology candidates` / MCP
+`kip_ontology_candidates` (which additively adds `relations_total`). Each
+item is an `AssertionCandidateView`: all `AssertionCandidate` fields plus
+additive review aids — `subject_display_name`, `object_display_name`,
+`predicate_label_ko`, `predicate_description`, and `evidence_previews`
+(`CandidateEvidencePreview`: content unit ID, `readable`, title, bounded
+snippet). Previews are resolved with the caller's own ACL context: a snippet
+is included only when the requesting principal can already read the unit,
+and snippets remain discovery aids, never final evidence. Items are ordered
+by review risk (high first), then confidence (high first, unknown last).
+The listing carries `total` plus the applied `status`, optional `predicate`,
+and optional `subject_id` filters.
+
+## Assertion review lifecycle
+
+`ApprovedAssertion.status` transitions are append-style and auditable:
+
+- `active -> revoked` via the application revocation service
+  (`kip review revoke`, REST `POST /v1/review/assertions/{id}/revoke`, MCP
+  `kip_ontology_assertion_revoke`). A non-empty note is required;
+  `revoked_at`, `revoked_by`, and `revocation_note` are recorded additively
+  on the assertion. Revoked assertions are excluded from every
+  approved-only consumption path (graph neighbors/paths with
+  `approved_only`, ontology answer context, contradiction checks, and
+  active-assertion listings) but remain readable by ID for audit.
+- `active -> superseded` when a reviewer approves a candidate carrying
+  `contradicts_assertion_ids` with `supersede_contradicted=true`; the
+  contradicted assertions record `superseded_by` referencing the new
+  assertion in the same transaction. Supersede targets must be among the
+  candidate's recorded contradictions.
+
 `AssertionExplanation` is a read model that combines one approved assertion with the exact `EvidenceRead` units supporting it. It is not stored as a second source of truth.
 
 `OntologyAnswerContext` is a versioned read model containing ACL-visible matched
@@ -205,6 +290,17 @@ IDs. The application removes candidates, non-active assertions, future or
 expired validity intervals, inaccessible evidence, and source-changed evidence
 before constructing it. An answer exposes the context only with citations for
 all included graph evidence.
+
+`include_candidate_assertions=true` additively populates
+`OntologyAnswerContext.candidates` with `OntologyAnswerCandidate` records on
+the surfaces that carry an ontology context section (`kip answer`,
+`kip ontology context`, REST `/v1/answer` and `/v1/ontology/context`, MCP
+`kip_answer` and `kip_ontology_context`). Candidate entries are always
+labeled `status="proposed"`, are kept separate from approved `edges`, never
+join `evidence_unit_ids`, never feed generation relations or citation
+requirements, and are subject to the same evidence-visibility ACL gating as
+candidate listings. On `search` and `context` responses, which have no
+ontology section, the flag is recorded in telemetry only.
 
 `ApprovedAssertion.evidence_acl_snapshot_ids` is the denormalized freshness
 guard for its reviewed evidence. It is rebuilt from canonical evidence and does

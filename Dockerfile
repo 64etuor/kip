@@ -54,8 +54,8 @@ COPY migrations ./migrations
 COPY scripts ./scripts
 COPY VERSION LICENSE ./
 RUN mkdir -p /data/cas /app/var && \
-    chown -R 10001:10001 /data /app/var && \
-    chmod -R a-w /app/config /app/contracts /app/ontology /app/migrations /app/scripts
+    chown -R 10001:10001 /data /app/var /app/ontology && \
+    chmod -R a-w /app/config /app/contracts /app/migrations /app/scripts
 USER 10001:10001
 STOPSIGNAL SIGTERM
 ENTRYPOINT ["kip"]

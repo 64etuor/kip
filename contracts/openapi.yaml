@@ -19,6 +19,24 @@ paths:
                   type: string
                 type: object
                 title: Response Healthz Healthz Get
+  /readyz:
+    get:
+      summary: Readyz
+      description: 'Readiness: liveness plus a real round-trip to the canonical store.
+
+
+        Container orchestration and ops probes use this endpoint; /healthz
+
+        stays process-liveness only. Any repository failure fails closed with
+
+        503 and no internal detail.'
+      operationId: readyz_readyz_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
   /v1/capabilities:
     get:
       summary: Capabilities
@@ -1487,6 +1505,22 @@ paths:
           type: integer
           default: 100
           title: Limit
+      - name: predicate
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Predicate
+      - name: subject_id
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Subject Id
       - name: x-kip-api-key
         in: header
         required: false
@@ -1503,6 +1537,45 @@ paths:
           - type: string
           - type: 'null'
           title: X-Kip-Admin-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      summary: Propose Candidate
+      operationId: propose_candidate_v1_review_candidates_post
+      parameters:
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      - name: x-kip-admin-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Admin-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CandidateProposal'
       responses:
         '200':
           description: Successful Response
@@ -1575,6 +1648,13 @@ paths:
           - type: string
           - type: 'null'
           title: Note
+      - name: supersede_contradicted
+        in: query
+        required: false
+        schema:
+          type: boolean
+          default: false
+          title: Supersede Contradicted
       - name: x-kip-api-key
         in: header
         required: false
@@ -1622,6 +1702,52 @@ paths:
           anyOf:
           - type: string
           - type: 'null'
+          title: Note
+      - name: x-kip-api-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Api-Key
+      - name: x-kip-admin-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Kip-Admin-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envelope'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/review/assertions/{assertion_id}/revoke:
+    post:
+      summary: Revoke Assertion
+      operationId: revoke_assertion_v1_review_assertions__assertion_id__revoke_post
+      parameters:
+      - name: assertion_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Assertion Id
+      - name: note
+        in: query
+        required: true
+        schema:
+          type: string
           title: Note
       - name: x-kip-api-key
         in: header
@@ -1747,6 +1873,48 @@ components:
       required:
       - query
       title: AnswerRequest
+    CandidateProposal:
+      properties:
+        subject_id:
+          type: string
+          title: Subject Id
+        predicate:
+          type: string
+          title: Predicate
+        object_entity_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Object Entity Id
+        object_value:
+          title: Object Value
+        evidence_unit_id:
+          items:
+            type: string
+          type: array
+          title: Evidence Unit Id
+        origin:
+          type: string
+          title: Origin
+          default: human
+        ontology_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ontology Version
+        confidence:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Confidence
+      additionalProperties: false
+      type: object
+      required:
+      - subject_id
+      - predicate
+      title: CandidateProposal
+      description: POST /v1/review/candidates body, mirroring the CLI `review propose`
+        fields.
     ClarificationAnswer:
       properties:
         question_id:
@@ -2178,6 +2346,60 @@ components:
           type: boolean
           const: true
           title: Confirmed
+        parent:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Parent
+        domain:
+          anyOf:
+          - items:
+              type: string
+            type: array
+            maxItems: 8
+            minItems: 1
+          - type: 'null'
+          title: Domain
+        range:
+          anyOf:
+          - items:
+              type: string
+            type: array
+            maxItems: 8
+            minItems: 1
+          - type: 'null'
+          title: Range
+        inverse:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Inverse
+        risk:
+          anyOf:
+          - type: string
+            enum:
+            - low
+            - medium
+            - high
+          - type: 'null'
+          title: Risk
+        review:
+          anyOf:
+          - type: string
+            enum:
+            - not_required
+            - conditional
+            - required
+          - type: 'null'
+          title: Review
+        extraction:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Extraction
       additionalProperties: false
       type: object
       required:

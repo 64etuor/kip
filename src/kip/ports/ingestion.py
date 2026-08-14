@@ -2,12 +2,19 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Iterable
+from collections.abc import Set as AbstractSet
 from pathlib import Path
 from typing import Protocol
 
 from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
-from kip.domain.models import ConnectorEvent, DocumentPacket, IngestResult, RequestContext
+from kip.domain.models import (
+    ConnectorEvent,
+    DocumentPacket,
+    IngestResult,
+    RequestContext,
+    SourceObjectAbsence,
+)
 from kip.ports.parser import ParserPort
 
 
@@ -133,3 +140,19 @@ class IngestionStore(Protocol):
         context: RequestContext,
         packet: DocumentPacket,
     ) -> IngestResult: ...
+
+    def reconcile_scan_absences(
+        self,
+        context: RequestContext,
+        system_id: str,
+        seen_object_ids: AbstractSet[str],
+    ) -> list[SourceObjectAbsence]:
+        """Record one complete scan's absence observations for a source system.
+
+        Clears the absence mark on every seen object, increments the
+        consecutive-absence counter on every active (non-tombstoned) object
+        the scan did not see, and returns those absent objects with their
+        updated counters. Callers must invoke this only after a COMPLETE,
+        successful scan; it never tombstones by itself.
+        """
+        ...

@@ -32,6 +32,14 @@ class PostgresJobStore:
     ) -> JobRecord | None:
         return self.database.claim_job(context, worker_id)
 
+    def record_job_result(
+        self,
+        context: RequestContext,
+        job_id: str,
+        result: JsonObject,
+    ) -> None:
+        self.database.record_job_result(context, job_id, result)
+
     def complete_job(self, context: RequestContext, job_id: str) -> None:
         self.database.complete_job(context, job_id)
 

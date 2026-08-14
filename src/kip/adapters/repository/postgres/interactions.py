@@ -22,6 +22,21 @@ from kip.domain.interactions import (
 from kip.domain.models import RequestContext
 from kip.errors import ConflictError, NotFoundError, ValidationError
 
+# `OntologyDiscoveryCandidate` fields that make up the release spec for
+# `entity_type` (`parent`) and `predicate` (`domain`, `range`, `inverse`,
+# `risk`, `review`, `extraction`) candidates. Stored losslessly as a single
+# nullable `proposal_spec` jsonb column rather than one scalar column per
+# field; `target_symbol` keeps its own dedicated column for backward
+# compatibility and is not part of this spec payload.
+_SPEC_FIELDS = ("parent", "domain", "range", "inverse", "risk", "review", "extraction")
+
+
+def _spec_payload(candidate: OntologyDiscoveryCandidate) -> dict[str, Any] | None:
+    payload = {field: getattr(candidate, field) for field in _SPEC_FIELDS}
+    if all(value is None for value in payload.values()):
+        return None
+    return payload
+
 
 class PostgresInteractionStore:
     name = "postgresql"
@@ -280,6 +295,7 @@ class PostgresInteractionStore:
         context: RequestContext,
         candidate: OntologyDiscoveryCandidate,
     ) -> OntologyDiscoveryCandidate:
+        spec_payload = _spec_payload(candidate)
         with self._database._connection(context) as connection:
             self._database._ensure_workspace_and_principal(connection, context)
             with connection.cursor() as cursor:
@@ -287,16 +303,17 @@ class PostgresInteractionStore:
                     """
                     INSERT INTO knowledge.ontology_discovery_candidates(
                         id, workspace_id, submitted_by, domain_profile, kind, symbol,
-                        label, definition, target_symbol, fingerprint, status,
-                        occurrence_count, created_at, updated_at
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        label, definition, target_symbol, proposal_spec, fingerprint,
+                        status, occurrence_count, created_at, updated_at
+                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,%s)
                     ON CONFLICT (workspace_id, fingerprint) DO UPDATE
                     SET occurrence_count=knowledge.ontology_discovery_candidates.occurrence_count + 1,
                         updated_at=EXCLUDED.updated_at
                     WHERE knowledge.ontology_discovery_candidates.status='proposed'
                     RETURNING id, domain_profile, kind, symbol, label, definition,
-                              target_symbol, fingerprint, status, occurrence_count,
-                              created_at, updated_at, reviewed_at, reviewed_by, review_note
+                              target_symbol, proposal_spec, fingerprint, status,
+                              occurrence_count, created_at, updated_at, reviewed_at,
+                              reviewed_by, review_note
                     """,
                     (
                         candidate.id,
@@ -308,6 +325,7 @@ class PostgresInteractionStore:
                         candidate.label,
                         candidate.definition,
                         candidate.target_symbol,
+                        _json(spec_payload) if spec_payload is not None else None,
                         candidate.fingerprint,
                         candidate.status,
                         candidate.occurrence_count,
@@ -320,8 +338,9 @@ class PostgresInteractionStore:
                     cursor.execute(
                         """
                         SELECT id, domain_profile, kind, symbol, label, definition,
-                               target_symbol, fingerprint, status, occurrence_count,
-                               created_at, updated_at, reviewed_at, reviewed_by, review_note
+                               target_symbol, proposal_spec, fingerprint, status,
+                               occurrence_count, created_at, updated_at, reviewed_at,
+                               reviewed_by, review_note
                         FROM knowledge.ontology_discovery_candidates
                         WHERE workspace_id=%s AND fingerprint=%s
                         """,
@@ -358,8 +377,9 @@ class PostgresInteractionStore:
                 cursor.execute(
                     """
                     SELECT id, domain_profile, kind, symbol, label, definition,
-                           target_symbol, fingerprint, status, occurrence_count,
-                           created_at, updated_at, reviewed_at, reviewed_by, review_note
+                           target_symbol, proposal_spec, fingerprint, status,
+                           occurrence_count, created_at, updated_at, reviewed_at,
+                           reviewed_by, review_note
                     FROM knowledge.ontology_discovery_candidates
                     WHERE workspace_id=%s
                     ORDER BY updated_at DESC, id DESC
@@ -371,8 +391,9 @@ class PostgresInteractionStore:
                 cursor.execute(
                     """
                     SELECT id, domain_profile, kind, symbol, label, definition,
-                           target_symbol, fingerprint, status, occurrence_count,
-                           created_at, updated_at, reviewed_at, reviewed_by, review_note
+                           target_symbol, proposal_spec, fingerprint, status,
+                           occurrence_count, created_at, updated_at, reviewed_at,
+                           reviewed_by, review_note
                     FROM knowledge.ontology_discovery_candidates
                     WHERE workspace_id=%s AND status=%s
                     ORDER BY updated_at DESC, id DESC
@@ -381,6 +402,31 @@ class PostgresInteractionStore:
                     (context.workspace, status, limit),
                 )
             return [_candidate(row) for row in cursor.fetchall()]
+
+    def get_ontology_discovery_candidate(
+        self,
+        context: RequestContext,
+        candidate_id: str,
+    ) -> OntologyDiscoveryCandidate:
+        with (
+            self._database._connection(context) as connection,
+            connection.cursor() as cursor,
+        ):
+            cursor.execute(
+                """
+                SELECT id, domain_profile, kind, symbol, label, definition,
+                       target_symbol, proposal_spec, fingerprint, status,
+                       occurrence_count, created_at, updated_at, reviewed_at,
+                       reviewed_by, review_note
+                FROM knowledge.ontology_discovery_candidates
+                WHERE workspace_id=%s AND id=%s
+                """,
+                (context.workspace, candidate_id),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            raise NotFoundError("ontology discovery candidate not found")
+        return _candidate(row)
 
     def review_ontology_discovery_candidate(
         self,
@@ -396,8 +442,9 @@ class PostgresInteractionStore:
                 cursor.execute(
                     """
                     SELECT id, domain_profile, kind, symbol, label, definition,
-                           target_symbol, fingerprint, status, occurrence_count,
-                           created_at, updated_at, reviewed_at, reviewed_by, review_note
+                           target_symbol, proposal_spec, fingerprint, status,
+                           occurrence_count, created_at, updated_at, reviewed_at,
+                           reviewed_by, review_note
                     FROM knowledge.ontology_discovery_candidates
                     WHERE workspace_id=%s AND id=%s
                     FOR UPDATE
@@ -424,8 +471,9 @@ class PostgresInteractionStore:
                         review_note=%s
                     WHERE workspace_id=%s AND id=%s
                     RETURNING id, domain_profile, kind, symbol, label, definition,
-                              target_symbol, fingerprint, status, occurrence_count,
-                              created_at, updated_at, reviewed_at, reviewed_by, review_note
+                              target_symbol, proposal_spec, fingerprint, status,
+                              occurrence_count, created_at, updated_at, reviewed_at,
+                              reviewed_by, review_note
                     """,
                     (
                         status,
@@ -579,6 +627,8 @@ def _preference(row: dict[str, Any]) -> UserPreference:
 
 
 def _candidate(row: dict[str, Any]) -> OntologyDiscoveryCandidate:
+    raw_spec = row["proposal_spec"]
+    spec: dict[str, Any] = _json_value(raw_spec) if raw_spec is not None else {}
     return OntologyDiscoveryCandidate(
         id=row["id"],
         domain_profile=row["domain_profile"],
@@ -587,6 +637,13 @@ def _candidate(row: dict[str, Any]) -> OntologyDiscoveryCandidate:
         label=row["label"],
         definition=row["definition"],
         target_symbol=row["target_symbol"],
+        parent=spec.get("parent"),
+        domain=spec.get("domain"),
+        range=spec.get("range"),
+        inverse=spec.get("inverse"),
+        risk=spec.get("risk"),
+        review=spec.get("review"),
+        extraction=spec.get("extraction"),
         status=row["status"],
         occurrence_count=row["occurrence_count"],
         fingerprint=row["fingerprint"],

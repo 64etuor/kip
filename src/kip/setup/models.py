@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Literal, Self
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from kip.domain.json_types import JsonObject
 from kip.errors import ValidationError
@@ -22,6 +22,7 @@ _DEFAULT_EXTENSIONS = [
     ".hwpx",
     ".md",
     ".pdf",
+    ".pptx",
     ".txt",
     ".xlsm",
     ".xlsx",
@@ -42,8 +43,12 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+_ENV_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_UNRESOLVABLE_SECRET_SCHEMES = {"keychain", "secret-manager"}
+
+
 class SecretReference(StrictModel):
-    scheme: Literal["env", "keychain", "secret-manager"]
+    scheme: Literal["env", "file"]
     name: str = Field(min_length=1, max_length=255)
 
     @field_validator("name")
@@ -53,12 +58,31 @@ class SecretReference(StrictModel):
             raise ValueError("secret reference name contains invalid characters")
         return value
 
+    @model_validator(mode="after")
+    def validate_scheme_shape(self) -> Self:
+        if self.scheme == "env" and not _ENV_NAME_PATTERN.fullmatch(self.name):
+            raise ValueError(
+                "env: secret reference must name an environment variable, "
+                "for example env:KIP_DATABASE_URL"
+            )
+        if self.scheme == "file" and not self.name.startswith("/"):
+            raise ValueError(
+                "file: secret reference must be an absolute path, "
+                "for example file:/run/secrets/kip-model-key"
+            )
+        return self
+
     @classmethod
     def parse(cls, value: str) -> Self:
         scheme, separator, name = value.partition(":")
         if not separator:
             raise ValueError(
                 "secret must be a reference such as env:KIP_DATABASE_URL"
+            )
+        if scheme in _UNRESOLVABLE_SECRET_SCHEMES:
+            raise ValueError(
+                f"{scheme}: secret references are not resolvable by the KIP "
+                "runtime; use env:NAME or file:/absolute/path instead"
             )
         return cls.model_validate({"scheme": scheme, "name": name})
 
@@ -199,6 +223,14 @@ class SourceInventory(StrictModel):
     unreadable_count: int = 0
 
 
+class SourcePreview(SourceInventory):
+    name: str
+    classification: Literal[
+        "public", "internal", "confidential", "restricted", "personal"
+    ]
+    acl_scope: str
+
+
 class SetupInspection(StrictModel):
     schema_version: Literal["kip.setup-inspection.v1"] = (
         "kip.setup-inspection.v1"
@@ -289,5 +321,7 @@ class SetupReceipt(StrictModel):
     plan_fingerprint: str
     verified: bool
     checks: list[SetupCheck]
+    runtime_readiness: list[SetupCheck] = Field(default_factory=list)
     source_summaries: list[JsonObject]
     limitations: list[str] = Field(default_factory=list)
+    next_steps: list[str] = Field(default_factory=list)

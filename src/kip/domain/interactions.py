@@ -12,6 +12,10 @@ from kip.ids import new_id
 
 _OPTION_ID_RE = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
 _SYMBOL_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+# Entity type identifiers (core and domain-profile) are PascalCase, e.g.
+# `Document`, `ResearchProject`, unlike the lowercase-only `_SYMBOL_RE`
+# convention used for newly proposed symbols and predicate names.
+_ENTITY_TYPE_REF_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,63}$")
 
 ClarificationReason = Literal[
     "ambiguous_term",
@@ -217,6 +221,21 @@ class InteractionFeedback(InteractionModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+RiskLevel = Literal["low", "medium", "high"]
+ReviewPolicy = Literal["not_required", "conditional", "required"]
+
+
+class OntologyDiscoveryRelease(InteractionModel):
+    """Result of materializing an accepted discovery candidate into the ontology tree."""
+
+    schema_version: Literal["kip.ontology-release.v1"] = "kip.ontology-release.v1"
+    kind: DiscoveryKind
+    symbol: str = Field(min_length=1, max_length=64)
+    file: str = Field(min_length=1, max_length=256)
+    version: str = Field(min_length=1, max_length=32)
+    catalog_refresh: Literal["applied", "restart_required"]
+
+
 class OntologyDiscoveryProposal(InteractionModel):
     kind: DiscoveryKind
     symbol: str = Field(min_length=1, max_length=64)
@@ -224,12 +243,45 @@ class OntologyDiscoveryProposal(InteractionModel):
     definition: str = Field(min_length=1, max_length=500)
     target_symbol: str | None = Field(default=None, max_length=64)
     confirmed: Literal[True]
+    # `entity_type` release spec. `parent` is validated strictly: when given,
+    # it must resolve to a known entity type or the shadow release validation
+    # fails closed. `target_symbol` remains the legacy/implicit hint and is
+    # applied leniently (silently dropped to root) when `parent` is absent.
+    parent: str | None = Field(default=None, max_length=64)
+    # `predicate` release spec. Absent fields fall back to safe defaults at
+    # materialization time (see `ontology_discovery_release.py`).
+    domain: list[str] | None = Field(default=None, min_length=1, max_length=8)
+    range: list[str] | None = Field(default=None, min_length=1, max_length=8)
+    inverse: str | None = Field(default=None, max_length=64)
+    risk: RiskLevel | None = None
+    review: ReviewPolicy | None = None
+    extraction: str | None = Field(default=None, max_length=64)
 
-    @field_validator("symbol", "target_symbol")
+    @field_validator("symbol", "target_symbol", "inverse", "extraction")
     @classmethod
     def valid_symbol(cls, value: str | None) -> str | None:
         if value is not None and _SYMBOL_RE.fullmatch(value) is None:
             raise ValueError("ontology discovery symbol is invalid")
+        return value
+
+    @field_validator("parent")
+    @classmethod
+    def valid_parent_reference(cls, value: str | None) -> str | None:
+        # `parent` names an *existing* entity type, and core/domain entity
+        # types are PascalCase (`Document`, `ResearchProject`), unlike the
+        # lowercase-only convention `_SYMBOL_RE` enforces for newly proposed
+        # `symbol`/predicate-shaped fields.
+        if value is not None and _ENTITY_TYPE_REF_RE.fullmatch(value) is None:
+            raise ValueError("ontology discovery parent is invalid")
+        return value
+
+    @field_validator("domain", "range")
+    @classmethod
+    def valid_entity_type_reference_list(cls, value: list[str] | None) -> list[str] | None:
+        if value is not None:
+            for item in value:
+                if _ENTITY_TYPE_REF_RE.fullmatch(item) is None:
+                    raise ValueError("ontology discovery entity type reference is invalid")
         return value
 
     @field_validator("label", "definition")
@@ -240,10 +292,31 @@ class OntologyDiscoveryProposal(InteractionModel):
     @model_validator(mode="after")
     def target_matches_kind(self) -> Self:
         target_required = self.kind in {"controlled_value", "alias"}
+        target_allowed = target_required or self.kind == "entity_type"
         if target_required and self.target_symbol is None:
             raise ValueError("ontology discovery target is required for this kind")
-        if not target_required and self.target_symbol is not None:
-            raise ValueError("ontology discovery target is only allowed for value or alias")
+        if not target_allowed and self.target_symbol is not None:
+            raise ValueError(
+                "ontology discovery target is only allowed for value, alias, or entity_type"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def spec_matches_kind(self) -> Self:
+        if self.kind != "entity_type" and self.parent is not None:
+            raise ValueError("ontology discovery parent is only allowed for entity_type")
+        predicate_fields = (
+            self.domain,
+            self.range,
+            self.inverse,
+            self.risk,
+            self.review,
+            self.extraction,
+        )
+        if self.kind != "predicate" and any(value is not None for value in predicate_fields):
+            raise ValueError(
+                "ontology discovery predicate spec fields are only allowed for predicate"
+            )
         return self
 
 
@@ -258,6 +331,13 @@ class OntologyDiscoveryCandidate(InteractionModel):
     label: str = Field(min_length=1, max_length=140)
     definition: str = Field(min_length=1, max_length=500)
     target_symbol: str | None = Field(default=None, max_length=64)
+    parent: str | None = Field(default=None, max_length=64)
+    domain: list[str] | None = None
+    range: list[str] | None = None
+    inverse: str | None = Field(default=None, max_length=64)
+    risk: RiskLevel | None = None
+    review: ReviewPolicy | None = None
+    extraction: str | None = Field(default=None, max_length=64)
     status: DiscoveryStatus = "proposed"
     occurrence_count: int = Field(default=1, ge=1)
     fingerprint: str = Field(min_length=1, max_length=128, exclude=True)
@@ -266,6 +346,9 @@ class OntologyDiscoveryCandidate(InteractionModel):
     reviewed_at: datetime | None = None
     reviewed_by: str | None = Field(default=None, max_length=128)
     review_note: str | None = Field(default=None, max_length=500)
+    # Populated only on the in-process response to an approval that
+    # materialized a release; never persisted by a store adapter.
+    release: OntologyDiscoveryRelease | None = None
 
 
 class OntologyDiscoveryReview(InteractionModel):

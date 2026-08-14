@@ -62,7 +62,11 @@
 
 ## Secrets
 
-- Keep secrets in environment variables or an approved secret manager.
+- Keep secrets in environment variables or an approved secret manager. The
+  runtime resolves only `env:` references (and `file:` for the model
+  credential); a secret manager must inject environment variables or files,
+  and guided setup rejects `keychain:`/`secret-manager:` references at answer
+  time.
 - Never commit `.env`, Slack tokens, IMAP passwords, API keys, or Neo4j credentials.
 - Do not place secrets in `.mcp.json`, `CLAUDE.md`, `AGENTS.md`, or Skill files.
 
@@ -82,9 +86,11 @@
 
 ## Interaction-memory boundary
 
-- Interaction persistence is disabled by default. Setup must explicitly select
-  `explicit_consent` before the application stores a clarification, preference,
-  feedback record, or discovery candidate.
+- The shipped example and container configurations enable interaction
+  persistence (`interaction.enabled = true`); guided setup still records an
+  explicit `disabled`/`explicit_consent` consent decision and `disabled`
+  remains fully supported. Regardless of the deployment default, nothing is
+  stored without the per-item confirmation semantics below.
 - Clarifications are scoped to one verified workspace/principal and have a
   bounded TTL. They are not query traces and their transient prompt/answer
   material is never exported as telemetry.
@@ -94,10 +100,13 @@
 - Feedback permits only opaque KIP request IDs, controlled outcome/reason
   values, and no free-form content. It cannot become a surrogate raw-query or
   source-content log.
-- Discovery candidates are untrusted review proposals. They never alter the
-  active ontology, entity index, assertion store, retrieval, or answer path.
-  Workspace reviewers need the verified admin role; accepted candidates still
-  require a normal YAML release review.
+- Discovery candidates are untrusted review proposals. A proposal never
+  alters the active ontology, entity index, assertion store, retrieval, or
+  answer path. Review requires the verified admin role; an admin approval
+  materializes an additive, shadow-validated, collision-safe (ADR-043)
+  ontology release automatically. Auto-released predicates default to
+  `review: required` and `risk: high`, so no assertion using them can become
+  a fact without exact evidence and human review.
 - PostgreSQL sets workspace, principal, ACL scopes, and verified roles in the
   transaction-local session before interaction queries. Production API/worker
   logins must remain non-owner, non-`BYPASSRLS` roles as documented in

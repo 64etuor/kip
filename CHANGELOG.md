@@ -1,5 +1,107 @@
 # Changelog
 
+## 3.3.0 - 2026-08-14
+
+- Made ontology discovery approval materialize an additive release
+  automatically (ADR-044): accepting an entity-type or predicate candidate
+  writes the symbol into the ontology YAML tree with comment-preserving
+  targeted edits, a minor version bump, review-policy sync, shadow
+  validation, atomic apply, idempotent retries, and fail-closed behavior on
+  read-only roots; discovery proposals gained optional spec fields
+  (`parent`, `domain`, `range`, `inverse`, `risk`, `review`, `extraction`)
+  on CLI/REST/MCP, persisted by migration 0021; auto-released predicates
+  default to review-required/high-risk; review responses carry a
+  `kip.ontology-release.v1` payload with `catalog_refresh:
+  "restart_required"` for long-running processes; candidate-proposal
+  surfaces now default `ontology_version` to the active catalog version.
+- Made the ontology contract writable in containers for auto-release: the
+  image no longer bakes `/app/ontology` immutable, and both Compose profiles
+  bind-mount the version-controlled checkout (`KIP_ONTOLOGY_PATH`, default
+  `./ontology` in development, required in production) read-write into the
+  API and read-only into the worker, so approved releases persist across
+  restarts and stay reviewable through git history.
+- Required a `CHANGELOG.md` entry for every user-visible behavior, contract,
+  configuration, or deployment change in the `AGENTS.md` change workflow.
+- Enabled the conversational curation loop by default in the shipped
+  configurations: `interaction.enabled = true` and
+  `ontology.adaptive_discovery = true` in the example and container
+  profiles; guided setup still records the explicit consent decision and
+  `disabled` remains supported.
+- Hardened the ontology contract validation (ADR-043): a domain profile that
+  redefines a core entity type or core predicate name, and a
+  `sources/*.yaml` object type whose `parent` is not a known entity type,
+  now fail `kip ontology validate`, `OntologyRelease.load`, and container
+  startup instead of silently shadowing core semantics.
+- Added `POST /v1/review/candidates` (admin), the REST equivalent of CLI
+  `review propose`: records a human-origin assertion candidate that enters
+  the same review queue and is never auto-approved.
+- Added the missing `limit` parameter to the MCP `kip_graph_neighbors` tool,
+  matching the CLI and REST graph-neighbors contract.
+- Added a real-PostgreSQL cross-scope ACL integration test proving that a
+  principal holding one scope cannot see another scope's content through
+  search, direct unit read, or graph neighbors/path.
+- Removed configuration keys that were documented but never read
+  (`database.pool_min`/`pool_max`, `storage.snapshot_*`,
+  `security.max_zip_*`, `search.lexical_limit_default`, `graph.max_*`) from
+  the example and container configuration, and set the real
+  `database.pool_max_size` in the container profile, which previously fell
+  back silently to the built-in default.
+- Added structured PPTX extraction (ADR-041): pinned `python-pptx` plus a
+  bounded read-only OOXML scan emit typed shape-level units for text, merged
+  tables, chart caches, images (with SHA-256), speaker notes, legacy comments,
+  and SmartArt, preserving slide/shape IDs, group paths, EMU geometry, source
+  z-order, and a geometry-derived reading order; malformed optional parts keep
+  primary content with a `partial` extraction and typed warnings; macros,
+  external relationships, and embedded OLE objects are never executed or
+  expanded, and ZIP entry/size/ratio limits apply before model construction.
+- Added Korean OCR candidate enrichment (ADR-042): a typed optional `OcrPort`
+  backed by a version-pinned Kordoc 4.7.3 executable (PP-OCRv5 Korean) appends
+  `pdf_ocr` units with page and pixel bounding boxes for low-text, private-use,
+  control-character, or replacement-character PDF pages and OCRs bounded PPTX
+  images, while native `pdf_page` and shape units stay canonical.
+- Made the ontology curation loop reviewable end to end (ADR-038): the mining
+  job digest includes the approved-entity-set hash so the two-pass
+  mine -> approve entities -> re-mine loop actually runs; invalid, duplicate,
+  and stale-evidence proposals are skipped with per-proposal reasons recorded
+  on a durable `kip.ontology-mining-result.v1` job payload (visible via
+  `kip jobs list`, `GET /v1/jobs`, and the new MCP `kip_jobs` tool); evidence
+  and review enforcement is derived from the ontology catalog and pinned to
+  `predicates.yaml` by a contract test; candidate listings return the
+  triage-ordered `kip.assertion-candidate-listing.v1` contract with display
+  names, Korean predicate labels, and ACL-gated evidence snippets;
+  `include_candidate_assertions` now surfaces clearly-marked proposed
+  candidates on ontology-context-bearing surfaces; and Korean
+  `label_ko`/`description`/`description_ko` metadata covers all predicates and
+  entity types without an ontology version bump.
+- Added assertion review governance: migration 0019 revocation audit columns,
+  `kip review revoke`, `POST /v1/review/assertions/{id}/revoke`, MCP
+  `kip_ontology_assertion_revoke`, exclusion of revoked assertions from every
+  approved-only surface, and `--supersede-contradicted` on approval.
+- Added filesystem deletion reconciliation (ADR-039): migration 0020 absence
+  tracking, `[sync] deletion_grace_scans` (default 2), complete-scan-only
+  fail-safe semantics (failed scans mark nothing; empty scans skip with a
+  warning), soft tombstone revisions through the shared ingest path,
+  reappearance re-indexing, and `absent`/`tombstoned` sync-summary fields.
+- Fixed PostgreSQL re-sync of unchanged files failing with an ACL-snapshot
+  ConflictError on every second run: configuration-owned snapshot timestamps
+  refresh while snapshot identity fields stay strictly verified.
+- Made guided setup end in a runnable deployment (ADR-040): fail-fast
+  Python 3.12+ bootstrap, `env:`/`file:`-only secret references rejected at
+  answer time, runtime-readiness verify checks, receipt `next_steps`, the
+  host-path `config/kip.host.generated.toml` selected by `.mcp.json`, and
+  `scripts/app-up.sh` layering the generated Compose override; the generated
+  default search mode is `reranked` per ADR-034.
+- Hardened the production topology: read-only `${KIP_NAS_PATH}` bind on the
+  API service, a `/readyz` database round-trip endpoint and healthcheck
+  (`/healthz` stays liveness-only), a worker database-connectivity
+  healthcheck, and resource limits on all services.
+- Added operations tooling: backup `--retain` retention pruning and
+  `--dry-run`, redacted configuration snapshots with a seal-and-verify secret
+  rescan, launchd daily backup and optional `ops-report.sh` scheduling with
+  generated newsyslog rotation and a double-worker guard, and
+  `scripts/ops-report.sh` (failed jobs, queue age, sync age, disk free,
+  backup age, API health, `--json`, `KIP_OPS_WEBHOOK`).
+
 ## 3.2.0 - 2026-08-10
 
 - Split application capabilities and repository ports so CLI, REST, MCP, and

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kip-knowledge-fabric"
-version = "3.2.0"
+version = "3.3.0"
 description = "Agent-first evidence-backed knowledge fabric for files, Slack, and mail"
 readme = "README.md"
 requires-python = ">=3.12"

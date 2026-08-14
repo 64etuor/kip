@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import subprocess
+import sys
 import tomllib
 from pathlib import Path
 from typing import cast
@@ -20,7 +24,7 @@ from kip.setup.models import (
     SetupInspection,
     SetupPlan,
     SetupReceipt,
-    SourceInventory,
+    SourcePreview,
 )
 from kip.setup.paths import canonical_managed_path
 from kip.setup.planner import build_setup_plan, inspect_setup
@@ -67,11 +71,19 @@ class SetupService:
         )
         return inspect_setup(updated, project_root=self.project_root)
 
-    def preview(self) -> list[SourceInventory]:
+    def preview(self) -> list[SourcePreview]:
         answers = self.load_answers()
         if answers.filesystem_sources is None:
             raise ValidationError("filesystem_sources must be answered before preview")
-        return [inspect_source(source) for source in answers.filesystem_sources]
+        return [
+            SourcePreview(
+                name=source.name,
+                classification=source.classification,
+                acl_scope=source.acl_scope,
+                **inspect_source(source).model_dump(),
+            )
+            for source in answers.filesystem_sources
+        ]
 
     def create_plan(self) -> SetupPlan:
         return build_setup_plan(
@@ -101,13 +113,23 @@ class SetupService:
     def verify(self, plan: SetupPlan) -> SetupReceipt:
         plan.verify_fingerprint()
         config_path = self.project_root / "config/kip.generated.toml"
+        host_config_path = self.project_root / "config/kip.host.generated.toml"
         compose_path = self.project_root / "compose.generated.yaml"
         mcp_path = self.project_root / ".mcp.json"
         checks: list[SetupCheck] = []
         checks.append(_file_check("generated_config", config_path))
+        checks.append(_file_check("generated_host_config", host_config_path))
         checks.append(_file_check("compose_override", compose_path))
         checks.append(_file_check("mcp_adapter", mcp_path))
-        checks.extend(self._parse_checks(plan, config_path, compose_path, mcp_path))
+        checks.extend(
+            self._parse_checks(
+                plan,
+                config_path,
+                host_config_path,
+                compose_path,
+                mcp_path,
+            )
+        )
         source_summaries: list[JsonObject] = []
         for source in plan.sources:
             exists = Path(source.host_root).is_dir()
@@ -132,13 +154,78 @@ class SetupService:
             limitations.append(
                 "API key identity is intended for bootstrap only; proxy JWT is recommended"
             )
+        limitations.append(
+            "setup apply/verify only generate configuration; nothing is indexed "
+            "or served until ./scripts/app-up.sh (or the app profile) and a "
+            "source sync have completed"
+        )
+        first_source = plan.sources[0].name if plan.sources else "SOURCE"
+        next_steps = [
+            "./scripts/migrate.sh",
+            "./scripts/app-up.sh",
+            f"./scripts/kip sync run --source {first_source}",
+            './scripts/kip search "smoke test query" --limit 5',
+        ]
         return SetupReceipt(
             plan_fingerprint=plan.plan_fingerprint,
             verified=all(check.ok for check in checks),
             checks=checks,
+            runtime_readiness=self._runtime_readiness(plan),
             source_summaries=source_summaries,
             limitations=limitations,
+            next_steps=next_steps,
         )
+
+    def _runtime_readiness(self, plan: SetupPlan) -> list[SetupCheck]:
+        checks: list[SetupCheck] = []
+        python_ok = sys.version_info >= (3, 12)
+        checks.append(
+            SetupCheck(
+                name="python_version",
+                ok=python_ok,
+                detail=(
+                    f"{sys.version_info.major}.{sys.version_info.minor}"
+                    if python_ok
+                    else (
+                        f"{sys.version_info.major}.{sys.version_info.minor} "
+                        "is too old; install Python 3.12+ and re-run "
+                        "./scripts/bootstrap.sh"
+                    )
+                ),
+            )
+        )
+        docker_cli = shutil.which("docker")
+        checks.append(
+            SetupCheck(
+                name="docker_cli",
+                ok=docker_cli is not None,
+                detail=(
+                    docker_cli
+                    if docker_cli
+                    else "docker CLI not found; install Docker to run "
+                    "./scripts/app-up.sh"
+                ),
+            )
+        )
+        if docker_cli:
+            checks.append(_docker_daemon_check(docker_cli))
+        checks.append(_database_secret_check(plan))
+        for source in plan.sources:
+            root = Path(source.host_root)
+            readable = root.is_dir() and os.access(root, os.R_OK | os.X_OK)
+            checks.append(
+                SetupCheck(
+                    name=f"source_readable:{source.name}",
+                    ok=readable,
+                    detail=(
+                        "readable"
+                        if readable
+                        else f"{root} is missing or unreadable; restore the "
+                        "mount or fix its permissions before syncing"
+                    ),
+                )
+            )
+        return checks
 
     def _parse_answer(
         self,
@@ -175,9 +262,17 @@ class SetupService:
             "identity_admin_key_secret_ref",
         }:
             try:
-                return SecretReference.parse(value)
+                reference = SecretReference.parse(value)
             except ValueError as exc:
                 raise ValidationError(str(exc)) from exc
+            if question_id != "model_secret_ref" and reference.scheme != "env":
+                raise ValidationError(
+                    f"{question_id} must use an env: reference (for example "
+                    "env:KIP_DATABASE_URL); the runtime resolves this secret "
+                    "only through an environment variable, optionally backed "
+                    "by a NAME_FILE indirection"
+                )
+            return reference
         if question_id == "retention_days":
             try:
                 return int(value)
@@ -282,19 +377,29 @@ class SetupService:
         self,
         plan: SetupPlan,
         config_path: Path,
+        host_config_path: Path,
         compose_path: Path,
         mcp_path: Path,
     ) -> list[SetupCheck]:
-        if not config_path.is_file() or not compose_path.is_file() or not mcp_path.is_file():
+        if (
+            not config_path.is_file()
+            or not host_config_path.is_file()
+            or not compose_path.is_file()
+            or not mcp_path.is_file()
+        ):
             return []
         try:
             with config_path.open("rb") as handle:
                 config = tomllib.load(handle)
+            with host_config_path.open("rb") as handle:
+                host_config = tomllib.load(handle)
             compose_value = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
             compose = compose_value if isinstance(compose_value, dict) else {}
             mcp_value = json.loads(mcp_path.read_text(encoding="utf-8"))
             fingerprint_ok = (
                 config.get("setup", {}).get("plan_fingerprint")
+                == plan.plan_fingerprint
+                and host_config.get("setup", {}).get("plan_fingerprint")
                 == plan.plan_fingerprint
             )
             read_only_ok = _all_source_mounts_read_only(compose, plan)
@@ -378,6 +483,56 @@ def _mcp_uses_generated_config(value: object, plan: SetupPlan) -> bool:
         server.get("command") == "bash"
         and server.get("args") == ["scripts/mcp.sh"]
         and isinstance(environment, dict)
-        and environment.get("KIP_CONFIG") == "config/kip.generated.toml"
+        and environment.get("KIP_CONFIG") == "config/kip.host.generated.toml"
         and environment.get("KIP_WORKSPACE") == plan.workspace
+    )
+
+
+def _docker_daemon_check(docker_cli: str) -> SetupCheck:
+    try:
+        completed = subprocess.run(
+            [docker_cli, "info"],
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+        ok = completed.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        ok = False
+    return SetupCheck(
+        name="docker_daemon",
+        ok=ok,
+        detail=(
+            "reachable"
+            if ok
+            else "docker daemon unreachable; start Docker, then run "
+            "./scripts/app-up.sh"
+        ),
+    )
+
+
+def _database_secret_check(plan: SetupPlan) -> SetupCheck:
+    reference = plan.database_secret_ref
+    if reference.scheme == "env":
+        resolvable = bool(
+            os.environ.get(reference.name)
+            or os.environ.get(f"{reference.name}_FILE")
+        )
+        detail = (
+            "resolvable"
+            if resolvable
+            else f"set {reference.name} (or {reference.name}_FILE) in the "
+            "environment or .env before starting the app profile"
+        )
+    else:
+        resolvable = Path(reference.name).is_file()
+        detail = (
+            "resolvable"
+            if resolvable
+            else f"secret file {reference.name} is missing or unreadable"
+        )
+    return SetupCheck(
+        name="database_secret",
+        ok=resolvable,
+        detail=detail,
     )

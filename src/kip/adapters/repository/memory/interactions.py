@@ -226,6 +226,17 @@ class MemoryInteractionStore:
         selected.sort(key=lambda item: (item.updated_at, item.id), reverse=True)
         return selected[:limit]
 
+    def get_ontology_discovery_candidate(
+        self,
+        context: RequestContext,
+        candidate_id: str,
+    ) -> OntologyDiscoveryCandidate:
+        self._require_admin(context)
+        stored = self.state.ontology_discovery_candidates.get(candidate_id)
+        if stored is None or stored[0] != context.workspace:
+            raise NotFoundError("ontology discovery candidate not found")
+        return stored[1].model_copy(deep=True)
+
     def review_ontology_discovery_candidate(
         self,
         context: RequestContext,

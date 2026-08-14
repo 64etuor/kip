@@ -116,16 +116,36 @@ def test_setup_cli_answers_previews_plans_applies_and_verifies(
         [*_setup_args(project_root, state), "verify", "--plan", str(plan)],
     )
 
-    assert json.loads(preview.stdout)["data"][0]["file_count"] == 1
+    preview_data = json.loads(preview.stdout)["data"]
+    assert preview_data[0]["file_count"] == 1
+    assert preview_data[0]["name"] == "company-docs"
+    assert preview_data[0]["classification"] == "internal"
+    assert preview_data[0]["acl_scope"] == "workspace:acme-rnd"
     assert planned.exit_code == 0, planned.stdout
     assert applied.exit_code == 0, applied.stdout
     receipt = json.loads(verified.stdout)["data"]
     assert receipt["verified"] is True
     assert receipt["source_summaries"][0]["file_count"] == 1
     assert (project_root / "config/kip.generated.toml").is_file()
+    assert (project_root / "config/kip.host.generated.toml").is_file()
     assert (project_root / "compose.generated.yaml").is_file()
     assert (project_root / ".mcp.json").is_file()
     assert any(check["name"] == "mcp_adapter" for check in receipt["checks"])
+    assert any(
+        check["name"] == "generated_host_config" for check in receipt["checks"]
+    )
+    readiness_names = {check["name"] for check in receipt["runtime_readiness"]}
+    assert "python_version" in readiness_names
+    assert "docker_cli" in readiness_names
+    assert "database_secret" in readiness_names
+    assert "source_readable:company-docs" in readiness_names
+    assert receipt["next_steps"][:2] == [
+        "./scripts/migrate.sh",
+        "./scripts/app-up.sh",
+    ]
+    assert any(
+        "configuration" in limitation for limitation in receipt["limitations"]
+    )
 
 
 def test_setup_cli_rejects_stale_plan_before_apply(tmp_path: Path) -> None:

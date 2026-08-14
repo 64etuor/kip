@@ -1,7 +1,15 @@
 ontology: kip-core-predicates
 version: 1.0.0
+# Label and description keys (`description`, `label_ko`, `description_ko`) are
+# presentation metadata. They do not change predicate meaning, domain, range,
+# risk, review, or extraction policy, so adding or editing them is a
+# non-breaking metadata change that does not require a new release version or
+# migration manifest. Semantic changes still require a new release.
 predicates:
   authored_by:
+    description: The evidence object was written or produced by the person.
+    label_ko: 작성자
+    description_ko: 근거 객체를 해당 인물이 작성했다.
     domain: [EvidenceObject]
     range: [Person]
     inverse: null
@@ -9,6 +17,9 @@ predicates:
     extraction: deterministic_when_source_identified
     review: not_required
   belongs_to_project:
+    description: The item is part of, or produced for, the project.
+    label_ko: 과제 소속
+    description_ko: 해당 항목이 특정 과제(프로젝트)에 속하거나 그 과제를 위해 생산되었다.
     domain: [EvidenceObject, Decision, Requirement, Task]
     range: [Project]
     inverse: null
@@ -16,6 +27,9 @@ predicates:
     extraction: mixed
     review: conditional
   reply_to:
+    description: Source-level threading relation between two communications.
+    label_ko: 답장
+    description_ko: 원본 시스템 메타데이터로 확인되는 두 커뮤니케이션 간의 답장(스레드) 관계.
     domain: [Communication]
     range: [Communication]
     inverse: null
@@ -23,6 +37,9 @@ predicates:
     extraction: deterministic_source_relation
     review: not_required
   responds_to:
+    description: A business-level response to another communication, document, or requirement.
+    label_ko: 회신 대응
+    description_ko: 다른 커뮤니케이션, 문서, 요구사항에 대한 업무상 대응(회신) 관계.
     domain: [Communication, Document]
     range: [Communication, Document, Requirement]
     inverse: null
@@ -30,6 +47,9 @@ predicates:
     extraction: semantic
     review: required
   amends:
+    description: The document or communication changes part of a prior document.
+    label_ko: 변경
+    description_ko: 문서 또는 커뮤니케이션이 기존 문서의 일부를 변경(개정)한다.
     domain: [Document, Communication]
     range: [Document]
     inverse: null
@@ -37,6 +57,9 @@ predicates:
     extraction: semantic
     review: required
   supersedes:
+    description: The document or communication fully replaces a prior document.
+    label_ko: 대체
+    description_ko: 문서 또는 커뮤니케이션이 기존 문서를 전면 대체한다.
     domain: [Document, Communication]
     range: [Document]
     inverse: null
@@ -44,6 +67,9 @@ predicates:
     extraction: semantic
     review: required
   approves:
+    description: The actor or record grants approval to a decision, requirement, task, or document.
+    label_ko: 승인
+    description_ko: 행위자 또는 기록물이 의사결정, 요구사항, 과업, 문서를 승인한다.
     domain: [Document, Communication, Person, Organization]
     range: [Decision, Requirement, Task, Document]
     inverse: null
@@ -51,6 +77,9 @@ predicates:
     extraction: semantic
     review: required
   evidences:
+    description: The evidence object substantiates a requirement, decision, event, or concept.
+    label_ko: 근거 제공
+    description_ko: 근거 객체가 요구사항, 의사결정, 사건, 개념을 입증한다.
     domain: [EvidenceObject]
     range: [Requirement, Decision, Event, Concept]
     inverse: null
@@ -58,6 +87,9 @@ predicates:
     extraction: semantic
     review: required
   records_decision:
+    description: The document or communication records a decision.
+    label_ko: 의사결정 기록
+    description_ko: 문서 또는 커뮤니케이션이 의사결정을 기록한다.
     domain: [Document, Communication]
     range: [Decision]
     inverse: null
@@ -65,6 +97,9 @@ predicates:
     extraction: semantic
     review: required
   responsible_for:
+    description: The person or organization is responsible for the project, task, or requirement.
+    label_ko: 책임 담당
+    description_ko: 인물 또는 조직이 과제, 과업, 요구사항에 대한 책임을 진다.
     domain: [Person, Organization]
     range: [Project, Task, Requirement]
     inverse: null
@@ -72,6 +107,9 @@ predicates:
     extraction: semantic
     review: conditional
   attached_to:
+    description: The evidence object is attached to a communication or document.
+    label_ko: 첨부
+    description_ko: 근거 객체가 커뮤니케이션 또는 문서에 첨부되어 있다.
     domain: [EvidenceObject]
     range: [Communication, Document]
     inverse: null

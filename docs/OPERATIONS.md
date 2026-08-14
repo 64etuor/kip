@@ -6,11 +6,53 @@
 ./scripts/doctor.sh
 ./scripts/kip status
 ./scripts/kip jobs list --status failed
+./scripts/ops-report.sh
 ```
+
+`ops-report.sh` is the single-command health summary: failed-job count,
+oldest queued-job age, last successful sync progress, disk free on the volume
+holding `var/`, newest sealed backup age, and API health on the loopback
+port. It exits nonzero with an `OPS-REPORT FAIL:` summary line when a check
+breaches its threshold, supports `--json` for machine consumption, and POSTs
+the JSON report to `KIP_OPS_WEBHOOK` when set and failing. Thresholds are
+tunable through `KIP_OPS_MAX_QUEUE_AGE_SECONDS` (default 3600),
+`KIP_OPS_MAX_SYNC_AGE_SECONDS` (unset means warn only),
+`KIP_OPS_DISK_MIN_FREE_PCT` (default 10), and
+`KIP_OPS_BACKUP_MAX_AGE_HOURS` (default 26). An API that is not running is a
+warning, not a failure; an API that answers non-200 is a failure. The API
+check probes `/readyz` (which round-trips the database) and falls back to the
+liveness-only `/healthz` when a deployment predates `/readyz` and answers 404.
 
 ## Incremental sync
 
-Use source-specific cursors. A source outage must not be interpreted as deletion. Files are considered deleted only after a successful complete scan confirms absence according to the configured grace policy.
+Use source-specific cursors. A source outage must not be interpreted as deletion.
+
+### Filesystem deletion grace policy
+
+Filesystem deletion is reconciled by consecutive complete scans, controlled by
+`[sync] deletion_grace_scans` (default `2`, minimum `1`):
+
+- Only a COMPLETE, successful scan contributes absence evidence. A scan that
+  fails or aborts mid-walk (for example an unavailable mount) changes nothing,
+  and a scan that sees zero files is treated as a possible mount outage: it
+  skips deletion reconciliation entirely and records a warning.
+- After each complete scan, every active indexed object the scan did not see
+  gets its consecutive-absence counter incremented (reported as `absent` in
+  the sync summary). A file that reappears — or that failed to parse but was
+  still seen on disk — clears its absence mark and restarts the count.
+- Once an object stays absent for `deletion_grace_scans` consecutive complete
+  scans, it is soft-deleted with the same tombstone-revision semantics used by
+  event connectors (reported as `tombstoned`): a tombstone revision with zero
+  content units becomes the current revision, the object leaves search,
+  context bundles, and ontology evidence, and prior revisions, extraction
+  history, and approved assertions are preserved. Nothing is ever hard-deleted
+  and the source tree is never written.
+- A file that reappears after tombstoning is re-indexed by the next sync and
+  becomes searchable again.
+- Dry-run syncs never mark absences and never tombstone. A file removed from
+  the configured collection scope (`include_extensions`/`exclude_globs`)
+  follows the same policy: content outside the approved scope leaves the
+  active index after the grace window.
 
 ## Production deployment
 
@@ -45,6 +87,16 @@ identity in an identity-aware proxy before forwarding the Bearer JWT. The
 PostgreSQL network is internal and the NAS bind is read-only. Validate the
 resolved Compose model before every rollout and reject a deployment if a
 secret, source path, or image digest is still an example value.
+
+`${KIP_NAS_PATH}` is required and is bind-mounted read-only into **both** the
+worker and the API service. The API opens the live source path for evidence
+freshness checks and `xlsx-read` range reads; without the bind every unit
+reports stale and answers silently drop evidence. All three application
+services carry resource limits, the API and worker have container
+healthchecks (the worker check proves PostgreSQL reachability with the
+worker's own credentials), and the API healthcheck targets `/readyz`, which
+performs a real database round-trip and answers 503 when PostgreSQL is
+unreachable. `/healthz` remains a process-liveness probe only.
 
 ## Release artifacts
 
@@ -84,7 +136,7 @@ digest in the change record.
 export KIP_DATABASE_URL_FILE=/run/secrets/backup-database-url
 export KIP_CAS_PATH=/srv/kip/cas
 export KIP_BACKUP_PATH=/srv/kip/backups
-./scripts/backup.sh
+./scripts/backup.sh --retain 7
 ```
 
 The backup set contains:
@@ -92,8 +144,19 @@ The backup set contains:
 - PostgreSQL custom-format dump with `row_security=off`;
 - canonical JSONL export and database row/migration/extension/RLS manifest;
 - CAS archive plus content-hash manifest;
-- ontology and redacted configuration snapshot;
+- ontology and configuration snapshot;
 - sealed manifest and SHA-256 checksums.
+
+The configuration snapshot copies `config/*.toml` and `config/*.yaml` through
+a redaction pass: a quoted literal value assigned to a secret-looking key
+(`password`, `secret`, `token`, `credential`, `api_key`, `access_key`,
+`private_key`) is replaced with `[REDACTED]` unless the value is an
+`env:`/`file:` reference or the key uses the `*_env`/`*_file` indirection
+convention, and URL userinfo passwords are redacted anywhere they appear.
+Sealing and verification then rescan the archived configuration and fail the
+backup if a literal secret survived. This protects only convention-following
+configuration keys; it is not a general secret scanner, so keep secrets out of
+TOML values in the first place.
 
 Run backup with the dedicated, audited `kip_backup` login membership or the
 database owner. That role needs full read access and verified `BYPASSRLS`;
@@ -102,10 +165,44 @@ directory first and atomically publishes it only after every artifact is
 sealed. A retained `.partial-*` directory with `FAILED` is incident evidence,
 not a usable backup.
 
-The local archive is not encrypted, scheduled, uploaded, or retained by KIP.
-Use the platform backup service to encrypt it, copy it off-host, apply legal
-retention, and alert on age. Never put a database URL or encryption key in the
-archive or repository.
+`--retain N` (default 7, also `KIP_BACKUP_RETAIN`) prunes the oldest sealed
+backup sets after a successful run so at most N remain. Only directories named
+like a backup timestamp that contain `backup-manifest.json` are pruning
+candidates; `.partial-*` incident evidence and unrelated files are never
+touched.
+
+The local archive is not encrypted or uploaded by KIP. On the macOS host,
+`install-launchd.sh` schedules the daily backup and retention (see
+"Host scheduling"); still use the platform backup service to encrypt the
+archive, copy it off-host, and apply legal retention. `ops-report.sh` alerts
+when the newest sealed backup is missing or older than 26 hours. Never put a
+database URL or encryption key in the archive or repository.
+
+## Host scheduling (macOS launchd)
+
+```bash
+./scripts/install-launchd.sh 900 --retain 7 --with-ops-report
+./scripts/install-launchd.sh --dry-run   # render plists without installing
+./scripts/uninstall-launchd.sh
+```
+
+The installer manages four user launch agents: the host worker
+(`com.kip.knowledge-fabric.worker`), the periodic sync enqueue
+(`com.kip.knowledge-fabric.sync`), the daily sealed backup with retention
+(`com.kip.backup`, 03:15 local by default, `--backup-hour` to change,
+`RunAtLoad` disabled), and — only with `--with-ops-report` — the periodic
+`ops-report.sh` run (`com.kip.ops-report`, `--ops-interval`, default 1800s).
+
+Before installing the host worker the installer refuses if a Docker Compose
+worker service is already running, because two workers would double-process
+the same queue; pass `--allow-compose-worker` only when that is intended.
+
+Launchd job logs append under `var/log/launchd-*.log`. The installer renders a
+newsyslog rotation policy (5 rotations, 10 MB, compressed) to
+`var/newsyslog.kip.conf` and prints the one `sudo install` command that
+activates it under `/etc/newsyslog.d/kip.conf`; rotation is not active until
+that command is run. `--dry-run` renders every plist under
+`var/launchd-preview/` and installs nothing.
 
 ### Isolated restore
 
@@ -215,10 +312,12 @@ a type that already has live entities.
 
 ## Adaptive ontology discovery and interaction memory
 
-The starter default is `ontology.domain_profile = "empty"` and both
-`ontology.adaptive_discovery` and `interaction.enabled` are false. Guided setup
-sets both only after the operator selects `explicit_consent`. This feature does
-not run during normal search, answer, sync, or mining.
+The starter default is `ontology.domain_profile = "empty"`, and the shipped
+example and container configurations enable both
+`ontology.adaptive_discovery` and `interaction.enabled`. Guided setup still
+records the `disabled`/`explicit_consent` consent decision and writes the
+chosen mode. This feature does not run during normal search, answer, sync, or
+mining.
 
 Ask a bounded follow-up question and persist a selection only when the caller
 explicitly asks to remember it:
@@ -254,8 +353,24 @@ An ontology observation remains a candidate even after review:
 ./scripts/kip ontology discovery review --candidate-id ODC_ID --action accept
 ```
 
-`accept` means `accepted_for_release`, not active. Write a reviewed YAML release
-and use the preceding migration workflow before changing the catalog. Schedule
+Accepting an `entity_type` or `predicate` candidate materializes an additive
+ontology release automatically (ADR-044): the symbol is written into the
+YAML tree (entity types into the active domain profile, predicates into
+`core/predicates.yaml` with review-policy sync), the file version bumps
+minor, and the review response reports the released file and version.
+Auto-released predicates default to `review: required`/`risk: high`, so
+assertions using them still need exact evidence and human review. Restart
+the API, worker, and MCP processes to load the new catalog
+(`catalog_refresh: "restart_required"`); per-invocation CLI commands see it
+immediately. Both Compose profiles bind-mount the version-controlled
+ontology checkout (`KIP_ONTOLOGY_PATH`, default `./ontology`) read-write
+into the API — the admin review surface that writes releases — and
+read-only into the worker; the host directory must be writable by uid
+10001, and released changes stay reviewable through git history. A missing
+or read-only mount fails closed with an actionable error.
+`controlled_value` and `alias` candidates stay status-only; use the manual
+release and migration workflow for those. Breaking changes (rename, merge,
+deprecate) still go through the preceding migration workflow. Schedule
 `./scripts/kip interaction prune` at least daily when interaction persistence
 is enabled; it deletes only expired clarification rows in the active workspace.
 MCP reviewers must set `KIP_ROLES=admin`; normal users do not receive reviewer

@@ -11,6 +11,7 @@ from kip.domain.identity import AclSnapshot
 from kip.domain.knowledge import (
     CandidateEvidence,
     EntityCandidate,
+    MinedProposalSkip,
     RelationDerivation,
 )
 from kip.domain.xlsx import XlsxCell
@@ -288,12 +289,37 @@ class OntologyAnswerPath(StrictModel):
     depth: int
 
 
+class OntologyAnswerCandidate(StrictModel):
+    """A proposed, unreviewed assertion candidate shown for transparency only.
+
+    Candidates are never facts: `status` is always "proposed", they carry no
+    approved evidence, and they must never satisfy answer evidence
+    requirements or citations.
+    """
+
+    candidate_id: str
+    subject_id: str
+    predicate: str
+    object_entity_id: str | None = None
+    object_value: Any = None
+    status: Literal["proposed"] = "proposed"
+    confidence: float | None = None
+    review_risk: Literal["low", "medium", "high"] = "medium"
+    ontology_version: str
+    evidence_unit_ids: list[str] = Field(default_factory=list)
+
+
 class OntologyAnswerContext(StrictModel):
     schema_version: Literal["kip.ontology-context.v1"] = "kip.ontology-context.v1"
     entities: list[OntologyAnswerEntity] = Field(default_factory=list)
     edges: list[OntologyAnswerEdge] = Field(default_factory=list)
     paths: list[OntologyAnswerPath] = Field(default_factory=list)
     evidence_unit_ids: list[str] = Field(default_factory=list)
+    # Present only when the caller explicitly sets
+    # include_candidate_assertions=true. Entries are unreviewed proposals,
+    # clearly separated from approved edges, and are excluded from
+    # evidence_unit_ids and citation requirements.
+    candidates: list[OntologyAnswerCandidate] = Field(default_factory=list)
 
 
 AnswerRefusalReason = Literal[
@@ -416,6 +442,9 @@ class OntologyMiningSummary(StrictModel):
     schema_version: Literal["kip.ontology-mining.v1"] = "kip.ontology-mining.v1"
     entity_candidates: list[EntityCandidate] = Field(default_factory=list)
     relation_candidates: list[AssertionCandidate] = Field(default_factory=list)
+    # Per-proposal skip reasons: invalid, duplicate, or stale-evidence
+    # proposals are reported here instead of failing the whole batch.
+    skipped: list[MinedProposalSkip] = Field(default_factory=list)
     model: ModelRevision
     usage: GenerationUsage
     provider_request_id: str | None = None
@@ -439,12 +468,56 @@ class ApprovedAssertion(StrictModel):
     acl_scopes: list[str] = Field(default_factory=list)
     evidence_unit_ids: list[str] = Field(default_factory=list)
     evidence_acl_snapshot_ids: list[str] = Field(default_factory=list)
+    # Review-lifecycle audit fields. Revocation and supersession are
+    # append-style status transitions; they never delete the assertion row.
+    revoked_at: datetime | None = None
+    revoked_by: str | None = None
+    revocation_note: str | None = None
+    superseded_by: str | None = None
 
 
 class AssertionExplanation(StrictModel):
     assertion: ApprovedAssertion
     evidence: list[EvidenceRead] = Field(default_factory=list)
     source_candidate: AssertionCandidate | None = None
+
+
+class CandidateEvidencePreview(StrictModel):
+    """ACL-safe inline preview of one candidate evidence reference.
+
+    `snippet` is populated only when the requesting principal can already
+    read the underlying unit; it is a discovery aid, never final evidence.
+    """
+
+    content_unit_id: str
+    readable: bool = False
+    title: str | None = None
+    snippet: str | None = None
+
+
+class AssertionCandidateView(AssertionCandidate):
+    """An `AssertionCandidate` enriched for human review.
+
+    All base candidate fields are preserved; the extra fields are additive
+    read-model data (display names, ontology labels, evidence previews).
+    """
+
+    subject_display_name: str | None = None
+    object_display_name: str | None = None
+    predicate_label_ko: str | None = None
+    predicate_description: str | None = None
+    evidence_previews: list[CandidateEvidencePreview] = Field(default_factory=list)
+
+
+class AssertionCandidateListing(StrictModel):
+    schema_version: Literal["kip.assertion-candidate-listing.v1"] = (
+        "kip.assertion-candidate-listing.v1"
+    )
+    items: list[AssertionCandidateView] = Field(default_factory=list)
+    total: int = 0
+    status: str = "proposed"
+    predicate: str | None = None
+    subject_id: str | None = None
 
 
 class Capabilities(StrictModel):
@@ -490,11 +563,25 @@ class JobRecord(StrictModel):
     status: str
     attempts: int = 0
     max_attempts: int = 5
+    last_error: str | None = None
 
 class VocabularyItem(StrictModel):
     term: str
     document_frequency: int
     corpus_frequency: int
+
+
+class SourceObjectAbsence(StrictModel):
+    """An active source object that a complete filesystem scan did not see.
+
+    `absent_scan_count` is the number of consecutive complete scans that have
+    confirmed absence, including the scan that produced this record.
+    """
+
+    object_id: str
+    external_id: str
+    artifact_id: str
+    absent_scan_count: int
 
 
 class SyncSummary(StrictModel):
@@ -505,6 +592,8 @@ class SyncSummary(StrictModel):
     unchanged: int = 0
     failed: int = 0
     skipped: int = 0
+    absent: int = 0
+    tombstoned: int = 0
     warnings: list[str] = Field(default_factory=list)
 
 

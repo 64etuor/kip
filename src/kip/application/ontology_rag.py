@@ -14,6 +14,7 @@ from kip.domain.knowledge import (
     CandidateEvidence,
     EntityCandidate,
     KnowledgeEntity,
+    MinedProposalSkip,
     RelationDerivation,
     RelationMiningRequest,
     RelationProposal,
@@ -37,7 +38,7 @@ from kip.domain.telemetry import (
     QueryTraceUsage,
     safe_request_id,
 )
-from kip.errors import ValidationError
+from kip.errors import ConflictError, NotFoundError, ValidationError
 from kip.ontology import OntologyCatalog
 from kip.ports.jobs import JobStore
 from kip.ports.knowledge import KnowledgeStore
@@ -173,6 +174,12 @@ class OntologyRagUseCases:
                         context.acl_snapshot.id if context.acl_snapshot else None
                     ),
                     "ontology_version": ontology.version,
+                    # Relation proposals can only reference already-approved
+                    # entities, so the real curation loop is mine -> approve
+                    # entities -> mine again. Binding the digest to the
+                    # approved entity set makes the second mining run a new
+                    # job instead of deduplicating onto the finished one.
+                    "entities_digest": self._entities_digest(context),
                     "miner": {
                         "name": miner.name,
                         "model": miner.model,
@@ -249,16 +256,26 @@ class OntologyRagUseCases:
         ontology = self._require_ontology()
         miner = self._require_relation_miner()
         selected = _validate_mining_unit_ids(unit_ids, self._max_mining_units)
-        reads = [self._evidence.read_unit(context, unit_id) for unit_id in selected]
-        stale_ids = [
-            item.unit.id
-            for item in reads
-            if item.source_changed_since_index is not False
-        ]
-        if stale_ids:
+        skipped: list[MinedProposalSkip] = []
+        reads = []
+        for unit_id in selected:
+            item = self._evidence.read_unit(context, unit_id)
+            if item.source_changed_since_index is not False:
+                # Fail closed per unit: a stale or freshness-unverified unit
+                # is never mined, but it no longer destroys the whole batch.
+                skipped.append(
+                    MinedProposalSkip(
+                        kind="evidence_unit",
+                        reference=item.unit.id,
+                        reason="mining evidence is stale or freshness-unverified",
+                    )
+                )
+                continue
+            reads.append(item)
+        if not reads:
             raise ValidationError(
                 "mining evidence is stale or freshness-unverified: "
-                + ", ".join(stale_ids)
+                + ", ".join(skip.reference for skip in skipped)
             )
         character_count = sum(len(item.unit.body) for item in reads)
         if character_count > self._max_mining_characters:
@@ -293,6 +310,7 @@ class OntologyRagUseCases:
                 max_relation_proposals=self._max_relation_proposals,
             )
         )
+        skipped.extend(result.skipped)
         if result.model.model != miner.model or result.model.revision != miner.revision:
             raise ValidationError(
                 "relation mining result model revision does not match the configured miner"
@@ -302,18 +320,6 @@ class OntologyRagUseCases:
         if len(result.relations) > self._max_relation_proposals:
             raise ValidationError("relation proposal count exceeds configured limit")
         allowed_evidence_ids = {item.unit.id for item in reads}
-        for entity_proposal in result.entities:
-            ontology.validate_entity_type(entity_proposal.entity_type)
-            _require_known_evidence(
-                entity_proposal.evidence_ids, allowed_evidence_ids
-            )
-        for relation_proposal in result.relations:
-            ontology.validate_candidate(
-                relation_proposal.predicate, ontology.version
-            )
-            _require_known_evidence(
-                relation_proposal.evidence_ids, allowed_evidence_ids
-            )
         exact_evidence = {
             item.unit.id: CandidateEvidence(
                 content_unit_id=item.unit.id,
@@ -332,6 +338,19 @@ class OntologyRagUseCases:
         )
         entity_candidates: list[EntityCandidate] = []
         for proposal in result.entities:
+            reference = f"{proposal.entity_type}:{proposal.canonical_name}"
+            try:
+                ontology.validate_entity_type(proposal.entity_type)
+                _require_known_evidence(
+                    proposal.evidence_ids, allowed_evidence_ids
+                )
+            except ValidationError as exc:
+                skipped.append(
+                    MinedProposalSkip(
+                        kind="entity", reference=reference, reason=str(exc)
+                    )
+                )
+                continue
             evidence = tuple(exact_evidence[item] for item in proposal.evidence_ids)
             fingerprint = entity_candidate_fingerprint(
                 proposal,
@@ -346,47 +365,126 @@ class OntologyRagUseCases:
             if existing is not None:
                 entity_candidates.append(existing)
                 continue
-            entity_candidates.append(
-                self._store.save_entity_candidate(
-                    context,
-                    EntityCandidate(
-                        id=stable_entity_candidate_id(fingerprint),
-                        fingerprint=fingerprint,
-                        entity_type=proposal.entity_type,
-                        canonical_name=proposal.canonical_name,
-                        aliases=proposal.aliases,
-                        origin=f"model:{miner.name}",
-                        confidence=proposal.confidence,
-                        ontology_version=ontology.version,
-                        evidence=list(evidence),
-                        derivation=derivation,
-                    ),
+            try:
+                entity_candidates.append(
+                    self._store.save_entity_candidate(
+                        context,
+                        EntityCandidate(
+                            id=stable_entity_candidate_id(fingerprint),
+                            fingerprint=fingerprint,
+                            entity_type=proposal.entity_type,
+                            canonical_name=proposal.canonical_name,
+                            aliases=proposal.aliases,
+                            origin=f"model:{miner.name}",
+                            confidence=proposal.confidence,
+                            ontology_version=ontology.version,
+                            evidence=list(evidence),
+                            derivation=derivation,
+                        ),
+                    )
                 )
+            except (ValidationError, NotFoundError, ConflictError) as exc:
+                skipped.append(
+                    MinedProposalSkip(
+                        kind="entity", reference=reference, reason=str(exc)
+                    )
+                )
+        relation_candidates: list[AssertionCandidate] = []
+        for relation_proposal in result.relations:
+            reference = (
+                f"{relation_proposal.subject_entity_id} "
+                f"{relation_proposal.predicate} "
+                f"{relation_proposal.object_entity_id}"
             )
-        relation_candidates = [
-            self.propose_relation(
-                context,
-                RelationProposal(
-                    subject_id=proposal.subject_entity_id,
-                    predicate=proposal.predicate,
-                    object_entity_id=proposal.object_entity_id,
-                    ontology_version=ontology.version,
-                    evidence_unit_ids=proposal.evidence_ids,
-                    confidence=proposal.confidence,
-                    valid_from=proposal.valid_from,
-                    valid_to=proposal.valid_to,
-                    derivation=derivation,
-                ),
-            )
-            for proposal in result.relations
-        ]
-        return OntologyMiningSummary(
+            try:
+                ontology.validate_candidate(
+                    relation_proposal.predicate, ontology.version
+                )
+                _require_known_evidence(
+                    relation_proposal.evidence_ids, allowed_evidence_ids
+                )
+                relation_candidates.append(
+                    self.propose_relation(
+                        context,
+                        RelationProposal(
+                            subject_id=relation_proposal.subject_entity_id,
+                            predicate=relation_proposal.predicate,
+                            object_entity_id=relation_proposal.object_entity_id,
+                            ontology_version=ontology.version,
+                            evidence_unit_ids=relation_proposal.evidence_ids,
+                            confidence=relation_proposal.confidence,
+                            valid_from=relation_proposal.valid_from,
+                            valid_to=relation_proposal.valid_to,
+                            derivation=derivation,
+                        ),
+                    )
+                )
+            except (ValidationError, NotFoundError, ConflictError) as exc:
+                skipped.append(
+                    MinedProposalSkip(
+                        kind="relation", reference=reference, reason=str(exc)
+                    )
+                )
+        summary = OntologyMiningSummary(
             entity_candidates=entity_candidates,
             relation_candidates=relation_candidates,
+            skipped=skipped,
             model=result.model,
             usage=result.usage,
             provider_request_id=result.provider_request_id,
         )
+        self._record_job_result(context, summary)
+        return summary
+
+    def _entities_digest(self, context: RequestContext) -> str:
+        entities = sorted(
+            (
+                entity.id,
+                entity.entity_type,
+                entity.canonical_name_normalized,
+                sorted(normalize_entity_name(alias) for alias in entity.aliases),
+            )
+            for entity in self._store.list_entities(context, limit=10_000)
+        )
+        return hashlib.sha256(
+            json.dumps(
+                entities,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+
+    def _record_job_result(
+        self,
+        context: RequestContext,
+        summary: OntologyMiningSummary,
+    ) -> None:
+        """Attach the mining outcome to the durable job for status inspection."""
+        job_id = context.request_id
+        if not job_id or not job_id.startswith("job_"):
+            return
+        try:
+            self._jobs.record_job_result(
+                context,
+                job_id,
+                {
+                    "schema_version": "kip.ontology-mining-result.v1",
+                    "entity_candidate_ids": [
+                        item.id for item in summary.entity_candidates
+                    ],
+                    "relation_candidate_ids": [
+                        item.id for item in summary.relation_candidates
+                    ],
+                    "skipped": [
+                        item.model_dump(mode="json") for item in summary.skipped
+                    ],
+                },
+            )
+        except NotFoundError:
+            # process_mining may run outside a durable job (direct call with
+            # an opaque request ID); the summary itself is still returned.
+            return
 
     def _record_mining_trace(
         self,
@@ -439,7 +537,15 @@ class OntologyRagUseCases:
                     else None
                 ),
                 models=models,
-                warnings=[] if summary is not None else ["ontology_mining_failed"],
+                warnings=(
+                    ["ontology_mining_failed"]
+                    if summary is None
+                    else (
+                        ["ontology_mining_skipped_proposals"]
+                        if summary.skipped
+                        else []
+                    )
+                ),
                 usage=usage,
             ),
         )

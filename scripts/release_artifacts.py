@@ -102,6 +102,15 @@ EVALUATION_PATHS = (
     "schemas",
 )
 CONFIG_FILES = ("kip.container.toml", "kip.example.toml", "logging.yaml")
+COPY_IGNORED_NAMES = frozenset(
+    {
+        ".DS_Store",
+        ".pytest_cache",
+        ".ruff_cache",
+        "__pycache__",
+        "worktrees",
+    }
+)
 REQUIRED_BUNDLE_FILES = (
     "RELEASE-MANIFEST.json",
     "SHA256SUMS",
@@ -147,18 +156,18 @@ def _files(root: Path) -> list[Path]:
 
 def _copy_tree(source: Path, destination: Path) -> None:
     for path in source.rglob("*"):
+        relative = path.relative_to(source)
+        if any(part in COPY_IGNORED_NAMES for part in relative.parts):
+            continue
         if path.is_symlink():
-            raise ReleaseError(f"source tree contains a symlink: {path.relative_to(source)}")
+            raise ReleaseError(f"source tree contains a symlink: {relative}")
     shutil.copytree(
         source,
         destination,
         ignore=shutil.ignore_patterns(
-            ".DS_Store",
-            ".pytest_cache",
-            ".ruff_cache",
+            *COPY_IGNORED_NAMES,
             "*.pyc",
             "*.pyo",
-            "__pycache__",
         ),
     )
 

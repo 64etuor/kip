@@ -84,6 +84,12 @@ class InteractionStore(Protocol):
         limit: int,
     ) -> list[OntologyDiscoveryCandidate]: ...
 
+    def get_ontology_discovery_candidate(
+        self,
+        context: RequestContext,
+        candidate_id: str,
+    ) -> OntologyDiscoveryCandidate: ...
+
     def review_ontology_discovery_candidate(
         self,
         context: RequestContext,

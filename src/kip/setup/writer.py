@@ -67,11 +67,13 @@ def atomic_write_json(path: Path, content: str) -> None:
 
 
 def _render_files(plan: SetupPlan) -> dict[str, str]:
-    config = _config_payload(plan)
+    config = _config_payload(plan, container=True)
+    host_config = _config_payload(plan, container=False)
     compose = _compose_payload(plan)
     mcp = _mcp_payload(plan)
     return {
         "config/kip.generated.toml": tomli_w.dumps(config),
+        "config/kip.host.generated.toml": tomli_w.dumps(host_config),
         "compose.generated.yaml": yaml.safe_dump(
             compose,
             allow_unicode=True,
@@ -87,7 +89,7 @@ def _render_files(plan: SetupPlan) -> dict[str, str]:
     }
 
 
-def _config_payload(plan: SetupPlan) -> dict[str, object]:
+def _config_payload(plan: SetupPlan, *, container: bool) -> dict[str, object]:
     database: dict[str, object] = {
         "statement_timeout_ms": 15000,
         "secret_ref": plan.database_secret_ref.display(),
@@ -109,7 +111,7 @@ def _config_payload(plan: SetupPlan) -> dict[str, object]:
     sources = [
         {
             "name": source.name,
-            "root": source.target_root,
+            "root": source.target_root if container else source.host_root,
             "enabled": True,
             "read_only": True,
             "follow_symlinks": False,
@@ -169,9 +171,11 @@ def _config_payload(plan: SetupPlan) -> dict[str, object]:
             "source_ownership": plan.source_ownership,
         },
         "database": database,
-        "storage": {"cas_path": "/var/lib/kip/cas"},
+        "storage": {
+            "cas_path": "/var/lib/kip/cas" if container else plan.cas_path
+        },
         "api": {
-            "host": "0.0.0.0",
+            "host": "0.0.0.0" if container else "127.0.0.1",
             "port": 8080,
             "require_api_key_outside_development": True,
             "max_request_bytes": 10 * 1024 * 1024,
@@ -192,7 +196,7 @@ def _config_payload(plan: SetupPlan) -> dict[str, object]:
         },
         "search": {
             "semantic_enabled": False,
-            "default_mode": "lexical",
+            "default_mode": "reranked",
             "context_max_chars": 40000,
         },
         "models": {"generation": model},
@@ -241,7 +245,9 @@ def _config_payload(plan: SetupPlan) -> dict[str, object]:
         },
         "sources": {"filesystem": sources},
         "operations": {
-            "backup_path": "/var/lib/kip/backups",
+            "backup_path": (
+                "/var/lib/kip/backups" if container else plan.backup_path
+            ),
             "retention_days": plan.retention_days,
             "sync_schedule": plan.sync_schedule,
         },
@@ -294,7 +300,7 @@ def _mcp_payload(plan: SetupPlan) -> dict[str, object]:
                 "command": "bash",
                 "args": ["scripts/mcp.sh"],
                 "env": {
-                    "KIP_CONFIG": "config/kip.generated.toml",
+                    "KIP_CONFIG": "config/kip.host.generated.toml",
                     "KIP_WORKSPACE": plan.workspace,
                 },
             }
@@ -306,17 +312,26 @@ def _compose_service(
     plan: SetupPlan,
     environment: dict[str, str],
 ) -> dict[str, object]:
+    volumes: list[dict[str, object]] = [
+        {
+            "type": "bind",
+            "source": "./config/kip.generated.toml",
+            "target": "/app/config/kip.generated.toml",
+            "read_only": True,
+        }
+    ]
+    volumes.extend(
+        {
+            "type": "bind",
+            "source": mount.source,
+            "target": mount.target,
+            "read_only": mount.read_only,
+        }
+        for mount in plan.mounts
+    )
     return {
         "environment": dict(environment),
-        "volumes": [
-            {
-                "type": "bind",
-                "source": mount.source,
-                "target": mount.target,
-                "read_only": mount.read_only,
-            }
-            for mount in plan.mounts
-        ],
+        "volumes": volumes,
     }
 
 

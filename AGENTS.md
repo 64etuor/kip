@@ -41,7 +41,7 @@ This repository implements an evidence-first knowledge fabric for NAS documents,
 ./scripts/test.sh
 
 ./scripts/kip capabilities
-./scripts/kip sync run --source company-nas
+./scripts/kip sync run --source sample
 ./scripts/kip search "협약 변경 승인" --limit 10
 ./scripts/kip context "A과제 참여율 변경" --limit 5
 ./scripts/kip read UNIT_ID
@@ -58,8 +58,10 @@ This repository implements an evidence-first knowledge fabric for NAS documents,
 2. Treat documentation as part of the change. Any change to product behavior,
    public contracts, architecture, configuration, security, operations,
    parser/model/projection lifecycle, or a known limitation MUST update every
-   affected canonical document in the same change. A known implementation/doc
-   divergence is a completion blocker, not deferred cleanup.
+   affected canonical document in the same change, including a `CHANGELOG.md`
+   entry for every user-visible behavior, contract, configuration, or
+   deployment change. A known implementation/doc divergence is a completion
+   blocker, not deferred cleanup.
 3. Add or update a contract test before changing an adapter.
 4. Keep migrations append-only. Never edit an already-released migration.
 5. Run `./scripts/verify.sh` before considering work complete.

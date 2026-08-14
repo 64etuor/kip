@@ -235,7 +235,8 @@ When the API is intentionally started, use the same service semantics and compar
 
 ```bash
 ./scripts/api.sh
-curl -fsS http://127.0.0.1:8080/healthz
+curl -fsS http://127.0.0.1:8080/healthz   # process liveness
+curl -fsS http://127.0.0.1:8080/readyz    # liveness + database round-trip
 curl -fsS -X POST http://127.0.0.1:8080/v1/search \
   -H 'Content-Type: application/json' \
   -H "X-KIP-API-Key: $KIP_API_KEY" \

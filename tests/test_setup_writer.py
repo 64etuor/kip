@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -72,11 +73,103 @@ def test_generated_mcp_uses_generated_config_without_secret_material(
     receipt = apply_setup_plan(plan, project_root=project_root)
 
     generated = (project_root / ".mcp.json").read_text(encoding="utf-8")
-    assert '"KIP_CONFIG": "config/kip.generated.toml"' in generated
+    assert '"KIP_CONFIG": "config/kip.host.generated.toml"' in generated
     assert '"KIP_WORKSPACE": "acme-rnd"' in generated
     assert "KIP_OPENAI_API_KEY" not in generated
     assert ".mcp.json" in receipt.written_files
     assert ".mcp.json.previous" in receipt.previous_files
+
+
+def test_generated_compose_mounts_generated_config_for_runtime(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    plan = build_setup_plan(_complete_answers(tmp_path), project_root=project_root)
+
+    apply_setup_plan(plan, project_root=project_root)
+
+    compose = yaml.safe_load(
+        (project_root / "compose.generated.yaml").read_text(encoding="utf-8")
+    )
+    for service_name in ("api", "worker"):
+        service = compose["services"][service_name]
+        assert service["environment"]["KIP_CONFIG"] == (
+            "/app/config/kip.generated.toml"
+        )
+        config_mounts = [
+            volume
+            for volume in service["volumes"]
+            if volume.get("target") == "/app/config/kip.generated.toml"
+        ]
+        assert config_mounts == [
+            {
+                "type": "bind",
+                "source": "./config/kip.generated.toml",
+                "target": "/app/config/kip.generated.toml",
+                "read_only": True,
+            }
+        ]
+
+
+def test_generated_host_config_uses_host_paths_for_mcp(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    answers = _complete_answers(tmp_path)
+    plan = build_setup_plan(answers, project_root=project_root)
+
+    apply_setup_plan(plan, project_root=project_root)
+
+    with (project_root / "config/kip.host.generated.toml").open("rb") as handle:
+        host_config = tomllib.load(handle)
+    with (project_root / "config/kip.generated.toml").open("rb") as handle:
+        container_config = tomllib.load(handle)
+    assert host_config["storage"]["cas_path"] == answers.cas_path
+    assert host_config["operations"]["backup_path"] == answers.backup_path
+    assert host_config["sources"]["filesystem"][0]["root"] == (
+        answers.filesystem_sources[0].root
+    )
+    assert host_config["api"]["host"] == "127.0.0.1"
+    assert container_config["sources"]["filesystem"][0]["root"] == (
+        "/sources/company-docs"
+    )
+    assert container_config["storage"]["cas_path"] == "/var/lib/kip/cas"
+    assert host_config["setup"]["plan_fingerprint"] == plan.plan_fingerprint
+
+
+def test_generated_config_defaults_to_reranked_search_mode(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    plan = build_setup_plan(_complete_answers(tmp_path), project_root=project_root)
+
+    apply_setup_plan(plan, project_root=project_root)
+
+    for name in ("config/kip.generated.toml", "config/kip.host.generated.toml"):
+        text = (project_root / name).read_text(encoding="utf-8")
+        assert 'default_mode = "reranked"' in text
+        assert "semantic_enabled = false" in text
+
+
+def test_generated_configs_enable_pinned_korean_ocr(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    plan = build_setup_plan(_complete_answers(tmp_path), project_root=project_root)
+
+    apply_setup_plan(plan, project_root=project_root)
+
+    for name in ("config/kip.generated.toml", "config/kip.host.generated.toml"):
+        with (project_root / name).open("rb") as handle:
+            config = tomllib.load(handle)
+        kordoc = config["parsers"]["ocr"]["kordoc"]
+        assert kordoc == {
+            "enabled": True,
+            "argv": ["kordoc", "--format", "json", "--ocr", "--silent"],
+            "version_argv": ["kordoc", "--version"],
+            "expected_version": "4.7.3",
+        }
+        assert config["parsers"]["hwp"]["hwp-hwpx-parser"]["enabled"] is True
 
 
 def test_apply_rejects_tampered_plan_before_writing(tmp_path: Path) -> None:

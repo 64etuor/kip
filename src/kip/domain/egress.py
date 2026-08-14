@@ -236,5 +236,5 @@ def _is_secret_reference(value: str) -> bool:
     return bool(
         separator
         and name.strip()
-        and scheme in {"env", "keychain", "secret-manager"}
+        and scheme in {"env", "file"}
     )

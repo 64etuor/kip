@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from kip.adapters.repository.postgres.database import PostgresDatabase
@@ -168,8 +169,32 @@ class PostgresKnowledgeStore:
         context: RequestContext,
         status: str = "proposed",
         limit: int = 100,
+        *,
+        predicate: str | None = None,
+        subject_id: str | None = None,
     ) -> list[AssertionCandidate]:
-        return self.database.list_candidates(context, status, limit)
+        return self.database.list_candidates(
+            context,
+            status,
+            limit,
+            predicate=predicate,
+            subject_id=subject_id,
+        )
+
+    def count_candidates(
+        self,
+        context: RequestContext,
+        status: str = "proposed",
+        *,
+        predicate: str | None = None,
+        subject_id: str | None = None,
+    ) -> int:
+        return self.database.count_candidates(
+            context,
+            status,
+            predicate=predicate,
+            subject_id=subject_id,
+        )
 
     def approve_candidate(
         self,
@@ -177,12 +202,15 @@ class PostgresKnowledgeStore:
         candidate_id: str,
         reviewer_id: str,
         note: str | None = None,
+        *,
+        supersede_assertion_ids: Sequence[str] = (),
     ) -> ApprovedAssertion:
         return self.database.approve_candidate(
             context,
             candidate_id,
             reviewer_id,
             note,
+            supersede_assertion_ids=supersede_assertion_ids,
         )
 
     def reject_candidate(
@@ -205,6 +233,20 @@ class PostgresKnowledgeStore:
         assertion_id: str,
     ) -> ApprovedAssertion:
         return self.database.get_assertion(context, assertion_id)
+
+    def revoke_assertion(
+        self,
+        context: RequestContext,
+        assertion_id: str,
+        reviewer_id: str,
+        note: str,
+    ) -> ApprovedAssertion:
+        return self.database.revoke_assertion(
+            context,
+            assertion_id,
+            reviewer_id,
+            note,
+        )
 
     def graph_neighbors(
         self,

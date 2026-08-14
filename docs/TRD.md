@@ -483,7 +483,6 @@ space_name = "replace-with-versioned-space"
 
 [graph]
 backend = "postgres"
-max_depth_default = 4
 
 [security]
 allow_remote_model_egress = false
@@ -681,7 +680,7 @@ Assertion 필수 속성:
 - `assertion_id`
 - optional source candidate
 - subject, predicate, object/value
-- status: approved, superseded, revoked
+- status: active, superseded, revoked
 - valid time and transaction time
 - ontology release
 - access scope
@@ -1096,7 +1095,7 @@ CREATE TABLE knowledge.assertions (
   object_entity_id uuid REFERENCES knowledge.entities,
   value_type text,
   value_jsonb jsonb,
-  status text NOT NULL CHECK (status IN ('approved', 'superseded', 'revoked')),
+  status text NOT NULL CHECK (status IN ('active', 'superseded', 'revoked')),
   origin_type text NOT NULL,
   origin_metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   valid_from timestamptz,
@@ -1118,7 +1117,7 @@ CREATE TABLE knowledge.assertions (
 
 CREATE UNIQUE INDEX one_current_assertion_per_fingerprint
   ON knowledge.assertions(workspace_id, canonical_fingerprint)
-  WHERE status = 'approved';
+  WHERE status = 'active';
 
 CREATE TABLE knowledge.assertion_evidence (
   assertion_evidence_id uuid PRIMARY KEY,
@@ -1208,7 +1207,7 @@ SELECT
   :approved_object_entity_id,
   :approved_value_type,
   :approved_value_jsonb,
-  'approved',
+  'active',
   origin_type,
   origin_metadata,
   valid_from,
@@ -2613,46 +2612,67 @@ scan tuple 설정으로 보완하며, private corpus의 exact comparison에서 �
 ontology/
 ├── core/
 │   ├── entity-types.yaml
-│   ├── evidence-types.yaml
-│   └── assertion-status.yaml
+│   └── predicates.yaml
 ├── sources/
 │   ├── filesystem.yaml
 │   ├── slack.yaml
 │   └── mail.yaml
 ├── domains/
-│   ├── research-project.yaml
-│   ├── accounting.yaml
-│   └── organization.yaml
+│   ├── empty.yaml
+│   └── research-project.yaml
 ├── policies/
 │   ├── review-policy.yaml
-│   ├── acl-policy.yaml
-│   └── retention-policy.yaml
-└── mappings/
-    ├── postgres.yaml
-    ├── neo4j.yaml
-    └── rdf.yaml
+│   └── acl-policy.yaml
+├── mappings/
+│   └── property-graph.yaml
+└── migrations/
+    └── README.md          # release migration manifests (kip ontology diff/migrate-materialize)
 ```
+
+`core/entity-types.yaml`과 `core/predicates.yaml`, `domains/*.yaml`,
+`policies/review-policy.yaml`이 로더(`OntologyCatalog.load`,
+`OntologyRelease.load`)가 실제로 읽는 enforced contract다.
+`validate_ontology`는 추가로 (a) domain profile이 core entity type 또는
+core predicate 이름을 재정의하면 오류로 거부하고, (b) `sources/*.yaml`의
+`source_object_types.*.parent`가 core+domain에 없는 entity type을
+참조하면 오류로 거부한다. `sources/*.yaml`의 나머지 내용 중 런타임이
+소비하는 key는 `deterministic_relations`뿐이며,
+`mappings/property-graph.yaml`과 `policies/acl-policy.yaml`, 도메인의
+`controlled_values`는 advisory 참고 파일이다(로더는 YAML 문법과
+`version` 필드만 검증하고 내용을 집행하지 않는다).
 
 ### 24.2 Predicate definition
 
+`ontology/core/predicates.yaml`의 `predicates:` 맵 아래에 정의한다
+(스키마: `src/kip/ontology_release.py`의 `PredicateSpec`).
+
 ```yaml
-predicate: amends
-label_ko: 일부 변경
-kind: relation
-domain:
-  - Document
-  - Communication
-range:
-  - Document
-inverse: amended_by
-transitive: false
-symmetric: false
-risk_level: high
-review_policy: human_required
-definition: 기존 문서 전체를 폐기하지 않고 일부 조항 또는 내용을 변경한다.
+predicates:
+  amends:
+    description: The document or communication changes part of a prior document.
+    label_ko: 변경
+    description_ko: 문서 또는 커뮤니케이션이 기존 문서의 일부를 변경(개정)한다.
+    domain: [Document, Communication]
+    range: [Document]
+    inverse: null
+    risk: high            # low | medium | high
+    extraction: semantic  # deterministic_* | mixed | semantic
+    review: required      # not_required | conditional | required
 ```
 
 ### 24.3 Ontology release
+
+승인된 discovery 후보(entity type, predicate)는 ADR-044에 따라 자동으로
+additive release로 물질화된다: 대상 YAML 파일에 주석을 보존하는 targeted
+edit로 추가되고, 전체 트리를 임시 사본에서 shadow-validate한 뒤 원자적으로
+적용되며, 파일 version이 minor 범프된다. review-required predicate는 같은
+단계에서 `policies/review-policy.yaml`에 동기화된다. 장기 실행
+API/worker/MCP 프로세스는 재시작 시 새 카탈로그를 로드한다
+(`catalog_refresh: "restart_required"`). Compose 배포는 버전 관리되는
+체크아웃(`KIP_ONTOLOGY_PATH`)을 API에 읽기-쓰기, worker에 읽기 전용으로
+bind-mount하므로 릴리스가 재시작 후에도 유지되고 git으로 리뷰된다.
+마운트가 없거나 읽기 전용이면 fail-closed로 거부된다. Breaking 변경은
+여전히 수동 release + migration manifest 경로를 사용한다.
 
 Release는 다음을 포함한다.
 
@@ -2679,17 +2699,21 @@ Assertion write 전에 검증한다.
 
 ### 24.5 Migration
 
-지원 operation:
+지원 operation (`src/kip/ontology_migration.py`의 `MigrationOperation`):
 
 ```text
-rename predicate
-split predicate
-merge predicates
-deprecate predicate
-change review level
-change domain/range
-reclassify entity type
+rename
+deprecate
+replace
+split
+merge
 ```
+
+review 강화 완화, domain/range 축소, entity parent 변경 같은 semantic
+change는 별도 operation type이 아니라 `kip ontology diff`가 산출하는
+breaking-change 분류(`predicate_review_weakened`,
+`predicate_domain_narrowed`, `entity_parent_changed` 등)로 표면화되며,
+migration manifest의 위 operation 중 하나로 반드시 커버되어야 한다.
 
 기존 assertion을 destructive update하지 않는다. migration run이 새 assertion version 또는 mapping을 생성하고 old assertion을 supersede한다.
 
@@ -2760,8 +2784,8 @@ proposed → promoted
 proposed → rejected
 
 Assertion:
-approved → superseded
-approved → revoked
+active → superseded
+active → revoked
 ```
 
 `approve` 또는 `edit_and_approve`는 새 Assertion row를 생성하고 Candidate를 `promoted`로 만든다. 승인 상태를 Candidate row에 직접 부여하지 않는다. Audit log, review row, assertion insert, candidate transition을 같은 transaction에 기록한다.
@@ -2807,7 +2831,7 @@ SELECT
   a.valid_from,
   a.valid_to
 FROM knowledge.assertions a
-WHERE a.status = 'approved'
+WHERE a.status = 'active'
   AND (
     (:direction IN ('out', 'both') AND a.subject_entity_id = :node_id)
     OR
@@ -2830,7 +2854,7 @@ WITH RECURSIVE walk AS (
     ARRAY[a.assertion_id] AS edge_path,
     1 AS depth
   FROM knowledge.assertions a
-  WHERE a.status = 'approved'
+  WHERE a.status = 'active'
     AND a.subject_entity_id = :start_id
     AND a.object_entity_id IS NOT NULL
     AND (:predicates IS NULL OR a.predicate_key = ANY(:predicates))
@@ -2847,7 +2871,7 @@ WITH RECURSIVE walk AS (
   FROM walk w
   JOIN knowledge.assertions a
     ON a.subject_entity_id = w.current_id
-  WHERE a.status = 'approved'
+  WHERE a.status = 'active'
     AND a.object_entity_id IS NOT NULL
     AND w.depth < :max_depth
     AND NOT a.object_entity_id = ANY(w.node_path)
@@ -3468,13 +3492,20 @@ Ontology definition, review actor/time, projection state를 별도 top-level fie
 ```bash
 ./scripts/kip review list --status proposed --limit 50
 ./scripts/kip review approve cand_... --note "근거 확인"
+./scripts/kip review approve cand_... --supersede-contradicted --note "대체 승인"
 ./scripts/kip review reject cand_... --note "관계 불일치"
+./scripts/kip review revoke ast_... --note "근거 재검토 필요"
 ```
 
-Current commands are `list`, `propose`, `approve`, and `reject`. `show`는
-`get candidate CANDIDATE_ID`로 수행한다. Public `edit-approve`, `revoke`, actor
-option, optimistic concurrency token은 아직 없다. Reviewer identity는 verified
-`RequestContext`/role에서 와야 하며 caller가 actor 문자열을 선택하지 않는다.
+Current commands are `list`, `propose`, `approve`, `reject`, and `revoke`.
+`list`는 `kip.assertion-candidate-listing.v1`을 반환하며 review risk/confidence
+순으로 정렬되고 `--predicate`, `--subject-id` filter를 지원한다. `revoke`는
+required note와 함께 active assertion을 `revoked`로 전이시키고, contradiction을
+기록한 candidate는 `--supersede-contradicted`로 기존 assertion을 `superseded`
+처리하며 승인할 수 있다. `show`는 `get candidate CANDIDATE_ID`로 수행한다.
+Public `edit-approve`, actor option, optimistic concurrency token은 아직 없다.
+Reviewer identity는 verified `RequestContext`/role에서 와야 하며 caller가 actor
+문자열을 선택하지 않는다.
 
 ### 29.17 Pagination
 
@@ -3629,18 +3660,37 @@ CLI is the baseline edge adapter. A long-running application HTTP service is not
 
 ### 31.2 MCP adapter
 
-MCP MAY be added when agent clients need structured tool discovery. It must call the same application use cases as the CLI.
+MCP is implemented as a stdio adapter (`kip-mcp`, `scripts/mcp.sh`,
+`src/kip/mcp_server.py`) over the same application services as the CLI and
+REST. It derives its `RequestContext` from environment configuration
+(`KIP_WORKSPACE`, `KIP_PRINCIPAL_ID`, `KIP_ACL_SCOPES`, `KIP_ROLES`) before
+any service call; tool arguments cannot choose workspace, principal, or ACL
+scopes.
 
 ```text
-MCP tool             Application use case
-search_knowledge  -> SearchKnowledge
-read_evidence     -> ReadEvidence
-read_xlsx_range   -> ReadSpreadsheetRange
-traverse_graph    -> TraverseGraph
-explain_assertion -> ExplainAssertion
+MCP tool family                             Application use case
+kip_search / kip_context / kip_answer    -> shared retrieval and answering
+kip_read / kip_xlsx_read                 -> exact evidence reads
+kip_graph_neighbors / kip_graph_path
+  / kip_explain_assertion                -> approved graph traversal
+kip_ontology_entities / kip_ontology_context
+  / kip_ontology_entity_create
+  / kip_ontology_mine
+  / kip_ontology_candidates
+  / kip_ontology_entity_candidate_approve|reject
+  / kip_ontology_relation_candidate_approve|reject
+  / kip_ontology_assertion_revoke
+  / kip_ontology_discovery_propose|candidates|review
+                                         -> reviewed ontology curation
+kip_clarify / kip_answer_clarification
+  / kip_preferences / kip_remember_preference
+  / kip_forget_preference / kip_feedback -> adaptive interaction services
+kip_jobs / kip_status / kip_capabilities
+  / kip_vocabulary                       -> operations and discovery
 ```
 
-MCP MUST NOT become the only interface and MUST NOT bypass CLI contract tests.
+MCP MUST call the same application services as the other edges, MUST NOT
+become the only interface, and MUST NOT bypass CLI contract tests.
 
 ### 31.3 REST adapter
 
@@ -4988,6 +5038,10 @@ stand for implicit accepted decisions.
 | ADR-034 | Promote the candidate-local BM25 reranker | Accepted |
 | ADR-035 | Version semantic inputs and resume projection rebuilds | Accepted |
 | ADR-036 | Fix retrieval stage order and gate corpus regressions | Accepted |
+| ADR-037 | Align the production search contract and readiness gates | Accepted |
+| ADR-038 | Make the ontology curation loop reviewable end to end | Accepted |
+| ADR-039 | Reconcile filesystem deletions with a complete-scan grace policy | Accepted |
+| ADR-040 | Make guided setup end in a runnable deployment | Accepted |
 | ADR-041 | Structured PPTX extraction preserves presentation evidence | Accepted |
 | ADR-042 | Korean OCR enriches candidate pages and presentation images | Accepted |
 

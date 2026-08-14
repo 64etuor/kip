@@ -311,3 +311,49 @@ def test_ontology_commands_validate_and_diff_releases(tmp_path: Path) -> None:
     assert json.loads(validated.stdout)["data"]["version"] == "core/1.0.0"
     assert compared.exit_code == 0, compared.stdout
     assert json.loads(compared.stdout)["data"]["classification"] == "compatible"
+
+
+def test_review_propose_defaults_ontology_version_to_the_active_catalog() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "review",
+            "propose",
+            "--subject-id",
+            "doc_new",
+            "--predicate",
+            "amends",
+            "--object-entity-id",
+            "doc_old",
+        ],
+        env=_env(),
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert json.loads(result.stdout)["data"]["ontology_version"] == "core/1.0.0"
+
+
+def test_review_propose_still_accepts_an_explicit_ontology_version() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "review",
+            "propose",
+            "--subject-id",
+            "doc_new",
+            "--predicate",
+            "amends",
+            "--object-entity-id",
+            "doc_old",
+            "--ontology-version",
+            "core/1.0.0",
+        ],
+        env=_env(),
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert json.loads(result.stdout)["data"]["ontology_version"] == "core/1.0.0"

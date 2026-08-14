@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel, ConfigDict, Field
 
 from kip.container import Container, build_container
 from kip.domain.identity import IdentityCredential
@@ -18,9 +19,10 @@ from kip.domain.interactions import (
     OntologyDiscoveryReview,
     UserPreferenceWrite,
 )
-from kip.domain.knowledge import KnowledgeEntity
+from kip.domain.knowledge import CandidateEvidence, KnowledgeEntity
 from kip.domain.models import (
     AnswerRequest,
+    AssertionCandidate,
     ConnectorEvent,
     ContextRequest,
     Envelope,
@@ -61,6 +63,24 @@ def _serializable_errors(errors: Sequence[Any]) -> list[dict[str, Any]]:
             item["ctx"] = {key: str(value) for key, value in context.items()}
         cleaned.append(item)
     return cleaned
+
+
+class CandidateProposal(BaseModel):
+    """POST /v1/review/candidates body, mirroring the CLI `review propose` fields."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    subject_id: str
+    predicate: str
+    object_entity_id: str | None = None
+    object_value: Any = None
+    evidence_unit_id: list[str] = Field(default_factory=list)
+    origin: str = "human"
+    # None defaults to the active ontology catalog version at request time;
+    # `validate_candidate` enforces strict equality, so a hardcoded default
+    # goes stale the moment the ontology is released past its first version.
+    ontology_version: str | None = None
+    confidence: float | None = None
 
 
 def create_app(container: Container | None = None) -> FastAPI:
@@ -217,6 +237,26 @@ def create_app(container: Container | None = None) -> FastAPI:
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/readyz")
+    def readyz() -> JSONResponse:
+        """Readiness: liveness plus a real round-trip to the canonical store.
+
+        Container orchestration and ops probes use this endpoint; /healthz
+        stays process-liveness only. Any repository failure fails closed with
+        503 and no internal detail.
+        """
+        try:
+            selected.repository.operations.ping()
+        except Exception:
+            return JSONResponse(
+                status_code=503,
+                content={"status": "unavailable", "checks": {"repository": "failed"}},
+            )
+        return JSONResponse(
+            status_code=200,
+            content={"status": "ready", "checks": {"repository": "ok"}},
+        )
 
     @app.get("/v1/capabilities", response_model=Envelope)
     def capabilities(
@@ -498,6 +538,7 @@ def create_app(container: Container | None = None) -> FastAPI:
             selected.application.ontology_context.build(
                 context,
                 payload.query,
+                include_candidates=payload.include_candidate_assertions,
             ).context,
             context,
         )
@@ -644,9 +685,51 @@ def create_app(container: Container | None = None) -> FastAPI:
     def candidates(
         status: str = "proposed",
         limit: int = 100,
+        predicate: str | None = None,
+        subject_id: str | None = None,
         context: RequestContext = Depends(admin_context),
     ) -> Envelope:
-        return ok(selected.application.knowledge.list_candidates(context, status, limit), context)
+        return ok(
+            selected.application.knowledge.candidate_listing(
+                context,
+                status,
+                limit,
+                predicate=predicate,
+                subject_id=subject_id,
+            ),
+            context,
+        )
+
+    @app.post("/v1/review/candidates", response_model=Envelope)
+    def propose_candidate(
+        payload: CandidateProposal,
+        context: RequestContext = Depends(admin_context),
+    ) -> Envelope:
+        ontology_version = payload.ontology_version
+        if ontology_version is None:
+            if selected.ontology is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail="ontology_version is required when no ontology contract is loaded",
+                )
+            ontology_version = selected.ontology.version
+        candidate = AssertionCandidate(
+            id=new_id("cand"),
+            subject_id=payload.subject_id,
+            predicate=payload.predicate,
+            object_entity_id=payload.object_entity_id,
+            object_value=payload.object_value,
+            origin=payload.origin,
+            confidence=payload.confidence,
+            ontology_version=ontology_version,
+            evidence=[
+                CandidateEvidence(content_unit_id=value) for value in payload.evidence_unit_id
+            ],
+        )
+        return ok(
+            selected.application.knowledge.create_candidate(context, candidate),
+            context,
+        )
 
     @app.get("/v1/review/candidates/{candidate_id}", response_model=Envelope)
     def candidate(
@@ -659,10 +742,17 @@ def create_app(container: Container | None = None) -> FastAPI:
     def approve(
         candidate_id: str,
         note: str | None = None,
+        supersede_contradicted: bool = False,
         context: RequestContext = Depends(admin_context),
     ) -> Envelope:
         return ok(
-            selected.application.knowledge.review_approve(context, candidate_id, note), context
+            selected.application.knowledge.review_approve(
+                context,
+                candidate_id,
+                note,
+                supersede_contradicted=supersede_contradicted,
+            ),
+            context,
         )
 
     @app.post("/v1/review/candidates/{candidate_id}/reject", response_model=Envelope)
@@ -673,6 +763,17 @@ def create_app(container: Container | None = None) -> FastAPI:
     ) -> Envelope:
         return ok(
             selected.application.knowledge.review_reject(context, candidate_id, note), context
+        )
+
+    @app.post("/v1/review/assertions/{assertion_id}/revoke", response_model=Envelope)
+    def revoke_assertion(
+        assertion_id: str,
+        note: str,
+        context: RequestContext = Depends(admin_context),
+    ) -> Envelope:
+        return ok(
+            selected.application.knowledge.revoke_assertion(context, assertion_id, note),
+            context,
         )
 
     return app

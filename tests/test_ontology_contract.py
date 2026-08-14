@@ -62,6 +62,87 @@ def test_ontology_contract_detects_missing_predicate_risk(tmp_path: Path) -> Non
     assert "predicate authored_by: invalid risk level" in validate_ontology(copied)
 
 
+def test_ontology_contract_detects_domain_entity_type_shadowing_core(tmp_path: Path) -> None:
+    copied = tmp_path / "ontology"
+    shutil.copytree(ROOT / "ontology", copied)
+    domain_path = copied / "domains/research-project.yaml"
+    payload = _yaml(domain_path)
+    entity_types = payload["entity_types"]
+    assert isinstance(entity_types, dict)
+    entity_types["Person"] = {"description": "Shadowed by the domain profile."}
+    _write_yaml(domain_path, payload)
+
+    assert (
+        "research-project.yaml: entity type Person redefines core entity type"
+        in validate_ontology(copied)
+    )
+
+
+def test_ontology_contract_detects_domain_predicate_shadowing_core(tmp_path: Path) -> None:
+    copied = tmp_path / "ontology"
+    shutil.copytree(ROOT / "ontology", copied)
+    domain_path = copied / "domains/research-project.yaml"
+    payload = _yaml(domain_path)
+    _, core_predicates = _predicates(copied)
+    shadowed = core_predicates["authored_by"]
+    assert isinstance(shadowed, dict)
+    payload["predicates"] = {"authored_by": shadowed}
+    _write_yaml(domain_path, payload)
+
+    assert (
+        "research-project.yaml: predicate authored_by redefines core predicate"
+        in validate_ontology(copied)
+    )
+
+
+def test_ontology_contract_detects_unknown_source_object_parent(tmp_path: Path) -> None:
+    copied = tmp_path / "ontology"
+    shutil.copytree(ROOT / "ontology", copied)
+    source_path = copied / "sources/mail.yaml"
+    payload = _yaml(source_path)
+    source_object_types = payload["source_object_types"]
+    assert isinstance(source_object_types, dict)
+    email_message = source_object_types["EmailMessage"]
+    assert isinstance(email_message, dict)
+    email_message["parent"] = "NotARealEntityType"
+    _write_yaml(source_path, payload)
+
+    assert (
+        "mail.yaml: source object type EmailMessage unknown parent NotARealEntityType"
+        in validate_ontology(copied)
+    )
+
+
+def test_ontology_contract_accepts_valid_domain_and_source_definitions(tmp_path: Path) -> None:
+    copied = tmp_path / "ontology"
+    shutil.copytree(ROOT / "ontology", copied)
+
+    assert validate_ontology(copied) == []
+
+
+def test_ontology_catalog_exposes_korean_labels_through_mining_contract() -> None:
+    catalog = OntologyCatalog.load(ROOT / "ontology")
+
+    spec = catalog.predicate_specs["records_decision"]
+    assert spec.label_ko == "의사결정 기록"
+    assert spec.description
+    assert spec.description_ko
+
+    contract = catalog.mining_contract()
+    predicates = contract["predicates"]
+    assert isinstance(predicates, dict)
+    assert predicates["amends"]["label_ko"] == "변경"
+    assert predicates["amends"]["description"]
+    labels = contract["entity_type_labels"]
+    assert isinstance(labels, dict)
+    assert labels["Agreement"]["label_ko"] == "협약서"
+    assert labels["Decision"]["label_ko"] == "의사결정"
+    # Every predicate carries a Korean label and a description.
+    for name in catalog.predicates:
+        assert catalog.predicate_specs[name].label_ko
+        assert catalog.predicate_specs[name].description
+
+
 def test_ontology_catalog_rejects_unknown_predicates_and_versions() -> None:
     catalog = OntologyCatalog.load(ROOT / "ontology")
 

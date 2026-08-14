@@ -1,0 +1,19 @@
+.gitignore
+  s_ad962c4c3ae8de::t_ada8f22f8a0ca6 9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "dbb82de455d4a4c193681ce23943deaaf95e9727",
+  "prompts": {},
+  "sessions": {
+    "s_ad962c4c3ae8de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7b5ac8f7-2921-4c40-a768-515e565b34b7",
+        "model": "claude-fable-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

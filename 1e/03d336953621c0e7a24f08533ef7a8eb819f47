@@ -1,0 +1,110 @@
+contracts/openapi.yaml
+  s_ad962c4c3ae8de::t_d7bf147495dd14 1867,1870,2099
+docs/RAG_EVALUATION.md
+  s_ad962c4c3ae8de::t_2c06dcac11ce09 198-202
+  s_ad962c4c3ae8de::t_68637c4e2cacf9 190-197,203
+contracts/context-request.schema.json
+  s_ad962c4c3ae8de::t_d7bf147495dd14 24
+skills/knowledge-fabric/SKILL.md
+  s_ad962c4c3ae8de::t_106d7648638d0d 28
+docs/adr/ADR-045-judge-proposed-golden-dataset-growth.md
+  s_ad962c4c3ae8de::t_abaabe98475242 1-40,53-66,73-86
+  s_ad962c4c3ae8de::t_9dfce1f20add2f 41-52
+  s_ad962c4c3ae8de::t_62eaef76467ed4 67-72
+config/kip.container.toml
+  s_ad962c4c3ae8de::t_bd6c02e1fa6613 27
+src/kip/application/answering.py
+  s_ad962c4c3ae8de::t_b805f97ae51eee 65-66
+evaluation/golden/drafts/README.md
+  s_ad962c4c3ae8de::t_910418b11f404f 15-20
+  s_ad962c4c3ae8de::t_359bf04541fb6d 1-14
+CHANGELOG.md
+  s_ad962c4c3ae8de::t_275936b05774be 3-4,17-24
+  s_ad962c4c3ae8de::t_031cad0730266e 5-10
+  s_ad962c4c3ae8de::t_7fcec80360c257 11-16
+docs/IMPLEMENTATION_STATUS.md
+  s_ad962c4c3ae8de::t_54947a5e45d08d 34
+evaluation/golden/drafts/example-draft.yaml
+  s_ad962c4c3ae8de::t_5da131671d1aef 1-21
+config/kip.example.toml
+  s_ad962c4c3ae8de::t_dbd7dddfeab59c 63-64
+  s_ad962c4c3ae8de::t_818711d823c075 119-120
+  s_ad962c4c3ae8de::t_2a02ec896c7855 125-128
+  s_ad962c4c3ae8de::t_2c8783e2c51788 135-136
+src/kip/settings.py
+  s_ad962c4c3ae8de::t_3d504b62ea8ee5 238
+src/kip/domain/models.py
+  s_ad962c4c3ae8de::t_4924c8b5234fd7 247
+  s_ad962c4c3ae8de::t_adb31bf33f6adb 229
+contracts/golden-draft-review.schema.json
+  s_ad962c4c3ae8de::t_986b9882024298 1-78
+src/kip/container.py
+  s_ad962c4c3ae8de::t_8f1d21861f5617 344
+  s_ad962c4c3ae8de::t_af9737cc289ce8 315
+  s_ad962c4c3ae8de::t_27e1981d393a1f 307
+  s_ad962c4c3ae8de::t_b1c53760ab69c6 323
+  s_ad962c4c3ae8de::t_f38c245a73ab5c 336
+  s_ad962c4c3ae8de::t_9291d7e27d8834 299
+src/kip/evaluation/drafts.py
+  s_ad962c4c3ae8de::t_8aa882e54adc95 205-206
+  s_ad962c4c3ae8de::t_ed93c375169890 306-307,309,312
+  s_ad962c4c3ae8de::t_9e677aaa073c05 125-142
+  s_ad962c4c3ae8de::t_f5eb64eb30387d 195-197
+  s_ad962c4c3ae8de::t_73aee44b9166be 19
+  s_ad962c4c3ae8de::t_f3a19e769c0c29 180-181
+  s_ad962c4c3ae8de::t_bd3562cebf2299 74-76,78-79,81,83-84,86
+  s_ad962c4c3ae8de::t_847384e6e8e776 14,16-17,29-44
+  s_ad962c4c3ae8de::t_ac6e61f61ea468 64-73,77,80,82,85
+  s_ad962c4c3ae8de::t_1165d994eb8149 220-228,236-242,255-257
+  s_ad962c4c3ae8de::t_aad11f64171af8 1-13,15,18,20-28,45-63,87-124,143-179,182-194,198-204,207-219,229-235,243-254,258-272,283-304,310-311,313-319,321-329,353,365,372-377,380-392,396
+  s_ad962c4c3ae8de::t_3c0e7497516f35 273-282
+  s_ad962c4c3ae8de::t_4b0540c1b935c7 305,308,320,330-352,354-364,366-371,378-379,393-395
+src/kip/mcp_server.py
+  s_ad962c4c3ae8de::t_3b0034c3bb4875 137
+  s_ad962c4c3ae8de::t_d724d3271dc42e 113
+.claude/skills/knowledge-fabric/SKILL.md
+  s_ad962c4c3ae8de::t_1c4bfdfd2cb98c 28
+src/kip/setup/writer.py
+  s_ad962c4c3ae8de::t_0227ebfaf7a1d6 200
+src/kip/cli.py
+  s_ad962c4c3ae8de::t_19534cbb04a773 1232-1272,1287-1293,1297-1301
+  s_ad962c4c3ae8de::t_77e16cc875d3bc 37
+  s_ad962c4c3ae8de::t_4dd441a9be95ec 541
+  s_ad962c4c3ae8de::t_892f860128e39e 504
+  s_ad962c4c3ae8de::t_406c663e52da47 1273-1286,1294-1296
+  s_ad962c4c3ae8de::t_c19170d9a924cc 101
+  s_ad962c4c3ae8de::t_e073c99c30ccd0 73-76
+docs/plans/2026-08-14-llm-capability-scaling.md
+  s_ad962c4c3ae8de::t_2ab21678cab17a 1-68
+contracts/golden-draft.schema.json
+  s_ad962c4c3ae8de::t_986b9882024298 1-438
+contracts/openapi.json
+  s_ad962c4c3ae8de::t_d7bf147495dd14 84-85,412
+contracts/answer-request.schema.json
+  s_ad962c4c3ae8de::t_d7bf147495dd14 24-25
+scripts/generate_contracts.py
+  s_ad962c4c3ae8de::t_e0415c996aec19 85
+  s_ad962c4c3ae8de::t_d6e42a4a12d160 171-172
+tests/test_evaluation_drafts.py
+  s_ad962c4c3ae8de::t_0616a7108a3c35 1-250,252-256,260-268,278-314,316-324,333-428,563-624,627-634
+  s_ad962c4c3ae8de::t_9b22acd124599d 315,325-332
+  s_ad962c4c3ae8de::t_9275b66d8c4108 429-562
+  s_ad962c4c3ae8de::t_bd0ac877e46ad1 251,257-259,269-277
+  s_ad962c4c3ae8de::t_838b51d2e89393 625-626
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "1e03d336953621c0e7a24f08533ef7a8eb819f47",
+  "prompts": {},
+  "sessions": {
+    "s_ad962c4c3ae8de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7b5ac8f7-2921-4c40-a768-515e565b34b7",
+        "model": "claude-fable-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

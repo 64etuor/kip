@@ -1,0 +1,121 @@
+tests/test_semantic_projection_resume.py
+  s_ad962c4c3ae8de::t_16b12d958c4e65 160-207,209-218
+  s_ad962c4c3ae8de::t_86fc1e025fbfe1 208
+AGENTS.md
+  s_ad962c4c3ae8de::t_45c0ea065cf628 28-34
+docs/plans/2026-08-14-llm-capability-scaling.md
+  s_ad962c4c3ae8de::t_d99a67b8414c59 40-52,56-58
+src/kip/adapters/repository/postgres/database.py
+  s_ad962c4c3ae8de::t_22de96bc08cfd0 3222-3261
+  s_ad962c4c3ae8de::t_f65c8ebe98e8b9 24,27
+src/kip/ports/knowledge.py
+  s_ad962c4c3ae8de::t_8fed8fc6efa104 6-10
+  s_ad962c4c3ae8de::t_fcc94f50e196e2 145-157
+contracts/openapi.yaml
+  s_ad962c4c3ae8de::t_7390705af61e11 1929,1983,2508
+docs/adr/ADR-031-hwp-reextraction-and-local-reranking.md
+  s_ad962c4c3ae8de::t_f43e62d510372d 3-10
+contracts/clarification-resolution.schema.json
+  s_ad962c4c3ae8de::t_7390705af61e11 43,152,192
+skills/knowledge-fabric/SKILL.md
+  s_ad962c4c3ae8de::t_0316c20e0b6879 179-182
+.claude/skills/knowledge-fabric/SKILL.md
+  s_ad962c4c3ae8de::t_abb7c3bff075a2 179-182
+tests/contract/test_repository_behavior_parity.py
+  s_ad962c4c3ae8de::t_5d67b5b1b17fef 484-553
+  s_ad962c4c3ae8de::t_49932830b990a2 15
+tests/test_adaptive_interactions.py
+  s_ad962c4c3ae8de::t_26a9733c438073 10,15
+  s_ad962c4c3ae8de::t_66bd0a9bd23161 172-248
+tests/test_ontology_auto_approve.py
+  s_ad962c4c3ae8de::t_77785078b49b57 1-26,28-525
+  s_ad962c4c3ae8de::t_0369c1e4d23aec 27
+docs/adr/ADR-047-measured-auto-approve-policy.md
+  s_ad962c4c3ae8de::t_5b32c6b279bf87 1-83
+docs/ONTOLOGY_GUIDE.md
+  s_ad962c4c3ae8de::t_37cc7c088321c6 37-45
+config/kip.example.toml
+  s_ad962c4c3ae8de::t_22edfa7d57dbc2 87-93
+  s_ad962c4c3ae8de::t_44b57c9bc0a3e7 140-148
+config/kip.container.toml
+  s_ad962c4c3ae8de::t_21b922a7d2ba9a 44-52
+contracts/clarification-request.schema.json
+  s_ad962c4c3ae8de::t_7390705af61e11 43
+docs/adr/ADR-032-consent-based-interaction-memory.md
+  s_ad962c4c3ae8de::t_ed2f922f7c3721 5-13
+docs/IMPLEMENTATION_STATUS.md
+  s_ad962c4c3ae8de::t_a847b98b8d6427 39
+contracts/clarification-answer.schema.json
+  s_ad962c4c3ae8de::t_7390705af61e11 21
+src/kip/domain/knowledge.py
+  s_ad962c4c3ae8de::t_8e50e1e436868d 8,18-23
+  s_ad962c4c3ae8de::t_1f436c67fcf2db 205-229
+  s_ad962c4c3ae8de::t_45db84b1481a13 24
+contracts/ontology-mining-summary.schema.json
+  s_ad962c4c3ae8de::t_825871b103be3f 168-202,494-500
+docs/adr/ADR-035-versioned-resumable-semantic-projections.md
+  s_ad962c4c3ae8de::t_7beb53220ddee9 3,6-16
+  s_ad962c4c3ae8de::t_40622084c2667c 17
+src/kip/domain/interactions.py
+  s_ad962c4c3ae8de::t_43ba05b9529f6a 157-160
+  s_ad962c4c3ae8de::t_a4d0b7c1d875e8 81-83
+  s_ad962c4c3ae8de::t_f95303ed76f473 181
+  s_ad962c4c3ae8de::t_20bec13dec27c8 201
+  s_ad962c4c3ae8de::t_99738e47c6251a 5
+  s_ad962c4c3ae8de::t_6f62ce850b0bad 56-60
+  s_ad962c4c3ae8de::t_96d449110c00bb 126-128
+src/kip/domain/models.py
+  s_ad962c4c3ae8de::t_a5084cd69be5c7 452-467,478-481
+src/kip/adapters/repository/memory/knowledge.py
+  s_ad962c4c3ae8de::t_234d01575dabb3 13,17
+  s_ad962c4c3ae8de::t_803a0fa7f4f87b 376-405
+docs/DATA_CONTRACTS.md
+  s_ad962c4c3ae8de::t_d353d363f4b98f 347-348
+src/kip/application/ontology_rag.py
+  s_ad962c4c3ae8de::t_a672c2d83ed5f4 10,15,20,34
+  s_ad962c4c3ae8de::t_8c47c0dde59232 412-413,427-442,444-447,461,466-538
+  s_ad962c4c3ae8de::t_0218d6a4185316 62,68-71,80-85,90-93
+  s_ad962c4c3ae8de::t_6d05a61f558764 583-586
+  s_ad962c4c3ae8de::t_02468e910db51a 539
+CHANGELOG.md
+  s_ad962c4c3ae8de::t_a5532e8e578f05 5-27
+src/kip/application/semantic.py
+  s_ad962c4c3ae8de::t_422a932051b9c8 173
+src/kip/adapters/repository/postgres/knowledge.py
+  s_ad962c4c3ae8de::t_f3b8c735c0fa3b 7-11
+  s_ad962c4c3ae8de::t_4db38c2d265a73 203-209
+contracts/openapi.json
+  s_ad962c4c3ae8de::t_7390705af61e11 220,282,1039
+contracts/clarification-question.schema.json
+  s_ad962c4c3ae8de::t_7390705af61e11 43
+contracts/user-preference.schema.json
+  s_ad962c4c3ae8de::t_7390705af61e11 36
+docs/adr/ADR-003-neo4j-optional.md
+  s_ad962c4c3ae8de::t_f0f35771d4c6a5 3-11
+contracts/user-preference-write.schema.json
+  s_ad962c4c3ae8de::t_7390705af61e11 19
+docs/adr/ADR-018-jina-huggingface-reranker.md
+  s_ad962c4c3ae8de::t_132f10376e22d8 3-5,7-11
+docs/adr/ADR-025-reviewed-ontology-mining-jobs.md
+  s_ad962c4c3ae8de::t_48ba6bc56e26cd 3,6-10
+  s_ad962c4c3ae8de::t_b6451bd8b98782 11
+src/kip/container.py
+  s_ad962c4c3ae8de::t_0cadf2061bbeb8 733,739-744
+  s_ad962c4c3ae8de::t_14299eec1eb6ac 311-316,325,358-387
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "bce5e4a6d0364b7cdf18006e88df6d544db66458",
+  "prompts": {},
+  "sessions": {
+    "s_ad962c4c3ae8de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7b5ac8f7-2921-4c40-a768-515e565b34b7",
+        "model": "claude-fable-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

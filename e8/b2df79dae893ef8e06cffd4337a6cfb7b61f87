@@ -1,0 +1,213 @@
+skills/kip-setup/references/questions.md
+  s_ad962c4c3ae8de::t_fc8b94b0bd1c92 13-48
+  s_ad962c4c3ae8de::t_1ecd5659aea374 56-60
+config/kip.example.toml
+  s_ad962c4c3ae8de::t_203b7cfb9940db 174-181
+CHANGELOG.md
+  s_ad962c4c3ae8de::t_af64ef632da79c 5-34
+docs/IMPLEMENTATION_STATUS.md
+  s_ad962c4c3ae8de::t_80a6e4a3f0bde2 28
+  s_ad962c4c3ae8de::t_df136069d0e979 27
+  s_ad962c4c3ae8de::t_87b8441c0c3b5e 26
+  s_ad962c4c3ae8de::t_1daae961836c13 31
+  s_ad962c4c3ae8de::t_509ae27ab54f35 29
+  s_ad962c4c3ae8de::t_e73f813451e22e 30
+src/kip/adapters/parsers/hwp_native.py
+  s_ad962c4c3ae8de::t_1188c197117057 262-266,282
+  s_ad962c4c3ae8de::t_4c60fa3401f5e1 3,5,19-120
+  s_ad962c4c3ae8de::t_78479a3c514749 301-304
+  s_ad962c4c3ae8de::t_322ce67bfec47f 227-232
+  s_ad962c4c3ae8de::t_71ec023fd84ff8 219-223,233
+docs/OPERATIONS.md
+  s_ad962c4c3ae8de::t_448a77f4f10597 427-429,432-434
+  s_ad962c4c3ae8de::t_9b3a59fbb6feb5 25-26
+  s_ad962c4c3ae8de::t_b57127da59a3e1 3-24,27-44
+  s_ad962c4c3ae8de::t_b5d8d92cae7425 180-188
+  s_ad962c4c3ae8de::t_1df21d107492ca 330-335,338,341-342
+  s_ad962c4c3ae8de::t_523d010f321b60 435
+tests/test_xlsx_two_stage.py
+  s_ad962c4c3ae8de::t_30bb3a8561966d 232-269
+src/kip/cli.py
+  s_ad962c4c3ae8de::t_d03f78b662b23c 792-798
+  s_ad962c4c3ae8de::t_97b217e90fd00e 394-397
+  s_ad962c4c3ae8de::t_a718af654df53c 37
+  s_ad962c4c3ae8de::t_0a9fc0c5a45d90 1377,1379-1380,1382
+  s_ad962c4c3ae8de::t_a9a39146670a3b 1993
+  s_ad962c4c3ae8de::t_74956e02cb7770 1121-1122
+  s_ad962c4c3ae8de::t_0d6ca5d39902cb 2031-2032
+  s_ad962c4c3ae8de::t_112a6c8674476b 1497,1501-1502,1504-1505
+  s_ad962c4c3ae8de::t_297ab304c20612 1848-1849,1862-1863
+  s_ad962c4c3ae8de::t_3084716b814bab 2176
+  s_ad962c4c3ae8de::t_ab0608be4410dd 212-224,226-230,235
+  s_ad962c4c3ae8de::t_584bd325284b62 1001
+  s_ad962c4c3ae8de::t_484f861a3db325 1071
+  s_ad962c4c3ae8de::t_cf94d077f977d3 199,206
+  s_ad962c4c3ae8de::t_6f2e320fe2180d 1456-1458,1464,1467
+  s_ad962c4c3ae8de::t_2d5291c57471e8 942,948,954,960,974-979
+  s_ad962c4c3ae8de::t_02a3a019c08fa3 2012
+  s_ad962c4c3ae8de::t_bcab83845bc171 549-574
+  s_ad962c4c3ae8de::t_6880844bfd63c7 290-295,299-300
+  s_ad962c4c3ae8de::t_4582195374b0b9 258-289
+  s_ad962c4c3ae8de::t_91e398288549aa 1048
+  s_ad962c4c3ae8de::t_8b17b5f2fd493d 1590,1592-1593,1599-1600,1602-1603,1605-1607
+  s_ad962c4c3ae8de::t_593a93925736ac 1822-1824,1826-1832,1834-1839
+  s_ad962c4c3ae8de::t_d4972526fa688f 1571
+  s_ad962c4c3ae8de::t_ee82a8ce246c72 225
+  s_ad962c4c3ae8de::t_526c9e638c0496 1514,1516-1517,1519,1527,1534-1535,1538,1552-1553
+  s_ad962c4c3ae8de::t_94b1c4a3a91900 1770,1784-1785,1794,1796-1797,1799-1800,1802-1803,1807-1810
+  s_ad962c4c3ae8de::t_c365ea755ffcfa 39
+  s_ad962c4c3ae8de::t_239b119d8dedb7 1704
+  s_ad962c4c3ae8de::t_36ad34e3da98f5 1968-1969
+  s_ad962c4c3ae8de::t_bb845e8bb793bd 1572,1575-1576
+  s_ad962c4c3ae8de::t_8311b38407a8bc 1615,1618-1619,1621-1622,1625,1640,1660,1682-1683,1724-1725
+  s_ad962c4c3ae8de::t_53c6709b319e93 2068-2069
+  s_ad962c4c3ae8de::t_ad7c3498e8ffbe 1399,1409-1410,1412-1413
+  s_ad962c4c3ae8de::t_0d09b25b326d61 842,854,866,878
+  s_ad962c4c3ae8de::t_84650c3e85a7fa 1159,1177,1192,1207
+  s_ad962c4c3ae8de::t_aea5dbb5b533c7 674
+  s_ad962c4c3ae8de::t_6ded667451c684 2198
+  s_ad962c4c3ae8de::t_097dfe7921b77e 1932
+  s_ad962c4c3ae8de::t_bd3f6022dfbd39 449-478,480-487,489-492,495-496
+  s_ad962c4c3ae8de::t_7d27d2a3121d4f 1903-1904
+  s_ad962c4c3ae8de::t_84c9b9204c0766 1952
+  s_ad962c4c3ae8de::t_7064ef1fd5d685 2104
+  s_ad962c4c3ae8de::t_973aa4c63cfb6e 1322-1323
+  s_ad962c4c3ae8de::t_14fb8ea7c2e6e0 2124
+  s_ad962c4c3ae8de::t_4d1bd8faf50c41 905
+  s_ad962c4c3ae8de::t_e3c20cee682cab 1753
+src/kip/adapters/parsers/docx.py
+  s_ad962c4c3ae8de::t_88fb7a7fc0639b 212-213
+  s_ad962c4c3ae8de::t_8d71065ed6996c 185-192
+  s_ad962c4c3ae8de::t_0e532543e6874d 644-683
+  s_ad962c4c3ae8de::t_e93c4cdc519575 152-153
+  s_ad962c4c3ae8de::t_bac063c1e92494 821-844
+  s_ad962c4c3ae8de::t_295dc3de6fc297 418-426
+  s_ad962c4c3ae8de::t_6bcd6d1d298f8f 38-52
+src/kip/adapters/parsers/registry.py
+  s_ad962c4c3ae8de::t_064b99db127b34 43-46
+src/kip/adapters/parsers/plain.py
+  s_ad962c4c3ae8de::t_e7fa7e26bb46e7 48-50,52-67
+  s_ad962c4c3ae8de::t_d46ddc701cf225 39-47,51,68
+  s_ad962c4c3ae8de::t_9cc753cbd69818 145-146,150
+  s_ad962c4c3ae8de::t_43070c156acdb0 128-144,147-149,151-173
+  s_ad962c4c3ae8de::t_e550ca6c5d20e1 127
+docs/TRD.md
+  s_ad962c4c3ae8de::t_93fe1cf5168ea0 628
+  s_ad962c4c3ae8de::t_55232b88bfd016 626
+src/kip/setup/planner.py
+  s_ad962c4c3ae8de::t_42135bdabc3330 332-338
+  s_ad962c4c3ae8de::t_85d879ba76b2dc 242-248
+  s_ad962c4c3ae8de::t_c9abd3ff8d5310 353-359
+  s_ad962c4c3ae8de::t_9c51659e780499 315-325
+  s_ad962c4c3ae8de::t_c4e0d64a696843 408-413
+  s_ad962c4c3ae8de::t_0a177a3604b5b4 434-440
+  s_ad962c4c3ae8de::t_bcc1f06674b381 304-308
+tests/test_docx_parser.py
+  s_ad962c4c3ae8de::t_2f3b56fa1361ba 621-787
+src/kip/adapters/parsers/xlsx.py
+  s_ad962c4c3ae8de::t_db0ecb2fc2d3a7 151
+  s_ad962c4c3ae8de::t_f8127afb7669d4 210
+  s_ad962c4c3ae8de::t_d2fe393f083427 233-237
+  s_ad962c4c3ae8de::t_81ae1169b1d5ef 59,65,76-85
+  s_ad962c4c3ae8de::t_e47cbf172b7374 159-160
+tests/test_hwp_parser.py
+  s_ad962c4c3ae8de::t_66da596fdd91a7 516-518
+  s_ad962c4c3ae8de::t_e6266eaafc3a4a 226-281
+  s_ad962c4c3ae8de::t_407a0818f65b27 496
+  s_ad962c4c3ae8de::t_ebcc1937e1ea6e 6
+  s_ad962c4c3ae8de::t_96cb85ffe2d5fe 519-633
+  s_ad962c4c3ae8de::t_18a938a20095e7 408-495,497,503
+  s_ad962c4c3ae8de::t_a95fb80ec212ac 152-153,155-158
+  s_ad962c4c3ae8de::t_36c7e8c8ddff36 91-93
+  s_ad962c4c3ae8de::t_f35b885bd7d771 86-89,95-98,105
+  s_ad962c4c3ae8de::t_83cc4c8cc72c58 132-136
+  s_ad962c4c3ae8de::t_29982822fb9cf5 498-502,504-515
+README.md
+  s_ad962c4c3ae8de::t_a28ad83b6c1275 130-143
+  s_ad962c4c3ae8de::t_eed64be9ae96e4 15-26
+  s_ad962c4c3ae8de::t_3e57bf19a44502 88-107
+  s_ad962c4c3ae8de::t_0e31b49b66f34b 27-30
+docs/adr/ADR-049-measured-pdf-tables-and-hwp-section-locators.md
+  s_ad962c4c3ae8de::t_fb4d88a613b10c 66-74
+  s_ad962c4c3ae8de::t_8b354d8c43f2f9 1-36,39-65,75-80,97-120,127-135
+  s_ad962c4c3ae8de::t_077d7c1ca3249d 37-38
+  s_ad962c4c3ae8de::t_e0deb3965bce1e 121-126
+  s_ad962c4c3ae8de::t_7c91cc71c88d5c 81-96
+src/kip/adapters/parsers/pptx_shapes.py
+  s_ad962c4c3ae8de::t_9fb47e3ff5bff0 126,136,145
+  s_ad962c4c3ae8de::t_6d94bb983c7013 326-330,335-336,338-358
+  s_ad962c4c3ae8de::t_9630bee922d10d 337
+  s_ad962c4c3ae8de::t_c5807abdbf70e2 46-108,110
+  s_ad962c4c3ae8de::t_499fcbe7af5f81 5
+  s_ad962c4c3ae8de::t_16e7f39a426151 14
+src/kip/setup_cli.py
+  s_ad962c4c3ae8de::t_6479916aa5c2af 78
+  s_ad962c4c3ae8de::t_a1a8d1b079b533 58
+  s_ad962c4c3ae8de::t_de3d5321460289 117-118
+  s_ad962c4c3ae8de::t_ba43be831877ec 160
+  s_ad962c4c3ae8de::t_0fdb421c267b51 96
+  s_ad962c4c3ae8de::t_776af9ad6b2c38 141
+docs/TROUBLESHOOTING.md
+  s_ad962c4c3ae8de::t_31a1b2f7317b3d 1-63,66-131,134,142,144-165
+  s_ad962c4c3ae8de::t_3aeb5d2964feb2 132-133,135-141,143
+  s_ad962c4c3ae8de::t_c8f446deeaeff1 64-65
+tests/test_plain_text_parser.py
+  s_ad962c4c3ae8de::t_91f09b58dbbb6d 165-203
+tests/test_pdf_parser.py
+  s_ad962c4c3ae8de::t_69986c407f2c9b 160-188,192-196,202-210,212,214-238,240-421
+  s_ad962c4c3ae8de::t_5c61bd3f95c62f 189-191,197-201,211,213
+  s_ad962c4c3ae8de::t_d4f99191aac154 239
+tests/test_pptx_parser.py
+  s_ad962c4c3ae8de::t_130719e7a2464c 299-344
+tests/test_cli_envelope_contract.py
+  s_ad962c4c3ae8de::t_e499c247e98391 87-138
+config/kip.container.toml
+  s_ad962c4c3ae8de::t_dbfc65ef5e509e 64-71
+.claude/skills/kip-setup/references/questions.md
+  s_ad962c4c3ae8de::t_0973490653f3bb 13-48,56-60
+tests/test_csv_parser.py
+  s_ad962c4c3ae8de::t_f203f6469377fe 258-289
+docs/GLOSSARY.md
+  s_ad962c4c3ae8de::t_4a22b59d577267 1-208
+tests/test_cli_surface.py
+  s_ad962c4c3ae8de::t_aafd375dfc446f 52-87
+docs/QUICKSTART.md
+  s_ad962c4c3ae8de::t_6b92ea945d3dd2 3-5
+  s_ad962c4c3ae8de::t_a6859b8eb9e785 66-97
+src/kip/adapters/parsers/csv_table.py
+  s_ad962c4c3ae8de::t_17e2da272aa9e6 28-49,56-63
+src/kip/adapters/parsers/hwp_broker.py
+  s_ad962c4c3ae8de::t_3b164d670f02f4 133,135-155
+tests/test_xlsx_range_values.py
+  s_ad962c4c3ae8de::t_255ed837b89241 23-26,35
+  s_ad962c4c3ae8de::t_f436c52dce7feb 217-311
+tests/test_cli_doctor.py
+  s_ad962c4c3ae8de::t_4d4cca8171b3b5 176,180,182-197,200
+  s_ad962c4c3ae8de::t_ce924d39564a21 3
+  s_ad962c4c3ae8de::t_22a4bb46850738 179,181,198-199,201,203
+  s_ad962c4c3ae8de::t_94c64a22582bd1 170-175,177-178,202,204-211
+src/kip/adapters/parsers/pdf.py
+  s_ad962c4c3ae8de::t_b1b535b2b3c73d 39-40
+  s_ad962c4c3ae8de::t_948907feba4e76 94-101,129-140
+  s_ad962c4c3ae8de::t_c3305bcba88498 62,64
+  s_ad962c4c3ae8de::t_3821700d3a6c87 145-148
+  s_ad962c4c3ae8de::t_d6e92fa292f71f 266-350
+  s_ad962c4c3ae8de::t_4ee71a309acb52 18-29,33
+  s_ad962c4c3ae8de::t_6852054e10b9ea 34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "e8b2df79dae893ef8e06cffd4337a6cfb7b61f87",
+  "prompts": {},
+  "sessions": {
+    "s_ad962c4c3ae8de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7b5ac8f7-2921-4c40-a768-515e565b34b7",
+        "model": "claude-opus-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

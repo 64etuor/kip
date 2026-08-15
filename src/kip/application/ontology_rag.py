@@ -56,10 +56,10 @@ class OntologyRagUseCases:
         relation_miner: RelationMinerPort | None = None,
         telemetry: TelemetryUseCases | None = None,
         *,
-        max_mining_units: int = 50,
-        max_mining_characters: int = 120_000,
-        max_entity_proposals: int = 32,
-        max_relation_proposals: int = 64,
+        max_mining_units: int = 200,
+        max_mining_characters: int = 480_000,
+        max_entity_proposals: int = 128,
+        max_relation_proposals: int = 256,
     ) -> None:
         self._store = store
         self._evidence = evidence

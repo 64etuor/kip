@@ -183,10 +183,30 @@ class MemoryInteractionStore:
             workspace, existing = self.state.ontology_discovery_candidates[existing_id]
             if workspace != context.workspace:
                 raise NotFoundError("ontology discovery candidate not found")
+            if existing.status != "proposed":
+                # Never mutate an already-reviewed candidate (not even its
+                # `occurrence_count`), matching the PostgreSQL adapter's
+                # `WHERE status='proposed'` conflict-update predicate.
+                return existing.model_copy(deep=True)
+            # A re-proposal of the same (fingerprinted) symbol with
+            # corrected label/definition/spec must not be silently dropped:
+            # the fingerprint intentionally excludes these fields (stable
+            # dedup identity), so refresh them here instead of only bumping
+            # `occurrence_count`.
             updated = existing.model_copy(
                 update={
                     "occurrence_count": existing.occurrence_count + 1,
                     "updated_at": candidate.updated_at,
+                    "label": candidate.label,
+                    "definition": candidate.definition,
+                    "target_symbol": candidate.target_symbol,
+                    "parent": candidate.parent,
+                    "domain": candidate.domain,
+                    "range": candidate.range,
+                    "inverse": candidate.inverse,
+                    "risk": candidate.risk,
+                    "review": candidate.review,
+                    "extraction": candidate.extraction,
                 }
             )
             self.state.ontology_discovery_candidates[existing_id] = (

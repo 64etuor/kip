@@ -632,3 +632,59 @@ def test_cli_draft_validate_review_promote_round_trip(tmp_path: Path) -> None:
 
     loaded = load_dataset(dataset_path)
     assert {case.id for case in loaded.cases} == {"EX-001", "EX-002"}
+
+
+def test_promote_reports_comment_loss_for_annotated_existing_dataset(tmp_path: Path) -> None:
+    dataset_path = tmp_path / "dataset.yaml"
+    dataset_path.write_text(
+        "# reviewer note: keep PRE-001 aligned with the 2026 corpus\n"
+        + yaml.safe_dump(
+            {
+                "schema_version": "kip.golden-dataset.v1",
+                "name": "existing",
+                "corpus_fingerprint": "sha256:existing",
+                "cases": [
+                    {
+                        "id": "PRE-001",
+                        "question": "기존 질문",
+                        "category": "semantic_paraphrase",
+                        "principal": "principal_public",
+                        "acl_scopes": ["workspace:default"],
+                        "expected_documents": ["ldoc_pre_001"],
+                        "forbidden_documents": [],
+                        "recall_at": 10,
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    draft_path, review_path = _promote_ready_draft_and_review(
+        tmp_path, case_ids=["EX-001"], reviewed_case_ids=["EX-001"]
+    )
+
+    summary = promote_draft(
+        draft_path=draft_path,
+        review_path=review_path,
+        dataset_path=dataset_path,
+        min_sample_rate=0.2,
+        dataset_version="1.0.0",
+    )
+
+    assert summary["comments_discarded"] is True
+
+    fresh_path = tmp_path / "fresh.yaml"
+    second_dir = tmp_path / "second"
+    second_dir.mkdir()
+    draft_path2, review_path2 = _promote_ready_draft_and_review(
+        second_dir, case_ids=["EX-101"], reviewed_case_ids=["EX-101"]
+    )
+    fresh_summary = promote_draft(
+        draft_path=draft_path2,
+        review_path=review_path2,
+        dataset_path=fresh_path,
+        min_sample_rate=0.2,
+        dataset_version="1.0.0",
+    )
+    assert fresh_summary["comments_discarded"] is False

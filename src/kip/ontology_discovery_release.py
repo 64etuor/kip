@@ -20,16 +20,39 @@ profile files carry hand-written comment headers. This module never
 round-trips file contents through `yaml.dump` (which would silently drop
 them); it only appends a correctly indented text block under an existing (or
 newly created) top-level key and rewrites the `version:` line in place.
+
+Concurrency and crash safety, single-host deployment:
+
+1. `materialize_ontology_release` serializes the whole read-modify-write
+   cycle per ontology root with an OS-level advisory lock
+   (`fcntl.flock` on `<ontology_root>/.release.lock`), so two
+   near-simultaneous approvals can never race and silently drop one release
+   (lost update). The lock blocks with a bounded timeout and fails closed
+   with a `ValidationError` rather than hanging forever.
+2. A predicate release with `review: required` touches two files
+   (`core/predicates.yaml` and `policies/review-policy.yaml`) that must
+   change together for `validate_ontology`'s exact-match invariant to hold.
+   `_apply_via_shadow` journals the full new contents of every file it is
+   about to replace to `<ontology_root>/.pending-release.json` (fsynced)
+   before doing the `os.replace` sequence, and deletes the journal once every
+   file has landed. If the process crashes between the two replaces, the
+   journal survives and `complete_pending_release` (called at the start of
+   every materialization, and once at container start-up before the eager
+   `OntologyCatalog.load`) re-applies it idempotently, healing the tree
+   without operator intervention.
 """
 
 from __future__ import annotations
 
 import contextlib
+import fcntl
 import json
 import os
 import re
 import shutil
 import tempfile
+import time
+from collections.abc import Iterator
 from pathlib import Path
 
 import yaml
@@ -39,7 +62,7 @@ from kip.domain.interactions import (
     OntologyDiscoveryCandidate,
     OntologyDiscoveryRelease,
 )
-from kip.errors import ValidationError
+from kip.errors import ConflictError, ValidationError
 from kip.ontology import domain_profile_path, validate_ontology
 
 # Predicates in `ontology/core/predicates.yaml` describe evidence-linking
@@ -59,7 +82,20 @@ _DEFAULT_PREDICATE_RISK = "high"
 _DEFAULT_PREDICATE_REVIEW = "required"
 _DEFAULT_PREDICATE_EXTRACTION = "semantic"
 
-_VERSION_LINE_RE = re.compile(r"^version:\s*([0-9]+)\.([0-9]+)\.([0-9]+)\s*$")
+_VERSION_LINE_RE = re.compile(
+    r"^version:\s*([0-9]+)\.([0-9]+)\.([0-9]+)\s*(?P<comment>#.*)?$"
+)
+
+# Sentinel files under `ontology_root` used for release serialization and
+# crash recovery. Neither is a `*.yaml` file, so `validate_ontology`'s
+# `root.rglob("*.yaml")` scan (and any shadow copy of the tree) never sees
+# them.
+RELEASE_LOCK_FILENAME = ".release.lock"
+RELEASE_JOURNAL_FILENAME = ".pending-release.json"
+_LOCK_TIMEOUT_SECONDS = 10.0
+_LOCK_POLL_INTERVAL_SECONDS = 0.05
+
+_MATERIALIZED_KINDS = frozenset({"entity_type", "predicate"})
 
 
 def materialize_ontology_release(
@@ -70,17 +106,150 @@ def materialize_ontology_release(
     """Materialize `candidate` into the ontology tree, or return the existing release.
 
     Raises `ValidationError` if the ontology root is read-only, the release
-    would fail contract validation, or `candidate.kind` is not releasable
-    automatically. Never leaves a half-written tree: on failure, no real file
-    under `ontology_root` is modified.
+    would fail contract validation, the release lock cannot be acquired
+    within the timeout, or `candidate.kind` is not releasable automatically.
+    Raises `ConflictError` if `candidate.symbol` was already released with
+    different content by a different candidate. Never leaves a half-written
+    tree: on failure, no real file under `ontology_root` is modified.
     """
-    if candidate.kind == "entity_type":
-        return _materialize_entity_type(ontology_root, domain_profile, candidate)
-    if candidate.kind == "predicate":
-        return _materialize_predicate(ontology_root, candidate)
-    raise ValidationError(
-        f"ontology discovery kind {candidate.kind!r} does not release automatically"
+    if candidate.kind not in _MATERIALIZED_KINDS:
+        raise ValidationError(
+            f"ontology discovery kind {candidate.kind!r} does not release automatically"
+        )
+    with _release_lock(ontology_root):
+        # Heal a journal left behind by a crashed release before attempting
+        # a new one, so a half-applied two-file predicate release from an
+        # earlier process never masks or gets clobbered by this one.
+        complete_pending_release(ontology_root)
+        if candidate.kind == "entity_type":
+            return _materialize_entity_type(ontology_root, domain_profile, candidate)
+        return _materialize_predicate(ontology_root, domain_profile, candidate)
+
+
+@contextlib.contextmanager
+def _release_lock(
+    ontology_root: Path, *, timeout: float = _LOCK_TIMEOUT_SECONDS
+) -> Iterator[None]:
+    """Serialize ontology release materialization for one ontology root.
+
+    Single-host deployment: an `fcntl.flock` advisory lock on a sentinel
+    file is sufficient (see module docstring) to prevent the
+    read-modify-write race between two near-simultaneous approvals. Blocks
+    up to `timeout` seconds, then fails closed with a `ValidationError`
+    instead of hanging forever.
+    """
+    lock_path = ontology_root / RELEASE_LOCK_FILENAME
+    try:
+        fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o644)
+    except OSError as exc:
+        raise ValidationError(
+            "ontology root is not writable; run the release from a writable "
+            "checkout or mount ontology/ writable"
+        ) from exc
+    try:
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise ValidationError(
+                        "timed out waiting for the ontology release lock; "
+                        "another release is in progress"
+                    ) from None
+                time.sleep(_LOCK_POLL_INTERVAL_SECONDS)
+        yield
+    finally:
+        with contextlib.suppress(OSError):
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
+def has_pending_release(ontology_root: Path) -> bool:
+    """Whether a crashed release left a journal behind, without reading it."""
+    return (ontology_root / RELEASE_JOURNAL_FILENAME).is_file()
+
+
+def complete_pending_release(ontology_root: Path) -> bool:
+    """Re-apply a journaled release left behind by a crashed materialization.
+
+    Idempotent: safe to call whether or not any real file already reflects
+    the journaled content (each file is re-written with `os.replace`
+    regardless). Returns `True` if a journal was found and healed, `False`
+    if there was nothing to do (the common case: near-zero overhead, a
+    single `Path.is_file` check).
+    """
+    journal_path = ontology_root / RELEASE_JOURNAL_FILENAME
+    if not journal_path.is_file():
+        return False
+    try:
+        payload = json.loads(journal_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValidationError(
+            f"ontology release journal at {journal_path} is corrupt: {exc}"
+        ) from exc
+    files = payload.get("files") if isinstance(payload, dict) else None
+    if not isinstance(files, dict):
+        raise ValidationError(f"ontology release journal at {journal_path} is malformed")
+    root_resolved = ontology_root.resolve()
+    for relative, new_text in files.items():
+        if not isinstance(relative, str) or not isinstance(new_text, str):
+            raise ValidationError(f"ontology release journal at {journal_path} is malformed")
+        real_path = (ontology_root / relative).resolve()
+        if not real_path.is_relative_to(root_resolved):
+            raise ValidationError(f"ontology release journal at {journal_path} is malformed")
+        _atomic_write(real_path, new_text)
+    journal_path.unlink()
+    return True
+
+
+def complete_pending_release_locked(ontology_root: Path) -> bool:
+    """Like `complete_pending_release`, but acquires the release lock first.
+
+    For callers outside `materialize_ontology_release`'s own lock scope
+    (currently only `kip.container.build_container` at process start-up).
+    """
+    with _release_lock(ontology_root):
+        return complete_pending_release(ontology_root)
+
+
+def _write_release_journal(
+    ontology_root: Path,
+    edits: dict[Path, str],
+    release_info: dict[str, str],
+) -> None:
+    journal_path = ontology_root / RELEASE_JOURNAL_FILENAME
+    payload = {
+        "release": release_info,
+        "files": {
+            str(real_path.relative_to(ontology_root)): new_text
+            for real_path, new_text in edits.items()
+        },
+    }
+    fd, tmp_name = tempfile.mkstemp(
+        dir=str(ontology_root), prefix=f".{RELEASE_JOURNAL_FILENAME}.", suffix=".tmp"
     )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_name, journal_path)
+    except BaseException:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(tmp_name)
+        raise
+    dir_fd = os.open(str(ontology_root), os.O_RDONLY)
+    try:
+        os.fsync(dir_fd)
+    finally:
+        os.close(dir_fd)
+
+
+def _clear_release_journal(ontology_root: Path) -> None:
+    with contextlib.suppress(FileNotFoundError):
+        (ontology_root / RELEASE_JOURNAL_FILENAME).unlink()
 
 
 def _materialize_entity_type(
@@ -97,8 +266,6 @@ def _materialize_entity_type(
         existing_entity_types = {}
     current_version = str(payload.get("version", "1.0.0"))
     relative_path = str(domain_path.relative_to(ontology_root))
-    if candidate.symbol in existing_entity_types:
-        return _release("entity_type", candidate.symbol, relative_path, current_version)
 
     core_path = ontology_root / "core" / "entity-types.yaml"
     core_payload = yaml.safe_load(core_path.read_text(encoding="utf-8")) or {}
@@ -114,17 +281,35 @@ def _materialize_entity_type(
         hint = candidate.target_symbol
         parent = hint if hint is not None and hint in known_entity_types else None
 
+    if candidate.symbol in existing_entity_types:
+        # A retry of the *same* candidate must stay idempotent, but
+        # approving a *different* candidate that reuses an already-released
+        # symbol must not silently no-op without writing its content.
+        _check_idempotent_or_conflict(
+            "entity type",
+            candidate.symbol,
+            existing_entity_types[candidate.symbol],
+            _entity_type_fields(parent, candidate.label, candidate.definition),
+        )
+        return _release("entity_type", candidate.symbol, relative_path, current_version)
+
     block = _entity_type_block(candidate.symbol, parent, candidate.label, candidate.definition)
     new_version = _bump_minor(current_version)
     new_text = _set_version_line(text, new_version)
     new_text = _insert_top_level_block(new_text, "entity_types", block)
 
-    _apply_via_shadow(ontology_root, domain_profile, {domain_path: new_text})
+    _apply_via_shadow(
+        ontology_root,
+        domain_profile,
+        {domain_path: new_text},
+        release_info={"kind": "entity_type", "symbol": candidate.symbol, "version": new_version},
+    )
     return _release("entity_type", candidate.symbol, relative_path, new_version)
 
 
 def _materialize_predicate(
     ontology_root: Path,
+    domain_profile: str,
     candidate: OntologyDiscoveryCandidate,
 ) -> OntologyDiscoveryRelease:
     predicates_path = ontology_root / "core" / "predicates.yaml"
@@ -136,8 +321,6 @@ def _materialize_predicate(
         existing_predicates = {}
     current_version = str(payload.get("version", "1.0.0"))
     relative_path = str(predicates_path.relative_to(ontology_root))
-    if candidate.symbol in existing_predicates:
-        return _release("predicate", candidate.symbol, relative_path, current_version)
 
     domain = candidate.domain or [_DEFAULT_PREDICATE_ROOT]
     range_ = candidate.range or [_DEFAULT_PREDICATE_ROOT]
@@ -145,6 +328,24 @@ def _materialize_predicate(
     risk = candidate.risk or _DEFAULT_PREDICATE_RISK
     review = candidate.review or _DEFAULT_PREDICATE_REVIEW
     extraction = candidate.extraction or _DEFAULT_PREDICATE_EXTRACTION
+
+    if candidate.symbol in existing_predicates:
+        _check_idempotent_or_conflict(
+            "predicate",
+            candidate.symbol,
+            existing_predicates[candidate.symbol],
+            _predicate_fields(
+                label=candidate.label,
+                definition=candidate.definition,
+                domain=domain,
+                range_=range_,
+                inverse=inverse,
+                risk=risk,
+                review=review,
+                extraction=extraction,
+            ),
+        )
+        return _release("predicate", candidate.symbol, relative_path, current_version)
 
     block = _predicate_block(
         candidate.symbol,
@@ -173,9 +374,33 @@ def _materialize_predicate(
             item=candidate.symbol,
         )
 
-    domain_profile_for_shadow = _any_domain_profile(ontology_root)
-    _apply_via_shadow(ontology_root, domain_profile_for_shadow, edits)
+    domain_profile_for_shadow = _resolve_predicate_shadow_profile(ontology_root, domain_profile)
+    _apply_via_shadow(
+        ontology_root,
+        domain_profile_for_shadow,
+        edits,
+        release_info={"kind": "predicate", "symbol": candidate.symbol, "version": new_version},
+    )
     return _release("predicate", candidate.symbol, relative_path, new_version)
+
+
+def _resolve_predicate_shadow_profile(ontology_root: Path, domain_profile: str) -> str:
+    """Prefer the caller's real domain profile for predicate shadow validation.
+
+    Predicate releases do not touch a domain profile file, but
+    `validate_ontology` needs one to validate the tree as a whole. Using the
+    real `domain_profile` a predicate's domain/range can cite domain-profile
+    entity types (e.g. `ResearchProject`) and still validate; falling back to
+    an arbitrary profile (alphabetically first, which may be an empty
+    placeholder) would make such a predicate impossible to approve. Only
+    fall back to `_any_domain_profile` when the passed profile does not name
+    a file that actually exists on disk.
+    """
+    try:
+        domain_profile_path(ontology_root, domain_profile)
+    except ValidationError:
+        return _any_domain_profile(ontology_root)
+    return domain_profile
 
 
 def _release(kind: DiscoveryKind, symbol: str, file: str, version: str) -> OntologyDiscoveryRelease:
@@ -221,6 +446,8 @@ def _apply_via_shadow(
     ontology_root: Path,
     domain_profile: str,
     edits: dict[Path, str],
+    *,
+    release_info: dict[str, str],
 ) -> None:
     for real_path, new_text in edits.items():
         try:
@@ -240,8 +467,16 @@ def _apply_via_shadow(
             raise ValidationError(
                 "ontology release failed shadow validation: " + "; ".join(errors)
             )
+    # A multi-file release (predicate + review-policy sync) is not
+    # group-atomic across two `os.replace` calls: journal the full new
+    # contents first (fsynced) so a crash between the replaces can be healed
+    # by `complete_pending_release` instead of bricking every subsequent
+    # `OntologyCatalog.load` with a tree that violates the exact-match
+    # invariant `validate_ontology` enforces.
+    _write_release_journal(ontology_root, edits, release_info)
     for real_path, new_text in edits.items():
         _atomic_write(real_path, new_text)
+    _clear_release_journal(ontology_root)
 
 
 def _atomic_write(path: Path, text: str) -> None:
@@ -262,15 +497,21 @@ def _bump_minor(version: str) -> str:
     match = _VERSION_LINE_RE.fullmatch(f"version: {version}")
     if match is None:
         raise ValidationError(f"ontology file version is not semantic x.y.z: {version!r}")
-    major, minor, _patch = match.groups()
+    major, minor = match.group(1), match.group(2)
     return f"{major}.{int(minor) + 1}.0"
 
 
 def _set_version_line(text: str, new_version: str) -> str:
     lines = text.splitlines()
     for index, line in enumerate(lines):
-        if _VERSION_LINE_RE.fullmatch(line.rstrip("\n")):
-            lines[index] = f"version: {new_version}"
+        match = _VERSION_LINE_RE.fullmatch(line.rstrip("\n"))
+        if match is not None:
+            # Preserve a trailing `# comment` on the version line if there
+            # was one; dropping it would be acceptable too, but keeping it
+            # is cheap and avoids a spurious diff on every release.
+            comment = match.group("comment")
+            suffix = f"  {comment}" if comment else ""
+            lines[index] = f"version: {new_version}{suffix}"
             return _join(lines, text)
     raise ValidationError("ontology file is missing a version: line")
 
@@ -386,3 +627,66 @@ def _predicate_block(
         f"    extraction: {extraction}",
         f"    review: {review}",
     ]
+
+
+def _entity_type_fields(parent: str | None, label: str, definition: str) -> dict[str, object]:
+    """The semantic fields the materializer writes for an entity type symbol.
+
+    Mirrors `_entity_type_block`'s shape (a `parent` key present only when
+    a parent is set) so it can be compared field-by-field against the
+    already-parsed YAML mapping for an already-released symbol.
+    """
+    fields: dict[str, object] = {}
+    if parent is not None:
+        fields["parent"] = parent
+    fields["label_ko"] = label
+    fields["description_ko"] = definition
+    return fields
+
+
+def _predicate_fields(
+    *,
+    label: str,
+    definition: str,
+    domain: list[str],
+    range_: list[str],
+    inverse: str | None,
+    risk: str,
+    review: str,
+    extraction: str,
+) -> dict[str, object]:
+    """The semantic fields the materializer writes for a predicate symbol."""
+    return {
+        "description": definition,
+        "label_ko": label,
+        "domain": domain,
+        "range": range_,
+        "inverse": inverse,
+        "risk": risk,
+        "extraction": extraction,
+        "review": review,
+    }
+
+
+def _check_idempotent_or_conflict(
+    kind_label: str,
+    symbol: str,
+    existing: object,
+    would_be: dict[str, object],
+) -> None:
+    """Approving an already-released symbol is idempotent only on a match.
+
+    A retry of the *same* candidate must be a silent no-op (needed so an
+    approval that already landed can be safely retried). Approving a
+    *different* candidate that happens to reuse an already-released symbol
+    must not also silently no-op without writing its content: compare the
+    fields the materializer would write against what is already on disk
+    (nothing stricter than that) and raise `ConflictError` on any
+    divergence.
+    """
+    if not isinstance(existing, dict) or any(
+        existing.get(field) != value for field, value in would_be.items()
+    ):
+        raise ConflictError(
+            f"{kind_label} {symbol!r} already released with different content"
+        )

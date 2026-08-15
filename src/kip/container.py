@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import assert_never
 
@@ -53,6 +54,7 @@ from kip.domain.egress import (
 )
 from kip.errors import ConfigurationError
 from kip.ontology import OntologyCatalog
+from kip.ontology_discovery_release import complete_pending_release_locked, has_pending_release
 from kip.ports.embedding import EmbeddingPort
 from kip.ports.generation import GenerationPort
 from kip.ports.identity import IdentityResolverPort
@@ -249,6 +251,24 @@ def build_container(
     ontology_profile = str(
         selected.get("ontology.domain_profile", "research-project")
     )
+    if ontology_root.is_dir() and has_pending_release(ontology_root):
+        # Heal a release journal left behind by a process that crashed
+        # mid-materialization (see `kip.ontology_discovery_release`) before
+        # the eager load below, so a half-applied two-file predicate release
+        # never bricks every subsequent `OntologyCatalog.load`. When the
+        # root is read-only, a pending journal cannot be healed here (or by
+        # `materialize_ontology_release` next time either); fail loudly
+        # instead of silently loading a possibly-inconsistent tree. The
+        # common case (no journal) costs a single `Path.is_file` check and
+        # never touches or creates the release lock file.
+        if os.access(ontology_root, os.W_OK):
+            complete_pending_release_locked(ontology_root)
+        else:
+            raise ConfigurationError(
+                f"ontology root {ontology_root} is read-only and has a pending "
+                "release journal; run from a writable checkout to heal it "
+                "before loading"
+            )
     ontology = (
         OntologyCatalog.load(ontology_root, domain_profile=ontology_profile)
         if ontology_root.is_dir()

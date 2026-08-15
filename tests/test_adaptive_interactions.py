@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import shutil
+import stat
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -15,8 +17,15 @@ from kip.domain.interactions import (
     OntologyDiscoveryProposal,
     OntologyDiscoveryReview,
 )
-from kip.errors import AuthorizationError, ConflictError, NotFoundError, ValidationError
+from kip.errors import (
+    AuthorizationError,
+    ConfigurationError,
+    ConflictError,
+    NotFoundError,
+    ValidationError,
+)
 from kip.ontology import OntologyCatalog
+from kip.ontology_discovery_release import RELEASE_JOURNAL_FILENAME
 from kip.settings import Settings
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -375,3 +384,185 @@ def test_approval_that_fails_to_materialize_leaves_the_candidate_proposed(
         OntologyCatalog.load(
             project_root / "ontology", domain_profile="empty"
         ).validate_entity_type("contract")
+
+
+def test_re_proposing_the_same_entity_type_symbol_refreshes_content_while_proposed(
+    tmp_path: Path,
+) -> None:
+    project_root = _copied_project_root(tmp_path)
+    container = _container(tmp_path, project_root=project_root)
+    context = _context(container)
+
+    first = container.application.interactions.propose_ontology_discovery(
+        context,
+        OntologyDiscoveryProposal(
+            kind="entity_type",
+            symbol="contract",
+            label="계약 초안",
+            definition="아직 다듬어지지 않은 정의.",
+            confirmed=True,
+        ),
+        now=datetime(2026, 8, 10, tzinfo=UTC),
+    )
+    second = container.application.interactions.propose_ontology_discovery(
+        context,
+        OntologyDiscoveryProposal(
+            kind="entity_type",
+            symbol="contract",
+            label="계약",
+            definition="업무상 체결하는 계약을 표현한다.",
+            confirmed=True,
+        ),
+        now=datetime(2026, 8, 10, 0, 1, tzinfo=UTC),
+    )
+
+    # The fingerprint (domain_profile, principal_id, kind, symbol,
+    # target_symbol) intentionally excludes label/definition, so this must
+    # dedupe onto the same candidate...
+    assert second.id == first.id
+    assert second.occurrence_count == 2
+    # ...but the corrected content must win, not be silently dropped.
+    assert second.label == "계약"
+    assert second.definition == "업무상 체결하는 계약을 표현한다."
+
+    admin_context = _context(container, admin=True)
+    [listed] = container.application.interactions.list_ontology_discovery_candidates(
+        admin_context, status="proposed"
+    )
+    assert listed.label == "계약"
+    assert listed.definition == "업무상 체결하는 계약을 표현한다."
+
+
+def test_re_proposing_the_same_predicate_symbol_refreshes_the_release_spec_while_proposed(
+    tmp_path: Path,
+) -> None:
+    project_root = _copied_project_root(tmp_path)
+    container = _container(tmp_path, project_root=project_root)
+    context = _context(container)
+
+    container.application.interactions.propose_ontology_discovery(
+        context,
+        OntologyDiscoveryProposal(
+            kind="predicate",
+            symbol="funds",
+            label="지원 초안",
+            definition="초안 정의.",
+            confirmed=True,
+        ),
+        now=datetime(2026, 8, 10, tzinfo=UTC),
+    )
+    second = container.application.interactions.propose_ontology_discovery(
+        context,
+        OntologyDiscoveryProposal(
+            kind="predicate",
+            symbol="funds",
+            label="지원한다",
+            definition="한 조직이 다른 프로젝트를 지원한다.",
+            domain=["Organization"],
+            range=["Project"],
+            risk="low",
+            review="not_required",
+            extraction="deterministic_source_relation",
+            confirmed=True,
+        ),
+        now=datetime(2026, 8, 10, 0, 1, tzinfo=UTC),
+    )
+
+    assert second.occurrence_count == 2
+    assert second.label == "지원한다"
+    assert second.definition == "한 조직이 다른 프로젝트를 지원한다."
+    assert second.domain == ["Organization"]
+    assert second.range == ["Project"]
+    assert second.risk == "low"
+    assert second.review == "not_required"
+    assert second.extraction == "deterministic_source_relation"
+
+
+def test_re_proposing_a_symbol_after_review_never_mutates_the_reviewed_candidate(
+    tmp_path: Path,
+) -> None:
+    project_root = _copied_project_root(tmp_path)
+    container = _container(tmp_path, project_root=project_root)
+    context = _context(container)
+    admin_context = _context(container, admin=True)
+
+    proposed = container.application.interactions.propose_ontology_discovery(
+        context,
+        OntologyDiscoveryProposal(
+            kind="entity_type",
+            symbol="contract",
+            label="계약",
+            definition="업무상 체결하는 계약을 표현한다.",
+            confirmed=True,
+        ),
+        now=datetime(2026, 8, 10, tzinfo=UTC),
+    )
+    container.application.interactions.review_ontology_discovery_candidate(
+        admin_context,
+        proposed.id,
+        OntologyDiscoveryReview(action="accept"),
+        now=datetime(2026, 8, 10, 0, 1, tzinfo=UTC),
+    )
+
+    again = container.application.interactions.propose_ontology_discovery(
+        context,
+        OntologyDiscoveryProposal(
+            kind="entity_type",
+            symbol="contract",
+            label="다른 라벨",
+            definition="다른 정의.",
+            confirmed=True,
+        ),
+        now=datetime(2026, 8, 10, 0, 2, tzinfo=UTC),
+    )
+
+    assert again.id == proposed.id
+    assert again.status == "accepted_for_release"
+    # Nothing about an already-reviewed candidate is mutated by a later
+    # re-proposal, not even `occurrence_count`.
+    assert again.occurrence_count == 1
+    assert again.label == "계약"
+    assert again.definition == "업무상 체결하는 계약을 표현한다."
+
+
+def test_container_heals_a_pending_release_journal_before_the_eager_ontology_load(
+    tmp_path: Path,
+) -> None:
+    project_root = _copied_project_root(tmp_path)
+    ontology_root = project_root / "ontology"
+    predicates_path = ontology_root / "core" / "predicates.yaml"
+    healed_text = predicates_path.read_text(encoding="utf-8") + "\n# healed marker\n"
+    journal_path = ontology_root / RELEASE_JOURNAL_FILENAME
+    journal_path.write_text(
+        json.dumps(
+            {
+                "release": {"kind": "predicate", "symbol": "cites", "version": "1.1.0"},
+                "files": {"core/predicates.yaml": healed_text},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    _container(tmp_path, project_root=project_root)
+
+    assert predicates_path.read_text(encoding="utf-8") == healed_text
+    assert not journal_path.is_file()
+
+
+def test_container_fails_closed_on_a_read_only_ontology_root_with_a_pending_journal(
+    tmp_path: Path,
+) -> None:
+    project_root = _copied_project_root(tmp_path)
+    ontology_root = project_root / "ontology"
+    journal_path = ontology_root / RELEASE_JOURNAL_FILENAME
+    journal_path.write_text(
+        json.dumps({"release": {}, "files": {}}),
+        encoding="utf-8",
+    )
+    mode = ontology_root.stat().st_mode
+    ontology_root.chmod(mode & ~stat.S_IWUSR & ~stat.S_IWGRP & ~stat.S_IWOTH)
+    try:
+        with pytest.raises(ConfigurationError, match="pending release journal"):
+            _container(tmp_path, project_root=project_root)
+    finally:
+        ontology_root.chmod(mode)

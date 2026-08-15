@@ -63,9 +63,12 @@ def test_release_bundle_contains_verified_starter_artifacts(tmp_path: Path) -> N
         "starter/.mcp.json",
         "starter/.claude/skills/kip-setup/SKILL.md",
         "starter/migrations/0012_query_traces.sql",
+        "starter/migrations/0021_discovery_candidate_spec.sql",
         "starter/ontology/core/predicates.yaml",
         "starter/contracts/setup-plan.schema.json",
         "starter/contracts/evaluation-review-bundle.schema.json",
+        "starter/contracts/golden-draft.schema.json",
+        "starter/contracts/golden-draft-review.schema.json",
         "starter/skills/kip-setup/SKILL.md",
         "starter/docs/STARTER_KIT_GUIDE.md",
         "RELEASE-MANIFEST.json",
@@ -98,6 +101,54 @@ def test_release_bundle_contains_verified_starter_artifacts(tmp_path: Path) -> N
         check=False,
     )
     assert archived.returncode == 0, archived.stderr
+
+
+def test_release_bundle_excludes_private_onedrive_golden_corpus(tmp_path: Path) -> None:
+    bundle = _build_bundle(tmp_path)
+
+    excluded = [
+        "starter/evaluation/golden/private-onedrive-nl.yaml",
+        "starter/evaluation/golden/private-onedrive-nl.floor.json",
+    ]
+    for relative in excluded:
+        assert not (bundle / relative).exists(), relative
+
+    # private-starter.yaml is a deliberately redacted synthetic sample that
+    # docs/AI_OPERATOR_RUNBOOK.md and evaluation/README.md instruct operators
+    # to run as the starter-kit acceptance template, so it must still ship.
+    assert (bundle / "starter/evaluation/golden/private-starter.yaml").is_file()
+
+    verified = subprocess.run(
+        [str(ROOT / "scripts/verify-release.sh"), str(bundle)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert verified.returncode == 0, verified.stderr
+
+
+def test_release_verifier_rejects_bundle_containing_private_golden_corpus(
+    tmp_path: Path,
+) -> None:
+    bundle = _build_bundle(tmp_path)
+    golden = bundle / "starter/evaluation/golden"
+    golden.mkdir(parents=True, exist_ok=True)
+    (golden / "private-onedrive-nl.yaml").write_text(
+        "schema_version: kip.golden-dataset.v1\nname: private-onedrive-nl\ncases: []\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [str(ROOT / "scripts/verify-release.sh"), str(bundle)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "private golden corpus" in result.stderr.lower()
 
 
 def test_release_verifier_rejects_secrets_private_paths_and_state(
@@ -143,6 +194,14 @@ def test_production_compose_enforces_isolation_and_digest_images() -> None:
     assert services["api"]["healthcheck"]["test"][0] == "CMD"
     assert services["worker"]["volumes"][1]["read_only"] is True
     assert payload["networks"]["database"]["internal"] is True
+
+    for name in ("api", "worker"):
+        ontology_mounts = [
+            volume
+            for volume in services[name]["volumes"]
+            if volume.get("target") == "/app/ontology"
+        ]
+        assert ontology_mounts, f"{name} service is missing an /app/ontology bind mount"
 
 
 def test_runtime_image_is_locked_and_non_root() -> None:

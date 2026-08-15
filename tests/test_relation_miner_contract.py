@@ -54,7 +54,17 @@ class RecordingStructuredGenerator:
         )
 
 
-def _request(body: str = "A공문은 B결정을 기록한다.") -> RelationMiningRequest:
+def _request(
+    body: str = "A공문은 B결정을 기록한다.",
+    *,
+    max_entity_proposals: int | None = None,
+    max_relation_proposals: int | None = None,
+) -> RelationMiningRequest:
+    overrides: dict[str, int] = {}
+    if max_entity_proposals is not None:
+        overrides["max_entity_proposals"] = max_entity_proposals
+    if max_relation_proposals is not None:
+        overrides["max_relation_proposals"] = max_relation_proposals
     return RelationMiningRequest(
         evidence=(
             GenerationEvidence(id="unit_1", body=body, locator="page:1"),
@@ -72,6 +82,7 @@ def _request(body: str = "A공문은 B결정을 기록한다.") -> RelationMinin
             ),
         ),
         ontology_version="core/1.0.0",
+        **overrides,
     )
 
 
@@ -276,8 +287,10 @@ def test_relation_miner_still_fails_closed_on_batch_contract_breaches() -> None:
         {"entities": [], "relations": [dict(relation) for _ in range(65)]}
     )
 
+    # Pin the request's own cap rather than relying on the model default so
+    # this breach test stays valid regardless of where the default cap sits.
     with pytest.raises(ValidationError, match="relation proposal count"):
-        _miner(generator).mine(_request())
+        _miner(generator).mine(_request(max_relation_proposals=64))
 
 
 def test_prompt_injection_is_transmitted_only_as_evidence_data() -> None:

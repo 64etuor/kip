@@ -49,6 +49,12 @@ shadow-validated, idempotent, and atomic. Absent predicate spec fields
 default fail-safe (`domain`/`range` `["EvidenceObject"]`, `risk: high`,
 `review: required`, `extraction: semantic`), so assertions using an
 auto-released predicate still require exact evidence and human review.
+Materialization is serialized per ontology root by a file lock
+(`.release.lock`), and a two-file predicate release is journaled
+(`.pending-release.json`) so a crash between the two writes heals
+automatically on the next materialization or process start instead of
+leaving an unloadable tree. Approving a different candidate that reuses an
+already-released symbol with different content is refused as a conflict.
 Long-running API/worker/MCP processes pick the release up on restart
 (`catalog_refresh: "restart_required"` in the review response); every fresh
 CLI invocation sees it immediately. Compose deployments bind-mount the

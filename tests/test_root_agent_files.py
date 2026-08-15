@@ -10,10 +10,36 @@ def test_root_agent_files_present_and_imported():
     assert (ROOT / "docs/PRODUCTION_DESIGN_ALIGNMENT.md").is_file()
 
 
-def test_project_skill_mirrors_portable_skill():
-    portable = ROOT / "skills/knowledge-fabric/SKILL.md"
-    claude = ROOT / ".claude/skills/knowledge-fabric/SKILL.md"
-    assert portable.read_bytes() == claude.read_bytes()
+_SKIP_NAMES = {".DS_Store"}
+
+
+def _is_dotfile_noise(path: Path) -> bool:
+    return path.name in _SKIP_NAMES or path.name.startswith(".")
+
+
+def test_all_skill_files_mirrored_byte_for_byte_into_claude_skills():
+    portable_root = ROOT / "skills"
+    claude_root = ROOT / ".claude/skills"
+
+    portable_files = {
+        path.relative_to(portable_root)
+        for path in portable_root.rglob("*")
+        if path.is_file() and not _is_dotfile_noise(path)
+    }
+    claude_files = {
+        path.relative_to(claude_root)
+        for path in claude_root.rglob("*")
+        if path.is_file() and not _is_dotfile_noise(path)
+    }
+
+    assert claude_files == portable_files, (
+        f"missing mirror: {portable_files - claude_files}; "
+        f"extra content on .claude side: {claude_files - portable_files}"
+    )
+    for relative in sorted(portable_files):
+        portable_bytes = (portable_root / relative).read_bytes()
+        claude_bytes = (claude_root / relative).read_bytes()
+        assert portable_bytes == claude_bytes, f"mirror drift: {relative}"
 
 
 def test_bootstrap_installs_agent_identity_and_observability_runtime() -> None:

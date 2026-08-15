@@ -115,7 +115,10 @@ make verify-release BUNDLE="dist/kip-$(tr -d '[:space:]' < VERSION).tar.gz"
 
 The verifier checks the manifest, checksums, wheel, SPDX SBOM, SLSA provenance
 statement, image lock, required starter files, private-path patterns, and
-forbidden secret/data artifacts. A branch or pull-request workflow produces a
+forbidden secret/data artifacts. The private reviewed golden corpus
+(`evaluation/golden/private-onedrive-nl.yaml` and its floor file) is excluded
+from the starter copy and its presence in a bundle fails verification; the
+redacted `private-starter.yaml` sample ships intentionally. A branch or pull-request workflow produces a
 candidate only. A `v$(cat VERSION)` tag whose value exactly matches `VERSION`
 is the sole GitHub workflow that pushes the immutable GHCR image and creates
 GitHub provenance and wheel-SBOM attestations. Verify published subjects with
@@ -193,6 +196,13 @@ The installer manages four user launch agents: the host worker
 `RunAtLoad` disabled), and — only with `--with-ops-report` — the periodic
 `ops-report.sh` run (`com.kip.ops-report`, `--ops-interval`, default 1800s).
 
+The installer resolves the configuration once at install time — an explicit
+`KIP_CONFIG`, else `config/kip.host.generated.toml` when guided setup
+produced one, else `config/kip.toml` — prints the choice, and bakes it into
+every plist's `EnvironmentVariables`, so launchd jobs run the same
+consented configuration as the interactive surfaces. Re-run the installer
+after re-running guided setup to pick up a new generated config.
+
 Before installing the host worker the installer refuses if a Docker Compose
 worker service is already running, because two workers would double-process
 the same queue; pass `--allow-compose-worker` only when that is intended.
@@ -257,6 +267,14 @@ Rebuild lexical, vector, and graph projections independently. Never delete appro
 Enable `[models.relation_mining]` only after the generation destination and
 egress policy pass the target corpus review. Mining is never triggered by
 search or answer requests.
+
+When raising the mining batch caps (`max_units`, `max_characters`, and the
+proposal limits), review the generation client knobs alongside them: a
+larger batch sends a proportionally larger request and can need more than
+the default `models.generation.timeout_seconds = 60` to complete, and a
+provider returning more proposals can approach
+`max_response_bytes` (default 1 MiB). Both are configuration keys; raise
+them together with the batch caps rather than after the first timeout.
 
 ```bash
 ./scripts/kip ontology entities

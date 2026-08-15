@@ -101,6 +101,19 @@ EVALUATION_PATHS = (
     "reviews",
     "schemas",
 )
+# Policy: exclude by CONTENT, not filename prefix. `private-onedrive-nl.yaml`
+# and its `.floor.json` companion hold the real private OneDrive corpus
+# (verbatim internal question text, real document IDs, a reviewer name) and
+# must never leave this repository (docs/STARTER_KIT_GUIDE.md#8). By
+# contrast `private-starter.yaml` is a deliberately redacted synthetic
+# sample -- its own description says so, and `evaluation/README.md` and
+# `docs/AI_OPERATOR_RUNBOOK.md` both instruct operators to run it as the
+# starter-kit acceptance template -- so it is intentionally NOT excluded and
+# ships with the starter bundle.
+STARTER_EXCLUDED_PATHS = (
+    "evaluation/golden/private-onedrive-nl.yaml",
+    "evaluation/golden/private-onedrive-nl.floor.json",
+)
 CONFIG_FILES = ("kip.container.toml", "kip.example.toml", "logging.yaml")
 COPY_IGNORED_NAMES = frozenset(
     {
@@ -121,9 +134,12 @@ REQUIRED_BUNDLE_FILES = (
     "starter/CLAUDE.md",
     "starter/compose.production.yaml",
     "starter/contracts/evaluation-review-bundle.schema.json",
+    "starter/contracts/golden-draft-review.schema.json",
+    "starter/contracts/golden-draft.schema.json",
     "starter/contracts/setup-plan.schema.json",
     "starter/docs/STARTER_KIT_GUIDE.md",
     "starter/migrations/0012_query_traces.sql",
+    "starter/migrations/0021_discovery_candidate_spec.sql",
     "starter/ontology/core/predicates.yaml",
     "starter/skills/kip-setup/SKILL.md",
 )
@@ -197,6 +213,10 @@ def _copy_starter(root: Path, destination: Path) -> None:
             _copy_tree(source, target)
         elif source.is_file():
             shutil.copy2(source, target)
+    for excluded in STARTER_EXCLUDED_PATHS:
+        excluded_path = destination / excluded
+        if excluded_path.is_symlink() or excluded_path.is_file():
+            excluded_path.unlink()
 
 
 def _git_value(root: Path, *arguments: str) -> str:
@@ -451,6 +471,12 @@ def verify_bundle(bundle: Path) -> dict[str, Any]:
     wheels = sorted((bundle / "artifacts/wheels").glob("*.whl"))
     if len(wheels) != 1:
         raise ReleaseError("release bundle must contain exactly one wheel")
+    for excluded in STARTER_EXCLUDED_PATHS:
+        excluded_relative = f"starter/{excluded}"
+        if excluded_relative in actual_files:
+            raise ReleaseError(
+                f"forbidden private golden corpus in release bundle: {excluded_relative}"
+            )
     for relative, path in actual_files.items():
         if _path_is_forbidden(PurePosixPath(relative)):
             raise ReleaseError(f"forbidden release path: {relative}")

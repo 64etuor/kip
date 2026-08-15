@@ -299,6 +299,16 @@ class PostgresInteractionStore:
         with self._database._connection(context) as connection:
             self._database._ensure_workspace_and_principal(connection, context)
             with connection.cursor() as cursor:
+                # A re-proposal of the same (fingerprinted) symbol with
+                # corrected label/definition/spec must not be silently
+                # dropped: the fingerprint intentionally excludes these
+                # fields (stable dedup identity), so the conflict path
+                # refreshes them here from the incoming row (`EXCLUDED`).
+                # The `WHERE status='proposed'` clause makes this refresh
+                # conditional at the row level: if the existing row has
+                # already been reviewed, the `DO UPDATE` predicate is false,
+                # no column is touched, and the `RETURNING` clause below
+                # yields no row, falling through to the plain `SELECT`.
                 cursor.execute(
                     """
                     INSERT INTO knowledge.ontology_discovery_candidates(
@@ -308,7 +318,11 @@ class PostgresInteractionStore:
                     ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,%s)
                     ON CONFLICT (workspace_id, fingerprint) DO UPDATE
                     SET occurrence_count=knowledge.ontology_discovery_candidates.occurrence_count + 1,
-                        updated_at=EXCLUDED.updated_at
+                        updated_at=EXCLUDED.updated_at,
+                        label=EXCLUDED.label,
+                        definition=EXCLUDED.definition,
+                        target_symbol=EXCLUDED.target_symbol,
+                        proposal_spec=EXCLUDED.proposal_spec
                     WHERE knowledge.ontology_discovery_candidates.status='proposed'
                     RETURNING id, domain_profile, kind, symbol, label, definition,
                               target_symbol, proposal_spec, fingerprint, status,

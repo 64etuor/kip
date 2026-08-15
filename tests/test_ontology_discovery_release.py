@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
 import shutil
 import stat
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -13,9 +16,14 @@ from kip.domain.interactions import (
     ReviewPolicy,
     RiskLevel,
 )
-from kip.errors import ValidationError
+from kip.errors import ConflictError, ValidationError
 from kip.ontology import OntologyCatalog
-from kip.ontology_discovery_release import materialize_ontology_release
+from kip.ontology_discovery_release import (
+    RELEASE_JOURNAL_FILENAME,
+    complete_pending_release,
+    has_pending_release,
+    materialize_ontology_release,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -286,3 +294,232 @@ def test_unreleasable_kind_raises_without_touching_files(tmp_path: Path) -> None
 
     with pytest.raises(ValidationError, match="does not release automatically"):
         materialize_ontology_release(ontology_root, "research-project", candidate)
+
+
+def test_predicate_domain_thread_through_validates_against_the_real_domain_profile(
+    tmp_path: Path,
+) -> None:
+    # `ResearchProject` is only declared in the `research-project` domain
+    # profile, not in `core/entity-types.yaml`. Before threading the real
+    # `domain_profile` through, `_materialize_predicate` shadow-validated
+    # against whatever domain profile sorts first alphabetically on disk
+    # (`empty.yaml`, which declares no entity types), so a predicate citing
+    # a domain-profile-only type could never be approved even when the
+    # caller's real profile is `research-project`.
+    ontology_root = _ontology_root(tmp_path)
+    candidate = _candidate(
+        kind="predicate",
+        symbol="funds",
+        label="지원한다",
+        definition="한 조직이 연구과제를 지원한다.",
+        domain=["Organization"],
+        range=["ResearchProject"],
+    )
+
+    release = materialize_ontology_release(ontology_root, "research-project", candidate)
+
+    assert release.symbol == "funds"
+    catalog = OntologyCatalog.load(ontology_root, domain_profile="research-project")
+    assert catalog.predicate_specs["funds"].range == ("ResearchProject",)
+
+
+def test_predicate_materialization_against_the_empty_profile_still_validates(
+    tmp_path: Path,
+) -> None:
+    # Deployments using the empty domain profile must keep working exactly
+    # as before: a predicate whose domain/range only cite core entity types
+    # still validates when `domain_profile="empty"` is the real profile.
+    ontology_root = _ontology_root(tmp_path)
+    candidate = _candidate(
+        kind="predicate",
+        symbol="cites",
+        domain_profile="empty",
+        label="인용",
+        definition="한 문서가 다른 문서를 인용한다.",
+    )
+
+    release = materialize_ontology_release(ontology_root, "empty", candidate)
+
+    assert release.symbol == "cites"
+    catalog = OntologyCatalog.load(ontology_root, domain_profile="empty")
+    assert "cites" in catalog.evidence_required_predicates()
+
+
+def test_approving_a_different_entity_type_candidate_with_the_same_symbol_conflicts(
+    tmp_path: Path,
+) -> None:
+    ontology_root = _ontology_root(tmp_path)
+    first = _candidate(
+        kind="entity_type",
+        symbol="side_letter",
+        label="부속서",
+        definition="원 계약을 보완하는 부속 문서.",
+    )
+    materialize_ontology_release(ontology_root, "research-project", first)
+    domain_path = ontology_root / "domains" / "research-project.yaml"
+    after_first = domain_path.read_text(encoding="utf-8")
+
+    divergent = _candidate(
+        kind="entity_type",
+        symbol="side_letter",
+        label="다른 라벨",
+        definition="완전히 다른 정의.",
+    )
+
+    with pytest.raises(ConflictError, match="already released with different content"):
+        materialize_ontology_release(ontology_root, "research-project", divergent)
+
+    # The conflicting approval must not have written anything.
+    assert domain_path.read_text(encoding="utf-8") == after_first
+
+
+def test_approving_a_different_predicate_candidate_with_the_same_symbol_conflicts(
+    tmp_path: Path,
+) -> None:
+    ontology_root = _ontology_root(tmp_path)
+    first = _candidate(
+        kind="predicate",
+        symbol="clarifies",
+        label="명확화",
+        definition="한 문서가 다른 문서를 명확히 한다.",
+    )
+    materialize_ontology_release(ontology_root, "research-project", first)
+    predicates_path = ontology_root / "core" / "predicates.yaml"
+    after_first = predicates_path.read_text(encoding="utf-8")
+
+    divergent = _candidate(
+        kind="predicate",
+        symbol="clarifies",
+        label="명확화",
+        definition="한 문서가 다른 문서를 명확히 한다.",
+        domain=["Communication"],
+        risk="low",
+        review="not_required",
+    )
+
+    with pytest.raises(ConflictError, match="already released with different content"):
+        materialize_ontology_release(ontology_root, "research-project", divergent)
+
+    assert predicates_path.read_text(encoding="utf-8") == after_first
+
+
+def test_set_version_line_tolerates_and_preserves_a_trailing_comment(
+    tmp_path: Path,
+) -> None:
+    ontology_root = _ontology_root(tmp_path)
+    domain_path = ontology_root / "domains" / "research-project.yaml"
+    commented = domain_path.read_text(encoding="utf-8").replace(
+        "version: 1.0.0", "version: 1.0.0  # pinned by release process"
+    )
+    domain_path.write_text(commented, encoding="utf-8")
+    candidate = _candidate(
+        kind="entity_type",
+        symbol="side_letter",
+        label="부속서",
+        definition="d",
+    )
+
+    release = materialize_ontology_release(ontology_root, "research-project", candidate)
+
+    assert release.version == "1.1.0"
+    after = domain_path.read_text(encoding="utf-8")
+    assert "version: 1.1.0  # pinned by release process" in after
+
+
+def test_complete_pending_release_heals_a_crashed_two_file_release(
+    tmp_path: Path,
+) -> None:
+    ontology_root = _ontology_root(tmp_path)
+    predicates_path = ontology_root / "core" / "predicates.yaml"
+    review_policy_path = ontology_root / "policies" / "review-policy.yaml"
+    healed_predicates_text = predicates_path.read_text(encoding="utf-8") + "\n# healed marker\n"
+    healed_review_text = review_policy_path.read_text(encoding="utf-8") + "\n# healed marker\n"
+    journal_path = ontology_root / RELEASE_JOURNAL_FILENAME
+    journal_path.write_text(
+        json.dumps(
+            {
+                "release": {"kind": "predicate", "symbol": "cites", "version": "1.1.0"},
+                "files": {
+                    "core/predicates.yaml": healed_predicates_text,
+                    "policies/review-policy.yaml": healed_review_text,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert has_pending_release(ontology_root) is True
+
+    healed = complete_pending_release(ontology_root)
+
+    assert healed is True
+    assert predicates_path.read_text(encoding="utf-8") == healed_predicates_text
+    assert review_policy_path.read_text(encoding="utf-8") == healed_review_text
+    assert not journal_path.is_file()
+    assert has_pending_release(ontology_root) is False
+    # Idempotent: a second call with no journal present is a clean no-op.
+    assert complete_pending_release(ontology_root) is False
+
+
+def test_complete_pending_release_rejects_a_malformed_journal(tmp_path: Path) -> None:
+    ontology_root = _ontology_root(tmp_path)
+    journal_path = ontology_root / RELEASE_JOURNAL_FILENAME
+    journal_path.write_text("not json", encoding="utf-8")
+
+    with pytest.raises(ValidationError, match="corrupt"):
+        complete_pending_release(ontology_root)
+
+
+def test_concurrent_materialization_is_serialized_by_the_release_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Two near-simultaneous approvals for *different* symbols targeting the
+    # same domain profile file used to race on read-modify-write: the last
+    # `os.replace` would win and silently drop the other release, with the
+    # version bumped only once. Widen the race window artificially (a small
+    # sleep right before the real file write) so the test would reliably
+    # fail without the release lock, then assert both symbols land and the
+    # version is bumped exactly twice.
+    ontology_root = _ontology_root(tmp_path)
+    from kip import ontology_discovery_release
+
+    original_atomic_write = ontology_discovery_release._atomic_write
+
+    def slow_atomic_write(path: Path, text: str) -> None:
+        time.sleep(0.05)
+        original_atomic_write(path, text)
+
+    monkeypatch.setattr(ontology_discovery_release, "_atomic_write", slow_atomic_write)
+
+    candidate_a = _candidate(
+        kind="entity_type", symbol="contract_a", label="계약 A", definition="첫 번째 계약."
+    )
+    candidate_b = _candidate(
+        kind="entity_type", symbol="contract_b", label="계약 B", definition="두 번째 계약."
+    )
+    results: dict[str, object] = {}
+    errors: list[BaseException] = []
+
+    def run(name: str, candidate: OntologyDiscoveryCandidate) -> None:
+        try:
+            results[name] = materialize_ontology_release(
+                ontology_root, "research-project", candidate
+            )
+        except BaseException as exc:
+            errors.append(exc)
+
+    thread_a = threading.Thread(target=run, args=("a", candidate_a))
+    thread_b = threading.Thread(target=run, args=("b", candidate_b))
+    thread_a.start()
+    thread_b.start()
+    thread_a.join(timeout=10)
+    thread_b.join(timeout=10)
+
+    assert not errors, errors
+    domain_path = ontology_root / "domains" / "research-project.yaml"
+    payload = yaml.safe_load(domain_path.read_text(encoding="utf-8"))
+    assert "contract_a" in payload["entity_types"]
+    assert "contract_b" in payload["entity_types"]
+    # Both releases landed and each bumped the minor version once.
+    assert payload["version"] == "1.2.0"
+    assert not (ontology_root / RELEASE_JOURNAL_FILENAME).is_file()

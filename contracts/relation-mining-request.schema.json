@@ -107,14 +107,14 @@
       "type": "array"
     },
     "max_entity_proposals": {
-      "default": 32,
+      "default": 128,
       "maximum": 256,
       "minimum": 0,
       "title": "Max Entity Proposals",
       "type": "integer"
     },
     "max_relation_proposals": {
-      "default": 64,
+      "default": 256,
       "maximum": 512,
       "minimum": 0,
       "title": "Max Relation Proposals",

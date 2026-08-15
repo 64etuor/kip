@@ -25,6 +25,7 @@ max_file_bytes = 524288000
 [search]
 semantic_enabled = false
 context_max_chars = 120000
+context_item_max_chars = 16000
 korean_ngram_min = 2
 korean_ngram_max = 4
 lexical_rerank_enabled = true
@@ -32,7 +33,7 @@ lexical_rerank_candidate_limit = 40
 
 [models.reranker]
 enabled = true
-backend = "rapidfuzz"
+backend = "bm25"  # promoted 2026-08-11 on the reviewed NL set (ADR-034); rapidfuzz remains the fallback backend
 max_document_chars = 8000
 baseline_weight = 0.15
 

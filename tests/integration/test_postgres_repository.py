@@ -273,6 +273,123 @@ def test_postgres_discovery_candidate_persists_predicate_spec_across_round_trip(
             cursor.execute("DELETE FROM kip.workspaces WHERE slug=%s", (workspace,))
 
 
+def test_postgres_re_proposing_a_symbol_refreshes_content_only_while_proposed(
+    tmp_path: Path,
+) -> None:
+    # The `ON CONFLICT (workspace_id, fingerprint) DO UPDATE ... WHERE
+    # status='proposed'` clause in `PostgresInteractionStore
+    # .save_ontology_discovery_candidate` must refresh label/definition/spec
+    # from a corrected re-proposal while the candidate is still "proposed",
+    # and must never mutate it (not even `occurrence_count`) once reviewed.
+    pytest.importorskip("psycopg")
+    workspace = "test_" + uuid.uuid4().hex[:12]
+    real_root = Path(__file__).resolve().parents[2]
+    project_root = tmp_path / "repo"
+    shutil.copytree(real_root / "ontology", project_root / "ontology")
+    shutil.copytree(real_root / "migrations", project_root / "migrations")
+    settings = Settings(
+        project_root=project_root,
+        config_path=tmp_path / "kip.toml",
+        raw={
+            "search": {"semantic_enabled": False},
+            "graph": {"backend": "memory"},
+            "sources": {"filesystem": []},
+            "interaction": {
+                "enabled": True,
+                "clarification_ttl_seconds": 3600,
+            },
+            "ontology": {
+                "domain_profile": "empty",
+                "adaptive_discovery": True,
+            },
+        },
+        environment="test",
+        workspace=workspace,
+        database_url=str(URL),
+        cas_path=tmp_path / "cas",
+    )
+    repository = PostgresRepository(str(URL))
+    container = build_container(settings, repository=repository)
+    repository.operations.migrate(settings.project_root / "migrations")
+    owner = container.application.operations.request_context(
+        workspace=workspace,
+        principal_id="principal_owner",
+        acl_scopes=[f"workspace:{workspace}"],
+    )
+    admin = owner.model_copy(update={"roles": ["admin"]})
+
+    try:
+        first = container.application.interactions.propose_ontology_discovery(
+            owner,
+            OntologyDiscoveryProposal(
+                kind="predicate",
+                symbol="funds_refresh_test",
+                label="지원 초안",
+                definition="초안 정의.",
+                confirmed=True,
+            ),
+        )
+        second = container.application.interactions.propose_ontology_discovery(
+            owner,
+            OntologyDiscoveryProposal(
+                kind="predicate",
+                symbol="funds_refresh_test",
+                label="지원한다",
+                definition="한 조직이 다른 프로젝트를 지원한다.",
+                domain=["Organization"],
+                range=["Project"],
+                risk="low",
+                review="not_required",
+                extraction="deterministic_source_relation",
+                confirmed=True,
+            ),
+        )
+
+        assert second.id == first.id
+        assert second.occurrence_count == 2
+        assert second.label == "지원한다"
+        assert second.definition == "한 조직이 다른 프로젝트를 지원한다."
+        assert second.domain == ["Organization"]
+        assert second.range == ["Project"]
+        assert second.risk == "low"
+        assert second.review == "not_required"
+        assert second.extraction == "deterministic_source_relation"
+
+        container.application.interactions.review_ontology_discovery_candidate(
+            admin,
+            first.id,
+            OntologyDiscoveryReview(action="accept"),
+        )
+
+        third = container.application.interactions.propose_ontology_discovery(
+            owner,
+            OntologyDiscoveryProposal(
+                kind="predicate",
+                symbol="funds_refresh_test",
+                label="다른 라벨",
+                definition="다른 정의.",
+                domain=["Person"],
+                confirmed=True,
+            ),
+        )
+
+        assert third.id == first.id
+        assert third.status == "accepted_for_release"
+        # Nothing about an already-reviewed candidate is mutated by a later
+        # re-proposal, not even `occurrence_count`.
+        assert third.occurrence_count == 2
+        assert third.label == "지원한다"
+        assert third.domain == ["Organization"]
+    finally:
+        import psycopg
+
+        with (
+            psycopg.connect(str(URL), autocommit=True) as connection,
+            connection.cursor() as cursor,
+        ):
+            cursor.execute("DELETE FROM kip.workspaces WHERE slug=%s", (workspace,))
+
+
 def test_postgres_discovery_candidate_preserves_an_invalid_parent_for_review_time_rejection(
     tmp_path: Path,
 ) -> None:

@@ -2,6 +2,41 @@
 
 ## Unreleased
 
+- Excluded the private reviewed golden corpus
+  (`evaluation/golden/private-onedrive-nl.yaml` + floor file) from the
+  starter release bundle; the release verifier now fails a bundle that
+  contains it, and the redacted `private-starter.yaml` sample remains
+  shipped intentionally.
+- Hardened ontology discovery auto-release: materialization is serialized
+  by a per-root file lock (concurrent approvals no longer lose a release),
+  a two-file predicate release is journaled and self-heals after a crash
+  instead of leaving an unloadable tree, predicate shadow validation now
+  uses the configured domain profile (domain-profile entity types are
+  approvable in `domain`/`range`), reusing an already-released symbol with
+  different content is refused as a conflict, and re-proposing a still
+  `proposed` candidate refreshes its label/definition/spec instead of
+  silently keeping the first version.
+- `kip doctor` now checks ontology-root writability when adaptive
+  discovery is enabled and reports a leftover pending-release journal;
+  `kip evaluate draft promote` reports `comments_discarded` when rewriting
+  an annotated dataset.
+- `scripts/install-launchd.sh` resolves and bakes `KIP_CONFIG` into every
+  plist (explicit env, else the guided-setup generated config, else
+  `config/kip.toml`), so launchd jobs no longer silently ignore guided
+  setup; `deploy/production.env.example` documents the required
+  `KIP_ONTOLOGY_PATH`; `.env.example` documents `KIP_ROLES`,
+  `KIP_PROJECT_ROOT`, and `KIP_DATABASE_POOL_MAX_SIZE`.
+- `scripts/verify.sh` runs pytest through `uv run` when available
+  (matching CI import semantics) and warns loudly when ruff/mypy are
+  missing instead of silently skipping them.
+- Aligned the container profile with ADR-034 and the example
+  configuration: `models.reranker.backend = "bm25"` and
+  `search.context_item_max_chars = 16000`; fixed the last stale mining-cap
+  literals (`OntologyRagUseCases` and `RelationMiningRequest` defaults now
+  match the raised configuration values) and added drift-protector tests
+  (skill-mirror walk, capacity-default parity across model/CLI/MCP/setup,
+  VERSION/pyproject, CI/production Postgres image digest, MCP tool list
+  documentation).
 - Added judge-proposed golden-dataset growth (ADR-045): an LLM judge
   authors `kip.golden-draft.v1` case proposals with per-case confidence
   and rationale; `kip evaluate draft validate/review/promote` runs the
@@ -22,6 +57,8 @@
   120k -> 480k chars / 32 -> 128 entity and 64 -> 256 relation proposals,
   ontology answer context 8 -> 16 entities and 50 -> 150 edges. All remain
   config keys with unchanged code-side hard bounds.
+
+## 3.3.0 - 2026-08-14
 
 - Made ontology discovery approval materialize an additive release
   automatically (ADR-044): accepting an entity-type or predicate candidate

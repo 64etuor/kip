@@ -169,8 +169,8 @@ class RelationMiningRequest(KnowledgeModel):
     evidence: tuple[GenerationEvidence, ...] = Field(min_length=1)
     existing_entities: tuple[KnowledgeEntity, ...]
     ontology_version: str = Field(min_length=1)
-    max_entity_proposals: int = Field(default=32, ge=0, le=256)
-    max_relation_proposals: int = Field(default=64, ge=0, le=512)
+    max_entity_proposals: int = Field(default=128, ge=0, le=256)
+    max_relation_proposals: int = Field(default=256, ge=0, le=512)
 
 
 class MinedProposalSkip(KnowledgeModel):

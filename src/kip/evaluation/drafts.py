@@ -305,8 +305,15 @@ def promote_draft(
     is_fresh_dataset = not dataset_path.exists()
     raw_dataset: dict[str, Any]
     existing_dataset_version: str | None
+    comments_discarded = False
     if not is_fresh_dataset:
-        raw_dataset = yaml.safe_load(dataset_path.read_text(encoding="utf-8")) or {}
+        existing_text = dataset_path.read_text(encoding="utf-8")
+        # Promotion rewrites the dataset through yaml.safe_dump, which cannot
+        # round-trip comments. Surface the loss instead of blocking on it.
+        comments_discarded = any(
+            line.lstrip().startswith("#") for line in existing_text.splitlines()
+        )
+        raw_dataset = yaml.safe_load(existing_text) or {}
         if not isinstance(raw_dataset, dict):
             raise ValidationError(f"target dataset '{dataset_path}' is not a valid golden dataset document")
         existing_dataset_version = raw_dataset.get("version") or "draft"
@@ -393,4 +400,5 @@ def promote_draft(
         "lifecycle": lifecycle,
         "dataset_version": resolved_dataset_version,
         "source_revision": resolved_source_revision,
+        "comments_discarded": comments_discarded,
     }

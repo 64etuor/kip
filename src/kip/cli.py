@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -47,6 +48,7 @@ from kip.evaluation.runner import (
 )
 from kip.ids import new_id
 from kip.ontology import OntologyCatalog, validate_ontology
+from kip.ontology_discovery_release import RELEASE_JOURNAL_FILENAME
 from kip.ontology_migration import (
     diff_ontologies,
     load_migration,
@@ -425,6 +427,50 @@ def doctor(ctx: typer.Context) -> None:
                     },
                 }
             )
+        ontology_root = settings.project_root / "ontology"
+        adaptive_discovery = bool(settings.get("ontology.adaptive_discovery", False))
+        ontology_root_writable = ontology_root.is_dir() and os.access(ontology_root, os.W_OK)
+        ontology_check_ok = (not adaptive_discovery) or ontology_root_writable
+        checks.append(
+            {
+                "name": "ontology_adaptive_discovery_writable",
+                "ok": ontology_check_ok,
+                # Only a real blocker once adaptive discovery is on: approval
+                # of a discovery candidate writes the release and fails
+                # closed if the root is missing or not writable.
+                "required": adaptive_discovery,
+                "details": {
+                    "path": str(ontology_root),
+                    "adaptive_discovery_enabled": adaptive_discovery,
+                    "reason": None
+                    if ontology_check_ok
+                    else (
+                        "ontology.adaptive_discovery is enabled but the ontology "
+                        "root is missing or not writable; discovery approval "
+                        "will fail closed"
+                    ),
+                },
+            }
+        )
+        pending_release_path = ontology_root / RELEASE_JOURNAL_FILENAME
+        pending_release_exists = pending_release_path.exists()
+        checks.append(
+            {
+                "name": "ontology_pending_release_journal",
+                "ok": not pending_release_exists,
+                "required": False,
+                "details": {
+                    "path": str(pending_release_path),
+                    "reason": None
+                    if not pending_release_exists
+                    else (
+                        "a pending ontology release journal was found; a prior "
+                        "release may have crashed mid-write and will be healed "
+                        "on the next container start-up or materialization"
+                    ),
+                },
+            }
+        )
         required_failures = [item["name"] for item in checks if item["required"] and not item["ok"]]
         return {
             "healthy": not required_failures,

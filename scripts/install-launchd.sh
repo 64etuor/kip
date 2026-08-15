@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Capture the caller's KIP_CONFIG before common.sh fills in a default, so the
+# resolution below can tell "explicitly set" apart from "unset".
+ORIGINAL_KIP_CONFIG="${KIP_CONFIG:-}"
 source "$SCRIPT_DIR/common.sh"
 
 usage() {
@@ -90,9 +93,24 @@ if (( dry_run )); then
 fi
 mkdir -p "$agent_dir" "$log_dir"
 
+# Resolve which config the launchd jobs will use: prefer an explicitly set
+# KIP_CONFIG, then the guided-setup output, then the default. launchd does
+# not inherit the shell environment, so without baking this in the jobs
+# silently fall back to config/kip.toml even when guided setup produced
+# config/kip.host.generated.toml.
+if [[ -n "$ORIGINAL_KIP_CONFIG" ]]; then
+  resolved_config="$ORIGINAL_KIP_CONFIG"
+elif [[ -f "$PROJECT_ROOT/config/kip.host.generated.toml" ]]; then
+  resolved_config="$PROJECT_ROOT/config/kip.host.generated.toml"
+else
+  resolved_config="$PROJECT_ROOT/config/kip.toml"
+fi
+printf 'Using KIP_CONFIG=%s for launchd jobs.\n' "$resolved_config"
+
 PROJECT_ROOT="$PROJECT_ROOT" INTERVAL="$interval" AGENT_DIR="$agent_dir" \
 LOG_DIR="$log_dir" RETAIN="$retain" BACKUP_HOUR="$backup_hour" \
-WITH_OPS_REPORT="$with_ops_report" OPS_INTERVAL="$ops_interval" python3 - <<'PY'
+WITH_OPS_REPORT="$with_ops_report" OPS_INTERVAL="$ops_interval" \
+RESOLVED_KIP_CONFIG="$resolved_config" python3 - <<'PY'
 import os
 import plistlib
 from pathlib import Path
@@ -104,12 +122,15 @@ interval = int(os.environ["INTERVAL"])
 retain = int(os.environ["RETAIN"])
 backup_hour = int(os.environ["BACKUP_HOUR"])
 ops_interval = int(os.environ["OPS_INTERVAL"])
+resolved_kip_config = os.environ["RESOLVED_KIP_CONFIG"]
+environment_variables = {"KIP_CONFIG": resolved_kip_config}
 
 items = {
     "com.kip.knowledge-fabric.worker": {
         "Label": "com.kip.knowledge-fabric.worker",
         "ProgramArguments": ["/bin/bash", str(root / "scripts/kip"), "worker", "run"],
         "WorkingDirectory": str(root),
+        "EnvironmentVariables": environment_variables,
         "RunAtLoad": True,
         "KeepAlive": True,
         "ThrottleInterval": 10,
@@ -120,6 +141,7 @@ items = {
         "Label": "com.kip.knowledge-fabric.sync",
         "ProgramArguments": ["/bin/bash", str(root / "scripts/kip"), "sync", "all", "--enqueue"],
         "WorkingDirectory": str(root),
+        "EnvironmentVariables": environment_variables,
         "StartInterval": interval,
         "RunAtLoad": True,
         "StandardOutPath": str(log_dir / "launchd-sync.out.log"),
@@ -134,6 +156,7 @@ items = {
             str(retain),
         ],
         "WorkingDirectory": str(root),
+        "EnvironmentVariables": environment_variables,
         "RunAtLoad": False,
         "StartCalendarInterval": {"Hour": backup_hour, "Minute": 15},
         "StandardOutPath": str(log_dir / "launchd-backup.out.log"),
@@ -145,6 +168,7 @@ if os.environ["WITH_OPS_REPORT"] == "1":
         "Label": "com.kip.ops-report",
         "ProgramArguments": ["/bin/bash", str(root / "scripts/ops-report.sh")],
         "WorkingDirectory": str(root),
+        "EnvironmentVariables": environment_variables,
         "RunAtLoad": True,
         "StartInterval": ops_interval,
         "StandardOutPath": str(log_dir / "launchd-ops-report.out.log"),

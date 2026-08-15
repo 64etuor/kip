@@ -1,0 +1,101 @@
+src/kip/adapters/parsers/hwp_broker.py
+  s_ad962c4c3ae8de::t_63424675d5feea 14
+  s_ad962c4c3ae8de::t_2a806dd9edeb4f 208
+src/kip/adapters/parsers/hwp_native.py
+  s_ad962c4c3ae8de::t_8be06b3970a483 8
+  s_ad962c4c3ae8de::t_60fe069ac24eae 186
+src/kip/adapters/parsers/csv_table.py
+  s_ad962c4c3ae8de::t_3a8adc1692d674 1-167
+src/kip/adapters/parsers/pptx_ooxml.py
+  s_ad962c4c3ae8de::t_1c09914ac4e1ee 109,112
+  s_ad962c4c3ae8de::t_38ad1bc9a41888 50-55
+  s_ad962c4c3ae8de::t_a0bca4e97e501f 131-132
+  s_ad962c4c3ae8de::t_98d9d3e108a496 80,82
+src/kip/adapters/parsers/xlsx.py
+  s_ad962c4c3ae8de::t_1359938230c54f 149-150,156-166
+  s_ad962c4c3ae8de::t_d3d7d3ccbcf8ea 8
+  s_ad962c4c3ae8de::t_a1c983f1918a33 216-220,227
+src/kip/adapters/parsers/docx.py
+  s_ad962c4c3ae8de::t_f44adcc15862ac 91,167
+  s_ad962c4c3ae8de::t_6415785885c81a 395,397
+  s_ad962c4c3ae8de::t_9dfc2f9db0e077 62
+  s_ad962c4c3ae8de::t_10d3c187c46493 309,311,320
+  s_ad962c4c3ae8de::t_45e5e7b7178b30 3-4,6,8,11,17-61,63-85,90,92-93,98-105,107,110-121,123-124,127,129-130,132-150,156-166,168-244,246-308,310,312-319,321-394,396,398-643
+docs/OPERATIONS.md
+  s_ad962c4c3ae8de::t_1cba2a8f5ae746 529-535
+src/kip/adapters/parsers/text_quality.py
+  s_ad962c4c3ae8de::t_202832c5f5e1bd 1-90
+tests/test_plain_text_parser.py
+  s_ad962c4c3ae8de::t_b9d76750121cb2 1-29,31-93
+  s_ad962c4c3ae8de::t_3b99ef0c6b6a94 30
+tests/test_pptx_parser.py
+  s_ad962c4c3ae8de::t_64e91e2ea26c7f 577-580
+  s_ad962c4c3ae8de::t_96d58827418dd7 71-73
+  s_ad962c4c3ae8de::t_6996fcb7b250cf 583-621
+  s_ad962c4c3ae8de::t_618cb889fa8673 17
+  s_ad962c4c3ae8de::t_b4f049b5557b24 622-645
+  s_ad962c4c3ae8de::t_7d4b902d173d1e 581-582
+CHANGELOG.md
+  s_ad962c4c3ae8de::t_55a74fa1b66b26 5-31
+docs/TRD.md
+  s_ad962c4c3ae8de::t_9809c741c671b6 620-621,625-632,634
+tests/test_xlsx_two_stage.py
+  s_ad962c4c3ae8de::t_56cfe77637e8b5 4
+  s_ad962c4c3ae8de::t_2f9fc0701cc54e 152-240
+tests/test_hwp_parser.py
+  s_ad962c4c3ae8de::t_9cf95d30091083 91-158
+docs/IMPLEMENTATION_STATUS.md
+  s_ad962c4c3ae8de::t_2a9188a502a588 30
+  s_ad962c4c3ae8de::t_a98e6eb42d5150 26-28
+  s_ad962c4c3ae8de::t_325834e482889e 31
+src/kip/adapters/parsers/pptx.py
+  s_ad962c4c3ae8de::t_7581ce87971b9f 21
+  s_ad962c4c3ae8de::t_4b0626386afc4c 150-160,168
+src/kip/cli.py
+  s_ad962c4c3ae8de::t_a8ceee440a211a 457
+  s_ad962c4c3ae8de::t_d893e3cd66e13b 13
+  s_ad962c4c3ae8de::t_037734ac5022ef 376-424
+tests/test_docx_parser.py
+  s_ad962c4c3ae8de::t_ae9918d045ec29 119
+  s_ad962c4c3ae8de::t_96f6e5687a2dee 211
+  s_ad962c4c3ae8de::t_858b9a80202a1d 1-118,120-210,212-375
+src/kip/adapters/parsers/registry.py
+  s_ad962c4c3ae8de::t_ddc174119a5eaa 6
+  s_ad962c4c3ae8de::t_7f9acd471a722c 26
+  s_ad962c4c3ae8de::t_1d911d2f0166ab 66
+src/kip/adapters/parsers/plain.py
+  s_ad962c4c3ae8de::t_092a56dcbd0407 4,12-91,110-111,127-130,137-138,140-141
+  s_ad962c4c3ae8de::t_81266f88764722 6
+tests/test_text_quality.py
+  s_ad962c4c3ae8de::t_9e4bea6e7385f5 1-79
+tests/test_parser_reextraction.py
+  s_ad962c4c3ae8de::t_965cd548baca73 20-33
+  s_ad962c4c3ae8de::t_65e09b9b68ab6c 214
+  s_ad962c4c3ae8de::t_94e8b6d8892831 315
+tests/test_csv_parser.py
+  s_ad962c4c3ae8de::t_045f66b6a5299c 69
+  s_ad962c4c3ae8de::t_325babd2bc8898 121
+  s_ad962c4c3ae8de::t_76cdf88829f4ea 89
+  s_ad962c4c3ae8de::t_b7727c2886d2f3 1-68,70-88,90-120,122-201
+src/kip/adapters/ocr/kordoc.py
+  s_ad962c4c3ae8de::t_b05fac0dfb1bf0 28-79
+  s_ad962c4c3ae8de::t_db26dcf8169496 115-118
+tests/test_cli_doctor.py
+  s_ad962c4c3ae8de::t_c6d648c888a79d 1-168
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "2d91a8ccd205518e448b14e618582f65c6b9f07d",
+  "prompts": {},
+  "sessions": {
+    "s_ad962c4c3ae8de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7b5ac8f7-2921-4c40-a768-515e565b34b7",
+        "model": "claude-fable-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

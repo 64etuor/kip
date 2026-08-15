@@ -162,3 +162,42 @@ def test_decode_text_bytes_empty_input_is_full_quality_success() -> None:
     assert decoded.status == "succeeded"
     assert decoded.quality == 1.0
     assert decoded.warnings == []
+
+
+def test_plain_text_flags_control_byte_binary_disguised_as_valid_utf8(
+    tmp_path: Path,
+) -> None:
+    # Given a binary blob whose bytes (0x01-0x1F) are all single-byte ASCII
+    # control characters - every one of them is a legal single-byte UTF-8
+    # sequence, so the primary UTF-8 strict decode "succeeds" without ever
+    # producing a UnicodeDecodeError or a replacement character. Before this
+    # fix nothing downstream of a clean decode ever inspected *what* was
+    # decoded, so this reported as full-quality clean text.
+    path = tmp_path / "not_actually_text.txt"
+    path.write_bytes(bytes(range(1, 32)) * 20)
+
+    # When it is parsed.
+    extraction, units = PlainTextParser().parse(
+        path, artifact_id="art_binary", document_id="doc_binary", acl_scopes=["workspace:default"]
+    )
+
+    # Then the decode is flagged instead of silently reported as clean,
+    # full-quality text.
+    assert extraction.status == "partial"
+    assert extraction.quality_score < 0.5
+    assert any(warning.startswith("BINARY_SUSPECTED:") for warning in extraction.warnings)
+    assert units[0].metadata["encoding"] == "utf-8"
+
+
+def test_decode_text_bytes_classic_mac_carriage_returns_are_not_binary_suspected() -> None:
+    # Given plain text using only classic Mac (\r-only) line endings - a
+    # short file where every \r is a legitimate line ending, not decode-loss
+    # or binary-garbage evidence. `str.isprintable()` reports \r as
+    # non-printable, so a naive reuse of the shared printable-ratio check
+    # would misclassify this as suspected binary content.
+    decoded = decode_text_bytes(b"a,b,c\r1,2,3\r")
+
+    # Then it is not misclassified as suspected binary content.
+    assert decoded.status == "succeeded"
+    assert decoded.quality == 1.0
+    assert decoded.warnings == []

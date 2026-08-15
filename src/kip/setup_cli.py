@@ -55,6 +55,7 @@ def setup_inspect(
     ] = None,
     state: Annotated[Path | None, typer.Option("--state")] = None,
 ) -> None:
+    """Show the next unanswered setup question and what is still missing."""
     _run_setup(
         ctx,
         lambda service: service.inspect(),
@@ -74,6 +75,7 @@ def setup_answer(
     ] = None,
     state: Annotated[Path | None, typer.Option("--state")] = None,
 ) -> None:
+    """Record one answer to the question `setup inspect` just asked."""
     _run_setup(
         ctx,
         lambda service: service.record_answer(question, value),
@@ -91,6 +93,7 @@ def setup_preview(
     ] = None,
     state: Annotated[Path | None, typer.Option("--state")] = None,
 ) -> None:
+    """Preview what would be collected (file counts, sizes, exclusions) before planning."""
     _run_setup(
         ctx,
         lambda service: service.preview(),
@@ -111,6 +114,8 @@ def setup_plan(
     ] = None,
     state: Annotated[Path | None, typer.Option("--state")] = None,
 ) -> None:
+    """Write the reviewable setup plan file a human approves before `setup apply`."""
+
     def action(service: SetupService) -> object:
         target = output if output.is_absolute() else service.project_root / output
         return service.write_plan(target)
@@ -133,6 +138,7 @@ def setup_apply(
     ] = None,
     state: Annotated[Path | None, typer.Option("--state")] = None,
 ) -> None:
+    """Generate the configuration files from an approved plan (writes nothing else)."""
     _run_setup(
         ctx,
         lambda service: service.apply(service.load_plan(plan)),
@@ -151,6 +157,7 @@ def setup_verify(
     ] = None,
     state: Annotated[Path | None, typer.Option("--state")] = None,
 ) -> None:
+    """Check the applied configuration and print the remaining next steps."""
     _run_setup(
         ctx,
         lambda service: service.verify(service.load_plan(plan)),

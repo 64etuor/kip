@@ -36,6 +36,36 @@ ENCODING_UNCERTAIN_FLOOR: Final = 0.05
 _REPLACEMENT_CHAR = "�"
 _NUL_CHAR = "\x00"
 
+# Below this printable-character ratio, a *successful* decode is still
+# flagged instead of silently reported as clean full-quality text. A binary
+# blob whose bytes all happen to fall in the single-byte UTF-8/CP949 ASCII
+# range (e.g. raw control bytes 0x01-0x1F, common in non-text formats such as
+# terminal capture files or truncated binary headers) decodes without error
+# under either codec, so the encoding ladder above never sees a
+# UnicodeDecodeError or a replacement character to key off of. This is a
+# distinct signal from `_REPLACEMENT_CHAR` density (which flags *failed*
+# decodes) and from the NUL check in `_finalize` (which flags one specific
+# byte value) - `_binary_suspected_ratio` catches the broader "this decoded
+# cleanly but is not really text" case. Ordinary text (Korean or otherwise)
+# sits at ~1.0.
+_BINARY_SUSPECTED_FLOOR: Final = 0.85
+
+# Line-ending/whitespace control characters that must count as printable text
+# content even though `str.isprintable()` reports them as non-printable.
+# Unlike `text_quality.printable_ratio` (shared with format-specific parsers
+# that never see a raw line ending), plain text/CSV bytes reach this check
+# *before* CsvTableParser's own \r-normalization, so a classic Mac (\r-only)
+# or Windows (\r\n) line-ending file must not be misclassified as binary
+# control-byte garbage merely for containing \r.
+_TEXT_CONTROL_CHARS: Final = frozenset("\n\r\t")
+
+
+def _binary_suspected_ratio(text: str) -> float:
+    if not text:
+        return 0.0
+    printable = sum(1 for char in text if char.isprintable() or char in _TEXT_CONTROL_CHARS)
+    return printable / len(text)
+
 
 @dataclass
 class DecodedText:
@@ -87,6 +117,53 @@ def _decode_utf16_without_bom(raw: bytes) -> str | None:
 
 
 def _finalize(
+    raw: bytes,
+    text: str,
+    *,
+    encoding: str,
+    status: Literal["succeeded", "partial"],
+    quality: float,
+    warnings: list[str],
+) -> DecodedText:
+    """Shared safety net applied after every decode-ladder branch.
+
+    Composes the NUL safety net (see `_finalize_nul_safety`) with a
+    printable-content check (see `_flag_if_binary_suspected`) so every
+    decode-ladder branch gets both signals regardless of which one fires.
+    """
+    return _flag_if_binary_suspected(
+        _finalize_nul_safety(
+            raw, text, encoding=encoding, status=status, quality=quality, warnings=warnings
+        )
+    )
+
+
+def _flag_if_binary_suspected(result: DecodedText) -> DecodedText:
+    """Downgrade a decode that succeeded but is unlikely to be real text.
+
+    See `_BINARY_SUSPECTED_FLOOR` for why this check exists. Empty text is
+    exempt (`_binary_suspected_ratio` defines an empty string as 0.0, which
+    would otherwise wrongly flag every empty file).
+    """
+    if not result.text:
+        return result
+    ratio = _binary_suspected_ratio(result.text)
+    if ratio >= _BINARY_SUSPECTED_FLOOR:
+        return result
+    return DecodedText(
+        text=result.text,
+        encoding=result.encoding,
+        status="partial",
+        quality=round(result.quality * ratio, 4),
+        warnings=[
+            *result.warnings,
+            f"BINARY_SUSPECTED: only {ratio:.0%} printable characters after decode; "
+            "content may not be plain text",
+        ],
+    )
+
+
+def _finalize_nul_safety(
     raw: bytes,
     text: str,
     *,

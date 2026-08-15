@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+- Closed two measured parsing gaps (ADR-049), both decided by A/B study
+  against candidates already pinned in-tree, so neither adds a dependency:
+  - PDF tables are extracted as additive `pdf_table` evidence units
+    (PyMuPDF `find_tables(lines_strict)`, promoted only at rows>=2 and
+    cols>=2 to suppress the decorative-box false positives measured on a
+    real corpus). `pdf_page` text is byte-identical whether the feature is
+    on or off, detection failure degrades to a `TABLE_DETECTION_FAILED`
+    warning, and `[parsers.pdf] tables_enabled` (default on) lets operators
+    turn it off — measured cost is ~150 ms/page versus ~4 ms/page baseline.
+    kordoc was measured and rejected for this path (95.8% false-table rate
+    on a real document, cannot open encrypted PDFs, all-or-nothing failure
+    on damaged files).
+  - HWP/HWPX evidence units now carry a real `section` index, reconstructed
+    in-process and verified byte-for-byte against the parser library's own
+    output; on any mismatch the locator falls back to `section: null` with a
+    warning instead of guessing, and the extracted text never changes.
+    Losing the label no longer downgrades the extraction to `partial`.
+- Fixed parser defects found by adversarial and realistic-input testing:
+  DOCX footnote/endnote text was silently dropped at full reported quality
+  and `w:noBreakHyphen` glued words together; a leading comment line made a
+  CSV parse into a single column at quality 1.0 with no warning; control-byte
+  binary that decodes as valid UTF-8 passed as clean text and is now flagged
+  `BINARY_SUSPECTED`; XLSX hidden sheets are flagged; PPTX grouped-shape
+  geometry is converted to slide-absolute coordinates instead of reporting
+  local coordinates as if they were slide coordinates.
+- Fixed two latent bugs in the HWP command-broker path: it read kordoc
+  `section`/`sectionNumber` keys that kordoc never emits, and a locator
+  `page` value carried no indication of whether it was an exact page or a
+  section approximation (`page_mode` now always accompanies it).
+
 - Hardened the system against a nine-lane adversarial audit (ADR-048):
   - Auto-approve precision is now tamper-resistant (a dedicated
     `assertion_candidates.auto_approved` column via migration 0023, not a

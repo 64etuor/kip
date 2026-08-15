@@ -623,8 +623,9 @@ ContentUnit은 검색과 인용의 최소 구조 단위다.
 |---|---|
 | `pdf_page` | page 3 |
 | `pdf_ocr` | page 3 + pixel bounding box |
+| `pdf_table` | page 3, table index (행≥2·열≥2만 승격, ADR-049) |
 | `pptx_shape` / `pptx_notes` / `pptx_comment` / `pptx_diagram` | slide, shape id, geometry / slide notes / comment / SmartArt part |
-| `hwp_structure` | chunk + 문자 범위 (page/section 번호는 알려진 미구현 한계) |
+| `hwp_structure` | section 번호 + chunk + 문자 범위 (page는 포맷에 정보가 없어 null; ADR-049) |
 | `xlsx_sheet` | sheet `정산` (수치는 `xlsx-read` live range로 확인) |
 | `docx_paragraphs` | start/end paragraph (1-indexed) |
 | `docx_table` / `docx_textbox` / `docx_header_footer` | table index / textbox index / header·footer part |

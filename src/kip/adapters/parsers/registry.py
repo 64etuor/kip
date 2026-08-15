@@ -40,7 +40,10 @@ class ParserRegistry:
     @classmethod
     def from_settings(cls, settings: Settings) -> ParserRegistry:
         ocr = _kordoc_ocr(settings)
-        pdf = PdfParser(ocr=ocr)
+        pdf = PdfParser(
+            ocr=ocr,
+            tables_enabled=bool(settings.get("parsers.pdf.tables_enabled", True)),
+        )
         hwp_configs: list[CommandParserConfig] = []
         native_parser: HwpNativeParser | None = None
         for name in settings.get("parsers.hwp.order", ["kordoc", "unhwp"]):

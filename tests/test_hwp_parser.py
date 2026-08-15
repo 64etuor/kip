@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sys
 import zipfile
+from importlib import import_module
 from pathlib import Path
 from types import SimpleNamespace
 from xml.etree import ElementTree as ET
@@ -82,14 +83,26 @@ def test_native_parser_emits_bounded_evidence_units(monkeypatch, tmp_path):
         acl_scopes=["workspace:default"],
     )
 
+    # This FakeReader is a pure stand-in (no _get_reader()/_get_section_files()
+    # etc.) so the section fail-safe correctly cannot verify a reconstruction
+    # against it and falls back to section: None with a warning, rather than
+    # ever guessing - see _reconstruct_section_spans in hwp_native.py.
     assert extraction.parser_name == "hwp-hwpx-parser"
+    # The section label is best-effort enrichment: losing it is reported as a
+    # warning but must NOT downgrade the extraction to "partial", which
+    # operators read as "some document content is missing".
     assert extraction.status == "succeeded"
+    assert extraction.warnings == [
+        "SECTION_INDEX_UNAVAILABLE: per-section reconstruction did not "
+        "verify against extract_text() output; section left as None"
+    ]
     assert extraction.metadata["table_count"] == 1
     assert extraction.metadata["image_count"] == 1
     assert len(units) > 1
     assert all(len(unit.body) <= 40 for unit in units)
     assert all(unit.locator.type == "hwp_structure" for unit in units)
     assert all("section" in unit.locator.data for unit in units)
+    assert all(unit.locator.data["section"] is None for unit in units)
 
 
 def _fake_reader_class(text: str):
@@ -116,7 +129,11 @@ def _fake_reader_class(text: str):
 def test_native_parser_scores_a_clean_long_korean_document_near_the_ceiling(
     monkeypatch, tmp_path
 ):
-    # Given a long, clean, fully-Hangul extraction with no warnings.
+    # Given a long, clean, fully-Hangul extraction. The FakeReader below has
+    # no real per-section internals, so the section fail-safe adds exactly
+    # one SECTION_INDEX_UNAVAILABLE warning (see
+    # test_native_parser_emits_bounded_evidence_units) - the one warning
+    # this test still expects.
     text = "계약 조건과 승인 절차를 명확히 기록한 문서입니다. " * 80
     monkeypatch.setitem(
         sys.modules, "hwp_hwpx_parser", SimpleNamespace(Reader=_fake_reader_class(text))
@@ -132,8 +149,13 @@ def test_native_parser_scores_a_clean_long_korean_document_near_the_ceiling(
     )
 
     # Then quality reflects the shared hwp_text_quality formula and stays >= 0.9,
-    # matching the flat 0.95 the parser used before content-derived scoring.
+    # matching the flat 0.95 the parser used before content-derived scoring,
+    # even after the one section-fail-safe warning's penalty.
     assert extraction.status == "succeeded"
+    assert extraction.warnings == [
+        "SECTION_INDEX_UNAVAILABLE: per-section reconstruction did not "
+        "verify against extract_text() output; section left as None"
+    ]
     assert units
     assert extraction.quality_score >= 0.9
 
@@ -198,6 +220,62 @@ def test_native_parser_wraps_corrupted_section_xml_as_typed_parser_error(
             artifact_id="art_corrupted",
             document_id="doc_corrupted",
             acl_scopes=["workspace:default"],
+        )
+
+
+def _minimal_hwpx_section(text: str) -> str:
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>'
+        '<hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" '
+        'xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">'
+        '<hp:p id="0" paraPrIDRef="0" styleIDRef="0">'
+        f'<hp:run charPrIDRef="0"><hp:t>{text}</hp:t></hp:run>'
+        "</hp:p></hs:sec>"
+    )
+
+
+def test_native_parser_extracts_text_from_every_hwpx_section(tmp_path: Path) -> None:
+    # Given a real (not mocked) minimal HWPX archive with two sections
+    # (section0.xml, section1.xml) - the hwp-hwpx-parser dependency, not a
+    # FakeReader, does the actual extraction here.
+    path = tmp_path / "multi_section.hwpx"
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("mimetype", "application/hwp+zip")
+        archive.writestr("Contents/content.hpf", '<?xml version="1.0"?><package/>')
+        archive.writestr("Contents/section0.xml", _minimal_hwpx_section("SECTION_ZERO_MARKER"))
+        archive.writestr("Contents/section1.xml", _minimal_hwpx_section("SECTION_ONE_MARKER"))
+
+    # When the native parser extracts text end-to-end through the real library.
+    extraction, units = HwpNativeParser().parse(
+        path, artifact_id="art_multi", document_id="doc_multi", acl_scopes=["workspace:default"]
+    )
+
+    # Then both sections' text are present, not just the first one.
+    body = "".join(unit.body for unit in units)
+    assert "SECTION_ZERO_MARKER" in body
+    assert "SECTION_ONE_MARKER" in body
+    assert extraction.status == "succeeded"
+
+
+def test_native_parser_rejects_encrypted_hwpx_as_typed_parser_error(tmp_path: Path) -> None:
+    # Given a real (not mocked) HWPX archive whose manifest declares
+    # encryption data - the hwp-hwpx-parser dependency's own extract_text()
+    # raises a plain ValueError("Encrypted files are not supported") for
+    # this case, which the outer except clause in HwpNativeParser.parse()
+    # already covers.
+    path = tmp_path / "encrypted.hwpx"
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("mimetype", "application/hwp+zip")
+        archive.writestr("Contents/content.hpf", '<?xml version="1.0"?><package/>')
+        archive.writestr("Contents/section0.xml", _minimal_hwpx_section("SHOULD_NOT_APPEAR"))
+        archive.writestr("META-INF/manifest.xml", "<manifest><encryption-data/></manifest>")
+
+    # When the native parser attempts to extract text through the real library.
+    # Then the encrypted-file rejection surfaces as a typed ParserError, not
+    # an uncaught ValueError, and no partial/garbled text is emitted.
+    with pytest.raises(ParserError, match="native HWP parse failed"):
+        HwpNativeParser().parse(
+            path, artifact_id="art_encrypted", document_id="doc_encrypted", acl_scopes=["workspace:default"]
         )
 
 
@@ -327,3 +405,229 @@ def test_command_broker_preserves_kordoc_structured_blocks(tmp_path: Path) -> No
         "mime_type": "image/png",
     }
     assert extraction.warnings == ["PARTIAL_PARSE page 2: 도형 일부를 건너뜀"]
+    # And the locator never trusts kordoc's never-emitted section/sectionNumber
+    # keys, and pairs every non-null page with a page_mode so a reader can
+    # tell a real page from a section-position approximation (ADR-049).
+    assert all(unit.locator.data["section"] is None for unit in units)
+    assert [unit.locator.data["page"] for unit in units] == [1, 2, 2]
+    assert [unit.locator.data["page_mode"] for unit in units] == [
+        "section_approx",
+        "section_approx",
+        "section_approx",
+    ]
+
+
+def test_command_broker_marks_page_exact_only_when_metadata_says_so(
+    tmp_path: Path,
+) -> None:
+    # Given a payload whose document metadata explicitly claims exact pages.
+    payload = {
+        "metadata": {"parserVersion": "4.7.3", "pageMode": "exact"},
+        "blocks": [{"type": "paragraph", "text": "승인 완료", "pageNumber": 1}],
+    }
+    source = tmp_path / "fixture.hwp"
+    source.write_bytes(bytes.fromhex("D0CF11E0A1B11AE1") + b"fixture")
+    command = [sys.executable, "-c", f"print({json.dumps(json.dumps(payload))})"]
+    broker = HwpParserBroker([CommandParserConfig(name="kordoc", argv=command)])
+
+    # When the command boundary translates the payload.
+    _extraction, units = broker.parse(
+        source,
+        artifact_id="art_fixture",
+        document_id="doc_fixture",
+        acl_scopes=["workspace:default"],
+    )
+
+    # Then the locator records the exact page mode instead of the
+    # conservative section_approx default.
+    assert units[0].locator.data["page"] == 1
+    assert units[0].locator.data["page_mode"] == "exact"
+
+
+def test_command_broker_leaves_page_mode_null_when_no_page_is_placed(
+    tmp_path: Path,
+) -> None:
+    # Given a block that carries no pageNumber at all.
+    payload = {
+        "metadata": {"parserVersion": "4.7.3"},
+        "blocks": [{"type": "paragraph", "text": "승인 완료"}],
+    }
+    source = tmp_path / "fixture.hwp"
+    source.write_bytes(bytes.fromhex("D0CF11E0A1B11AE1") + b"fixture")
+    command = [sys.executable, "-c", f"print({json.dumps(json.dumps(payload))})"]
+    broker = HwpParserBroker([CommandParserConfig(name="kordoc", argv=command)])
+
+    # When the command boundary translates the payload.
+    _extraction, units = broker.parse(
+        source,
+        artifact_id="art_fixture",
+        document_id="doc_fixture",
+        acl_scopes=["workspace:default"],
+    )
+
+    # Then page_mode is never fabricated for an absent page.
+    assert units[0].locator.data["page"] is None
+    assert units[0].locator.data["page_mode"] is None
+
+
+def _hwpx_section_xml(text: str) -> str:
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>'
+        '<hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" '
+        'xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">'
+        '<hp:p id="0" paraPrIDRef="0" styleIDRef="0">'
+        f'<hp:run charPrIDRef="0"><hp:t>{text}</hp:t></hp:run>'
+        "</hp:p></hs:sec>"
+    )
+
+
+def test_native_parser_labels_sections_numerically_despite_lexical_file_order(
+    tmp_path: Path,
+) -> None:
+    # Given a real (not mocked) HWPX archive with 11 sections, so section10
+    # sorts lexically before section2 in the dependency's own
+    # _get_section_files() (a real ordering quirk this feature does not
+    # attempt to fix - see hwp_native._reconstruct_section_spans).
+    path = tmp_path / "eleven_sections.hwpx"
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("mimetype", "application/hwp+zip")
+        archive.writestr("Contents/content.hpf", '<?xml version="1.0"?><package/>')
+        for index in range(11):
+            archive.writestr(f"Contents/section{index}.xml", _hwpx_section_xml(f"MARKER_{index}_END"))
+
+    # When the section reconstruction runs through the real hwp-hwpx-parser
+    # dependency directly (bypassing chunk splitting, whose windows can
+    # straddle multiple small sections and would make a body-substring
+    # assertion ambiguous).
+    from kip.adapters.parsers import hwp_native as hwp_native_module
+
+    Reader = import_module("hwp_hwpx_parser").Reader
+    with Reader(path) as reader:
+        text = reader.extract_text()
+        spans = hwp_native_module._reconstruct_section_spans(reader, path, text)
+
+    # Then reconstruction verified against extract_text() (spans is not
+    # None) and each section's true numeric index - parsed from its
+    # filename, never its position among the lexically-sorted files -
+    # matches the marker embedded in that section's own text.
+    assert spans is not None
+    assert {span.section for span in spans} == set(range(11))
+    for span in spans:
+        assert f"MARKER_{span.section}_END" in text[span.start : span.end]
+        assert f"MARKER_{span.section}_END" not in text[: span.start]
+        assert f"MARKER_{span.section}_END" not in text[span.end :]
+
+
+class _FakeHwp5Backend:
+    """Duck-types just the private HWP5Reader surface
+    _reconstruct_section_spans reaches into (_reset_counters,
+    _iter_sections, _read_section, _extract_section_text), so the HWP5
+    branch can be exercised without a real OLE-compound-file fixture."""
+
+    def __init__(self, sections: dict[int, str]):
+        self._sections = sections
+        self.reset_calls = 0
+
+    def _reset_counters(self):
+        self.reset_calls += 1
+
+    def _iter_sections(self):
+        return iter(sorted(self._sections))
+
+    def _read_section(self, section_idx):
+        return section_idx
+
+    def _extract_section_text(self, section_data, options):
+        return self._sections[section_data]
+
+
+class _FakeHwp5Reader:
+    def __init__(self, backend: _FakeHwp5Backend):
+        self._backend = backend
+
+    def _get_reader(self):
+        return self._backend
+
+
+def test_reconstruct_section_spans_succeeds_for_hwp5_numeric_stream_order(
+    tmp_path: Path,
+) -> None:
+    # Given a fake HWP5 backend whose _iter_sections() already yields the
+    # real BodyText/SectionN order (0, 1, 2 - HWP5 has no lexical-sort bug,
+    # unlike HWPX's _get_section_files()).
+    from kip.adapters.parsers import hwp_native as hwp_native_module
+
+    sections = {0: "ZERO", 1: "ONE", 2: "TWO"}
+    backend = _FakeHwp5Backend(sections)
+    reader = _FakeHwp5Reader(backend)
+    full_text = "\n\n".join(sections[i] for i in sorted(sections))
+    path = tmp_path / "fixture.hwp"
+
+    # When the reconstruction runs.
+    spans = hwp_native_module._reconstruct_section_spans(reader, path, full_text)
+
+    # Then it verifies and labels every section with its real numeric index,
+    # having reset counters first (mirroring HWP5Reader.extract_text()'s own
+    # preamble) so re-numbered footnote/endnote markers would stay correct.
+    assert backend.reset_calls == 1
+    assert spans is not None
+    assert [(span.section, full_text[span.start : span.end]) for span in spans] == [
+        (0, "ZERO"),
+        (1, "ONE"),
+        (2, "TWO"),
+    ]
+
+
+def test_reconstruct_section_spans_falls_back_to_none_on_mismatch(
+    tmp_path: Path,
+) -> None:
+    # Given a fake HWP5 backend whose per-section reconstruction does NOT
+    # concatenate to the text the caller already extracted (simulating
+    # dependency drift or an unexpected internal structure).
+    from kip.adapters.parsers import hwp_native as hwp_native_module
+
+    backend = _FakeHwp5Backend({0: "ZERO", 1: "ONE"})
+    reader = _FakeHwp5Reader(backend)
+    path = tmp_path / "fixture.hwp"
+
+    # When the reconstruction is checked against text that cannot match.
+    spans = hwp_native_module._reconstruct_section_spans(
+        reader, path, "SOMETHING ENTIRELY DIFFERENT"
+    )
+
+    # Then it fails safe: no spans, so callers fall back to section: None
+    # and a warning instead of ever emitting a wrong section number.
+    assert spans is None
+
+
+def test_reconstruct_section_spans_returns_none_for_unsupported_suffix(
+    tmp_path: Path,
+) -> None:
+    # Given a path whose suffix is neither .hwp nor .hwpx.
+    from kip.adapters.parsers import hwp_native as hwp_native_module
+
+    backend = _FakeHwp5Backend({0: "ZERO"})
+    reader = _FakeHwp5Reader(backend)
+    path = tmp_path / "fixture.txt"
+
+    # When reconstruction is attempted.
+    spans = hwp_native_module._reconstruct_section_spans(reader, path, "ZERO")
+
+    # Then it declines rather than guessing.
+    assert spans is None
+
+
+def test_section_for_offset_attributes_gaps_and_out_of_range_offsets() -> None:
+    # Given section spans with a gap between them (the paragraph_separator).
+    from kip.adapters.parsers.hwp_native import _section_for_offset, _SectionSpan
+
+    spans = [_SectionSpan(section=0, start=0, end=4), _SectionSpan(section=1, start=6, end=10)]
+
+    # When offsets land inside a span, inside the gap, and past the end.
+    # Then interior offsets resolve to their own section, an offset inside
+    # the gap attributes forward to the next section, and an offset past
+    # every span falls back to the last section rather than raising.
+    assert _section_for_offset(spans, 2) == 0
+    assert _section_for_offset(spans, 5) == 1
+    assert _section_for_offset(spans, 999) == 1
+    assert _section_for_offset([], 0) is None

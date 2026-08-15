@@ -296,6 +296,52 @@ def test_pptx_parser_extracts_charts_images_groups_and_links(tmp_path: Path) -> 
     ]
 
 
+def test_pptx_parser_converts_grouped_shape_geometry_to_slide_absolute_coordinates(
+    tmp_path: Path,
+) -> None:
+    # Given a text box grouped, then the *group itself* moved and resized
+    # after grouping - the ordinary "select shapes, group, then drag/resize
+    # the group" edit. The child text box's own <a:off>/<a:ext> in the XML
+    # stay exactly where they were before grouping (1in, 1in, 2in, 1in);
+    # only the group's chOff/chExt -> off/ext mapping changes to reflect
+    # where the group (and therefore its content) now actually sits.
+    path = tmp_path / "grouped.pptx"
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    group = slide.shapes.add_group_shape()
+    child = group.shapes.add_textbox(Inches(1), Inches(1), Inches(2), Inches(1))
+    child.text = "이동된 그룹 내부"
+    group.left = Inches(5)
+    group.top = Inches(5)
+    group.width = Inches(4)
+    group.height = Inches(2)
+    presentation.save(path)
+
+    # When the presentation is parsed.
+    _extraction, units = PptxParser().parse(
+        path,
+        artifact_id="art_grouped",
+        document_id="doc_grouped",
+        acl_scopes=["workspace:default"],
+    )
+
+    # Then the child's reported bbox reflects its true on-slide position
+    # (the group's new frame, since the child fills the whole group here) -
+    # not its raw, pre-move local offset inside the group. Previously this
+    # read back as {left: 1in, top: 1in, width: 2in, height: 1in}: the raw
+    # group-local XML values, silently wrong for any group ever moved or
+    # resized after grouping (and mislabeled "coordinate_space": "slide_emu"
+    # regardless).
+    assert len(units) == 1
+    assert units[0].locator.data["bbox_emu"] == {
+        "left": Inches(5),
+        "top": Inches(5),
+        "width": Inches(4),
+        "height": Inches(2),
+    }
+    assert units[0].metadata["coordinate_space"] == "slide_emu"
+
+
 def test_pptx_parser_reports_untranscribed_embedded_media(tmp_path: Path) -> None:
     # Given a slide with one embedded video and its poster frame.
     movie_path = tmp_path / "process.mp4"

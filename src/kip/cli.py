@@ -34,8 +34,9 @@ from kip.domain.models import (
     SearchHit,
     SearchMode,
     SearchRequest,
+    StatusReport,
 )
-from kip.errors import KipError, NotFoundError, ValidationError, error_code
+from kip.errors import AuthorizationError, KipError, NotFoundError, ValidationError, error_code
 from kip.evaluation.drafts import promote_draft, record_draft_review_decision, validate_draft
 from kip.evaluation.models import GoldenCase
 from kip.evaluation.reporting import append_evolution_record, write_report
@@ -195,23 +196,43 @@ def _runtime(ctx: typer.Context) -> Runtime:
     return value
 
 
-def _emit(runtime: Runtime, data: Any) -> None:
+def _emit(runtime: Runtime, data: Any, *, warnings: list[str] | None = None) -> None:
     envelope = Envelope(
         ok=True,
         data=data.model_dump(mode="json") if hasattr(data, "model_dump") else data,
         meta=EnvelopeMeta(
             request_id=runtime.context.request_id or new_id("req"),
             workspace=runtime.context.workspace,
+            warnings=warnings or [],
         ),
     )
     typer.echo(envelope.model_dump_json(indent=2))
+
+
+def _error_message(exc: BaseException) -> str:
+    """Human-readable error message; `forbidden` gains actionable guidance.
+
+    `error_code(exc)` stays exactly `forbidden` for an `AuthorizationError`
+    (every edge — CLI, REST, MCP — must keep agreeing on that machine
+    code). The operator's natural first fix, `kip <cmd> --role admin`,
+    fails with "No such option: --role" because `--role`/`--roles` are
+    root-level options that must precede the subcommand, so only the
+    human-readable message gains a hint pointing at the actual fix.
+    """
+    message = str(exc)
+    if isinstance(exc, AuthorizationError):
+        message += (
+            " — put --role admin BEFORE the subcommand "
+            "(./scripts/kip --role admin review approve <id>) or set KIP_ROLES=admin"
+        )
+    return message
 
 
 def _emit_error(runtime: Runtime | None, exc: BaseException) -> None:
     context = runtime.context if runtime else RequestContext(request_id=new_id("req"))
     envelope = Envelope(
         ok=False,
-        error=ErrorInfo(code=error_code(exc), message=str(exc)),
+        error=ErrorInfo(code=error_code(exc), message=_error_message(exc)),
         meta=EnvelopeMeta(
             request_id=context.request_id or new_id("req"),
             workspace=context.workspace,
@@ -234,11 +255,49 @@ def _clean_validation_message(exc: PydanticValidationError) -> str:
     return "; ".join(parts) or "validation failed"
 
 
-def _run(ctx: typer.Context, function: Callable[[Runtime], Any]) -> None:
+def _validated_existing_path(
+    path: Path,
+    option_name: str,
+    *,
+    dir_okay: bool = False,
+) -> Path:
+    """Validate a Path CLI option's existence inside the command body.
+
+    Click's `exists=True` (and sibling `file_okay`/`dir_okay`/`readable`)
+    filesystem checks run while Click parses arguments, before `_run` wraps
+    the command in a versioned JSON envelope — AGENTS.md requires every CLI
+    command to emit one. A missing or otherwise invalid path there prints
+    raw Click usage text on stderr with exit code 2 instead of an
+    `ok: false` envelope. Every `Path` option that used to declare those
+    Click-level checks now stays a plain `Path` option and calls this
+    helper first, so a bad path is reported the same way as any other
+    validation failure.
+    """
+    kind = "directory" if dir_okay else "file"
+    if not path.exists():
+        raise NotFoundError(
+            f"{kind} not found: {path} ({option_name} expects an existing {kind} path)"
+        )
+    if dir_okay and not path.is_dir():
+        raise ValidationError(f"{option_name} expects a directory, got a file: {path}")
+    if not dir_okay and not path.is_file():
+        raise ValidationError(f"{option_name} expects a file, got a directory: {path}")
+    if not os.access(path, os.R_OK):
+        raise ValidationError(f"{option_name} path is not readable: {path}")
+    return path
+
+
+def _run(
+    ctx: typer.Context,
+    function: Callable[[Runtime], Any],
+    *,
+    warnings: Callable[[Any], list[str]] | None = None,
+) -> None:
     runtime: Runtime | None = None
     try:
         runtime = _runtime(ctx)
-        _emit(runtime, function(runtime))
+        result = function(runtime)
+        _emit(runtime, result, warnings=warnings(result) if warnings is not None else None)
     except KipError as exc:
         _emit_error(runtime, exc)
         raise typer.Exit(code=4 if isinstance(exc, NotFoundError) else 3) from exc
@@ -332,7 +391,10 @@ def _resolve_sync_source(runtime: Runtime, source: str) -> str:
         raise ValidationError("both Apple Mail and IMAP are enabled; choose apple-mail or imap")
     if normalized in {"slack", "apple-mail", "imap", "all"}:
         return normalized
-    raise ValidationError(f"unknown source: {source}")
+    configured = runtime.container.application.ingestion.enabled_sync_sources()
+    raise ValidationError(
+        f"unknown source: {source}. Configured sources: {', '.join(configured) or 'none'}."
+    )
 
 
 def _sync_one(
@@ -384,12 +446,54 @@ def capabilities(ctx: typer.Context) -> None:
     )
 
 
+def _status_summary(report: StatusReport) -> str:
+    """One-line Korean plain-language verdict for `status --summary`.
+
+    `StatusReport` is a versioned contract model (checked by
+    `scripts/generate_contracts.py --check`), so a plain-language field
+    cannot be added to it without a contract change. Instead this is
+    attached to the envelope's existing `meta.warnings` list, and only
+    when the operator opts in with `--summary` — the default `status`
+    output is unchanged.
+    """
+    lexical_gap = report.content_units - report.lexical_units
+    notes: list[str] = []
+    if report.failed_jobs:
+        notes.append(
+            f"문제: 실패한 작업 {report.failed_jobs}건이 있습니다. "
+            "`kip jobs list --status failed`로 확인하세요."
+        )
+    if lexical_gap:
+        notes.append(
+            f"경고: 검색 색인이 원본보다 {lexical_gap}건 뒤처져 있습니다 "
+            f"(콘텐츠 {report.content_units}건 / 색인 {report.lexical_units}건)."
+        )
+    if notes:
+        return " ".join(notes)
+    return (
+        f"정상: 콘텐츠 {report.content_units}건 모두 색인됨, "
+        f"승인된 사실 {report.approved_assertions}건, 대기 작업 {report.queued_jobs}건."
+    )
+
+
 @app.command()
-def status(ctx: typer.Context) -> None:
+def status(
+    ctx: typer.Context,
+    summary: bool = typer.Option(
+        False,
+        "--summary",
+        help="Also add a one-line Korean plain-language verdict to meta.warnings",
+    ),
+) -> None:
     """Report canonical and projection counts."""
+
+    def action(runtime: Runtime) -> Any:
+        return runtime.container.application.operations.status(runtime.context)
+
     _run(
         ctx,
-        lambda runtime: runtime.container.application.operations.status(runtime.context),
+        action,
+        warnings=(lambda report: [_status_summary(report)]) if summary else None,
     )
 
 
@@ -440,6 +544,32 @@ def _kordoc_ocr_doctor_check(settings: Settings) -> dict[str, Any]:
         "required": False,
         "details": {"enabled": True, "version": probe.version, "reason": reason},
     }
+
+
+def _doctor_summary(checks: list[dict[str, Any]], required_failures: list[str]) -> str:
+    """One-line Korean plain-language verdict for the `doctor` payload.
+
+    `doctor`'s `checks` list (`content_units`, `lexical_units`,
+    `semantic_projection_status`-shaped detail dicts, ...) is meaningful to
+    an operator who already knows the system, not to a non-expert. This is
+    a plain `dict` field (not a versioned contract model), so adding it
+    here does not need a contract regeneration.
+    """
+    required_total = sum(1 for item in checks if item["required"])
+    required_ok = required_total - len(required_failures)
+    if required_failures:
+        return (
+            f"문제: 필수 점검 {len(required_failures)}건 실패 ({', '.join(required_failures)}). "
+            "아래 checks 항목의 reason을 확인하세요."
+        )
+    optional_warnings = [item for item in checks if not item["required"] and not item["ok"]]
+    if not optional_warnings:
+        return f"정상: 필수 점검 {required_ok}/{required_total} 통과."
+    first = optional_warnings[0]
+    details = first.get("details")
+    reason = details.get("reason") if isinstance(details, dict) else None
+    hint = f"{first['name']}" + (f" — {reason}" if reason else "")
+    return f"정상: 필수 점검 {required_ok}/{required_total} 통과. 경고 {len(optional_warnings)}건({hint})."
 
 
 @app.command()
@@ -541,6 +671,7 @@ def doctor(ctx: typer.Context) -> None:
             "required_failures": required_failures,
             "checks": checks,
             "capabilities": capabilities.model_dump(mode="json"),
+            "summary": _doctor_summary(checks, required_failures),
         }
 
     _run(ctx, action)
@@ -658,6 +789,13 @@ def answer(
         "--include-candidate-assertions",
     ),
 ) -> None:
+    """Get one evidence-backed answer with citations for a question.
+
+    Use `search` to find documents, `context` to build a raw evidence pack
+    for your own reasoning, `answer` when you want a direct, cited answer
+    instead, and `read` to read one evidence unit verbatim.
+    """
+
     def action(runtime: Runtime) -> Any:
         selected_query = query_option or query
         if not selected_query:
@@ -701,6 +839,7 @@ def read(
 
 @get_app.command("artifact")
 def get_artifact(ctx: typer.Context, artifact_id: str = typer.Argument(...)) -> None:
+    """Get one canonical artifact record (a stored file/blob) by its ID."""
     _run(
         ctx,
         lambda runtime: runtime.container.application.evidence.get_artifact(
@@ -712,6 +851,7 @@ def get_artifact(ctx: typer.Context, artifact_id: str = typer.Argument(...)) -> 
 
 @get_app.command("document")
 def get_document(ctx: typer.Context, document_id: str = typer.Argument(...)) -> None:
+    """Get one canonical document record by its ID."""
     _run(
         ctx,
         lambda runtime: runtime.container.application.evidence.get_document(
@@ -723,6 +863,7 @@ def get_document(ctx: typer.Context, document_id: str = typer.Argument(...)) -> 
 
 @get_app.command("candidate")
 def get_candidate(ctx: typer.Context, candidate_id: str = typer.Argument(...)) -> None:
+    """Get one candidate assertion by its ID, whatever its review status."""
     _run(
         ctx,
         lambda runtime: runtime.container.application.knowledge.get_candidate(
@@ -734,6 +875,7 @@ def get_candidate(ctx: typer.Context, candidate_id: str = typer.Argument(...)) -
 
 @get_app.command("assertion")
 def get_assertion(ctx: typer.Context, assertion_id: str = typer.Argument(...)) -> None:
+    """Get one approved assertion by its ID."""
     _run(
         ctx,
         lambda runtime: runtime.container.application.knowledge.get_assertion(
@@ -760,6 +902,7 @@ def sync_all(
     enqueue: bool = typer.Option(False, "--enqueue"),
     dry_run: bool = typer.Option(False, "--dry-run"),
 ) -> None:
+    """Synchronize every enabled source now (filesystem, Slack, mail); use for a full refresh."""
     _run(ctx, lambda runtime: _sync_one(runtime, "all", enqueue=enqueue, dry_run=dry_run))
 
 
@@ -796,21 +939,25 @@ def sync_filesystem(
         False, "--enqueue", help="Create a durable worker job instead of running now"
     ),
 ) -> None:
+    """Synchronize one configured filesystem (NAS) source."""
     _run(ctx, lambda runtime: _sync_one(runtime, source, enqueue=enqueue, dry_run=dry_run))
 
 
 @sync_app.command("slack")
 def sync_slack(ctx: typer.Context, oldest: str | None = typer.Option(None)) -> None:
+    """Synchronize the configured Slack workspace."""
     _run(ctx, lambda runtime: _sync_one(runtime, "slack", since=oldest))
 
 
 @sync_app.command("imap")
 def sync_imap(ctx: typer.Context) -> None:
+    """Synchronize the configured IMAP mailbox."""
     _run(ctx, lambda runtime: _sync_one(runtime, "imap"))
 
 
 @sync_app.command("apple-mail")
 def sync_apple_mail(ctx: typer.Context) -> None:
+    """Synchronize the configured Apple Mail account."""
     _run(ctx, lambda runtime: _sync_one(runtime, "apple-mail"))
 
 
@@ -824,6 +971,12 @@ def parser_reextract(
         help="Atomically replace active units after all safety gates pass",
     ),
 ) -> None:
+    """Re-run parsing for a filesystem source into a shadow extraction (safe by default).
+
+    Without `--activate` nothing changes; the previous active extraction stays
+    live until every safety gate passes and `--activate` replaces it atomically.
+    """
+
     def action(runtime: Runtime) -> Any:
         selected = _resolve_sync_source(runtime, source)
         if selected not in _enabled_filesystem_sources(runtime):
@@ -845,6 +998,7 @@ def xlsx_read(
     cell_range: str = typer.Option(..., "--range"),
     allow_stale: bool = typer.Option(False, "--allow-stale"),
 ) -> None:
+    """Read an exact cell range from one XLSX artifact; never estimate totals from search."""
     _run(
         ctx,
         lambda runtime: runtime.container.application.evidence.read_xlsx(
@@ -891,6 +1045,7 @@ def graph_neighbors(
     direction: str = typer.Option("both"),
     limit: int = typer.Option(100, min=1, max=1000),
 ) -> None:
+    """List approved assertions directly connected to a node."""
     _run(
         ctx,
         lambda runtime: runtime.container.application.knowledge.graph_neighbors(
@@ -913,6 +1068,7 @@ def graph_path(
     predicate: list[str] | None = typer.Option(None, "--predicate"),
     max_depth: int = typer.Option(4, min=1, max=8),
 ) -> None:
+    """Find an approved-assertion path between two nodes."""
     _run(
         ctx,
         lambda runtime: runtime.container.application.knowledge.graph_path(
@@ -962,6 +1118,8 @@ def review_propose(
     ),
     confidence: float | None = typer.Option(None),
 ) -> None:
+    """Propose a candidate assertion (subject/predicate/object) for human review."""
+
     def action(runtime: Runtime) -> Any:
         object_value: Any = None
         if object_json is not None:
@@ -998,6 +1156,7 @@ def review_approve(
         ),
     ),
 ) -> None:
+    """Approve a candidate assertion, promoting it to an approved fact (requires admin role)."""
     _run(
         ctx,
         lambda runtime: runtime.container.application.knowledge.review_approve(
@@ -1015,7 +1174,7 @@ def review_revoke(
     assertion_id: str = typer.Argument(...),
     note: str = typer.Option(..., "--note", help="Required revocation reason"),
 ) -> None:
-    """Revoke an approved assertion; it leaves all approved-only surfaces."""
+    """Revoke an approved assertion; it leaves all approved-only surfaces (requires admin role)."""
     _run(
         ctx,
         lambda runtime: runtime.container.application.knowledge.revoke_assertion(
@@ -1030,6 +1189,7 @@ def review_reject(
     candidate_id: str = typer.Argument(...),
     note: str | None = typer.Option(None),
 ) -> None:
+    """Reject a candidate assertion so it is not promoted (requires admin role)."""
     _run(
         ctx,
         lambda runtime: runtime.container.application.knowledge.review_reject(
@@ -1044,6 +1204,7 @@ def jobs_list(
     status_value: str | None = typer.Option(None, "--status"),
     limit: int = typer.Option(100, min=1, max=1000),
 ) -> None:
+    """List durable background jobs and their status."""
     _run(
         ctx,
         lambda runtime: runtime.container.application.operations.list_jobs(
@@ -1149,9 +1310,6 @@ def projection_activate(
     report: Path = typer.Option(
         ...,
         "--report",
-        exists=True,
-        dir_okay=False,
-        readable=True,
         help="Full evaluation report containing lexical and candidate variants",
     ),
     candidate: str = typer.Option(..., "--candidate"),
@@ -1161,7 +1319,8 @@ def projection_activate(
     def action(runtime: Runtime) -> Any:
         if name not in {"semantic", "vector"}:
             raise ValidationError("only semantic projections require explicit activation")
-        evaluation = json.loads(report.read_text(encoding="utf-8"))
+        report_path = _validated_existing_path(report, "--report")
+        evaluation = json.loads(report_path.read_text(encoding="utf-8"))
         decision = validate_activation_report(
             evaluation,
             candidate=candidate,
@@ -1215,10 +1374,12 @@ def rebuild(
 @evaluate_app.command("validate")
 def evaluate_validate(
     ctx: typer.Context,
-    dataset: Path = typer.Option(..., "--dataset", exists=True, dir_okay=False, readable=True),
+    dataset: Path = typer.Option(..., "--dataset"),
 ) -> None:
+    """Validate a golden dataset file's structure without running it."""
+
     def action(runtime: Runtime) -> Any:
-        loaded = load_dataset(dataset)
+        loaded = load_dataset(_validated_existing_path(dataset, "--dataset"))
         return {
             "dataset": loaded.name,
             "case_count": len(loaded.cases),
@@ -1235,21 +1396,21 @@ def evaluate_validate(
 @evaluate_app.command("run")
 def evaluate_run(
     ctx: typer.Context,
-    dataset: Path = typer.Option(..., "--dataset", exists=True, dir_okay=False, readable=True),
+    dataset: Path = typer.Option(..., "--dataset"),
     variants: str = typer.Option("lexical", "--variants"),
     output_dir: Path = typer.Option(Path("evaluation/reports"), "--output-dir"),
     warmup_passes: int = typer.Option(1, "--warmup-passes", min=0),
     reviews: Path | None = typer.Option(
         None,
         "--reviews",
-        exists=True,
-        dir_okay=False,
-        readable=True,
         help="Reviewed answer and ontology observations bound to this dataset version",
     ),
 ) -> None:
+    """Run retrieval quality evaluation for one or more variants against a golden dataset."""
+
     def action(runtime: Runtime) -> Any:
-        loaded = load_dataset(dataset)
+        dataset_path = _validated_existing_path(dataset, "--dataset")
+        loaded = load_dataset(dataset_path)
 
         def search_case(case: GoldenCase, variant: str) -> list[SearchHit]:
             context = runtime.container.application.operations.request_context(
@@ -1292,15 +1453,18 @@ def evaluate_run(
                 )
             return enriched
 
+        review_bundle = None
+        if reviews is not None:
+            review_bundle = load_review_bundle(_validated_existing_path(reviews, "--reviews"))
         report = run_evaluation(
             loaded,
             variants=_split_csv(variants),
             search=search_case,
             workspace=runtime.context.workspace,
-            dataset_bytes=dataset.read_bytes(),
+            dataset_bytes=dataset_path.read_bytes(),
             configuration=runtime.container.settings.raw,
             code_root=runtime.container.settings.project_root,
-            review_bundle=load_review_bundle(reviews) if reviews is not None else None,
+            review_bundle=review_bundle,
             warmup_passes=warmup_passes,
             enrich=(enrich_case if requires_stale_enrichment(loaded) else None),
         )
@@ -1330,12 +1494,15 @@ def evaluate_run(
 @evaluate_app.command("compare")
 def evaluate_compare(
     ctx: typer.Context,
-    report: Path = typer.Option(..., "--report", exists=True, dir_okay=False, readable=True),
+    report: Path = typer.Option(..., "--report"),
     baseline: str = typer.Option("lexical", "--baseline"),
     candidate: str = typer.Option(..., "--candidate"),
 ) -> None:
+    """Compare two variants from an existing evaluation report."""
+
     def action(runtime: Runtime) -> Any:
-        payload = json.loads(report.read_text(encoding="utf-8"))
+        report_path = _validated_existing_path(report, "--report")
+        payload = json.loads(report_path.read_text(encoding="utf-8"))
         return compare_variants(payload, baseline, candidate)
 
     _run(ctx, action)
@@ -1344,10 +1511,12 @@ def evaluate_compare(
 @evaluate_draft_app.command("validate")
 def evaluate_draft_validate(
     ctx: typer.Context,
-    draft: Path = typer.Option(..., "--draft", exists=True, dir_okay=False, readable=True),
+    draft: Path = typer.Option(..., "--draft"),
 ) -> None:
+    """Validate a judge-proposed golden case draft before sample-audit review."""
+
     def action(runtime: Runtime) -> Any:
-        return validate_draft(draft)
+        return validate_draft(_validated_existing_path(draft, "--draft"))
 
     _run(ctx, action)
 
@@ -1355,16 +1524,18 @@ def evaluate_draft_validate(
 @evaluate_draft_app.command("review")
 def evaluate_draft_review(
     ctx: typer.Context,
-    draft: Path = typer.Option(..., "--draft", exists=True, dir_okay=False, readable=True),
+    draft: Path = typer.Option(..., "--draft"),
     review: Path = typer.Option(..., "--review", dir_okay=False),
     case_id: str = typer.Option(..., "--case-id"),
     decision: str = typer.Option(..., "--action", help="approve|reject"),
     reviewer: str = typer.Option(..., "--reviewer"),
     note: str | None = typer.Option(None, "--note"),
 ) -> None:
+    """Record a reviewer's approve/reject decision for one drafted golden case."""
+
     def action(runtime: Runtime) -> Any:
         return record_draft_review_decision(
-            draft_path=draft,
+            draft_path=_validated_existing_path(draft, "--draft"),
             review_path=review,
             case_id=case_id,
             action=decision,
@@ -1378,8 +1549,8 @@ def evaluate_draft_review(
 @evaluate_draft_app.command("promote")
 def evaluate_draft_promote(
     ctx: typer.Context,
-    draft: Path = typer.Option(..., "--draft", exists=True, dir_okay=False, readable=True),
-    review: Path = typer.Option(..., "--review", exists=True, dir_okay=False, readable=True),
+    draft: Path = typer.Option(..., "--draft"),
+    review: Path = typer.Option(..., "--review"),
     dataset: Path = typer.Option(..., "--dataset", dir_okay=False),
     min_sample_rate: float = typer.Option(0.2, "--min-sample-rate", min=0.0, max=1.0),
     lifecycle: str = typer.Option(
@@ -1397,10 +1568,12 @@ def evaluate_draft_promote(
         help="Source revision assigned by promotion; defaults to the draft's corpus_fingerprint",
     ),
 ) -> None:
+    """Promote reviewed draft golden cases into the dataset once the sample-audit gate passes."""
+
     def action(runtime: Runtime) -> Any:
         return promote_draft(
-            draft_path=draft,
-            review_path=review,
+            draft_path=_validated_existing_path(draft, "--draft"),
+            review_path=_validated_existing_path(review, "--review"),
             dataset_path=dataset,
             min_sample_rate=min_sample_rate,
             lifecycle=lifecycle,
@@ -1414,19 +1587,24 @@ def evaluate_draft_promote(
 @quality_app.command("validate-manifest")
 def quality_validate_manifest(
     ctx: typer.Context,
-    manifest: Path = typer.Option(..., "--manifest", exists=True, dir_okay=False, readable=True),
+    manifest: Path = typer.Option(..., "--manifest"),
 ) -> None:
-    _run(ctx, lambda runtime: load_experiment(manifest))
+    """Validate a version-pinned experiment manifest."""
+    _run(ctx, lambda runtime: load_experiment(_validated_existing_path(manifest, "--manifest")))
 
 
 @quality_app.command("recommend")
 def quality_recommend(
     ctx: typer.Context,
-    manifest: Path = typer.Option(..., "--manifest", exists=True, dir_okay=False, readable=True),
-    report: Path = typer.Option(..., "--report", exists=True, dir_okay=False, readable=True),
+    manifest: Path = typer.Option(..., "--manifest"),
+    report: Path = typer.Option(..., "--report"),
 ) -> None:
+    """Recommend a promotion decision from an experiment manifest and an evaluation report."""
+
     def action(runtime: Runtime) -> Any:
-        return recommend(load_experiment(manifest), load_quality_report(report))
+        manifest_path = _validated_existing_path(manifest, "--manifest")
+        report_path = _validated_existing_path(report, "--report")
+        return recommend(load_experiment(manifest_path), load_quality_report(report_path))
 
     _run(ctx, action)
 
@@ -1434,14 +1612,17 @@ def quality_recommend(
 @ontology_app.command("validate")
 def ontology_validate(
     ctx: typer.Context,
-    root: Path = typer.Option(..., "--root", exists=True, file_okay=False, readable=True),
+    root: Path = typer.Option(..., "--root"),
     domain_profile: str = typer.Option("research-project", "--domain-profile"),
 ) -> None:
+    """Validate an ontology contract directory against its domain profile."""
+
     def action(runtime: Runtime) -> Any:
-        errors = validate_ontology(root, domain_profile=domain_profile)
+        root_path = _validated_existing_path(root, "--root", dir_okay=True)
+        errors = validate_ontology(root_path, domain_profile=domain_profile)
         if errors:
             raise ValidationError("invalid ontology contract: " + "; ".join(errors))
-        catalog = OntologyCatalog.load(root, domain_profile=domain_profile)
+        catalog = OntologyCatalog.load(root_path, domain_profile=domain_profile)
         return {
             "version": catalog.version,
             "domain_profile": catalog.domain_profile,
@@ -1456,6 +1637,7 @@ def ontology_entities(
     ctx: typer.Context,
     limit: int = typer.Option(100, min=1, max=10_000),
 ) -> None:
+    """List known knowledge entities."""
     _run(
         ctx,
         lambda runtime: runtime.container.application.ontology_rag.list_entities(
@@ -1475,6 +1657,7 @@ def ontology_context(
         help="Also list proposed (unapproved) candidates, clearly labeled",
     ),
 ) -> None:
+    """Build an ontology-aware context summary (entities and relations) for a query."""
     _run(
         ctx,
         lambda runtime: (
@@ -1496,6 +1679,8 @@ def ontology_entity_create(
     alias: list[str] | None = typer.Option(None, "--alias"),
     acl_scope: list[str] | None = typer.Option(None, "--acl-scope"),
 ) -> None:
+    """Create a new knowledge entity by hand (requires admin role)."""
+
     def action(runtime: Runtime) -> Any:
         return runtime.container.application.ontology_rag.create_entity(
             runtime.context,
@@ -1516,6 +1701,7 @@ def ontology_mine(
     ctx: typer.Context,
     unit_id: list[str] = typer.Option(..., "--unit-id"),
 ) -> None:
+    """Enqueue relation mining over evidence units for new candidates (requires admin role)."""
     _run(
         ctx,
         lambda runtime: {
@@ -1535,6 +1721,8 @@ def ontology_candidates(
     predicate: str | None = typer.Option(None, "--predicate"),
     subject_id: str | None = typer.Option(None, "--subject-id"),
 ) -> None:
+    """List proposed entity and relation candidates awaiting review."""
+
     def action(runtime: Runtime) -> Any:
         listing = runtime.container.application.knowledge.candidate_listing(
             runtime.context,
@@ -1562,6 +1750,7 @@ def ontology_entity_approve(
     candidate_id: str = typer.Argument(...),
     note: str | None = typer.Option(None),
 ) -> None:
+    """Approve a proposed entity candidate as a canonical entity (requires admin role)."""
     _run(
         ctx,
         lambda runtime: runtime.container.application.ontology_rag.approve_entity_candidate(
@@ -1578,6 +1767,7 @@ def ontology_entity_reject(
     candidate_id: str = typer.Argument(...),
     note: str | None = typer.Option(None),
 ) -> None:
+    """Reject a proposed entity candidate (requires admin role)."""
     _run(
         ctx,
         lambda runtime: runtime.container.application.ontology_rag.reject_entity_candidate(
@@ -1591,8 +1781,8 @@ def ontology_entity_reject(
 @ontology_app.command("diff")
 def ontology_diff(
     ctx: typer.Context,
-    before: Path = typer.Option(..., "--before", exists=True, file_okay=False, readable=True),
-    after: Path = typer.Option(..., "--after", exists=True, file_okay=False, readable=True),
+    before: Path = typer.Option(..., "--before"),
+    after: Path = typer.Option(..., "--after"),
     before_domain_profile: str = typer.Option(
         "research-project",
         "--before-domain-profile",
@@ -1601,16 +1791,23 @@ def ontology_diff(
         "research-project",
         "--after-domain-profile",
     ),
-    migration: Path | None = typer.Option(None, "--migration", dir_okay=False, readable=True),
+    migration: Path | None = typer.Option(None, "--migration", dir_okay=False),
 ) -> None:
+    """Diff two ontology contract versions and validate migration coverage."""
+
     def action(runtime: Runtime) -> Any:
+        before_path = _validated_existing_path(before, "--before", dir_okay=True)
+        after_path = _validated_existing_path(after, "--after", dir_okay=True)
         result = diff_ontologies(
-            before,
-            after,
+            before_path,
+            after_path,
             before_domain_profile=before_domain_profile,
             after_domain_profile=after_domain_profile,
         )
-        selected = load_migration(migration) if migration is not None else None
+        migration_path = (
+            _validated_existing_path(migration, "--migration") if migration is not None else None
+        )
+        selected = load_migration(migration_path) if migration_path is not None else None
         errors = validate_migration_coverage(result, selected)
         if errors:
             raise ValidationError("invalid ontology migration: " + "; ".join(errors))
@@ -1622,37 +1819,24 @@ def ontology_diff(
 @ontology_app.command("migrate-materialize")
 def ontology_migrate_materialize(
     ctx: typer.Context,
-    before: Path = typer.Option(
-        ...,
-        "--before",
-        exists=True,
-        file_okay=False,
-        readable=True,
-    ),
-    after: Path = typer.Option(
-        ...,
-        "--after",
-        exists=True,
-        file_okay=False,
-        readable=True,
-    ),
-    migration: Path = typer.Option(
-        ...,
-        "--migration",
-        exists=True,
-        dir_okay=False,
-        readable=True,
-    ),
+    before: Path = typer.Option(..., "--before"),
+    after: Path = typer.Option(..., "--after"),
+    migration: Path = typer.Option(..., "--migration"),
 ) -> None:
-    _run(
-        ctx,
-        lambda runtime: runtime.container.application.ontology_migrations.materialize(
+    """Materialize an ontology migration between a before and after ontology version."""
+
+    def action(runtime: Runtime) -> Any:
+        before_path = _validated_existing_path(before, "--before", dir_okay=True)
+        after_path = _validated_existing_path(after, "--after", dir_okay=True)
+        migration_path = _validated_existing_path(migration, "--migration")
+        return runtime.container.application.ontology_migrations.materialize(
             runtime.context,
-            before,
-            after,
-            load_migration(migration),
-        ),
-    )
+            before_path,
+            after_path,
+            load_migration(migration_path),
+        )
+
+    _run(ctx, action)
 
 
 @telemetry_app.command("traces")
@@ -1661,6 +1845,8 @@ def telemetry_traces(
     request_id: str | None = typer.Option(None, "--request-id"),
     limit: int = typer.Option(100, "--limit", min=1, max=1000),
 ) -> None:
+    """List redacted RAG query traces for debugging retrieval quality (requires admin role)."""
+
     def action(runtime: Runtime) -> Any:
         return runtime.container.application.telemetry.list_traces(
             runtime.context,
@@ -1673,6 +1859,8 @@ def telemetry_traces(
 
 @telemetry_app.command("prune")
 def telemetry_prune(ctx: typer.Context) -> None:
+    """Delete query traces past their retention window (requires admin role)."""
+
     def action(runtime: Runtime) -> Any:
         return {"deleted": runtime.container.application.telemetry.prune(runtime.context)}
 
@@ -1712,6 +1900,8 @@ def interaction_clarify(
     allow_multiple: bool = typer.Option(False, "--allow-multiple"),
     preference_key: str | None = typer.Option(None, "--preference-key"),
 ) -> None:
+    """Ask a bounded clarification question when a request is genuinely ambiguous."""
+
     def action(runtime: Runtime) -> Any:
         return runtime.container.application.interactions.create_clarification(
             runtime.context,
@@ -1739,6 +1929,7 @@ def interaction_answer(
     freeform: str | None = typer.Option(None, "--freeform"),
     remember: bool = typer.Option(False, "--remember"),
 ) -> None:
+    """Answer a pending clarification question raised by `interaction clarify`."""
     _run(
         ctx,
         lambda runtime: runtime.container.application.interactions.answer_clarification(
@@ -1758,6 +1949,7 @@ def interaction_answer(
 
 @interaction_app.command("preferences")
 def interaction_preferences(ctx: typer.Context) -> None:
+    """List saved user preferences."""
     _run(
         ctx,
         lambda runtime: runtime.container.application.interactions.list_preferences(
@@ -1773,6 +1965,8 @@ def interaction_remember(
     value: list[str] | None = typer.Option(None, "--value"),
     confirmed: bool = typer.Option(False, "--confirmed"),
 ) -> None:
+    """Persist a confirmed user preference (pass --confirmed to actually save it)."""
+
     def action(runtime: Runtime) -> Any:
         if not confirmed:
             raise ValidationError("--confirmed is required to persist a preference")
@@ -1796,6 +1990,7 @@ def interaction_forget(
     ctx: typer.Context,
     key: str = typer.Option(..., "--key"),
 ) -> None:
+    """Delete a saved user preference by key."""
     _run(
         ctx,
         lambda runtime: {
@@ -1814,6 +2009,7 @@ def interaction_feedback(
     reason_code: list[str] | None = typer.Option(None, "--reason-code"),
     request_id: str | None = typer.Option(None, "--request-id"),
 ) -> None:
+    """Submit outcome feedback (e.g. helpful/not helpful) for a prior request."""
     _run(
         ctx,
         lambda runtime: runtime.container.application.interactions.submit_feedback(
@@ -1832,6 +2028,8 @@ def interaction_feedback(
 
 @interaction_app.command("prune")
 def interaction_prune(ctx: typer.Context) -> None:
+    """Delete expired clarification questions that were never answered."""
+
     def action(runtime: Runtime) -> Any:
         return {
             "deleted": runtime.container.application.interactions.prune_expired_clarifications(
@@ -1867,6 +2065,8 @@ def ontology_discovery_propose(
     extraction: str | None = typer.Option(None, "--extraction", help="predicate only."),
     confirmed: bool = typer.Option(False, "--confirmed"),
 ) -> None:
+    """Propose a new non-activating ontology candidate (entity type or predicate) for review."""
+
     def action(runtime: Runtime) -> Any:
         if not confirmed:
             raise ValidationError("--confirmed is required to propose ontology discovery")
@@ -1901,6 +2101,7 @@ def ontology_discovery_list(
     status: str | None = typer.Option("proposed", "--status"),
     limit: int = typer.Option(100, "--limit", min=1, max=1000),
 ) -> None:
+    """List proposed ontology discovery candidates."""
     _run(
         ctx,
         lambda runtime: (
@@ -1920,6 +2121,7 @@ def ontology_discovery_review(
     action: str = typer.Option(..., "--action"),
     note: str | None = typer.Option(None, "--note"),
 ) -> None:
+    """Approve or reject an ontology discovery candidate (requires admin role)."""
     _run(
         ctx,
         lambda runtime: (
@@ -1971,6 +2173,7 @@ def api_serve(
     host: str | None = typer.Option(None),
     port: int | None = typer.Option(None),
 ) -> None:
+    """Run the optional REST API adapter (same application services as the CLI)."""
     runtime = _runtime(ctx)
     try:
         import uvicorn
@@ -1992,6 +2195,7 @@ def worker_run(
     once: bool = typer.Option(False, "--once"),
     poll_seconds: float = typer.Option(2.0, min=0.1, max=60),
 ) -> None:
+    """Run the background worker that drains durable jobs (sync, rebuild, mining, ...)."""
     runtime = _runtime(ctx)
     from kip.worker import run_worker
 

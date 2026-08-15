@@ -255,6 +255,38 @@ def test_csv_rejects_files_over_the_size_backstop(
         )
 
 
+def test_csv_recovers_delimiter_past_a_leading_comment_line(tmp_path: Path) -> None:
+    # Given a semicolon-delimited CSV with a leading "#"-prefixed metadata
+    # line, the kind of leading comment real export tools often prepend.
+    # csv.Sniffer's frequency heuristic cannot find a consistent delimiter
+    # across the whole sample (the comment line has none of the candidate
+    # delimiters) and raises - before this fix, the code fell straight back
+    # to the default ",", which does not appear anywhere in the actual data,
+    # so every row parsed into a single field with a consistent column count
+    # and the ragged-row check never tripped. That reported
+    # status="succeeded"/quality=1.0 while every value was silently merged
+    # into one field.
+    path = tmp_path / "commented.csv"
+    path.write_text(
+        "# generated 2026-08-15 by export tool\na;b;c\n1;2;3\n4;5;6\n",
+        encoding="utf-8",
+    )
+
+    # When it is parsed.
+    extraction, units = CsvTableParser().parse(
+        path, artifact_id="art_comment", document_id="doc_comment", acl_scopes=["workspace:default"]
+    )
+
+    # Then the real semicolon delimiter is recovered and each data row
+    # actually splits into 3 fields (visible as a ragged-row warning against
+    # the 1-field comment "header", not a silent single-field collapse).
+    assert units[0].metadata["delimiter"] == ";"
+    parsed_rows = _rows_from_body(units[0].body, delimiter=";")
+    assert parsed_rows[1:] == [["a", "b", "c"], ["1", "2", "3"], ["4", "5", "6"]]
+    assert extraction.status == "partial"
+    assert any("ragged rows" in warning for warning in extraction.warnings)
+
+
 def test_csv_routes_to_csv_table_parser_ahead_of_plain_text(tmp_path: Path) -> None:
     # Given the production parser registry.
     settings = Settings(

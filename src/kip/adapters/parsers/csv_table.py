@@ -25,13 +25,42 @@ _SNIFF_SAMPLE_CHARS: Final = 8192
 _MAX_FILE_BYTES: Final = 500 * 1024 * 1024
 
 
+def _strip_leading_comment_lines(sample: str) -> str:
+    """Drop leading ``#``-prefixed lines from a delimiter-sniffing sample.
+
+    CSV has no standardized comment syntax, but a leading ``#`` metadata line
+    (e.g. ``# generated 2026-08-15 by export tool``) is common enough in real
+    exports that csv.Sniffer's frequency-based heuristic cannot find a
+    consistent delimiter across the whole sample and raises ``csv.Error`` -
+    without this, the caller then fell back to the default "," even when
+    every actual data row used ";" or a tab, silently corrupting every row
+    into a single field without ever tripping the ragged-row warning (every
+    row looked consistently "ragged" at 1 column, which reads as clean).
+    Only used to pick a delimiter for sniffing; the comment line itself is
+    still parsed as ordinary CSV content afterwards (typically becoming an
+    odd-looking header row), so row numbering and locators are unaffected.
+    """
+    lines = sample.split("\n")
+    index = 0
+    while index < len(lines) and lines[index].startswith("#"):
+        index += 1
+    return "\n".join(lines[index:])
+
+
 def _detect_delimiter(sample: str) -> str:
     if not sample.strip():
         return _DEFAULT_DELIMITER
     try:
         return csv.Sniffer().sniff(sample, delimiters=_SNIFF_DELIMITERS).delimiter
     except csv.Error:
-        return _DEFAULT_DELIMITER
+        pass
+    stripped_sample = _strip_leading_comment_lines(sample)
+    if stripped_sample.strip() and stripped_sample != sample:
+        try:
+            return csv.Sniffer().sniff(stripped_sample, delimiters=_SNIFF_DELIMITERS).delimiter
+        except csv.Error:
+            pass
+    return _DEFAULT_DELIMITER
 
 
 def _serialize_rows(rows: list[list[str]], delimiter: str) -> str:

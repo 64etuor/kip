@@ -239,7 +239,13 @@ _QUESTIONS = {
         prompt="사용자 신원은 identity-aware proxy JWT와 API key 중 무엇으로 검증하나요?",
         answer_format="one choice",
         choices=["proxy_jwt", "api_key"],
-        why="클라이언트가 보낸 임의 header를 신원으로 신뢰하지 않기 위해 필요합니다.",
+        why=(
+            "혼자 또는 소규모 팀이 처음 시험한다면 api_key를 고르세요(설정이 "
+            "간단하고 곧바로 동작합니다). 사내 로그인(SSO)과 연동해 사용자별로 "
+            "권한을 구분해야 할 때만 proxy_jwt를 선택하며, 이 경우 사내 인증 "
+            "담당자에게 issuer와 JWKS URL을 받아야 합니다. 어느 쪽이든 클라이언트가 "
+            "보낸 임의 header를 신원으로 신뢰하지 않습니다."
+        ),
     ),
     "identity_owner": SetupQuestion(
         id="identity_owner",
@@ -295,21 +301,41 @@ _QUESTIONS = {
         prompt="이 배포는 회사 자료와 개인 자료 중 어느 한쪽만 수집하나요?",
         answer_format="one choice",
         choices=["company", "personal"],
-        why="개인 자료와 회사 자료를 동일 deployment에 섞지 않습니다.",
+        why=(
+            "개인 자료와 회사 자료는 보존·감사 규칙이 달라 한 배포에 섞지 "
+            "않습니다. 팀 업무용이면 company를 선택하세요. 회사 NAS와 개인 "
+            "드라이브를 모두 색인해야 한다면 배포를 두 번 따로 설치하세요."
+        ),
     ),
     "filesystem_sources": SetupQuestion(
         id="filesystem_sources",
         prompt="수집할 하위 폴더별 이름, 절대경로, 데이터 등급, ACL scope, 포함 확장자와 제외 glob을 알려주세요.",
         answer_format="JSON array of source objects",
         example='[{"name":"company-docs","root":"/mnt/nas/team","classification":"internal","acl_scope":"workspace:acme-rnd"}]',
-        why="과도한 폴더 수집을 막고 실제 수집 범위를 미리 계산합니다.",
+        why=(
+            "각 항목의 뜻: name=폴더 별명(영문 소문자·하이픈), root=실제 "
+            "절대경로, classification=민감도 등급(public 공개 가능 / internal "
+            "사내 공유 / confidential 관련 부서만 / restricted 지정 소수만 / "
+            "personal 개인정보 포함 — 모르면 엄격한 쪽으로), acl_scope=이 자료를 "
+            "볼 수 있는 그룹 이름표(형식 workspace:이름, 보통 조직 workspace와 "
+            "동일하게), include_extensions=색인할 확장자, exclude_globs=제외 "
+            "패턴(예: **/backup/**). 폴더는 읽기 전용으로만 연결되며 원본은 "
+            "절대 수정되지 않습니다. 처음에는 폴더 1개로 시작해 확인 후 "
+            "늘리세요."
+        ),
     ),
     "ontology_profile": SetupQuestion(
         id="ontology_profile",
         prompt="새 배포는 빈 도메인 프로파일과 연구과제 예제 프로파일 중 무엇으로 시작하나요?",
         answer_format="one choice",
         choices=["empty", "research-project"],
-        why="의미 계약의 최소 커널은 유지하면서 도메인 전제를 명시적으로 선택합니다.",
+        why=(
+            "온톨로지는 KIP이 문서에서 인식할 개념(사람·과제·계약 등)과 관계"
+            "(무엇이 무엇을 승인했는지 등)를 적어둔 사전입니다. 대부분의 신규 "
+            "조직은 empty(빈 사전으로 시작, 필요할 때 추가)를 선택하세요. "
+            "research-project는 연구과제 관리용 예시가 미리 채워진 사전이라 "
+            "실제 업무와 다르면 오히려 혼란스럽습니다."
+        ),
     ),
     "model_provider": SetupQuestion(
         id="model_provider",
@@ -324,7 +350,13 @@ _QUESTIONS = {
         answer_format="JSON array",
         choices=["public", "internal", "confidential", "restricted", "personal"],
         example='["public"]',
-        why="허용되지 않은 등급의 근거가 외부 모델로 나가는 것을 차단합니다.",
+        why=(
+            "여기 적은 등급의 문서만 외부 AI 서비스로 전송됩니다(등급 뜻: "
+            "public 공개 가능 / internal 사내 공유 / confidential 관련 부서만 / "
+            "restricted 지정 소수만 / personal 개인정보 포함). 확신이 없으면 "
+            '["public"] 또는 빈 배열 []로 시작하세요. 나중에 넓힐 수 있고, '
+            "좁게 시작하는 편이 안전합니다."
+        ),
     ),
     "model_retention_policy": SetupQuestion(
         id="model_retention_policy",
@@ -373,7 +405,12 @@ _QUESTIONS = {
         prompt="수집 주기는 5-field cron 또는 manual 중 무엇인가요?",
         answer_format="cron string or manual",
         example="0 * * * *",
-        why="검색 경로가 암묵적으로 전체 sync를 시작하지 않게 합니다.",
+        why=(
+            "이 값은 기록용이며 그 자체로 자동 실행을 설정하지는 않습니다. "
+            "처음에는 manual을 선택하고 필요할 때 `kip sync run`을 직접 "
+            "실행하세요. 자동화는 나중에 scripts/install-launchd.sh로 켤 수 "
+            "있습니다. 검색할 때 자동으로 전체 수집이 시작되지는 않습니다."
+        ),
     ),
     "evaluation_dataset": SetupQuestion(
         id="evaluation_dataset",
@@ -394,6 +431,12 @@ _QUESTIONS = {
         prompt="사용자 확인 기반 선호 기억과 온톨로지 발견 후보를 보존할까요?",
         answer_format="one choice",
         choices=["disabled", "explicit_consent"],
-        why="질의·답변·원문을 자동 보존하지 않고 명시적으로 동의한 설정만 기억합니다.",
+        why=(
+            "사용자가 대화 중 '기억해줘'라고 명시적으로 확인한 설정(예: 기본 "
+            "검색 범위)만 저장할지 정합니다. 검색어나 문서 내용 자체는 어느 "
+            "쪽을 골라도 저장되지 않습니다. 잘 모르면 explicit_consent(권장)를 "
+            "선택하세요. 새 용어·관계 제안을 모으는 기능도 함께 켜지지만, "
+            "제안은 관리자가 승인하기 전까지 시스템에 반영되지 않습니다."
+        ),
     ),
 }

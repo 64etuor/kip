@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol, assert_never, cast
+from typing import TYPE_CHECKING, Final, Protocol, assert_never, cast
 
 from kip.domain.json_types import JsonObject, JsonValue
 from kip.ids import sha256_bytes
@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from pptx.chart.chart import Chart
     from pptx.shapes.autoshape import Shape
     from pptx.shapes.base import BaseShape
+    from pptx.shapes.group import GroupShape
     from pptx.shapes.picture import Picture
     from pptx.slide import Slide
     from pptx.table import Table
@@ -42,8 +43,71 @@ class ShapeLike(Protocol):
     def height(self) -> int | None: ...
 
 
+@dataclass(frozen=True, slots=True)
+class _Transform:
+    """Maps a shape's raw local (left, top, width, height) to slide EMU.
+
+    A shape's own `<a:off>`/`<a:ext>` are always defined relative to its
+    *immediate parent's* coordinate system: for a top-level shape that
+    parent is the slide itself (an implicit identity transform), but for a
+    shape inside a `<p:grpSp>` it is the group's *child* coordinate space
+    (`chOff`/`chExt`), which PowerPoint lets an author move/resize
+    independently of the group's own on-slide `off`/`ext` - e.g. moving or
+    resizing a group after grouping, the most common real-world grouping
+    edit, changes this mapping without touching a single child shape's raw
+    XML. python-pptx's `.left`/`.top`/`.width`/`.height` return those raw,
+    unconverted local values, so reading them directly for a shape nested
+    in a group silently reports the wrong on-slide position/size (and
+    reading order, which sorts by this same bbox) - correct only by
+    coincidence, when a group has never been moved or resized after its
+    child extents were first computed.
+    """
+
+    scale_x: float
+    scale_y: float
+    offset_x: float
+    offset_y: float
+
+    def apply(self, left: int, top: int, width: int, height: int) -> tuple[int, int, int, int]:
+        return (
+            round(self.offset_x + left * self.scale_x),
+            round(self.offset_y + top * self.scale_y),
+            round(width * self.scale_x),
+            round(height * self.scale_y),
+        )
+
+    def child_transform(
+        self, *, off_x: int, off_y: int, ext_cx: int, ext_cy: int, ch_off_x: int, ch_off_y: int, ch_ext_cx: int, ch_ext_cy: int
+    ) -> _Transform:
+        """Compute the transform for a group's direct children.
+
+        ``off``/``ext`` are the group's own raw local position/size (in
+        *this* transform's coordinate space); ``chOff``/``chExt`` are the
+        group's child-coordinate-space origin/size that its children's
+        ``off``/``ext`` values are expressed in. Rotation/flip on the group
+        are intentionally not composed in here (consistent with how a
+        shape's own rotation is already reported separately as
+        ``rotation_degrees`` rather than folded into ``bbox_emu`` - see
+        ``_shape_metadata``): the result is the group's un-rotated frame in
+        slide-EMU terms, which keeps this a well-defined, low-risk affine
+        translate+scale instead of a lossy rotated-bbox approximation.
+        """
+        abs_x, abs_y, abs_cx, abs_cy = self.apply(off_x, off_y, ext_cx, ext_cy)
+        scale_x = (abs_cx / ch_ext_cx) if ch_ext_cx else 1.0
+        scale_y = (abs_cy / ch_ext_cy) if ch_ext_cy else 1.0
+        return _Transform(
+            scale_x=scale_x,
+            scale_y=scale_y,
+            offset_x=abs_x - ch_off_x * scale_x,
+            offset_y=abs_y - ch_off_y * scale_y,
+        )
+
+
+_IDENTITY_TRANSFORM: Final = _Transform(scale_x=1.0, scale_y=1.0, offset_x=0.0, offset_y=0.0)
+
+
 def extract_shape_records(slide: Slide) -> list[PptxShapeRecord]:
-    records = _extract_shapes(slide.shapes, group_path=(), z_prefix=())
+    records = _extract_shapes(slide.shapes, group_path=(), z_prefix=(), transform=_IDENTITY_TRANSFORM)
     return sorted(
         records,
         key=lambda record: (
@@ -59,6 +123,7 @@ def _extract_shapes(
     *,
     group_path: tuple[int, ...],
     z_prefix: tuple[int, ...],
+    transform: _Transform,
 ) -> list[PptxShapeRecord]:
     from pptx.shapes.autoshape import Shape
     from pptx.shapes.base import BaseShape
@@ -68,7 +133,7 @@ def _extract_shapes(
 
     records: list[PptxShapeRecord] = []
     for z_order, shape in enumerate(shapes):
-        bbox = _bbox(shape)
+        bbox = _bbox(shape, transform)
         z_path = (*z_prefix, z_order)
         match shape:
             case GroupShape():
@@ -77,6 +142,7 @@ def _extract_shapes(
                         shape.shapes,
                         group_path=(*group_path, shape.shape_id),
                         z_prefix=z_path,
+                        transform=_group_child_transform(shape, transform),
                     )
                 )
             case GraphicFrame() if shape.has_table:
@@ -257,14 +323,36 @@ def _extract_text(shape: Shape) -> tuple[str, list[JsonValue]]:
     return shape.text.strip(), paragraphs
 
 
-def _bbox(shape: ShapeLike) -> JsonObject:
-    return {
-        "left": _length(shape.left),
-        "top": _length(shape.top),
-        "width": _length(shape.width),
-        "height": _length(shape.height),
-    }
+def _bbox(shape: ShapeLike, transform: _Transform) -> JsonObject:
+    left, top, width, height = transform.apply(
+        _length(shape.left), _length(shape.top), _length(shape.width), _length(shape.height)
+    )
+    return {"left": left, "top": top, "width": width, "height": height}
 
 
 def _length(value: int | None) -> int:
     return int(value) if value is not None else 0
+
+
+def _group_child_transform(shape: GroupShape, transform: _Transform) -> _Transform:
+    """Build the transform for the direct children of group ``shape``.
+
+    Falls back to the group's own (already-correct) transform, unchanged,
+    when the group has no explicit child-coordinate-space extent to scale
+    from (an empty or malformed ``chExt``) - the same "no-op" 1:1 mapping
+    `child_transform` already applies per-axis when only one axis is
+    degenerate.
+    """
+    element = shape.element
+    ch_off = element.chOff
+    ch_ext = element.chExt
+    return transform.child_transform(
+        off_x=_length(shape.left),
+        off_y=_length(shape.top),
+        ext_cx=_length(shape.width),
+        ext_cy=_length(shape.height),
+        ch_off_x=_length(ch_off.x),
+        ch_off_y=_length(ch_off.y),
+        ch_ext_cx=_length(ch_ext.cx),
+        ch_ext_cy=_length(ch_ext.cy),
+    )

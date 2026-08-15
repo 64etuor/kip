@@ -1,5 +1,47 @@
 # Operations
 
+> 용어가 낯설면 [`GLOSSARY.md`](GLOSSARY.md), 문제가 생기면
+> [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)를 보세요.
+
+## 자주 하는 작업 (Everyday tasks)
+
+**문서 폴더 하나 더 추가하기.** 설정 파일(`config/kip.toml`)에 블록을 하나
+추가하고 그 소스만 수집하면 됩니다. 원본 폴더는 읽기 전용으로만 연결되며
+수정되지 않습니다.
+
+```toml
+[[sources.filesystem]]
+name = "sales-team"                 # 영문 소문자 별명 (수집할 때 쓰는 이름)
+root = "/mnt/nas/영업팀"             # 실제 절대경로
+enabled = true
+read_only = true
+include_extensions = [".md", ".txt", ".pdf", ".hwp", ".hwpx", ".docx", ".xlsx", ".pptx", ".csv"]
+exclude_globs = ["**/.DS_Store", "**/~$*", "**/backup/**"]
+acl_scope = "workspace:default"     # 이 자료를 볼 수 있는 그룹 이름표
+classification = "internal"          # public / internal / confidential / restricted / personal
+```
+
+```bash
+# doctor 의 checks 에 filesystem_source:sales-team 이 ok:true 로 보이면 등록된 것
+./scripts/kip doctor
+./scripts/kip sync run --source sales-team     # 그 폴더만 수집
+./scripts/kip status                           # content_units 가 늘었는지 확인
+```
+
+**바뀐 파일 다시 반영하기.** 같은 명령을 다시 실행하면 됩니다. 변경된 파일만
+다시 읽고, 그대로인 파일은 건너뜁니다. 검색은 절대 수집을 자동으로 시작하지
+않습니다.
+
+**문서가 검색되지 않을 때.** `./scripts/kip status`로 색인 건수를 보고,
+`./scripts/kip vocab "단어"`로 그 단어가 색인에 있는지 확인한 뒤,
+`sync run` 출력의 `failed`/`warnings`에서 파일별 이유를 확인하세요. 자세한
+절차는 [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) 2·3장에 있습니다.
+
+**후보 검토가 필요한지 확인.** `./scripts/kip ontology candidates --status
+proposed`가 비어 있으면 할 일이 없습니다. 관계 채굴을 켜지 않은 일반 설치에서는
+계속 비어 있는 것이 정상이며, 온톨로지 명령을 배우지 않아도 검색·답변은 그대로
+동작합니다.
+
 ## Daily
 
 ```bash
@@ -134,6 +176,15 @@ SHA-256, GHCR digest, attestation verification, migration result, and rollback
 digest in the change record.
 
 ## Backup
+
+로컬/개발 설치에서는 별도 설정 없이 그대로 실행하면 됩니다. `.env`의
+`KIP_DATABASE_URL`과 기본 경로(`var/backups`, `var/cas`)를 사용합니다.
+
+```bash
+./scripts/backup.sh --retain 7
+```
+
+프로덕션에서는 비밀 파일과 실제 경로를 지정합니다.
 
 ```bash
 export KIP_DATABASE_URL_FILE=/run/secrets/backup-database-url
@@ -276,13 +327,19 @@ provider returning more proposals can approach
 `max_response_bytes` (default 1 MiB). Both are configuration keys; raise
 them together with the batch caps rather than after the first timeout.
 
+Mining, entity creation, and every approve/reject/revoke require the **admin
+role**, and `--role` is a global option that must come **before** the
+subcommand (`./scripts/kip --role admin ontology mine ...`, not
+`./scripts/kip ontology mine ... --role admin`). Export `KIP_ROLES=admin`
+instead if you run many of these in one session.
+
 ```bash
 ./scripts/kip ontology entities
-./scripts/kip ontology mine --unit-id UNIT_ID
+./scripts/kip --role admin ontology mine --unit-id UNIT_ID
 ./scripts/worker.sh --once
 ./scripts/kip ontology candidates --status proposed
-./scripts/kip ontology entity-approve ENTITY_CANDIDATE_ID
-./scripts/kip review approve RELATION_CANDIDATE_ID
+./scripts/kip --role admin ontology entity-approve ENTITY_CANDIDATE_ID
+./scripts/kip --role admin review approve RELATION_CANDIDATE_ID
 ```
 
 Submit small, coherent evidence batches. A job is idempotent for workspace,
@@ -367,9 +424,14 @@ An ontology observation remains a candidate even after review:
 ./scripts/kip ontology discovery propose \
   --kind entity_type --symbol contract --label "계약" \
   --definition "업무상 체결하는 계약을 표현한다." --confirmed
-./scripts/kip ontology discovery list --status proposed
-./scripts/kip ontology discovery review --candidate-id ODC_ID --action accept
+./scripts/kip --role admin ontology discovery list --status proposed
+./scripts/kip --role admin ontology discovery review \
+  --candidate-id ODC_ID --action accept
 ```
+
+Listing and reviewing discovery candidates both require the admin role
+(`--role admin` before the subcommand, or `KIP_ROLES=admin`); proposing does
+not.
 
 Accepting an `entity_type` or `predicate` candidate materializes an additive
 ontology release automatically (ADR-044): the symbol is written into the

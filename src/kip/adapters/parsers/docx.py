@@ -35,6 +35,21 @@ _PKG_REL_NS: Final = "http://schemas.openxmlformats.org/package/2006/relationshi
 # nonsensical level 99.
 _HEADING_STYLE_RE: Final = re.compile(r"^Heading\s*([1-9])$", re.IGNORECASE)
 _HEADER_FOOTER_RE: Final = re.compile(r"^word/(header|footer)\d*\.xml$")
+# word/footnotes.xml and word/endnotes.xml are fixed, singular part names per
+# the OOXML WordprocessingML schema (unlike headers/footers, which are
+# numbered per section) - one part holds every footnote in the document, the
+# other every endnote.
+_FOOTNOTES_PART: Final = "word/footnotes.xml"
+_ENDNOTES_PART: Final = "word/endnotes.xml"
+# w:footnote/w:endnote elements with these w:type values are Word-generated
+# separator marks (the divider line and its continuation-page variant), not
+# author content. They render as a blank paragraph containing only a
+# <w:separator/> or <w:continuationSeparator/> child, so _walk_body's normal
+# text walk already turns them into empty text; this set of "skip" types is
+# a comment marker for that behavior, and the code below explicitly skips
+# them so a malformed part where an author-authored note happens to reuse
+# one of these type values can't be miscategorized.
+_NOTE_SEPARATOR_TYPES: Final = frozenset({"separator", "continuationSeparator", "continuationNotice"})
 _REPLACEMENT_CHAR: Final = "�"
 _DEFAULT_MAX_CHARS_PER_UNIT: Final = 4000
 # ET.fromstring accepts arbitrarily deep XML nesting (expat parses
@@ -134,6 +149,8 @@ class DocxParser:
                 paragraphs, tables = _walk_body(body, rels)
                 textboxes, nested_textbox_count = _collect_textboxes(body)
                 header_footer_texts = _read_header_footer_parts(archive, names, warnings)
+                footnotes = _read_notes_part(archive, names, _FOOTNOTES_PART, "footnote", warnings)
+                endnotes = _read_notes_part(archive, names, _ENDNOTES_PART, "endnote", warnings)
                 images = _collect_image_relationships(rels, content_types)
         except (zipfile.BadZipFile, KeyError, ET.ParseError) as exc:
             raise ParserError(f"DOCX parse failed: {path}: {exc}") from exc
@@ -165,6 +182,14 @@ class DocxParser:
             unit = _header_footer_unit(part_name, text, context, ordinal=len(units))
             if unit is not None:
                 units.append(unit)
+        for note_id, text in footnotes:
+            unit = _note_unit("footnote", note_id, text, context, ordinal=len(units))
+            if unit is not None:
+                units.append(unit)
+        for note_id, text in endnotes:
+            unit = _note_unit("endnote", note_id, text, context, ordinal=len(units))
+            if unit is not None:
+                units.append(unit)
 
         aggregate = "\n".join(unit.body for unit in units)
         quality = _compute_quality(paragraphs, aggregate) if units else 0.0
@@ -184,6 +209,8 @@ class DocxParser:
                 "nested_table_count": nested_table_count,
                 "textbox_count": len(textboxes),
                 "nested_textbox_count": nested_textbox_count,
+                "footnote_count": len(footnotes),
+                "endnote_count": len(endnotes),
                 "image_count": len(images),
                 "images": images,
             },
@@ -387,6 +414,15 @@ def _walk_run(
         return
     if tag in ("br", "cr"):
         texts.append("\n")
+        return
+    if tag == "noBreakHyphen":
+        # <w:noBreakHyphen/> renders as a literal "-" glyph (just one Word
+        # won't break across a line wrap); it carries no <w:t> child, so the
+        # generic recursion below silently drops it entirely, gluing the
+        # words on either side together (e.g. "Non-break" + "hyphen test."
+        # -> "Non-breakhyphen test.", losing the hyphen and looking like a
+        # single misspelled word). Emit the visible character instead.
+        texts.append("-")
         return
     if tag == "hyperlink":
         start = len(texts)
@@ -605,6 +641,46 @@ def _rels_path_for(part_name: str) -> str:
     return posixpath.join(directory, "_rels", f"{filename}.rels")
 
 
+# --- footnotes/endnotes: per-note units so a footnoteReference/endnoteReference -------------
+# in the body can be traced to its actual text instead of the reference mark
+# alone. Word stores every footnote in a single word/footnotes.xml part and
+# every endnote in a single word/endnotes.xml part (not one part per note, and
+# not numbered like headers/footers), keyed by a w:id that the body's
+# w:footnoteReference/w:endnoteReference elements point back to.
+
+
+def _read_notes_part(
+    archive: zipfile.ZipFile,
+    names: set[str],
+    part_name: str,
+    tag_name: str,
+    warnings: list[str],
+) -> list[tuple[str, str]]:
+    if part_name not in names:
+        return []
+    try:
+        root = ET.fromstring(archive.read(part_name))
+    except (KeyError, ET.ParseError) as exc:
+        warnings.append(f"PARTIAL_PARSE {part_name}: {exc}")
+        return []
+    rels = _read_relationships(archive, _rels_path_for(part_name))
+    results: list[tuple[str, str]] = []
+    for note in root.findall(_w(tag_name)):
+        if note.attrib.get(_w("type")) in _NOTE_SEPARATOR_TYPES:
+            continue
+        note_id = note.attrib.get(_w("id"), "")
+        paragraphs, tables = _walk_body(note, rels)
+        parts = [record.text for record in paragraphs if record.text.strip()]
+        for table in tables:
+            rendered = _render_table(table, rels)
+            if rendered.body.strip():
+                parts.append(rendered.body)
+        text = "\n".join(parts)
+        if text.strip():
+            results.append((note_id, text))
+    return results
+
+
 # --- unit construction -----------------------------------------------------------------------
 
 
@@ -739,6 +815,30 @@ def _header_footer_unit(
         locator=EvidenceLocator(type="docx_header_footer", data={"part": part_name}),
         acl_scopes=context.acl_scopes,
         metadata={"part_type": part_type},
+    )
+
+
+def _note_unit(
+    kind: str, note_id: str, text: str, context: _DocxContext, *, ordinal: int
+) -> ContentUnit | None:
+    normalized = normalize_text(text)
+    if not normalized:
+        return None
+    unit_type = f"docx_{kind}"
+    return ContentUnit(
+        id=stable_id("unit", context.extraction_id, str(ordinal)),
+        extraction_id=context.extraction_id,
+        document_id=context.document_id,
+        artifact_id=context.artifact_id,
+        ordinal=ordinal,
+        unit_type=unit_type,
+        title=f"{context.path.name} - {kind} {note_id}",
+        body=text,
+        body_normalized=normalized,
+        lexical_text=normalized,
+        locator=EvidenceLocator(type=unit_type, data={"note_id": note_id}),
+        acl_scopes=context.acl_scopes,
+        metadata={},
     )
 
 

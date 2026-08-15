@@ -20,6 +20,10 @@ from kip.errors import ValidationError
 
 
 def _rewrite_sheet_xml(path: Path, replacements: dict[bytes, bytes]) -> None:
+    _rewrite_member(path, "xl/worksheets/sheet1.xml", replacements)
+
+
+def _rewrite_member(path: Path, member_name: str, replacements: dict[bytes, bytes]) -> None:
     rewritten = path.with_suffix(".rewritten.xlsx")
     with zipfile.ZipFile(path) as source, zipfile.ZipFile(
         rewritten,
@@ -28,7 +32,7 @@ def _rewrite_sheet_xml(path: Path, replacements: dict[bytes, bytes]) -> None:
     ) as target:
         for member in source.infolist():
             payload = source.read(member.filename)
-            if member.filename == "xl/worksheets/sheet1.xml":
+            if member.filename == member_name:
                 for old, new in replacements.items():
                     assert old in payload
                     payload = payload.replace(old, new, 1)
@@ -208,6 +212,101 @@ def test_non_finite_numeric_cell_does_not_turn_into_json_null(tmp_path: Path) ->
     assert cell["value_type"] == "non_finite_number"
     assert cell["cached_value"] == "Infinity"
     json.dumps(cell, allow_nan=False)
+
+
+def test_deep_read_translates_shared_formulas_for_non_master_cells(tmp_path: Path) -> None:
+    # Given a follower cell in a shared-formula group (t="shared" with no
+    # formula text of its own, only a shared-group index "si" plus its own
+    # cached <v>) - the common Excel-generated shape for "fill formula down
+    # a column", which stores the formula text once on the master cell only.
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Shared"
+    sheet["A1"] = 1
+    sheet["A2"] = 2
+    sheet["B1"] = "=A1*2"
+    sheet["B2"] = "=A2*2"
+    path = tmp_path / "shared.xlsx"
+    workbook.save(path)
+    _rewrite_sheet_xml(
+        path,
+        {
+            b"<c r=\"B1\"><f>A1*2</f><v></v></c>": (
+                b'<c r="B1"><f t="shared" ref="B1:B2" si="0">A1*2</f><v>2</v></c>'
+            ),
+            b"<c r=\"B2\"><f>A2*2</f><v></v></c>": b'<c r="B2"><f t="shared" si="0"/><v>4</v></c>',
+        },
+    )
+
+    cells = read_xlsx_range(path, "Shared", "A1:B2")["cells"]
+
+    # Then the follower cell's relative reference is translated ("A1*2" ->
+    # "A2*2") instead of being left blank/untranslated, and its cached value
+    # is still readable.
+    assert cells[0][1]["formula"] == "=A1*2"
+    assert cells[0][1]["cached_value"] == 2
+    assert cells[1][1]["formula"] == "=A2*2"
+    assert cells[1][1]["cached_value"] == 4
+
+
+def test_deep_read_reports_formula_and_literal_error_cells(tmp_path: Path) -> None:
+    # Given a formula cell that evaluates to #DIV/0! and a literal #REF!
+    # error cell (both use data_type "e" with the error code as the cached
+    # text, per ECMA-376 18.3.1.4).
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Errors"
+    sheet["A1"] = "=1/0"
+    sheet["B1"] = 0
+    path = tmp_path / "errors.xlsx"
+    workbook.save(path)
+    _rewrite_sheet_xml(
+        path,
+        {
+            b"<c r=\"A1\"><f>1/0</f><v></v></c>": b'<c r="A1" t="e"><f>1/0</f><v>#DIV/0!</v></c>',
+            b'<c r="B1" t="n"><v>0</v></c>': b'<c r="B1" t="e"><v>#REF!</v></c>',
+        },
+    )
+
+    cells = read_xlsx_range(path, "Errors", "A1:B1")["cells"][0]
+
+    # Then both cells surface as readable error values instead of raising or
+    # silently coming back as None/0.
+    assert cells[0]["cached_value"] == "#DIV/0!"
+    assert cells[0]["cached_value_type"] == "error"
+    assert cells[1]["value"] == "#REF!"
+    assert cells[1]["value_type"] == "error"
+
+
+def test_deep_read_honors_the_1904_date_system_workbook_flag(tmp_path: Path) -> None:
+    # Given two otherwise-identical workbooks whose single date cell stores
+    # the exact same Excel serial number, differing only in
+    # <workbookPr date1904="1"/> (the 1904 date system some workbooks -
+    # notably ones with a Mac Excel history - declare). The same serial
+    # number means a different real-world date depending on which epoch is
+    # in effect; silently ignoring the flag would shift every date in the
+    # workbook by (incorrectly) about four years.
+    epoch_1900_path = tmp_path / "epoch_1900.xlsx"
+    epoch_1904_path = tmp_path / "epoch_1904.xlsx"
+    for path in (epoch_1900_path, epoch_1904_path):
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Dates"
+        sheet["A1"] = date(2024, 1, 1)
+        workbook.save(path)
+    _rewrite_member(
+        epoch_1904_path, "xl/workbook.xml", {b"<workbookPr/>": b'<workbookPr date1904="1"/>'}
+    )
+
+    normal_epoch = read_xlsx_range(epoch_1900_path, "Dates", "A1")["cells"][0][0]
+    shifted_epoch = read_xlsx_range(epoch_1904_path, "Dates", "A1")["cells"][0][0]
+
+    # Then the identical stored serial number resolves to a different
+    # calendar date under the 1904 flag instead of both files reporting the
+    # same 2024-01-01 date.
+    assert normal_epoch["excel_serial"] == shifted_epoch["excel_serial"]
+    assert normal_epoch["value"] == "2024-01-01T00:00:00"
+    assert shifted_epoch["value"] != normal_epoch["value"]
 
 
 def test_rest_xlsx_range_returns_date_cells_in_the_json_envelope(test_container) -> None:

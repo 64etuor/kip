@@ -49,6 +49,42 @@ def test_source_neutral_sync_run_supports_dry_run():
     assert '"source": "sample"' in result.stdout
 
 
+def test_sync_run_with_an_unknown_source_lists_configured_sources() -> None:
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["sync", "run", "--source", "does-not-exist"],
+        env=_env(),
+    )
+
+    assert result.exit_code == 3, result.stdout
+    payload = json.loads(result.stderr)
+    assert payload["error"]["code"] == "validation_error"
+    assert "unknown source: does-not-exist" in payload["error"]["message"]
+    assert "Configured sources:" in payload["error"]["message"]
+    assert "sample" in payload["error"]["message"]
+
+
+def test_status_summary_flag_adds_a_plain_language_verdict_to_envelope_warnings() -> None:
+    runner = CliRunner()
+
+    plain = runner.invoke(app, ["status"], env=_env())
+    assert plain.exit_code == 0, plain.stdout
+    plain_payload = json.loads(plain.stdout)
+    # `StatusReport` is a versioned contract model; the default `status`
+    # output must stay unchanged (no field added to the model).
+    assert "summary" not in plain_payload["data"]
+    assert plain_payload["meta"]["warnings"] == []
+
+    with_summary = runner.invoke(app, ["status", "--summary"], env=_env())
+    assert with_summary.exit_code == 0, with_summary.stdout
+    summary_payload = json.loads(with_summary.stdout)
+    assert summary_payload["data"] == plain_payload["data"]
+    warnings = summary_payload["meta"]["warnings"]
+    assert len(warnings) == 1
+    assert warnings[0].startswith("정상:") or warnings[0].startswith("문제:")
+
+
 def test_parser_reextract_defaults_to_non_mutating_shadow_mode() -> None:
     runner = CliRunner()
 

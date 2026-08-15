@@ -618,6 +618,173 @@ def test_docx_parser_captures_body_level_alternate_content_paragraph(tmp_path: P
     assert not any("대체 콘텐츠 폴백" in unit.body for unit in units)
 
 
+def test_docx_parser_extracts_footnote_and_endnote_text_as_dedicated_units(
+    tmp_path: Path,
+) -> None:
+    # Given a document whose body references one footnote and one endnote,
+    # with the real note text living in the separate footnotes.xml/
+    # endnotes.xml parts (the only place OOXML actually stores it), plus
+    # the separator/continuationSeparator marker notes every real Word
+    # document also carries in those parts.
+    path = tmp_path / "notes.docx"
+    document = Document()
+    document.add_paragraph("PLACEHOLDER")
+    document.save(path)
+    with zipfile.ZipFile(path) as archive:
+        document_xml = archive.read("word/document.xml")
+    body_paragraph = (
+        "<w:p><w:r><w:t>본문</w:t></w:r>"
+        '<w:r><w:footnoteReference w:id="1"/></w:r>'
+        '<w:r><w:endnoteReference w:id="1"/></w:r></w:p>'
+    ).encode()
+    document_xml = document_xml.replace(
+        b"<w:p><w:r><w:t>PLACEHOLDER</w:t></w:r></w:p>", body_paragraph
+    )
+    w_ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    footnotes_xml = (
+        f'<w:footnotes xmlns:w="{w_ns}">'
+        '<w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>'
+        '<w:footnote w:type="continuationSeparator" w:id="0">'
+        "<w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>"
+        '<w:footnote w:id="1"><w:p><w:r><w:t>각주 증거 텍스트</w:t></w:r></w:p></w:footnote>'
+        "</w:footnotes>"
+    ).encode()
+    endnotes_xml = (
+        f'<w:endnotes xmlns:w="{w_ns}">'
+        '<w:endnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:endnote>'
+        '<w:endnote w:id="1"><w:p><w:r><w:t>미주 증거 텍스트</w:t></w:r></w:p></w:endnote>'
+        "</w:endnotes>"
+    ).encode()
+    _replace_zip_members(
+        path,
+        {
+            "word/document.xml": document_xml,
+            "word/footnotes.xml": footnotes_xml,
+            "word/endnotes.xml": endnotes_xml,
+        },
+    )
+
+    # When the document is parsed.
+    extraction, units = _parse(path)
+
+    # Then the footnote and endnote text are recovered as their own units -
+    # previously this content was dropped entirely (the body walk only
+    # sees the reference marker, never word/footnotes.xml or
+    # word/endnotes.xml) while the extraction still reported "succeeded".
+    footnote_units = [unit for unit in units if unit.unit_type == "docx_footnote"]
+    endnote_units = [unit for unit in units if unit.unit_type == "docx_endnote"]
+    assert len(footnote_units) == 1
+    assert footnote_units[0].body == "각주 증거 텍스트"
+    assert footnote_units[0].locator.data == {"note_id": "1"}
+    assert len(endnote_units) == 1
+    assert endnote_units[0].body == "미주 증거 텍스트"
+    assert endnote_units[0].locator.data == {"note_id": "1"}
+    # The separator/continuationSeparator marker notes never surface as units.
+    assert extraction.metadata["footnote_count"] == 1
+    assert extraction.metadata["endnote_count"] == 1
+    assert extraction.status == "succeeded"
+
+
+def test_docx_parser_renders_no_break_hyphen_as_a_literal_hyphen(tmp_path: Path) -> None:
+    # Given a paragraph whose runs are joined by <w:noBreakHyphen/> (a
+    # single "-" that Word won't wrap across a line) instead of a literal
+    # hyphen character in a <w:t>.
+    path = tmp_path / "nobreakhyphen.docx"
+    document = Document()
+    document.add_paragraph("PLACEHOLDER")
+    document.save(path)
+    with zipfile.ZipFile(path) as archive:
+        document_xml = archive.read("word/document.xml")
+    wrapped_paragraph = (
+        '<w:p><w:r><w:t xml:space="preserve">비파괴</w:t></w:r>'
+        "<w:r><w:noBreakHyphen/></w:r>"
+        "<w:r><w:t>검사</w:t></w:r></w:p>"
+    ).encode()
+    document_xml = document_xml.replace(
+        b"<w:p><w:r><w:t>PLACEHOLDER</w:t></w:r></w:p>", wrapped_paragraph
+    )
+    _replace_zip_members(path, {"word/document.xml": document_xml})
+
+    # When the document is parsed.
+    _extraction, units = _parse(path)
+
+    # Then the hyphen character survives instead of the two words silently
+    # gluing together into "비파괴검사" (previously <w:noBreakHyphen/> had
+    # no <w:t> child and was walked as empty, dropping the character).
+    assert units[0].body == "비파괴-검사"
+
+
+def test_docx_parser_excludes_tracked_deletions_and_includes_tracked_insertions(
+    tmp_path: Path,
+) -> None:
+    # Given a paragraph with a tracked deletion (text removed but still
+    # present in the file for reviewers, stored in <w:delText> inside
+    # <w:del>) and a tracked insertion (<w:ins> around an ordinary <w:r>).
+    path = tmp_path / "tracked.docx"
+    document = Document()
+    document.add_paragraph("PLACEHOLDER")
+    document.save(path)
+    with zipfile.ZipFile(path) as archive:
+        document_xml = archive.read("word/document.xml")
+    wrapped_paragraph = (
+        '<w:p><w:r><w:t xml:space="preserve">예산: </w:t></w:r>'
+        '<w:del w:id="1" w:author="A"><w:r><w:delText>1억원</w:delText></w:r></w:del>'
+        '<w:ins w:id="2" w:author="A"><w:r><w:t>1억5천만원</w:t></w:r></w:ins>'
+        "</w:p>"
+    ).encode()
+    document_xml = document_xml.replace(
+        b"<w:p><w:r><w:t>PLACEHOLDER</w:t></w:r></w:p>", wrapped_paragraph
+    )
+    _replace_zip_members(path, {"word/document.xml": document_xml})
+
+    # When the document is parsed.
+    _extraction, units = _parse(path)
+
+    # Then the deleted text is excluded (it is no longer part of the
+    # document's actual content) while the inserted replacement text is
+    # included, matching what the document currently says.
+    assert units[0].body == "예산: 1억5천만원"
+    assert "1억원" not in units[0].body
+
+
+def test_docx_parser_resolves_field_code_cached_text_and_excludes_instructions(
+    tmp_path: Path,
+) -> None:
+    # Given a simple field (<w:fldSimple>, e.g. PAGEREF) and a complex field
+    # (<w:fldChar> begin/separate/end wrapping a <w:instrText> instruction),
+    # both carrying a cached display result alongside their instruction text.
+    path = tmp_path / "fields.docx"
+    document = Document()
+    document.add_paragraph("PLACEHOLDER")
+    document.save(path)
+    with zipfile.ZipFile(path) as archive:
+        document_xml = archive.read("word/document.xml")
+    wrapped_paragraph = (
+        '<w:p><w:fldSimple w:instr=" PAGEREF _Toc1 \\h ">'
+        "<w:r><w:t>3</w:t></w:r></w:fldSimple></w:p>"
+        "<w:p>"
+        '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
+        '<w:r><w:instrText xml:space="preserve"> HYPERLINK \\l "bookmark" </w:instrText></w:r>'
+        '<w:r><w:fldChar w:fldCharType="separate"/></w:r>'
+        "<w:r><w:t>3장</w:t></w:r>"
+        '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
+        "</w:p>"
+    ).encode()
+    document_xml = document_xml.replace(
+        b"<w:p><w:r><w:t>PLACEHOLDER</w:t></w:r></w:p>", wrapped_paragraph
+    )
+    _replace_zip_members(path, {"word/document.xml": document_xml})
+
+    # When the document is parsed.
+    _extraction, units = _parse(path)
+
+    # Then each field's cached display value is captured while its
+    # instruction code (PAGEREF/HYPERLINK syntax) is excluded.
+    assert units[0].body == "3\n3장"
+    assert "PAGEREF" not in units[0].body
+    assert "HYPERLINK" not in units[0].body
+
+
 def test_docx_heading_style_level_is_capped_to_nine() -> None:
     # Given a bogus two-digit heading style id (Word only defines levels 1-9).
     # When the style id is resolved to a heading level.

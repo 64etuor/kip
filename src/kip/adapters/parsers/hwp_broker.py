@@ -130,9 +130,29 @@ class HwpParserBroker:
                     continue
                 total_text += text + "\n"
                 normalized = normalize_text(text)
+                page = block.get("pageNumber")
                 locator_data = {
-                    "section": block.get("section") or block.get("sectionNumber"),
-                    "page": block.get("pageNumber"),
+                    # kordoc's structured-block JSON never emits a "section"
+                    # or "sectionNumber" key (verified against the pinned
+                    # 4.7.3 output shape - only pageNumber appears), so
+                    # reading either was dead code that always yielded None.
+                    # Kept explicit as None (rather than removed) so this
+                    # hwp_structure locator has the same shape as the native
+                    # parser's (kip.adapters.parsers.hwp_native), whose
+                    # "section" field IS a real, verified index.
+                    "section": None,
+                    "page": page,
+                    # A page value from kordoc was measured 100% "section-
+                    # approximate" on the available corpus whenever the
+                    # payload did not explicitly claim otherwise (see
+                    # ADR-049): pairing page_mode lets a reader tell a real
+                    # page number from a section-position approximation
+                    # instead of silently trusting an unqualified "page".
+                    "page_mode": (
+                        None
+                        if page is None
+                        else ("exact" if metadata.get("pageMode") == "exact" else "section_approx")
+                    ),
                     "block": ordinal,
                     "bbox": block.get("bbox"),
                 }

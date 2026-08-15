@@ -229,6 +229,44 @@ def test_xlsx_shallow_parser_penalizes_replacement_characters_in_extracted_text(
     assert extraction.quality_score < 0.9
 
 
+def test_xlsx_shallow_parser_flags_hidden_sheets_without_excluding_them(
+    tmp_path: Path,
+) -> None:
+    # Given a workbook whose second sheet is hidden via Excel's tab-hide UI
+    # (state="hidden" in workbook.xml). The cell data is still part of the
+    # file - hiding a sheet is a display preference, not a deletion - and
+    # nothing previously distinguished a hit against it from an ordinary
+    # visible-sheet hit.
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Visible"
+    sheet.append(["공개 데이터"])
+    hidden_sheet = workbook.create_sheet("Hidden")
+    hidden_sheet.append(["숨김 데이터"])
+    hidden_sheet.sheet_state = "hidden"
+    path = tmp_path / "hidden.xlsx"
+    workbook.save(path)
+
+    # When the shallow parser indexes it.
+    extraction, units = XlsxShallowParser().parse(
+        path,
+        artifact_id="art_hidden",
+        document_id="doc_hidden",
+        acl_scopes=["workspace:default"],
+    )
+
+    # Then the hidden sheet's content is still indexed (searchable), but
+    # each unit now records whether its source sheet was hidden, and the
+    # extraction totals a hidden-sheet count - mirroring the PPTX parser's
+    # existing hidden_slide/hidden_slide_count pattern instead of leaving
+    # XLSX as the odd one out with no visibility signal at all.
+    by_sheet = {unit.metadata["sheet"]: unit for unit in units}
+    assert by_sheet["Visible"].metadata["hidden"] is False
+    assert by_sheet["Hidden"].metadata["hidden"] is True
+    assert "숨김 데이터" in by_sheet["Hidden"].body
+    assert extraction.metadata["hidden_sheet_count"] == 1
+
+
 def _replace_zip_entry(path: Path, name: str, content: bytes) -> None:
     with zipfile.ZipFile(path) as archive:
         entries = {item.filename: archive.read(item.filename) for item in archive.infolist()}

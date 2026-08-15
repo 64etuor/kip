@@ -56,13 +56,13 @@ def _read_shared_strings(archive: zipfile.ZipFile) -> list[str]:
     return values
 
 
-def _sheet_paths(archive: zipfile.ZipFile) -> list[tuple[str, str]]:
+def _sheet_paths(archive: zipfile.ZipFile) -> list[tuple[str, str, bool]]:
     workbook = ET.fromstring(archive.read("xl/workbook.xml"))
     rel_root = ET.fromstring(archive.read("xl/_rels/workbook.xml.rels"))
     rels: dict[str, str] = {}
     for rel in rel_root.findall(f"{{{_PACKAGE_REL_NS}}}Relationship"):
         rels[rel.attrib["Id"]] = rel.attrib["Target"]
-    result: list[tuple[str, str]] = []
+    result: list[tuple[str, str, bool]] = []
     for sheet in workbook.findall(f".//{{{_MAIN_NS}}}sheet"):
         name = sheet.attrib.get("name", "Sheet")
         rel_id = sheet.attrib.get(f"{{{_REL_NS}}}id")
@@ -73,7 +73,16 @@ def _sheet_paths(archive: zipfile.ZipFile) -> list[tuple[str, str]]:
         if not raw_target.startswith("xl/"):
             target = PurePosixPath("xl") / target
         normalized = str(PurePosixPath(*[part for part in target.parts if part not in {".", "..", "/"}]))
-        result.append((name, normalized))
+        # <sheet state="hidden"/> or state="veryHidden" means the workbook
+        # author hid the tab in Excel's UI; the sheet's cell data is still
+        # part of the workbook (not deleted) and stays fully searchable, but
+        # nothing previously recorded that a matched sheet was hidden, so a
+        # search hit against it looked identical to one against an ordinary
+        # visible sheet. Surface it as metadata instead - same pattern the
+        # PPTX parser already uses for hidden slides - rather than silently
+        # dropping the distinction.
+        hidden = sheet.attrib.get("state", "visible") in {"hidden", "veryHidden"}
+        result.append((name, normalized, hidden))
     return result
 
 
@@ -139,6 +148,7 @@ class XlsxShallowParser:
         aggregate_parts: list[str] = []
         total_sheets = 0
         parsed_sheets = 0
+        hidden_sheet_count = 0
         try:
             with zipfile.ZipFile(path) as archive:
                 check_zip_bomb_guard(archive, format_name="XLSX")
@@ -146,7 +156,8 @@ class XlsxShallowParser:
                 next_ordinal = 0
                 sheet_paths = _sheet_paths(archive)
                 total_sheets = len(sheet_paths)
-                for sheet_name, sheet_path in sheet_paths:
+                hidden_sheet_count = sum(1 for _name, _path, hidden in sheet_paths if hidden)
+                for sheet_name, sheet_path, sheet_hidden in sheet_paths:
                     try:
                         dimension, strings, truncated = _parse_sheet(
                             archive, sheet_path, shared, self.max_chars_per_sheet
@@ -196,6 +207,7 @@ class XlsxShallowParser:
                                     "deep_read_required_for_numbers": True,
                                     "chunk": chunk_index,
                                     "chunk_count": len(chunks),
+                                    "hidden": sheet_hidden,
                                 },
                             )
                         )
@@ -218,6 +230,10 @@ class XlsxShallowParser:
             quality_score=quality if units else 0.0,
             output_hash=sha256_bytes(aggregate.encode("utf-8")),
             warnings=warnings,
-            metadata={"mode": "shallow", "numeric_values_indexed": False},
+            metadata={
+                "mode": "shallow",
+                "numeric_values_indexed": False,
+                "hidden_sheet_count": hidden_sheet_count,
+            },
         )
         return extraction, units

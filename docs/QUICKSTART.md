@@ -1,5 +1,8 @@
 # Quickstart
 
+> 처음 보는 단어가 나오면 [`GLOSSARY.md`](GLOSSARY.md)(용어집)를 먼저 보세요.
+> ACL, 온톨로지, 프로젝션 같은 말이 한 줄씩 쉬운 말로 정리되어 있습니다.
+
 처음 복제하거나 제3자 환경에 적용한다면 명령을 실행하기 전에
 [`STARTER_KIT_GUIDE.md`](STARTER_KIT_GUIDE.md)의 데이터 경계, ACL, 외부
 전송, 품질 기준 결정을 먼저 완료한다.
@@ -59,6 +62,38 @@ cp config/kip.example.toml config/kip.toml
 ```
 
 For a real read-only OneDrive audit, use [`docs/AI_OPERATOR_RUNBOOK.md`](AI_OPERATOR_RUNBOOK.md); it defines parser comparison, source-grounded validation, A/B scoring, and the post-fix cycle.
+
+## 어떤 명령을 쓸까 (Which command?)
+
+이름이 비슷한 네 명령의 차이입니다.
+
+| 명령 | 언제 쓰나 | 돌려주는 것 |
+|---|---|---|
+| `search` | 키워드로 관련 문서를 찾을 때 | 문서 조각 목록(발췌 + 원문 위치) |
+| `context` | AI에게 넘길 근거 묶음이 필요할 때 | 크기 제한이 걸린 근거 묶음 |
+| `answer` | 질문에 대한 답을 근거와 함께 받고 싶을 때 | 답변 + 인용(근거 부족하면 거부) |
+| `read` | 검색 결과 하나의 원문을 그대로 볼 때 | 그 조각의 전체 원문 |
+
+발췌(snippet)만 보고 판단하지 말고, 중요한 내용은 `read`로 원문을 확인하세요.
+엑셀 숫자는 `xlsx-read`로 원본 셀 범위를 직접 읽어야 합니다.
+
+## 명령 출력 읽는 법 (Reading the output)
+
+모든 출력은 JSON이며 `"ok": true`면 성공, `"error"`가 있으면 실패입니다.
+자주 보는 필드만 정리하면:
+
+| 필드 (명령) | 뜻 |
+|---|---|
+| `content_units` (`status`) | 검색 가능한 문서 조각 수. 0이면 아직 색인되지 않은 것 |
+| `source_objects` (`status`) | 수집된 원본 파일 수 |
+| `assertion_candidates` (`status`) | 사람 검토를 기다리는 관계 후보 수(0이면 할 일 없음) |
+| `lexical_search` (`capabilities`) | 키워드 검색 사용 가능 여부 |
+| `semantic_projection_status` (`capabilities`) | 의미 기반 검색 상태. `disabled`가 기본이며 정상입니다 |
+| `ok` / `reason` (`doctor`) | 각 점검의 통과 여부와, 실패 시 해야 할 일 |
+| `failed` / `warnings` (`sync run`) | 읽지 못한 파일 수와 파일별 이유 |
+
+막히면 [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)에서 증상별 해결 순서를
+찾을 수 있습니다.
 
 ## Application profile
 

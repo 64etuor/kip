@@ -84,6 +84,58 @@ def test_cli_search_rejects_a_whitespace_only_query_with_a_clean_enveloped_messa
     assert "\n" not in payload["error"]["message"]
 
 
+def test_missing_path_option_still_emits_the_error_envelope_not_raw_click_usage(
+    monkeypatch,
+    test_container,
+    tmp_path: Path,
+):
+    # `--draft` used to declare `exists=True`, which fails during Click's
+    # argument parsing -- before `_run` ever wraps the command in a
+    # versioned envelope -- and printed raw Click usage text with exit
+    # code 2 instead. It must now behave like any other validation error.
+    result = _invoke(
+        monkeypatch,
+        test_container,
+        tmp_path,
+        ["evaluate", "draft", "validate", "--draft", "/nonexistent/draft.yaml"],
+    )
+
+    assert result.exit_code == 4, result.output
+    payload = json.loads(result.stderr)
+    assert payload["schema_version"] == "kip.envelope.v1"
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "not_found"
+    assert "/nonexistent/draft.yaml" in payload["error"]["message"]
+    assert "--draft" in payload["error"]["message"]
+    # No raw Click usage text ("Usage: ...", "Try '... --help'") leaked.
+    assert "Usage:" not in result.output
+    assert "Try '" not in result.output
+
+
+def test_forbidden_error_message_gains_actionable_role_guidance(
+    monkeypatch,
+    test_container,
+    tmp_path: Path,
+):
+    # `review approve` requires the admin role; the operator's natural
+    # instinct (`--role admin` after the subcommand) fails since `--role`
+    # is a root-level option. The rendered message must point at the fix
+    # while keeping `error.code` exactly `forbidden`.
+    result = _invoke(
+        monkeypatch,
+        test_container,
+        tmp_path,
+        ["review", "approve", "cand_does_not_matter"],
+    )
+
+    payload = json.loads(result.stderr)
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "forbidden"
+    assert "--role admin" in payload["error"]["message"]
+    assert "BEFORE the subcommand" in payload["error"]["message"]
+    assert "KIP_ROLES=admin" in payload["error"]["message"]
+
+
 def test_error_code_mapping_is_shared_across_edges():
     from pydantic import ValidationError as PydanticValidationError
 

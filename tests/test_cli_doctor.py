@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -166,3 +167,45 @@ def test_doctor_command_surfaces_kordoc_resolvability(
     assert result.exit_code == 0, result.stdout
     assert '"kordoc_ocr_resolvable"' in result.stdout
     assert "not resolvable on PATH" in result.stdout
+
+    # And the payload carries a plain-language Korean verdict a non-expert
+    # operator can act on without decoding `content_units`/`checks`.
+    payload = json.loads(result.stdout)
+    summary = payload["data"]["summary"]
+    assert summary.startswith("정상:")
+    assert "경고" in summary
+
+
+def test_doctor_summary_is_clean_when_every_check_passes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # Every required check ok, and the one informational check (a config
+    # file on disk) present too, so `doctor` has zero optional warnings.
+    config_path = tmp_path / "kip.toml"
+    config_path.write_text("", encoding="utf-8")
+    settings = Settings(
+        project_root=tmp_path,
+        config_path=config_path,
+        raw={"sources": {"filesystem": []}},
+        environment="test",
+        database_url="memory://",
+        cas_path=tmp_path / "cas",
+        api_key="test-key",
+        admin_key="test-admin",
+    )
+    settings.cas_path.mkdir(parents=True, exist_ok=True)
+    container = build_container(settings, repository=MemoryRepository())
+    monkeypatch.setattr(
+        "kip.cli.build_container",
+        lambda settings, load_models=True: container,
+    )
+
+    result = CliRunner().invoke(app, ["doctor"])
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    summary = payload["data"]["summary"]
+    assert summary.startswith("정상:")
+    assert "통과" in summary
+    assert "경고" not in summary
+    assert "문제" not in summary

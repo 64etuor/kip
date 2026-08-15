@@ -15,12 +15,28 @@ from kip.ids import new_id, sha256_bytes, stable_id
 from kip.ports.ocr import OcrDocument, OcrPort
 
 
+class _PdfTable(Protocol):
+    row_count: int
+    col_count: int
+    bbox: tuple[float, float, float, float]
+
+    def to_markdown(self, clean: bool) -> str: ...
+
+
+class _PdfTableFinder(Protocol):
+    tables: list[_PdfTable]
+
+
 class _PdfPage(Protocol):
     def get_text(self, option: str) -> str: ...
+
+    def find_tables(self, strategy: str) -> _PdfTableFinder: ...
 
 
 class _PdfDocument(Protocol):
     def __iter__(self) -> Iterator[_PdfPage]: ...
+
+    def __len__(self) -> int: ...
 
     def close(self) -> None: ...
 
@@ -43,8 +59,9 @@ class PdfParser:
     name = "pymupdf"
     version = "1"
 
-    def __init__(self, ocr: OcrPort | None = None) -> None:
+    def __init__(self, ocr: OcrPort | None = None, *, tables_enabled: bool = True) -> None:
         self._ocr = ocr
+        self._tables_enabled = tables_enabled
 
     def supports(self, path: Path) -> bool:
         return path.suffix.lower() == ".pdf"
@@ -74,6 +91,14 @@ class PdfParser:
         try:
             document = pymupdf.open(path)
             try:
+                # Ordinals must be unique across every unit in the extraction
+                # (enforced by the ingestion repositories). Page units keep
+                # their historical ordinal == page-index scheme untouched;
+                # table units are numbered starting right after the last
+                # page ordinal so both stay unique without needing a
+                # second pass over the document.
+                page_count_total = len(document)
+                table_ordinal = page_count_total
                 for index, page in enumerate(document):
                     text = page.get_text("text") or ""
                     normalized = normalize_text(text)
@@ -101,11 +126,26 @@ class PdfParser:
                             metadata={"page": index + 1},
                         )
                     )
+                    if self._tables_enabled:
+                        table_units, table_ordinal = _extract_pdf_tables(
+                            page,
+                            page_index=index,
+                            start_ordinal=table_ordinal,
+                            extraction_id=extraction_id,
+                            artifact_id=artifact_id,
+                            document_id=document_id,
+                            acl_scopes=acl_scopes,
+                            warnings=warnings,
+                        )
+                        units.extend(table_units)
             finally:
                 document.close()
         except pdf_error_types as exc:
             raise ParserError(f"PDF parse failed: {path}: {exc}") from exc
-        page_count = len(units)
+        # `len(units)` now also includes additive pdf_table units, so the
+        # page-count-derived metrics below (text_coverage, quality) must use
+        # the actual page total captured above rather than the unit count.
+        page_count = page_count_total
         low_text_page_count = sum(
             reason == "low_text" for reason in ocr_candidates.values()
         )
@@ -221,6 +261,91 @@ def _ocr_units(
                 )
             )
     return units
+
+
+def _extract_pdf_tables(
+    page: _PdfPage,
+    *,
+    page_index: int,
+    start_ordinal: int,
+    extraction_id: str,
+    artifact_id: str,
+    document_id: str,
+    acl_scopes: list[str],
+    warnings: list[str],
+) -> tuple[list[ContentUnit], int]:
+    """Additively detect bordered tables on one page via PyMuPDF's own
+    ``find_tables(strategy="lines_strict")``.
+
+    Measured side-effect-free against ``page.get_text()`` (byte-identical
+    before/after on 100% of a synthetic + real corpus) so it never changes
+    ``pdf_page`` unit output. Table detection is best-effort: any failure
+    degrades to a ``TABLE_DETECTION_FAILED`` warning instead of failing the
+    page or the document, mirroring the existing ``OCR_FAILED:`` pattern.
+    """
+    page_number = page_index + 1
+    try:
+        finder = page.find_tables(strategy="lines_strict")
+        tables = list(finder.tables)
+    except Exception as exc:  # pragma: no cover - defensive, see docstring
+        warnings.append(f"TABLE_DETECTION_FAILED: page {page_number}: {exc}")
+        return [], start_ordinal
+
+    units: list[ContentUnit] = []
+    ordinal = start_ordinal
+    for table_index, table in enumerate(tables):
+        try:
+            row_count = int(table.row_count)
+            col_count = int(table.col_count)
+            # This filter is what suppresses the measured real-corpus false
+            # positives: decorative single-row callout/footer boxes that
+            # PyMuPDF's line-based strategy otherwise detects as 1xN "tables".
+            if row_count < 2 or col_count < 2:
+                continue
+            body = table.to_markdown(clean=True)
+            bbox = [float(value) for value in table.bbox]
+        except Exception as exc:  # pragma: no cover - defensive, see docstring
+            warnings.append(
+                f"TABLE_DETECTION_FAILED: page {page_number} table {table_index}: {exc}"
+            )
+            continue
+        normalized = normalize_text(body)
+        units.append(
+            ContentUnit(
+                id=stable_id("unit", extraction_id, f"{page_index}-table-{table_index}"),
+                extraction_id=extraction_id,
+                document_id=document_id,
+                artifact_id=artifact_id,
+                ordinal=ordinal,
+                unit_type="pdf_table",
+                title=f"table {table_index + 1} - page {page_number}",
+                body=body,
+                body_normalized=normalized,
+                lexical_text=normalized,
+                locator=EvidenceLocator(
+                    type="pdf_table",
+                    data={
+                        # PyMuPDF's find_tables never merges a table across a
+                        # page break, so end_page always equals page today;
+                        # the field is kept so a future cross-page merge can
+                        # populate it without a locator shape change.
+                        "page": page_number,
+                        "end_page": page_number,
+                        "table_index": table_index,
+                    },
+                ),
+                acl_scopes=acl_scopes,
+                metadata={
+                    "row_count": row_count,
+                    "col_count": col_count,
+                    "strategy": "lines_strict",
+                    "source": "pymupdf.find_tables",
+                    "bbox": bbox,
+                },
+            )
+        )
+        ordinal += 1
+    return units, ordinal
 
 
 def _page_was_ocrd(warning: str, covered_pages: set[int | None]) -> bool:

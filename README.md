@@ -12,6 +12,22 @@ production gaps are separated in
 [`docs/PRODUCTION_DESIGN_ALIGNMENT.md`](docs/PRODUCTION_DESIGN_ALIGNMENT.md).
 Do not infer current readiness from PRD/TRD target language alone.
 
+## 0. 처음 오셨나요? (Start here)
+
+전문 용어 없이 요약하면, KIP은 **회사 문서를 모아 검색하고, 답변에 그 근거가
+된 원문 위치를 항상 함께 제시하는 시스템**입니다.
+
+- 용어가 어렵다면 → [`docs/GLOSSARY.md`](docs/GLOSSARY.md) (용어집, 한 줄 설명)
+- 설치부터 하고 싶다면 → [`docs/QUICKSTART.md`](docs/QUICKSTART.md)
+- 설치 후 매일 쓰는 법 → [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
+
+가장 쉬운 설치 방법은 AI 에이전트에게 `KIP을 셋업해줘`라고 요청하는 것입니다.
+에이전트가 필요한 질문을 하나씩 물어보고 설정 파일을 대신 만들어 줍니다.
+
+**어떤 인터페이스를 쓰나요?** 셋 다 설치할 필요는 없습니다. 터미널에서 직접
+쓰면 CLI만으로 충분하고, 사내 다른 프로그램과 연동하려면 REST API를, Claude
+같은 AI 비서와 연결하려면 MCP를 쓰면 됩니다. 셋 다 내부 동작은 같습니다.
+
 ## 1. Repository guarantees
 
 - `AGENTS.md` and `CLAUDE.md` are at the project root.
@@ -69,9 +85,26 @@ per-environment decisions, the AI change contract, real-corpus acceptance
 tests, and the update-notification and promotion/rollback criteria into a
 single path.
 
-Prerequisites: Python 3.12+, Node.js 18+, and Docker with Compose. Bootstrap
-installs the pinned Kordoc OCR runtime and verifies the Korean model cache;
-normal indexing never downloads parser packages or models at runtime.
+### 준비물 확인 (Prerequisites)
+
+필요한 것: Python 3.12+, Node.js 18+, Docker(Compose 포함), 여유 디스크 공간
+**최소 10GB**(런타임 이미지 약 2GB + OCR 모델 약 0.8GB + Python 환경 약 1GB +
+데이터베이스). 시작 전에 아래를 그대로 붙여넣어 확인하세요.
+
+```bash
+python3 --version        # 3.12 이상
+node --version           # 18 이상
+docker compose version   # Docker Desktop이 설치되어 실행 중이어야 함
+df -h .                  # 여유 공간 10GB 이상
+```
+
+**운영체제:** 이 저장소의 스크립트는 bash입니다. macOS와 Linux에서는 터미널에서
+바로 실행됩니다. **Windows에서는 PowerShell/cmd가 아니라 WSL2(Ubuntu) 안에서**
+실행하세요(관리자 PowerShell에서 `wsl --install` 후 재부팅). 한 줄이라도 실패하면
+[`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)를 보세요.
+
+Bootstrap installs the pinned Kordoc OCR runtime and verifies the Korean model
+cache; normal indexing never downloads parser packages or models at runtime.
 
 ```bash
 cp .env.example .env
@@ -93,6 +126,20 @@ Index the bundled sample data:
 ./scripts/kip search "참여율 변경 승인" --limit 10
 ./scripts/kip context "정산 증빙 제출기한" --limit 5
 ```
+
+### 잘 됐는지 확인하는 법 (Did it work?)
+
+성공이라면 `search` 결과 JSON에 `"ok": true`가 있고 `data.results` 배열에 항목이
+최소 1개 있습니다. 결과가 비어 있다면 순서대로 확인하세요.
+
+```bash
+./scripts/kip status   # data.content_units 가 0보다 커야 합니다(0이면 아직 색인 전)
+./scripts/kip doctor   # ok:false 인 항목의 reason 이 다음에 할 일을 알려줍니다
+```
+
+`content_units`가 0이면 `./scripts/kip sync run --source sample`을 먼저
+실행했는지 확인하세요. 그래도 막히면
+[`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)를 보세요.
 
 ## 4. Run as an application
 

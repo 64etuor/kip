@@ -1,8 +1,0 @@
-{
-  "docPath": "docs/adr/ADR-047-measured-auto-approve-policy.md",
-  "section": "## Configuration `[ontology.auto_approve]`",
-  "evidence": "src/kip/container.py now defaults ontology.auto_approve.enabled to False (auto_approve_config.get(\"enabled\", False)) when the section is absent or omits enabled, and config/kip.example.toml + config/kip.container.toml ship enabled = false. This closes a consent gap: auto-approve previously defaulted to True and silently auto-promoted candidates in every generated deployment.",
-  "suggestion": "Update ADR-047 point 2 to read `enabled` (default false, opt-in -- promotes candidates without human review; enable only after reviewing this workspace's predicate precision history), and note that guided setup (src/kip/setup/writer.py) now emits [ontology.auto_approve] enabled = false explicitly.",
-  "sourceFile": "src/kip/container.py",
-  "createdAt": "2026-08-15T13:08:50.000Z"
-}

@@ -36,3 +36,4 @@ tmp/
 .claude/worktrees/
 ontology/.release.lock
 ontology/.pending-release.json
+.aio/

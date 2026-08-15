@@ -5,6 +5,7 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any, Literal
 
+from kip.adapters.parsers.text_quality import hwp_text_quality
 from kip.domain.models import ContentUnit, EvidenceLocator, ExtractionRun
 from kip.domain.text import normalize_text
 from kip.errors import DependencyUnavailableError, ParserError
@@ -182,7 +183,7 @@ class HwpNativeParser:
             parser_name=self.name,
             parser_version=self.version,
             status=status,
-            quality_score=0.95 if status == "succeeded" else 0.80,
+            quality_score=hwp_text_quality(text, warning_count=len(warnings)),
             output_hash=sha256_bytes(text.encode("utf-8")),
             warnings=warnings,
             metadata={

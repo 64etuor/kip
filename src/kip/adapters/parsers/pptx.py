@@ -18,6 +18,7 @@ from kip.adapters.parsers.pptx_units import (
     shape_units,
     supplemental_units,
 )
+from kip.adapters.parsers.text_quality import replacement_ratio
 from kip.domain.models import ContentUnit, ExtractionRun
 from kip.errors import DependencyUnavailableError, ParserError
 from kip.ids import new_id, sha256_bytes
@@ -146,6 +147,17 @@ class PptxParser:
                 warnings.extend(ocr_output.warnings)
                 ocr_metadata = ocr_output.metadata
         body = "\n".join(unit.body for unit in units)
+        # Parts that failed to parse (PARTIAL_PARSE slides/comments/diagrams,
+        # tracked while scanning the package) and replacement characters
+        # from decode failures both lower confidence below the 1.0 base a
+        # fully clean deck keeps.
+        processed_parts = package_info.processed_part_count
+        part_ratio = (
+            max(0.0, min(1.0, 1 - package_info.failed_part_count / processed_parts))
+            if processed_parts
+            else 1.0
+        )
+        quality = part_ratio * (1 - replacement_ratio(body))
         return (
             ExtractionRun(
                 id=extraction_id,
@@ -153,7 +165,7 @@ class PptxParser:
                 parser_name=parser_name,
                 parser_version=self.version,
                 status="partial" if warnings else "succeeded",
-                quality_score=1.0 if units else 0.0,
+                quality_score=quality if units else 0.0,
                 output_hash=sha256_bytes(body.encode("utf-8")),
                 warnings=warnings,
                 metadata={

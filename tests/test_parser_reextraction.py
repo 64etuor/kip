@@ -17,6 +17,20 @@ from kip.ports.ingestion import DiscoveredFile
 from kip.settings import Settings
 
 
+def _clean_hwp_text(phrase: str) -> str:
+    """Pad a short fixture phrase to a realistic, high-quality document size.
+
+    HwpNativeParser now scores quality from content (see
+    ``kip.adapters.parsers.text_quality.hwp_text_quality``) instead of a
+    flat constant, and that formula weighs extracted length. A bare 6-8
+    character phrase alone would score well below the default
+    ``minimum_quality_score`` gate even though it is otherwise clean
+    Hangul text, so repeat it to a length comparable to a real document
+    while keeping the identifying phrase searchable.
+    """
+    return phrase * 400
+
+
 class _FakeReader:
     text = "기존계약문구"
 
@@ -197,7 +211,7 @@ def test_hwp_reextraction_is_shadow_only_until_explicit_activation(
     repository = container.repository
     assert isinstance(repository, MemoryRepository)
     original_extraction_count = len(repository.state.extraction_packets)
-    _FakeReader.text = "혁신교체문구"
+    _FakeReader.text = _clean_hwp_text("혁신교체문구")
 
     # When the operator first runs shadow parsing and then explicitly activates it.
     shadow = container.application.ingestion.reextract_filesystem(
@@ -298,7 +312,7 @@ def test_hwp_reextraction_preserves_the_canonical_source_access_snapshot(
         canonical_snapshot,
         DataClassification.RESTRICTED,
     )
-    _FakeReader.text = "교체된계약문구"
+    _FakeReader.text = _clean_hwp_text("교체된계약문구")
 
     summary = container.application.ingestion.reextract_filesystem(
         context,

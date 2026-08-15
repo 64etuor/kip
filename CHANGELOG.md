@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+- Fixed silent Korean-encoding corruption in text parsing: plain text,
+  Markdown, and CSV now decode through a bounded ladder (BOM strip, UTF-8
+  strict, CP949 strict, then a visible degraded fallback with
+  `ENCODING_UNCERTAIN` warnings, replacement-ratio-derived quality, and
+  `partial` status) — a CP949 CSV previously indexed as mojibake with
+  quality 1.0 and no warning.
+- Added a structural CSV parser: sniffed delimiter (comma/semicolon/tab),
+  header-column metadata, row-boundary chunking with `csv_rows`
+  start/end-row locators, ragged-row warnings without file failure; CSV
+  numeric values are indexed verbatim.
+- Rebuilt the DOCX parser structurally: paragraph-range chunk locators
+  (`docx_paragraphs`) replace the single whole-document unit; tables become
+  dedicated units with gridSpan/vMerge-safe rendering; header/footer parts
+  are extracted; heading levels, hyperlink targets, and image counts land
+  in metadata; text boxes are extracted exactly once as `docx_textbox`
+  units (fixing measured mc:Choice/Fallback duplication); malformed
+  optional parts degrade to `partial` per part. Re-extract existing DOCX
+  content to benefit.
+- Made parser quality scores content-derived for XLSX (sheet success ×
+  replacement penalty; a corrupt sheet now degrades instead of aborting
+  the workbook), PPTX (part-failure ratio × replacement penalty), HWP
+  (shared hangul/printable formula), and text/CSV (replacement ratio), so
+  the `parsers.minimum_quality_score` gate can actually detect degraded
+  extractions; clean-file scores are unchanged.
+- `kip doctor` now verifies Kordoc OCR resolvability when
+  `parsers.ocr.kordoc.enabled` is true (actionable warning instead of
+  every image-bearing PDF/PPTX silently degrading to `partial`).
 - Added a measured, audited auto-approve policy for low-risk mined
   relations (ADR-047; architecture rule 10 reworded with owner sign-off):
   a candidate whose predicate is `review: not_required`/`risk: low`

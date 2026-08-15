@@ -14,6 +14,7 @@ from pptx.enum.chart import XL_CHART_TYPE
 from pptx.util import Inches
 
 from kip.adapters.parsers.pptx import PptxParser
+from kip.adapters.parsers.pptx_ooxml import scan_pptx_package
 from kip.adapters.parsers.registry import ParserRegistry
 from kip.domain.models import SearchRequest
 from kip.errors import ParserError, ValidationError
@@ -67,6 +68,9 @@ def test_pptx_parser_preserves_text_geometry_and_notes(tmp_path: Path) -> None:
 
     # Then text and notes are separate evidence with exact slide and shape locators.
     assert extraction.status == "succeeded"
+    # A clean deck (no failed parts, no replacement-character decode loss)
+    # keeps the parser's historical 1.0 quality ceiling.
+    assert extraction.quality_score == pytest.approx(1.0)
     assert extraction.metadata["slide_count"] == 1
     assert [unit.unit_type for unit in units] == ["pptx_text", "pptx_notes"]
     assert units[0].body == "프로젝트 현황"
@@ -570,6 +574,75 @@ def test_pptx_parser_keeps_primary_content_when_comment_part_is_missing(tmp_path
     assert any(
         warning.startswith("PARTIAL_PARSE slide 1 comments:") for warning in extraction.warnings
     )
+    # And quality is scaled down by the failed-part fraction (the slide
+    # itself plus its one attempted comments part: 1 of 2 parts failed),
+    # below the clean-deck 1.0 ceiling.
+    assert extraction.quality_score == pytest.approx(0.5)
+
+
+def test_scan_pptx_package_counts_processed_and_failed_parts(tmp_path: Path) -> None:
+    # Given a single-slide deck whose only comments relationship is broken.
+    path = tmp_path / "missing-comment.pptx"
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    slide.shapes.add_textbox(Inches(1), Inches(1), Inches(4), Inches(1)).text = "본문 유지"
+    presentation.save(path)
+    with zipfile.ZipFile(path) as archive:
+        rels_xml = archive.read("ppt/slides/_rels/slide1.xml.rels").replace(
+            b"</Relationships>",
+            (
+                b'<Relationship Id="rIdMissingComment" '
+                b'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" '
+                b'Target="../comments/missing.xml"/>'
+                b"</Relationships>"
+            ),
+        )
+    _replace_zip_members(path, {"ppt/slides/_rels/slide1.xml.rels": rels_xml})
+
+    # When the package is scanned.
+    package_info = scan_pptx_package(path)
+
+    # Then both the slide part and the failed comments part are counted.
+    assert package_info.processed_part_count == 2
+    assert package_info.failed_part_count == 1
+
+
+def test_scan_pptx_package_reports_no_failed_parts_for_a_clean_deck(tmp_path: Path) -> None:
+    path = tmp_path / "clean.pptx"
+    presentation = Presentation()
+    presentation.slides.add_slide(presentation.slide_layouts[6])
+    presentation.save(path)
+
+    package_info = scan_pptx_package(path)
+
+    assert package_info.processed_part_count == 1
+    assert package_info.failed_part_count == 0
+
+
+def test_pptx_parser_penalizes_replacement_characters_in_extracted_text(
+    tmp_path: Path,
+) -> None:
+    # Given a slide whose extracted text already contains Unicode replacement
+    # characters (as a prior encoding failure would leave behind).
+    path = tmp_path / "garbled.pptx"
+    presentation = Presentation()
+    slide = presentation.slides.add_slide(presentation.slide_layouts[6])
+    slide.shapes.add_textbox(Inches(1), Inches(1), Inches(4), Inches(1)).text = "����"
+    presentation.save(path)
+
+    # When the presentation is parsed.
+    extraction, units = PptxParser().parse(
+        path,
+        artifact_id="art_garbled",
+        document_id="doc_garbled",
+        acl_scopes=["workspace:default"],
+    )
+
+    # Then no part failed, but quality is reduced below the clean 1.0 ceiling
+    # by the replacement-character ratio in the extracted text.
+    assert extraction.status == "succeeded"
+    assert units
+    assert extraction.quality_score < 1.0
 
 
 def test_pptx_parser_rejects_archive_over_expansion_limit(tmp_path: Path) -> None:

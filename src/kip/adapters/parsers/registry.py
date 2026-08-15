@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from kip.adapters.ocr.kordoc import KordocOcrAdapter, KordocOcrConfig
+from kip.adapters.parsers.csv_table import CsvTableParser
 from kip.adapters.parsers.docx import DocxParser
 from kip.adapters.parsers.hwp_broker import CommandParserConfig, HwpParserBroker
 from kip.adapters.parsers.hwp_native import HwpNativeParser, HwpParserChain
@@ -22,6 +23,7 @@ _REPRESENTATION_ROLE_BY_EXTENSION: dict[str, str] = {
     ".xlsx": "workbook",
     ".xlsm": "workbook",
     ".xls": "workbook",
+    ".csv": "workbook",
     ".pptx": "presentation",
     ".pptm": "presentation",
     ".ppsx": "presentation",
@@ -61,6 +63,7 @@ class ParserRegistry:
             )
         return cls(
             [
+                CsvTableParser(),
                 PlainTextParser(),
                 XlsxShallowParser(),
                 DocxParser(),

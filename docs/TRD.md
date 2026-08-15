@@ -617,17 +617,21 @@ active → superseded
 
 ContentUnit은 검색과 인용의 최소 구조 단위다.
 
+구현된 locator type (예시):
+
 | Type | Locator examples |
 |---|---|
 | `pdf_page` | page 3 |
-| `hwp_section` | section 2, paragraph 14 |
-| `hwp_table` | table 3, row 4, column 2 |
-| `xlsx_sheet_profile` | sheet `정산`, used range `A1:F40000` |
-| `xlsx_live_range` | sheet `정산`, range `A1:F40` |
-| `docx_section` | heading path and paragraph range |
+| `pdf_ocr` | page 3 + pixel bounding box |
+| `pptx_shape` / `pptx_notes` / `pptx_comment` / `pptx_diagram` | slide, shape id, geometry / slide notes / comment / SmartArt part |
+| `hwp_structure` | chunk + 문자 범위 (page/section 번호는 알려진 미구현 한계) |
+| `xlsx_sheet` | sheet `정산` (수치는 `xlsx-read` live range로 확인) |
+| `docx_paragraphs` | start/end paragraph (1-indexed) |
+| `docx_table` / `docx_textbox` / `docx_header_footer` | table index / textbox index / header·footer part |
+| `csv_rows` | start/end row (header = row 1) |
+| `text_line_range` | md/txt 라인 범위 |
 | `slack_message` | workspace, conversation, ts, thread root |
-| `email_part` | Message-ID, MIME part `1.2` |
-| `markdown_section` | heading path |
+| `email_message` | Message-ID |
 
 ### 9.8 Entity
 

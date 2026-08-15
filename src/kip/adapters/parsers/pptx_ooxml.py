@@ -47,6 +47,12 @@ class PptxPackageInfo:
     media_object_count: int
     external_relationship_count: int
     document_properties: JsonObject
+    # Parts attempted (each slide's main XML, plus each comments/diagramData
+    # part read while scanning it) and how many of those emitted a
+    # PARTIAL_PARSE warning. Used to scale extraction quality by how much of
+    # the package was actually readable instead of a flat constant.
+    processed_part_count: int
+    failed_part_count: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,7 +77,9 @@ def scan_pptx_package(path: Path) -> PptxPackageInfo:
         embedded = 0
         media_parts: set[str] = set()
         external = 0
+        processed_parts = 0
         for slide_number, slide_path in enumerate(slide_paths, start=1):
+            processed_parts += 1
             try:
                 root = ET.fromstring(archive.read(slide_path))
             except (KeyError, ET.ParseError) as exc:
@@ -98,8 +106,10 @@ def scan_pptx_package(path: Path) -> PptxPackageInfo:
                     warnings=warnings,
                 )
                 if relation_type.endswith("/comments"):
+                    processed_parts += 1
                     comments.extend(_comments(part_context, authors))
                 elif relation_type.endswith("/diagramData"):
+                    processed_parts += 1
                     diagram = _diagram(part_context)
                     if diagram is not None:
                         diagrams.append(diagram)
@@ -118,6 +128,8 @@ def scan_pptx_package(path: Path) -> PptxPackageInfo:
             media_object_count=len(media_parts),
             external_relationship_count=external,
             document_properties=_document_properties(archive),
+            processed_part_count=processed_parts,
+            failed_part_count=sum(1 for warning in warnings if warning.startswith("PARTIAL_PARSE")),
         )
 
 

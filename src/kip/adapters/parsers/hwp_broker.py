@@ -11,6 +11,7 @@ from typing import Any
 from pydantic import TypeAdapter
 
 from kip.adapters.parsers.structured_blocks import format_external_warning, render_external_block
+from kip.adapters.parsers.text_quality import hwp_text_quality
 from kip.domain.json_types import JsonObject
 from kip.domain.models import ContentUnit, EvidenceLocator, ExtractionRun
 from kip.domain.text import normalize_text
@@ -204,21 +205,4 @@ class HwpParserBroker:
 
     @staticmethod
     def _quality(text: str, payload: dict[str, Any]) -> float:
-        if not text:
-            return 0.0
-        hangul = sum(1 for char in text if "가" <= char <= "힣")
-        printable = sum(1 for char in text if char.isprintable() or char in "\n\t")
-        base = min(1.0, len(text) / 2000)
-        hangul_ratio = hangul / max(1, len(text))
-        printable_ratio = printable / max(1, len(text))
-        warning_penalty = min(0.3, len(payload.get("warnings", [])) * 0.03)
-        return max(
-            0.0,
-            min(
-                1.0,
-                0.4 * base
-                + 0.3 * printable_ratio
-                + 0.3 * min(1.0, hangul_ratio * 3)
-                - warning_penalty,
-            ),
-        )
+        return hwp_text_quality(text, warning_count=len(payload.get("warnings", [])))

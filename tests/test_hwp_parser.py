@@ -88,6 +88,74 @@ def test_native_parser_emits_bounded_evidence_units(monkeypatch, tmp_path):
     assert all("section" in unit.locator.data for unit in units)
 
 
+def _fake_reader_class(text: str):
+    class FakeReader:
+        def __init__(self, filepath):
+            self.filepath = filepath
+            self.tables: list[object] = []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return None
+
+        def extract_text(self):
+            return text
+
+        def get_images(self):
+            return []
+
+    return FakeReader
+
+
+def test_native_parser_scores_a_clean_long_korean_document_near_the_ceiling(
+    monkeypatch, tmp_path
+):
+    # Given a long, clean, fully-Hangul extraction with no warnings.
+    text = "계약 조건과 승인 절차를 명확히 기록한 문서입니다. " * 80
+    monkeypatch.setitem(
+        sys.modules, "hwp_hwpx_parser", SimpleNamespace(Reader=_fake_reader_class(text))
+    )
+    path = tmp_path / "clean.hwp"
+    path.write_bytes(b"fixture")
+
+    extraction, units = HwpNativeParser().parse(
+        path,
+        artifact_id="art_fixture",
+        document_id="doc_fixture",
+        acl_scopes=["workspace:default"],
+    )
+
+    # Then quality reflects the shared hwp_text_quality formula and stays >= 0.9,
+    # matching the flat 0.95 the parser used before content-derived scoring.
+    assert extraction.status == "succeeded"
+    assert units
+    assert extraction.quality_score >= 0.9
+
+
+def test_native_parser_scores_garbled_replacement_riddled_text_lower_than_clean_text(
+    monkeypatch, tmp_path
+):
+    # Given a short extraction dominated by decode-failure replacement characters.
+    garbled = "�" * 60 + "가나다"
+    monkeypatch.setitem(
+        sys.modules, "hwp_hwpx_parser", SimpleNamespace(Reader=_fake_reader_class(garbled))
+    )
+    path = tmp_path / "garbled.hwp"
+    path.write_bytes(b"fixture")
+
+    extraction, _units = HwpNativeParser().parse(
+        path,
+        artifact_id="art_fixture",
+        document_id="doc_fixture",
+        acl_scopes=["workspace:default"],
+    )
+
+    # Then the degraded content drags quality well below a clean document's score.
+    assert extraction.quality_score < 0.5
+
+
 def test_registry_places_native_parser_in_the_hwp_chain(tmp_path: Path):
     settings = Settings(
         project_root=tmp_path,

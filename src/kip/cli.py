@@ -10,6 +10,7 @@ import typer
 from pydantic import BaseModel
 from pydantic import ValidationError as PydanticValidationError
 
+from kip.adapters.ocr.kordoc import KordocOcrConfig, probe_kordoc_version
 from kip.container import Container, build_container
 from kip.domain.interactions import (
     ClarificationAnswer,
@@ -372,6 +373,55 @@ def status(ctx: typer.Context) -> None:
     )
 
 
+# A doctor-only timeout: this check must stay fast even when
+# parsers.ocr.timeout_seconds is configured generously for real OCR runs.
+_KORDOC_DOCTOR_PROBE_TIMEOUT_SECONDS = 5
+
+
+def _kordoc_ocr_doctor_check(settings: Settings) -> dict[str, Any]:
+    """Report whether the configured Kordoc OCR runtime is resolvable.
+
+    Reuses :func:`probe_kordoc_version`, the same version-resolution policy
+    the OCR adapter enforces before every ``recognize`` call, so this check
+    and the adapter can never disagree about what counts as a usable Kordoc
+    runtime. Not required: parsing still succeeds (in degraded ``partial``
+    mode with ``OCR_FAILED`` warnings) without it, so this is a WARN-level
+    signal that surfaces the degradation before a real sync hits it.
+    """
+    kordoc_config = settings.get("parsers.ocr.kordoc", {}) or {}
+    enabled = isinstance(kordoc_config, dict) and bool(kordoc_config.get("enabled", False))
+    if not enabled:
+        return {
+            "name": "kordoc_ocr_resolvable",
+            "ok": True,
+            "required": False,
+            "details": {"enabled": False, "version": None, "reason": None},
+        }
+    probe = probe_kordoc_version(
+        KordocOcrConfig(
+            argv=tuple(str(item) for item in kordoc_config.get("argv", [])),
+            version_argv=tuple(str(item) for item in kordoc_config.get("version_argv", [])),
+            expected_version=str(kordoc_config.get("expected_version", "4.7.3")),
+            timeout_seconds=_KORDOC_DOCTOR_PROBE_TIMEOUT_SECONDS,
+        )
+    )
+    reason = (
+        None
+        if probe.ok
+        else (
+            f"kordoc enabled but not resolvable on PATH ({probe.error}); "
+            "image-bearing PDF/PPTX will degrade to partial; run "
+            "scripts/install-kordoc.sh or disable parsers.ocr.kordoc"
+        )
+    )
+    return {
+        "name": "kordoc_ocr_resolvable",
+        "ok": probe.ok,
+        "required": False,
+        "details": {"enabled": True, "version": probe.version, "reason": reason},
+    }
+
+
 @app.command()
 def doctor(ctx: typer.Context) -> None:
     """Check configuration, source mounts, storage, and adapter availability."""
@@ -404,6 +454,7 @@ def doctor(ctx: typer.Context) -> None:
                 "details": {"path": str(settings.cas_path)},
             }
         )
+        checks.append(_kordoc_ocr_doctor_check(settings))
         for source in settings.get("sources.filesystem", []) or []:
             if not isinstance(source, dict) or not source.get("enabled", True):
                 continue

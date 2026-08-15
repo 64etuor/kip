@@ -5,6 +5,7 @@ from collections import OrderedDict
 from pathlib import Path, PurePosixPath
 from xml.etree import ElementTree as ET
 
+from kip.adapters.parsers.text_quality import replacement_ratio
 from kip.adapters.parsers.xlsx_read import read_xlsx_range
 from kip.domain.models import ContentUnit, EvidenceLocator, ExtractionRun
 from kip.domain.text import normalize_text
@@ -145,15 +146,24 @@ class XlsxShallowParser:
         units: list[ContentUnit] = []
         warnings: list[str] = []
         aggregate_parts: list[str] = []
+        total_sheets = 0
+        parsed_sheets = 0
         try:
             with zipfile.ZipFile(path) as archive:
                 _safe_zip_check(archive)
                 shared = _read_shared_strings(archive)
                 next_ordinal = 0
-                for sheet_name, sheet_path in _sheet_paths(archive):
-                    dimension, strings, truncated = _parse_sheet(
-                        archive, sheet_path, shared, self.max_chars_per_sheet
-                    )
+                sheet_paths = _sheet_paths(archive)
+                total_sheets = len(sheet_paths)
+                for sheet_name, sheet_path in sheet_paths:
+                    try:
+                        dimension, strings, truncated = _parse_sheet(
+                            archive, sheet_path, shared, self.max_chars_per_sheet
+                        )
+                    except (KeyError, ET.ParseError) as exc:
+                        warnings.append(f"sheet {sheet_name}: parse failed: {exc}")
+                        continue
+                    parsed_sheets += 1
                     header = f"Sheet: {sheet_name}\nUsed range: {dimension or 'unknown'}"
                     body = header + ("\n" + "\n".join(strings) if strings else "")
                     aggregate_parts.append(body)
@@ -203,13 +213,18 @@ class XlsxShallowParser:
         except (zipfile.BadZipFile, KeyError, ET.ParseError) as exc:
             raise ParserError(f"XLSX parse failed: {path}: {exc}") from exc
         aggregate = "\n".join(aggregate_parts)
+        # Sheets that failed to parse (corrupted part, bad relationship
+        # target) and replacement characters from decode failures both
+        # lower confidence below the 0.9 base a fully clean workbook keeps.
+        sheet_ratio = (parsed_sheets / total_sheets) if total_sheets else 1.0
+        quality = 0.9 * sheet_ratio * (1 - replacement_ratio(aggregate))
         extraction = ExtractionRun(
             id=extraction_id,
             artifact_id=artifact_id,
             parser_name=self.name,
             parser_version=self.version,
             status="partial" if warnings else "succeeded",
-            quality_score=0.9 if units else 0.0,
+            quality_score=quality if units else 0.0,
             output_hash=sha256_bytes(aggregate.encode("utf-8")),
             warnings=warnings,
             metadata={"mode": "shallow", "numeric_values_indexed": False},

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import zipfile
 from datetime import date
 from pathlib import Path
 
@@ -146,6 +147,95 @@ def test_xlsx_deep_read_preserves_cell_semantics_and_source_bytes(tmp_path: Path
     assert cell["row_hidden"] is True
     assert cell["column_hidden"] is True
     assert hashlib.sha256(path.read_bytes()).hexdigest() == before
+
+
+def test_xlsx_shallow_parser_keeps_the_flat_base_score_for_a_clean_workbook(
+    tmp_path: Path,
+) -> None:
+    # Given a workbook whose sheets all parse successfully with clean text.
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Clean"
+    sheet.append(["가나다"])
+    path = tmp_path / "clean.xlsx"
+    workbook.save(path)
+
+    # When the shallow parser scores it.
+    extraction, units = XlsxShallowParser().parse(
+        path, artifact_id="art_clean", document_id="doc_clean", acl_scopes=["workspace:default"]
+    )
+
+    # Then the score stays at the historical 0.9 base (100% sheets parsed,
+    # no replacement-character decode failures).
+    assert extraction.status == "succeeded"
+    assert units
+    assert extraction.quality_score == pytest.approx(0.9)
+
+
+def test_xlsx_shallow_parser_lowers_quality_when_a_sheet_fails_to_parse(
+    tmp_path: Path,
+) -> None:
+    # Given a two-sheet workbook whose second sheet's XML part is corrupted.
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "S1"
+    sheet.append(["가나다"])
+    sheet2 = workbook.create_sheet("S2")
+    sheet2.append(["라마바"])
+    path = tmp_path / "one_bad_sheet.xlsx"
+    workbook.save(path)
+    _replace_zip_entry(path, "xl/worksheets/sheet2.xml", b"<not valid xml")
+
+    # When the shallow parser scores it.
+    extraction, units = XlsxShallowParser().parse(
+        path,
+        artifact_id="art_partial",
+        document_id="doc_partial",
+        acl_scopes=["workspace:default"],
+    )
+
+    # Then only the readable sheet contributes units, the failure is
+    # reported, and quality is scaled by the successfully parsed fraction
+    # (1 of 2 sheets) below the clean 0.9 base.
+    assert extraction.status == "partial"
+    assert any("S2" in warning and "parse failed" in warning for warning in extraction.warnings)
+    assert units
+    assert all(unit.metadata["sheet"] == "S1" for unit in units)
+    assert extraction.quality_score == pytest.approx(0.45)
+
+
+def test_xlsx_shallow_parser_penalizes_replacement_characters_in_extracted_text(
+    tmp_path: Path,
+) -> None:
+    # Given a workbook whose extracted cell text already contains Unicode
+    # replacement characters (as a prior encoding failure would leave behind).
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Garbled"
+    sheet.append(["����"])
+    path = tmp_path / "garbled.xlsx"
+    workbook.save(path)
+
+    # When the shallow parser scores it.
+    extraction, units = XlsxShallowParser().parse(
+        path,
+        artifact_id="art_garbled",
+        document_id="doc_garbled",
+        acl_scopes=["workspace:default"],
+    )
+
+    # Then quality is reduced below the clean 0.9 base by the replacement ratio.
+    assert units
+    assert extraction.quality_score < 0.9
+
+
+def _replace_zip_entry(path: Path, name: str, content: bytes) -> None:
+    with zipfile.ZipFile(path) as archive:
+        entries = {item.filename: archive.read(item.filename) for item in archive.infolist()}
+    entries[name] = content
+    with zipfile.ZipFile(path, "w") as archive:
+        for filename, data in entries.items():
+            archive.writestr(filename, data)
 
 
 def test_xlsx_deep_read_rejects_archive_over_expansion_limit(tmp_path: Path) -> None:

@@ -25,6 +25,58 @@ class KordocOcrConfig:
     timeout_seconds: int = 120
 
 
+@dataclass(frozen=True, slots=True)
+class KordocVersionProbe:
+    """Result of resolving and version-checking the configured Kordoc runtime.
+
+    ``ok`` is True only when the configured ``version_argv`` command ran,
+    exited zero, and reported exactly ``expected_version``. ``version`` is the
+    detected version string when one could be parsed (even on failure, so a
+    mismatch can be reported). ``error`` is an actionable, human-readable
+    reason set whenever ``ok`` is False.
+    """
+
+    ok: bool
+    version: str | None
+    error: str | None
+
+
+def probe_kordoc_version(config: KordocOcrConfig) -> KordocVersionProbe:
+    """Resolve the Kordoc runtime configured by ``config`` without raising.
+
+    Runs the same ``version_argv`` command that :class:`KordocOcrAdapter`
+    requires before every ``recognize`` call, so this is the single place
+    that decides whether a configured Kordoc runtime is usable. Both the
+    adapter's pre-flight check (which raises) and ``kip doctor`` (which
+    reports) call this helper so the resolution policy is defined once.
+    """
+    if not config.version_argv:
+        return KordocVersionProbe(ok=True, version=None, error=None)
+    try:
+        completed = subprocess.run(
+            config.version_argv,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=config.timeout_seconds,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return KordocVersionProbe(
+            ok=False, version=None, error=f"Kordoc version check failed: {exc}"
+        )
+    actual = completed.stdout.strip().removeprefix("v")
+    if completed.returncode != 0 or actual != config.expected_version:
+        return KordocVersionProbe(
+            ok=False,
+            version=actual or None,
+            error=(
+                f"Kordoc OCR expected {config.expected_version}, "
+                f"found {actual or 'unknown'}"
+            ),
+        )
+    return KordocVersionProbe(ok=True, version=actual, error=None)
+
+
 class KordocOcrAdapter:
     name = "kordoc-ppocrv5-korean"
     version = "4.7.3"
@@ -60,23 +112,10 @@ class KordocOcrAdapter:
         )
 
     def _require_version(self) -> None:
-        if not self._config.version_argv:
-            return
-        try:
-            completed = subprocess.run(
-                self._config.version_argv,
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=self._config.timeout_seconds,
-            )
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            raise ParserError(f"Kordoc version check failed: {exc}") from exc
-        actual = completed.stdout.strip().removeprefix("v")
-        if completed.returncode != 0 or actual != self._config.expected_version:
-            raise ParserError(
-                f"Kordoc OCR expected {self._config.expected_version}, found {actual or 'unknown'}"
-            )
+        probe = probe_kordoc_version(self._config)
+        if not probe.ok:
+            assert probe.error is not None
+            raise ParserError(probe.error)
 
 
 def _decode_json_stream(value: str) -> tuple[JsonObject, ...]:

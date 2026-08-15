@@ -526,6 +526,13 @@ protected job actually ran.
 
 ## Parser upgrade
 
+Parser improvements only benefit newly extracted content: documents indexed
+before an upgrade keep their previous units and locators until re-extracted
+through the shadow/atomic-activation path. After the 2026-08-15 parser
+upgrades (structural DOCX units and paragraph locators, structural CSV rows,
+encoding-aware text quality), re-sync or re-extract existing DOCX/CSV
+sources to pick up the richer units.
+
 Prepare HWP/HWPX candidates without changing the active index:
 
 ```bash

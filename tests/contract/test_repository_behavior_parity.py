@@ -12,7 +12,7 @@ from kip.adapters.repository.memory import MemoryRepository
 from kip.adapters.repository.postgres import PostgresRepository
 from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
-from kip.domain.knowledge import CandidateEvidence
+from kip.domain.knowledge import AUTO_APPROVE_POLICY_PRINCIPAL, CandidateEvidence
 from kip.domain.models import (
     Artifact,
     AssertionCandidate,
@@ -479,6 +479,76 @@ def test_assertion_candidate_propose_approve_appears_in_graph_then_revoke_disapp
         )
         == []
     )
+
+
+def test_predicate_review_precision_counts_human_decisions_and_excludes_auto_approve_marker(
+    harness: Harness,
+) -> None:
+    scope = f"workspace:{harness.workspace}"
+    context = harness.context(acl_scopes=[scope])
+    evidence = harness.ingest(
+        "precision-evidence",
+        body="predicate precision fixture text",
+        acl_scopes=[scope],
+    )
+    predicate = "precision_fixture_predicate"
+    subject = f"precision_subject_{harness.workspace}"
+
+    def _candidate(suffix: str) -> AssertionCandidate:
+        return AssertionCandidate(
+            id=new_id("cand"),
+            subject_id=subject,
+            predicate=predicate,
+            object_entity_id=f"precision_object_{suffix}_{harness.workspace}",
+            origin="human",
+            confidence=0.9,
+            ontology_version="core/1.0.0",
+            evidence=[CandidateEvidence(content_unit_id=evidence.unit_id)],
+        )
+
+    approved_one = harness.repository.knowledge.save_candidate(
+        context, _candidate("approved-1")
+    )
+    approved_two = harness.repository.knowledge.save_candidate(
+        context, _candidate("approved-2")
+    )
+    rejected_one = harness.repository.knowledge.save_candidate(
+        context, _candidate("rejected-1")
+    )
+    auto_approved_one = harness.repository.knowledge.save_candidate(
+        context, _candidate("auto-1")
+    )
+
+    harness.repository.knowledge.approve_candidate(
+        context, approved_one.id, context.principal_id
+    )
+    harness.repository.knowledge.approve_candidate(
+        context, approved_two.id, context.principal_id
+    )
+    harness.repository.knowledge.reject_candidate(
+        context, rejected_one.id, context.principal_id
+    )
+    # Approved by the calibrated auto-approve policy, exactly as
+    # `OntologyRagUseCases._maybe_auto_approve` invokes it: through a context
+    # whose principal is the dedicated policy marker, never a human or job
+    # principal, so the precision query can tell the two apart.
+    policy_context = harness.context(
+        principal_id=AUTO_APPROVE_POLICY_PRINCIPAL,
+        acl_scopes=[scope],
+    )
+    harness.repository.knowledge.approve_candidate(
+        policy_context,
+        auto_approved_one.id,
+        AUTO_APPROVE_POLICY_PRINCIPAL,
+        f"{AUTO_APPROVE_POLICY_PRINCIPAL} precision=1.0000 sample=0",
+    )
+
+    stats = harness.repository.knowledge.predicate_review_precision(context, predicate)
+
+    assert stats.approved == 2
+    assert stats.rejected == 1
+    assert stats.reviewed == 3
+    assert stats.precision == pytest.approx(2 / 3)
 
 
 def test_job_enqueue_claim_complete_lifecycle(harness: Harness) -> None:

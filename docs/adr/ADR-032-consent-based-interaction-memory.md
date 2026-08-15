@@ -2,7 +2,15 @@
 
 ## Status
 
-Accepted
+Accepted — choice cap amended 2026-08-15
+
+> Amendment: the "at most four choices" bound was the one capability limit
+> enforced as a bare validation constraint with no widening path. It is now
+> the named domain constant `CLARIFICATION_CHOICE_CAP = 8` (a
+> human-readability bound, not a model bound), applied consistently to
+> choices, multi-select answers, and remembered preference values
+> (`cap + 1` for the freeform slot). The consent, TTL, ownership, and
+> non-retention decisions in this ADR are unchanged.
 
 ## Context
 

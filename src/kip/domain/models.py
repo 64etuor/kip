@@ -449,6 +449,22 @@ class AssertionCandidate(StrictModel):
         return self
 
 
+class AutoApprovedRelation(StrictModel):
+    """One relation candidate approved by the calibrated auto-approve policy.
+
+    Recorded for audit visibility alongside `OntologyMiningSummary`. The
+    underlying assertion is approved through the same path as human review
+    (see `KnowledgeUseCases.review_approve`) and stays fully revocable via
+    the ordinary `review revoke` path like any other approved assertion.
+    """
+
+    candidate_id: str
+    assertion_id: str
+    predicate: str
+    precision: float
+    sample_size: int
+
+
 class OntologyMiningSummary(StrictModel):
     schema_version: Literal["kip.ontology-mining.v1"] = "kip.ontology-mining.v1"
     entity_candidates: list[EntityCandidate] = Field(default_factory=list)
@@ -459,6 +475,10 @@ class OntologyMiningSummary(StrictModel):
     model: ModelRevision
     usage: GenerationUsage
     provider_request_id: str | None = None
+    # Relation candidates auto-approved by the calibrated review-tier policy
+    # during this mining run. Always empty when the policy is disabled or no
+    # candidate qualified.
+    auto_approved: list[AutoApprovedRelation] = Field(default_factory=list)
 
 
 class OntologyMiningSubmission(StrictModel):

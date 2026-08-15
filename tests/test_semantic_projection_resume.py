@@ -157,6 +157,65 @@ def test_embedding_input_cap_is_bounded_and_versioned(
     assert expanded_space.name != bounded_space.name
 
 
+def test_embedding_input_cap_defaults_to_widened_bound(
+    test_container,
+    tmp_path: Path,
+) -> None:
+    # Given a long document and no explicit max_document_chars override.
+    source_root = tmp_path / "source"
+    (source_root / "장문.txt").write_text(
+        "HEAD" + "가" * 20000 + "TAIL",
+        encoding="utf-8",
+    )
+    embedding = CountingEmbedding()
+    container = build_container(
+        test_container.settings,
+        repository=test_container.repository,
+        embedding=embedding,
+    )
+    context = container.application.operations.request_context()
+    container.application.ingestion.sync_filesystem(context, "fixture")
+
+    # When the default (unset) embedding space is resolved and rebuilt.
+    default_space = container.application.retrieval.embedding_space(context)
+    container.application.retrieval.rebuild_semantic_projection(context)
+
+    # Then the widened 2026 default (12000, up from 4000) is used for both
+    # the space identity and the actual truncation bound.
+    assert default_space.configuration["max_document_chars"] == "12000"
+    assert default_space.name.endswith("-c12000-ht1")
+    assert embedding.document_batches
+    assert all(len(text) <= 12000 for text in embedding.document_batches[0])
+    assert embedding.document_batches[0][0].endswith("TAIL")
+
+
+def test_embedding_space_identity_changes_with_truncation_config(
+    test_container,
+) -> None:
+    # Given a baseline embedding space built from the default cap.
+    container = build_container(
+        test_container.settings,
+        repository=test_container.repository,
+        embedding=CountingEmbedding(),
+    )
+    context = container.application.operations.request_context()
+    baseline = container.application.retrieval.embedding_space(context)
+
+    # When the configured truncation cap changes.
+    embedding_config = test_container.settings.raw.setdefault("models", {}).setdefault(
+        "embedding", {}
+    )
+    embedding_config["max_document_chars"] = 20000
+    widened = container.application.retrieval.embedding_space(context)
+
+    # Then a brand-new space identity is produced, so a cap change can never
+    # silently mix old-truncation and new-truncation vectors in one space;
+    # it always requires the existing shadow -> evaluate -> activate flow.
+    assert widened.id != baseline.id
+    assert widened.name != baseline.name
+    assert widened.status == "shadow"
+
+
 def test_semantic_rebuild_groups_units_by_bounded_input_length(
     test_container,
 ) -> None:

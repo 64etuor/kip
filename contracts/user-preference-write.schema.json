@@ -16,7 +16,7 @@
       "items": {
         "type": "string"
       },
-      "maxItems": 5,
+      "maxItems": 9,
       "minItems": 1,
       "title": "Values",
       "type": "array"

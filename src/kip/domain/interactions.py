@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime
-from typing import Literal, Self
+from typing import Final, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -53,6 +53,11 @@ def validate_preference_key(value: str) -> str:
         raise ValidationError(str(exc)) from exc
 
 
+# Bounds how many options a clarification question may offer: kept humane for
+# a human to read and pick from, not a limit imposed by the answering model.
+CLARIFICATION_CHOICE_CAP: Final = 8
+
+
 class ClarificationChoice(InteractionModel):
     id: str = Field(min_length=1, max_length=64)
     label: str = Field(min_length=1, max_length=140)
@@ -73,7 +78,9 @@ class ClarificationChoice(InteractionModel):
 class ClarificationRequest(InteractionModel):
     reason: ClarificationReason
     prompt: str = Field(min_length=1, max_length=500)
-    choices: list[ClarificationChoice] = Field(default_factory=list, max_length=4)
+    choices: list[ClarificationChoice] = Field(
+        default_factory=list, max_length=CLARIFICATION_CHOICE_CAP
+    )
     allow_freeform: bool = True
     allow_multiple: bool = False
     preference_key: str | None = Field(default=None, max_length=64)
@@ -116,7 +123,9 @@ class ClarificationQuestion(ClarificationRequest):
 
 class ClarificationAnswer(InteractionModel):
     question_id: str = Field(min_length=1, max_length=128)
-    option_ids: list[str] = Field(default_factory=list, max_length=4)
+    # Bounded by `CLARIFICATION_CHOICE_CAP`: an `allow_multiple` answer must be
+    # able to select every choice a question offers.
+    option_ids: list[str] = Field(default_factory=list, max_length=CLARIFICATION_CHOICE_CAP)
     freeform: str | None = Field(default=None, max_length=500)
     remember: bool = False
 
@@ -145,7 +154,10 @@ class ClarificationAnswer(InteractionModel):
 
 class UserPreferenceWrite(InteractionModel):
     key: str = Field(min_length=1, max_length=64)
-    values: list[str] = Field(min_length=1, max_length=5)
+    # Bounded to cover a fully answered `allow_multiple` clarification
+    # (`CLARIFICATION_CHOICE_CAP` option IDs plus one freeform value); see
+    # `resolved_clarification_values` and `ClarificationResolution`.
+    values: list[str] = Field(min_length=1, max_length=CLARIFICATION_CHOICE_CAP + 1)
     confirmed: Literal[True]
 
     @field_validator("key")
@@ -166,7 +178,7 @@ class UserPreference(InteractionModel):
     schema_version: Literal["kip.user-preference.v1"] = "kip.user-preference.v1"
     id: str = Field(default_factory=lambda: new_id("pref"), min_length=1, max_length=128)
     key: str = Field(min_length=1, max_length=64)
-    values: list[str] = Field(min_length=1, max_length=5)
+    values: list[str] = Field(min_length=1, max_length=CLARIFICATION_CHOICE_CAP + 1)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
@@ -186,7 +198,7 @@ class ClarificationResolution(InteractionModel):
         "kip.clarification-resolution.v1"
     )
     question: ClarificationQuestion
-    selected_values: list[str] = Field(min_length=1, max_length=5)
+    selected_values: list[str] = Field(min_length=1, max_length=CLARIFICATION_CHOICE_CAP + 1)
     preference: UserPreference | None = None
 
 

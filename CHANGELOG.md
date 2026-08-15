@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- Added a measured, audited auto-approve policy for low-risk mined
+  relations (ADR-047; architecture rule 10 reworded with owner sign-off):
+  a candidate whose predicate is `review: not_required`/`risk: low`
+  auto-approves only when the miner's per-predicate precision over at
+  least 20 human decisions clears 0.95 and the candidate clears 0.8
+  confidence (`[ontology.auto_approve]`, enabled by default, fail-closed
+  on every axis, human decisions only in the statistic); auto-approvals
+  run through the standard approval path, carry the
+  `auto-approve-policy/v1` marker with the measured precision, appear in
+  the mining result payload's additive `auto_approved` list, and stay
+  revocable.
+- Raised the embedding input cap `models.embedding.max_document_chars`
+  4000 -> 12000 (ADR-035 amendment): the cap is part of the embedding
+  space name and identity, so the change yields a fresh shadow space
+  through the normal rebuild/evaluate/activate governance and can never
+  mix truncation regimes.
+- Raised the clarification choice cap from four to eight
+  (`CLARIFICATION_CHOICE_CAP`, ADR-032 amendment), applied coherently to
+  multi-select answers and remembered preference values; clarification
+  and preference contracts regenerated.
+- Annotated superseded ADRs (003 -> 046, 018/031 -> 034 with re-test
+  triggers, 025 -> 047, 032/035 amendments) so decisions and current
+  mechanisms stay traceable.
 - Consolidated the adapter seams for tool swappability (ADR-046): removed
   the decorative graph port/adapter/config triad (`capabilities.
   graph_backend` now reports the active repository backend; the dead

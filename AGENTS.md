@@ -25,7 +25,13 @@ This repository implements an evidence-first knowledge fabric for NAS documents,
 7. Public IDs and JSON contracts are stable. Never expose PostgreSQL row IDs or Neo4j internal IDs.
 8. Search snippets are discovery aids. Read the exact evidence unit before making a material claim.
 9. Never calculate spreadsheet totals from the shallow lexical index. Use `kip xlsx-read` on the original workbook range.
-10. Model, parser, Graphify, and relation-miner outputs are candidates until approved. Never silently promote them to facts.
+10. Model, parser, Graphify, and relation-miner outputs are candidates until
+    approved. Never promote them to facts without an audited, measured,
+    revocable policy; silent promotion is forbidden. The only sanctioned
+    non-human approval path is the measured auto-approve policy (ADR-047):
+    low-risk, review-not-required predicates whose miner precision is
+    proven over enough human decisions, with every auto-approval marked,
+    reported, and revocable.
 11. Apply ACL filters before search or graph traversal, not after results are produced.
 12. A failed extraction must not replace the previous active extraction. Use shadow extraction and atomic activation.
 13. Normal retrieval must not trigger a full sync, re-index, embedding rebuild, or graph rebuild.

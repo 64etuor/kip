@@ -1926,7 +1926,7 @@ components:
           items:
             type: string
           type: array
-          maxItems: 4
+          maxItems: 8
           title: Option Ids
         freeform:
           anyOf:
@@ -1980,7 +1980,7 @@ components:
           items:
             $ref: '#/components/schemas/ClarificationChoice'
           type: array
-          maxItems: 4
+          maxItems: 8
           title: Choices
         allow_freeform:
           type: boolean
@@ -2505,7 +2505,7 @@ components:
           items:
             type: string
           type: array
-          maxItems: 5
+          maxItems: 9
           minItems: 1
           title: Values
         confirmed:

@@ -34,6 +34,15 @@ only; do not rely on them to enforce behavior.
   enforcement set is derived from `ontology/core/predicates.yaml` at approval
   time — never from a hardcoded list — and a contract test pins the
   store-level fallback set to the same file.
+- Low-risk `review: not_required` predicates gain a measured auto-approve
+  lane (ADR-047): a mined candidate is auto-approved only when the miner's
+  per-predicate precision over at least `min_reviewed` HUMAN decisions
+  clears `min_precision` and the candidate clears `min_confidence`
+  (`[ontology.auto_approve]`, fail-closed on every axis; auto-approved
+  decisions never count toward their own statistic). Auto-approvals run
+  through the same approval path as human review, carry the
+  `auto-approve-policy/v1` marker with the measured precision, are reported
+  in the mining result payload, and stay revocable.
 - Every ontology release is immutable. Semantic changes (types, predicates,
   domain/range, risk, review, extraction, inverses) create a new release and
   migration note.

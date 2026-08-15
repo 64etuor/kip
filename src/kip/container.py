@@ -308,6 +308,12 @@ def build_container(
         evidence,
         ontology,
     )
+    auto_approve_config = selected.get("ontology.auto_approve", {}) or {}
+    if not isinstance(auto_approve_config, dict):
+        raise ConfigurationError("ontology.auto_approve must be a table")
+    auto_approve_enabled = auto_approve_config.get("enabled", True)
+    if not isinstance(auto_approve_enabled, bool):
+        raise ConfigurationError("ontology.auto_approve.enabled must be boolean")
     ontology_rag = OntologyRagUseCases(
         selected_repository.knowledge,
         evidence,
@@ -316,6 +322,7 @@ def build_container(
         egress,
         selected_relation_miner,
         telemetry,
+        knowledge=knowledge,
         max_mining_units=_bounded_integer(
             mining_config,
             "models.relation_mining",
@@ -347,6 +354,36 @@ def build_container(
             default=256,
             minimum=0,
             maximum=512,
+        ),
+        auto_approve_enabled=auto_approve_enabled,
+        # Bounds enforce the open-closed (0, 1] contract: a precision or
+        # confidence floor of exactly 0 would let every candidate qualify
+        # regardless of measured quality, defeating the gate.
+        auto_approve_min_precision=_bounded_float(
+            auto_approve_config,
+            "ontology.auto_approve",
+            "min_precision",
+            default=0.95,
+            minimum=0.0,
+            maximum=1.0,
+            exclusive_minimum=True,
+        ),
+        auto_approve_min_confidence=_bounded_float(
+            auto_approve_config,
+            "ontology.auto_approve",
+            "min_confidence",
+            default=0.8,
+            minimum=0.0,
+            maximum=1.0,
+            exclusive_minimum=True,
+        ),
+        auto_approve_min_reviewed=_bounded_integer(
+            auto_approve_config,
+            "ontology.auto_approve",
+            "min_reviewed",
+            default=20,
+            minimum=1,
+            maximum=1_000_000,
         ),
     )
     ontology_context = OntologyContextUseCases(
@@ -693,11 +730,18 @@ def _bounded_float(
     default: float,
     minimum: float,
     maximum: float,
+    exclusive_minimum: bool = False,
 ) -> float:
     try:
         value = float(str(raw.get(name, default)))
     except ValueError as error:
         raise ConfigurationError(f"{section}.{name} must be a number") from error
+    if exclusive_minimum:
+        if not minimum < value <= maximum:
+            raise ConfigurationError(
+                f"{section}.{name} must be greater than {minimum} and at most {maximum}"
+            )
+        return value
     if not minimum <= value <= maximum:
         raise ConfigurationError(
             f"{section}.{name} must be between {minimum} and {maximum}"

@@ -3,7 +3,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Protocol
 
-from kip.domain.knowledge import EntityCandidate, KnowledgeEntity
+from kip.domain.knowledge import (
+    EntityCandidate,
+    KnowledgeEntity,
+    PredicateReviewStats,
+)
 from kip.domain.models import (
     ApprovedAssertion,
     AssertionCandidate,
@@ -137,6 +141,19 @@ class KnowledgeStore(Protocol):
         predicate: str | None = None,
         subject_id: str | None = None,
     ) -> int: ...
+
+    def predicate_review_precision(
+        self,
+        context: RequestContext,
+        predicate: str,
+    ) -> PredicateReviewStats:
+        """Human review outcome counts for one predicate.
+
+        Feeds the calibrated auto-approve policy's precision gate. Counts
+        only human approve/reject decisions; candidates approved by the
+        auto-approve policy itself are excluded (no self-reinforcement).
+        """
+        ...
 
     def approve_candidate(
         self,

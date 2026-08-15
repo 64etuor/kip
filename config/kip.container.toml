@@ -41,6 +41,15 @@ baseline_weight = 0.15
 domain_profile = "research-project"
 adaptive_discovery = true
 
+[ontology.auto_approve]
+# Calibrated review tiers (ADR pending, roadmap item 4): audited, measured,
+# revocable auto-approval for low-risk, review-not-required predicates only.
+# enabled=false makes the mechanism fully inert.
+enabled = true
+min_precision = 0.95
+min_confidence = 0.8
+min_reviewed = 20
+
 [interaction]
 enabled = true
 clarification_ttl_seconds = 3600

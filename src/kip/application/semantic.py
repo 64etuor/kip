@@ -170,7 +170,7 @@ class SemanticProjectionUseCases:
 
     def _max_document_chars(self) -> int:
         configured = int(
-            self._settings.get("models.embedding.max_document_chars", 4000)
+            self._settings.get("models.embedding.max_document_chars", 12000)
         )
         if configured < 1:
             raise ConfigurationError(

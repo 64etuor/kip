@@ -40,7 +40,7 @@
           "items": {
             "$ref": "#/$defs/ClarificationChoice"
           },
-          "maxItems": 4,
+          "maxItems": 8,
           "title": "Choices",
           "type": "array"
         },
@@ -149,7 +149,7 @@
           "items": {
             "type": "string"
           },
-          "maxItems": 5,
+          "maxItems": 9,
           "minItems": 1,
           "title": "Values",
           "type": "array"
@@ -189,7 +189,7 @@
       "items": {
         "type": "string"
       },
-      "maxItems": 5,
+      "maxItems": 9,
       "minItems": 1,
       "title": "Selected Values",
       "type": "array"

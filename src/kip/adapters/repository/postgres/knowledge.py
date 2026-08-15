@@ -4,7 +4,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from kip.adapters.repository.postgres.database import PostgresDatabase
-from kip.domain.knowledge import EntityCandidate, KnowledgeEntity
+from kip.domain.knowledge import (
+    EntityCandidate,
+    KnowledgeEntity,
+    PredicateReviewStats,
+)
 from kip.domain.models import (
     ApprovedAssertion,
     AssertionCandidate,
@@ -195,6 +199,13 @@ class PostgresKnowledgeStore:
             predicate=predicate,
             subject_id=subject_id,
         )
+
+    def predicate_review_precision(
+        self,
+        context: RequestContext,
+        predicate: str,
+    ) -> PredicateReviewStats:
+        return self.database.predicate_review_precision(context, predicate)
 
     def approve_candidate(
         self,

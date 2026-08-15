@@ -84,7 +84,13 @@ model = "kip-qwen3-embedding-0.6b"
 revision = "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
 dimensions = 1024
 batch_size = 4
-max_document_chars = 4000
+# Qwen3 embedding sidecar accepts up to 32k tokens; 12000 chars (~6-8k Korean
+# tokens after head/tail truncation) stays comfortably inside that budget
+# while covering long NAS documents that were previously cut to 4000 chars.
+# Any change to this value changes the embedding space identity (see
+# SemanticProjectionUseCases.embedding_space / ADR-035) so it always lands
+# in a fresh shadow space instead of mixing truncation lengths in one space.
+max_document_chars = 12000
 timeout_seconds = 120
 query_instruction = "Retrieve relevant Korean evidence for this query: "
 space_name = "qwen3-embedding-0.6b-1024"
@@ -130,6 +136,15 @@ max_relation_proposals = 256
 [ontology]
 domain_profile = "empty"
 adaptive_discovery = true
+
+[ontology.auto_approve]
+# Calibrated review tiers (ADR pending, roadmap item 4): audited, measured,
+# revocable auto-approval for low-risk, review-not-required predicates only.
+# enabled=false makes the mechanism fully inert.
+enabled = true
+min_precision = 0.95
+min_confidence = 0.8
+min_reviewed = 20
 
 [ontology.answer_context]
 entity_limit = 16

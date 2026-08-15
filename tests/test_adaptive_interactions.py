@@ -7,10 +7,12 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError as PydanticValidationError
 
 from kip.adapters.repository.memory import MemoryRepository
 from kip.container import build_container
 from kip.domain.interactions import (
+    CLARIFICATION_CHOICE_CAP,
     ClarificationAnswer,
     ClarificationRequest,
     FeedbackSubmission,
@@ -165,6 +167,83 @@ def test_expired_clarification_cannot_persist_a_preference(tmp_path: Path) -> No
             now=now + timedelta(seconds=61),
         )
     assert container.application.interactions.list_preferences(context) == []
+
+
+def test_clarification_request_accepts_the_widened_choice_cap() -> None:
+    request = ClarificationRequest(
+        reason="scope_selection",
+        prompt="어느 소스를 포함할까요?",
+        choices=[
+            {"id": f"source_{i}", "label": f"Source {i}"} for i in range(CLARIFICATION_CHOICE_CAP)
+        ],
+    )
+
+    assert len(request.choices) == CLARIFICATION_CHOICE_CAP == 8
+
+
+def test_clarification_request_rejects_choices_beyond_the_cap() -> None:
+    with pytest.raises(PydanticValidationError, match="choices"):
+        ClarificationRequest(
+            reason="scope_selection",
+            prompt="어느 소스를 포함할까요?",
+            choices=[
+                {"id": f"source_{i}", "label": f"Source {i}"}
+                for i in range(CLARIFICATION_CHOICE_CAP + 1)
+            ],
+        )
+
+
+def test_clarification_answer_option_ids_matches_the_choice_cap() -> None:
+    answer = ClarificationAnswer(
+        question_id="clrq_test",
+        option_ids=[f"source_{i}" for i in range(CLARIFICATION_CHOICE_CAP)],
+    )
+
+    assert len(answer.option_ids) == CLARIFICATION_CHOICE_CAP
+
+    with pytest.raises(PydanticValidationError, match="option_ids"):
+        ClarificationAnswer(
+            question_id="clrq_test",
+            option_ids=[f"source_{i}" for i in range(CLARIFICATION_CHOICE_CAP + 1)],
+        )
+
+
+def test_remembering_a_fully_selected_eight_choice_answer_fits_the_preference_cap(
+    tmp_path: Path,
+) -> None:
+    container = _container(tmp_path)
+    context = _context(container)
+    now = datetime(2026, 8, 10, tzinfo=UTC)
+
+    question = container.application.interactions.create_clarification(
+        context,
+        ClarificationRequest(
+            reason="scope_selection",
+            prompt="어느 소스를 모두 포함할까요?",
+            choices=[
+                {"id": f"source_{i}", "label": f"Source {i}"}
+                for i in range(CLARIFICATION_CHOICE_CAP)
+            ],
+            allow_freeform=False,
+            allow_multiple=True,
+            preference_key="included_sources",
+        ),
+        now=now,
+    )
+
+    resolution = container.application.interactions.answer_clarification(
+        context,
+        ClarificationAnswer(
+            question_id=question.id,
+            option_ids=[f"source_{i}" for i in range(CLARIFICATION_CHOICE_CAP)],
+            remember=True,
+        ),
+        now=now + timedelta(seconds=1),
+    )
+
+    assert resolution.preference is not None
+    assert len(resolution.selected_values) == CLARIFICATION_CHOICE_CAP
+    assert len(resolution.preference.values) == CLARIFICATION_CHOICE_CAP
 
 
 def test_interaction_storage_is_disabled_without_explicit_configuration(

@@ -344,7 +344,8 @@ bounded route/outcome/count/latency attributes, not candidate or evidence IDs.
 ## Adaptive interaction boundary
 
 `ClarificationQuestion` is `kip.clarification.v1`: it has a bounded prompt,
-at most four stable choice IDs, a caller-only scope, and an expiry. Its answer
+at most eight stable choice IDs (`CLARIFICATION_CHOICE_CAP`, a
+human-readability bound), a caller-only scope, and an expiry. Its answer
 is transient unless `remember=true` is accepted for a question carrying a
 preference key. Direct `UserPreferenceWrite` records require `confirmed=true`.
 `UserPreference` is `kip.user-preference.v1` and is visible only to its owning

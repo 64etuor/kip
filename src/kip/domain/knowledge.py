@@ -5,7 +5,7 @@ import json
 import re
 import unicodedata
 from datetime import datetime
-from typing import Any, Literal, Self
+from typing import Any, Final, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -14,6 +14,13 @@ from kip.domain.generation import (
     GenerationUsage,
     ModelRevision,
 )
+
+# Policy identity recorded as the reviewer on relation candidates approved by
+# the calibrated auto-approve mechanism (never a human or job principal), so
+# `PredicateReviewStats` can unambiguously exclude auto-approved decisions
+# from its own denominator and audit surfaces can tell auto-approved
+# assertions apart from human-reviewed ones on sight.
+AUTO_APPROVE_POLICY_PRINCIPAL: Final[str] = "auto-approve-policy/v1"
 
 
 class KnowledgeModel(BaseModel):
@@ -193,6 +200,31 @@ class RelationMiningResult(KnowledgeModel):
     usage: GenerationUsage
     provider_request_id: str | None = None
     skipped: tuple[MinedProposalSkip, ...] = ()
+
+
+class PredicateReviewStats(KnowledgeModel):
+    """Human review outcome counts for one predicate.
+
+    Only approve/reject decisions made by a human reviewer are counted:
+    candidates approved by the auto-approve policy itself
+    (`AUTO_APPROVE_POLICY_PRINCIPAL`) are excluded, so the measured
+    precision that gates future auto-approvals can never be reinforced by
+    its own automated decisions (no self-reinforcement).
+    """
+
+    predicate: str
+    approved: int = Field(default=0, ge=0)
+    rejected: int = Field(default=0, ge=0)
+
+    @property
+    def reviewed(self) -> int:
+        return self.approved + self.rejected
+
+    @property
+    def precision(self) -> float | None:
+        if self.reviewed == 0:
+            return None
+        return self.approved / self.reviewed
 
 
 class EntityCandidate(KnowledgeModel):

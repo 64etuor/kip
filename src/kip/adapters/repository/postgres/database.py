@@ -21,8 +21,10 @@ if TYPE_CHECKING:
 from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
 from kip.domain.knowledge import (
+    AUTO_APPROVE_POLICY_PRINCIPAL,
     EntityCandidate,
     KnowledgeEntity,
+    PredicateReviewStats,
     RelationDerivation,
     normalize_entity_name,
     stable_entity_id,
@@ -3215,6 +3217,46 @@ class PostgresDatabase:
             review_risk=row.get("review_risk") or "medium",
             contradicts_assertion_ids=list(row.get("contradicts_assertion_ids") or []),
             migrates_assertion_ids=list(row.get("migrates_assertion_ids") or []),
+        )
+
+    def predicate_review_precision(
+        self,
+        context: RequestContext,
+        predicate: str,
+    ) -> PredicateReviewStats:
+        """Human review outcome counts for one predicate, workspace-scoped.
+
+        Existing `assertion_candidates.status`/`review_note` columns are
+        sufficient (no migration, no new column): candidates whose
+        `review_note` carries the auto-approve policy marker are excluded so
+        the measured precision can never be reinforced by its own automated
+        decisions. This is an aggregate count only -- it never returns
+        candidate content -- so it is scoped by workspace like every other
+        candidate query, without joining evidence-level ACL visibility.
+        """
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT status, count(*) AS n
+                FROM knowledge.assertion_candidates
+                WHERE workspace_id=%s
+                  AND predicate=%s
+                  AND status IN ('approved','rejected')
+                  AND (review_note IS NULL OR review_note NOT LIKE %s)
+                GROUP BY status
+                """,
+                (
+                    context.workspace,
+                    predicate,
+                    f"{AUTO_APPROVE_POLICY_PRINCIPAL}%",
+                ),
+            )
+            rows = cursor.fetchall()
+        counts = {row["status"]: int(row["n"]) for row in rows}
+        return PredicateReviewStats(
+            predicate=predicate,
+            approved=counts.get("approved", 0),
+            rejected=counts.get("rejected", 0),
         )
 
     def approve_candidate(

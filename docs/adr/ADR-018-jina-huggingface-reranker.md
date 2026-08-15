@@ -1,7 +1,14 @@
 # ADR-018: Jina Hugging Face reranker remains an opt-in shadow adapter
 
-- Status: Accepted for shadow evaluation
+- Status: Accepted for shadow evaluation — production-default claim
+  superseded by ADR-034 (BM25 is the promoted default backend; RapidFuzz is
+  the fallback)
 - Date: 2026-08-06
+- Re-test trigger: re-run the reranker comparison when the corpus grows
+  materially past the 36-case/70-unit evaluation this ADR rests on
+  (the private corpus is already 30,000+ units) or when a candidate
+  reranker model is upgraded; use the judge-draft pipeline (ADR-045) to
+  grow the reviewed comparison set instead of re-using the dated one.
 
 ## Context
 

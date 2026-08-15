@@ -37,23 +37,25 @@ permanent limit.
    golden set with stale-source cases via the draft pipeline, measure
    `stale_warning_rate`, and if the gate passes, activate the vector path
    that already wins every quality metric (Recall@10 0.947 vs lexical
-   0.789). This is now purely an evidence task.
-4. **Calibrated review tiers**: today every semantic mining candidate
-   waits for full human review regardless of predicate risk or measured
-   miner precision. Prerequisite: per-predicate precision tracking over
-   reviewed decisions (approve/reject history exists in the store).
-   Design: low-risk (`review: not_required`) predicates with measured
-   precision above a threshold gain an audited auto-approve path —
-   marked, sampled, revocable — while `required`/high-risk predicates
-   stay fully human. Changes architecture rule 10's wording ("never
-   silently promote" -> "never promote without an audited, measured,
-   revocable policy"), so it needs its own ADR and owner sign-off.
+   0.789). This is now purely an evidence task. Landed alongside
+   (2026-08-15, ADR-035 amendment): the embedding input cap rose
+   4k -> 12k chars — the next projection rebuild embeds documents at the
+   wider cap in a fresh versioned space, so run it before the activation
+   measurement.
+4. **Calibrated review tiers — LANDED 2026-08-15 (ADR-047)**: low-risk
+   `review: not_required` predicates auto-approve when measured miner
+   precision over >= 20 human decisions clears 0.95 and the candidate
+   clears 0.8 confidence; marked (`auto-approve-policy/v1`), reported in
+   mining payloads, revocable, self-excluding statistics, fail-closed on
+   every axis. Architecture rule 10 reworded with owner sign-off.
+   Also landed from the same ADR review: clarification choice cap 4 -> 8
+   (`CLARIFICATION_CHOICE_CAP`, ADR-032 amendment).
 5. **Single-pass mining**: the two-pass loop (mine -> approve entities ->
    re-mine) exists because relations may only reference approved
    entities. A batch-consistency mode could stage entity+relation
-   proposals together and release both on one review pass. Prerequisite:
-   review-tier calibration (item 4), since it multiplies candidate
-   volume.
+   proposals together and release both on one review pass. Its
+   prerequisite (review-tier calibration, item 4) is now in place; this
+   is the next candidate when mining volume justifies it.
 6. **Richer feedback signal**: feedback is deliberately bounded to coded
    outcomes and reason codes for privacy. If the owner wants richer
    learning signal, the consent framework (ADR-040/044 pattern) can gate

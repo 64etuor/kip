@@ -7,14 +7,17 @@ from time import perf_counter
 
 from kip.application.egress import EgressPolicyUseCases
 from kip.application.evidence import EvidenceUseCases
+from kip.application.knowledge import KnowledgeUseCases
 from kip.application.telemetry import TelemetryUseCases
 from kip.domain.generation import GenerationEvidence
 from kip.domain.json_types import JsonObject, JsonValue
 from kip.domain.knowledge import (
+    AUTO_APPROVE_POLICY_PRINCIPAL,
     CandidateEvidence,
     EntityCandidate,
     KnowledgeEntity,
     MinedProposalSkip,
+    PredicateReviewStats,
     RelationDerivation,
     RelationMiningRequest,
     RelationProposal,
@@ -28,6 +31,7 @@ from kip.domain.knowledge import (
 from kip.domain.models import (
     ApprovedAssertion,
     AssertionCandidate,
+    AutoApprovedRelation,
     OntologyMiningSummary,
     RequestContext,
 )
@@ -55,11 +59,16 @@ class OntologyRagUseCases:
         egress: EgressPolicyUseCases,
         relation_miner: RelationMinerPort | None = None,
         telemetry: TelemetryUseCases | None = None,
+        knowledge: KnowledgeUseCases | None = None,
         *,
         max_mining_units: int = 200,
         max_mining_characters: int = 480_000,
         max_entity_proposals: int = 128,
         max_relation_proposals: int = 256,
+        auto_approve_enabled: bool = True,
+        auto_approve_min_precision: float = 0.95,
+        auto_approve_min_confidence: float = 0.8,
+        auto_approve_min_reviewed: int = 20,
     ) -> None:
         self._store = store
         self._evidence = evidence
@@ -68,10 +77,20 @@ class OntologyRagUseCases:
         self._egress = egress
         self._relation_miner = relation_miner
         self._telemetry = telemetry
+        # Required to auto-approve a qualifying candidate through the exact
+        # path human review uses (`KnowledgeUseCases.review_approve`), so
+        # ontology validation, evidence checks, and supersession semantics
+        # never diverge between the two paths. `None` (e.g. a caller that
+        # never wires it) leaves the auto-approve mechanism fully inert.
+        self._knowledge = knowledge
         self._max_mining_units = max_mining_units
         self._max_mining_characters = max_mining_characters
         self._max_entity_proposals = max_entity_proposals
         self._max_relation_proposals = max_relation_proposals
+        self._auto_approve_enabled = auto_approve_enabled
+        self._auto_approve_min_precision = auto_approve_min_precision
+        self._auto_approve_min_confidence = auto_approve_min_confidence
+        self._auto_approve_min_reviewed = auto_approve_min_reviewed
 
     def create_entity(
         self,
@@ -390,6 +409,8 @@ class OntologyRagUseCases:
                     )
                 )
         relation_candidates: list[AssertionCandidate] = []
+        auto_approved: list[AutoApprovedRelation] = []
+        precision_cache: dict[str, PredicateReviewStats] = {}
         for relation_proposal in result.relations:
             reference = (
                 f"{relation_proposal.subject_entity_id} "
@@ -403,22 +424,27 @@ class OntologyRagUseCases:
                 _require_known_evidence(
                     relation_proposal.evidence_ids, allowed_evidence_ids
                 )
-                relation_candidates.append(
-                    self.propose_relation(
-                        context,
-                        RelationProposal(
-                            subject_id=relation_proposal.subject_entity_id,
-                            predicate=relation_proposal.predicate,
-                            object_entity_id=relation_proposal.object_entity_id,
-                            ontology_version=ontology.version,
-                            evidence_unit_ids=relation_proposal.evidence_ids,
-                            confidence=relation_proposal.confidence,
-                            valid_from=relation_proposal.valid_from,
-                            valid_to=relation_proposal.valid_to,
-                            derivation=derivation,
-                        ),
-                    )
+                candidate = self.propose_relation(
+                    context,
+                    RelationProposal(
+                        subject_id=relation_proposal.subject_entity_id,
+                        predicate=relation_proposal.predicate,
+                        object_entity_id=relation_proposal.object_entity_id,
+                        ontology_version=ontology.version,
+                        evidence_unit_ids=relation_proposal.evidence_ids,
+                        confidence=relation_proposal.confidence,
+                        valid_from=relation_proposal.valid_from,
+                        valid_to=relation_proposal.valid_to,
+                        derivation=derivation,
+                    ),
                 )
+                approval = self._maybe_auto_approve(
+                    context, ontology, candidate, precision_cache
+                )
+                if approval is not None:
+                    candidate, record = approval
+                    auto_approved.append(record)
+                relation_candidates.append(candidate)
             except (ValidationError, NotFoundError, ConflictError) as exc:
                 skipped.append(
                     MinedProposalSkip(
@@ -432,9 +458,84 @@ class OntologyRagUseCases:
             model=result.model,
             usage=result.usage,
             provider_request_id=result.provider_request_id,
+            auto_approved=auto_approved,
         )
         self._record_job_result(context, summary)
         return summary
+
+    def _maybe_auto_approve(
+        self,
+        context: RequestContext,
+        ontology: OntologyCatalog,
+        candidate: AssertionCandidate,
+        precision_cache: dict[str, PredicateReviewStats],
+    ) -> tuple[AssertionCandidate, AutoApprovedRelation] | None:
+        """Attempt the audited, measured, revocable auto-approve policy.
+
+        Fail-closed on every axis: predicate risk/review tier, confidence,
+        and measured per-predicate precision over a minimum human-reviewed
+        sample must all clear their configured floors, or the candidate is
+        left untouched as a normal `proposed` review item. Approval always
+        goes through `KnowledgeUseCases.review_approve` -- the identical
+        path human review uses -- so ontology validation, evidence checks,
+        and supersession semantics apply exactly as they do for a human
+        reviewer. The reviewer identity is the dedicated
+        `AUTO_APPROVE_POLICY_PRINCIPAL` marker, never the mining job's own
+        principal, so the precision query this policy depends on can
+        unambiguously exclude its own decisions from their denominator.
+        """
+        if (
+            not self._auto_approve_enabled
+            or self._knowledge is None
+            or candidate.status != "proposed"
+        ):
+            return None
+        spec = ontology.predicate_specs.get(candidate.predicate)
+        if spec is None or spec.review != "not_required" or spec.risk != "low":
+            return None
+        if (
+            candidate.confidence is None
+            or candidate.confidence < self._auto_approve_min_confidence
+        ):
+            return None
+        stats = precision_cache.get(candidate.predicate)
+        if stats is None:
+            stats = self._store.predicate_review_precision(
+                context, candidate.predicate
+            )
+            precision_cache[candidate.predicate] = stats
+        if stats.reviewed < self._auto_approve_min_reviewed:
+            return None
+        precision = stats.precision
+        if precision is None or precision < self._auto_approve_min_precision:
+            return None
+        note = (
+            f"{AUTO_APPROVE_POLICY_PRINCIPAL} precision={precision:.4f} "
+            f"sample={stats.reviewed}"
+        )
+        policy_context = context.model_copy(
+            update={"principal_id": AUTO_APPROVE_POLICY_PRINCIPAL}
+        )
+        try:
+            assertion = self._knowledge.review_approve(
+                policy_context, candidate.id, note
+            )
+        except (ValidationError, NotFoundError, ConflictError):
+            # Fail closed: any rejection by the human review path (e.g. an
+            # evidence gate or a race with a concurrent decision) leaves the
+            # candidate as a normal proposed item rather than forcing it.
+            return None
+        approved_candidate = candidate.model_copy(
+            update={"status": "approved", "review_note": note}
+        )
+        record = AutoApprovedRelation(
+            candidate_id=candidate.id,
+            assertion_id=assertion.id,
+            predicate=candidate.predicate,
+            precision=precision,
+            sample_size=stats.reviewed,
+        )
+        return approved_candidate, record
 
     def _entities_digest(self, context: RequestContext) -> str:
         entities = sorted(
@@ -478,6 +579,10 @@ class OntologyRagUseCases:
                     ],
                     "skipped": [
                         item.model_dump(mode="json") for item in summary.skipped
+                    ],
+                    "auto_approved": [
+                        item.model_dump(mode="json")
+                        for item in summary.auto_approved
                     ],
                 },
             )

@@ -1,7 +1,19 @@
 # ADR-035: Version semantic inputs and resume projection rebuilds
 
-- **Status:** Accepted
+- **Status:** Accepted — default input cap amended 2026-08-15
 - **Date:** 2026-08-13
+
+> Amendment (2026-08-15): `models.embedding.max_document_chars` default
+> raised 4,000 -> 12,000 (well inside the Qwen3 sidecar's 32k-token
+> window) after an ADR review found it was the one capacity cap left
+> behind by the 2026-08-14 scaling change, silently truncating document
+> middles on the strongest retrieval channel. The versioning this ADR
+> designed makes the raise safe by construction: the cap is part of the
+> space name (`-c<cap>-ht1`) and identity fingerprint, so a cap change
+> produces a fresh shadow space rebuilt through the normal
+> shadow -> evaluate -> activate governance and can never mix truncation
+> regimes inside one space. Richer source-aware chunking remains a future
+> evaluated design change.
 
 ## Context
 

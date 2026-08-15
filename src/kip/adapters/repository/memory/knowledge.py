@@ -10,9 +10,11 @@ from typing import assert_never
 from kip.adapters.repository.memory.acl import assertion_is_visible, unit_is_visible
 from kip.adapters.repository.memory.state import MemoryState
 from kip.domain.knowledge import (
+    AUTO_APPROVE_POLICY_PRINCIPAL,
     CandidateEvidence,
     EntityCandidate,
     KnowledgeEntity,
+    PredicateReviewStats,
     normalize_entity_name,
     stable_entity_id,
 )
@@ -370,6 +372,36 @@ class MemoryKnowledgeStore:
         subject_id: str | None = None,
     ) -> int:
         return len(self._visible_candidates(context, status, predicate, subject_id))
+
+    def predicate_review_precision(
+        self,
+        context: RequestContext,
+        predicate: str,
+    ) -> PredicateReviewStats:
+        approved = 0
+        rejected = 0
+        for candidate in self.state.candidates.values():
+            if candidate.predicate != predicate:
+                continue
+            if candidate.status not in ("approved", "rejected"):
+                continue
+            # The auto-approve policy's own decisions are excluded from the
+            # statistic it feeds, so precision can never be reinforced by
+            # itself. The marker is recorded in `review_note` since
+            # `AssertionCandidate` carries no separate reviewer-identity
+            # field (no schema change).
+            note = candidate.review_note or ""
+            if note.startswith(AUTO_APPROVE_POLICY_PRINCIPAL):
+                continue
+            if candidate.status == "approved":
+                approved += 1
+            else:
+                rejected += 1
+        return PredicateReviewStats(
+            predicate=predicate,
+            approved=approved,
+            rejected=rejected,
+        )
 
     def approve_candidate(
         self,

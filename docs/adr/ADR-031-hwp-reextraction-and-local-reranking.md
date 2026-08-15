@@ -1,6 +1,13 @@
 # ADR-031: Guarded HWP re-extraction and local lexical reranking
 
-Status: Accepted
+Status: Accepted — reranker-default framing superseded by ADR-034 (2026-08-11)
+
+> Amendment: RapidFuzz is no longer "the" production reranker; ADR-034
+> promoted the candidate-local BM25 backend on an adversarially re-verified
+> reviewed dataset, and RapidFuzz remains the fallback backend. The HWP
+> re-extraction guards and the numeric rerank bounds in this ADR remain
+> valid for the fallback path. Re-test trigger: re-compare fallback tuning
+> when the corpus or the default backend changes materially.
 
 ## Context
 

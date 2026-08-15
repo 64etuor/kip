@@ -165,6 +165,41 @@
       "title": "AssertionCandidate",
       "type": "object"
     },
+    "AutoApprovedRelation": {
+      "additionalProperties": false,
+      "description": "One relation candidate approved by the calibrated auto-approve policy.\n\nRecorded for audit visibility alongside `OntologyMiningSummary`. The\nunderlying assertion is approved through the same path as human review\n(see `KnowledgeUseCases.review_approve`) and stays fully revocable via\nthe ordinary `review revoke` path like any other approved assertion.",
+      "properties": {
+        "assertion_id": {
+          "title": "Assertion Id",
+          "type": "string"
+        },
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "precision": {
+          "title": "Precision",
+          "type": "number"
+        },
+        "predicate": {
+          "title": "Predicate",
+          "type": "string"
+        },
+        "sample_size": {
+          "title": "Sample Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "assertion_id",
+        "predicate",
+        "precision",
+        "sample_size"
+      ],
+      "title": "AutoApprovedRelation",
+      "type": "object"
+    },
     "CandidateEvidence": {
       "additionalProperties": false,
       "properties": {
@@ -456,6 +491,13 @@
   },
   "additionalProperties": false,
   "properties": {
+    "auto_approved": {
+      "items": {
+        "$ref": "#/$defs/AutoApprovedRelation"
+      },
+      "title": "Auto Approved",
+      "type": "array"
+    },
     "entity_candidates": {
       "items": {
         "$ref": "#/$defs/EntityCandidate"

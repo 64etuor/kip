@@ -1,0 +1,280 @@
+src/kip/ontology.py
+  s_ad962c4c3ae8de::t_7ef0277533c1c6 140-142
+src/kip/cli.py
+  s_ad962c4c3ae8de::t_3c39eaad04c4eb 223-236,245-250
+tests/test_filesystem_retrieval.py
+  s_ad962c4c3ae8de::t_866e11eb319c20 150-204
+src/kip/mcp_server.py
+  s_ad962c4c3ae8de::t_d8c821b9457641 118,125,131,154,179,203,209,215,221,237,243,249,254,269,291,304,338,352,366,383,395,401,415,442,463,469,486,494,515,563,578
+  s_ad962c4c3ae8de::t_f151ab23dcd81f 73-107
+  s_ad962c4c3ae8de::t_a583052ad3429b 3,6,22-24,31-32
+.env.example
+  s_ad962c4c3ae8de::t_6dcaf470cc049a 59-60
+src/kip/adapters/connectors/filesystem.py
+  s_ad962c4c3ae8de::t_92ab494792105f 35-41,60-64,70,72,75,84
+  s_ad962c4c3ae8de::t_0f212ff72ed985 110
+src/kip/adapters/parsers/pptx_ooxml.py
+  s_ad962c4c3ae8de::t_2c494ef2224471 137-143
+  s_ad962c4c3ae8de::t_f3b6545a06272d 11
+tests/test_csv_parser.py
+  s_ad962c4c3ae8de::t_6c58bb50dc63e4 220-239
+  s_ad962c4c3ae8de::t_b7732d76d36a6c 133-161
+  s_ad962c4c3ae8de::t_01ac6cb4b53925 207-210,213
+  s_ad962c4c3ae8de::t_b9f463d46dfbd2 7-9,12
+  s_ad962c4c3ae8de::t_86dc3c904eb110 240-257
+tests/test_ontology_migration_materialization.py
+  s_ad962c4c3ae8de::t_a7a8d9c94780e7 95
+tests/integration/test_postgres_repository.py
+  s_ad962c4c3ae8de::t_9d2529223afdb8 668,1136
+  s_ad962c4c3ae8de::t_94d145b6c42c09 1292
+src/kip/adapters/parsers/csv_table.py
+  s_ad962c4c3ae8de::t_57cad805a8a9c7 18-26
+  s_ad962c4c3ae8de::t_e4b9dc21e94064 99-104
+  s_ad962c4c3ae8de::t_c6193d5211f007 134-142
+  s_ad962c4c3ae8de::t_4a06b69ebc5259 86-91
+  s_ad962c4c3ae8de::t_1bfd20d7246019 178-179
+  s_ad962c4c3ae8de::t_da0fbdf6100e1e 184-192,199
+tests/test_pdf_parser.py
+  s_ad962c4c3ae8de::t_832305c97df99e 4
+  s_ad962c4c3ae8de::t_7ba5f748adb135 139-159
+config/kip.example.toml
+  s_ad962c4c3ae8de::t_96784aa5ab59b7 62
+  s_ad962c4c3ae8de::t_01af56deb19cfd 142-146
+src/kip/adapters/parsers/pdf.py
+  s_ad962c4c3ae8de::t_36e14c5e5c6ab8 57-67,69
+  s_ad962c4c3ae8de::t_f8ddc7eb1c9a19 3
+  s_ad962c4c3ae8de::t_c515db50bd0c53 68
+  s_ad962c4c3ae8de::t_dabf29a7d1c3d5 106
+tests/test_ontology_contract.py
+  s_ad962c4c3ae8de::t_f89ce136e783b1 65-69,74,76-83
+  s_ad962c4c3ae8de::t_e0d12c0809ef0d 70-73,75
+tests/test_ontology_rag_domain.py
+  s_ad962c4c3ae8de::t_b639aa9fb370f1 86,165,208,255
+CHANGELOG.md
+  s_ad962c4c3ae8de::t_19a87ce23e8a70 5-40
+src/kip/adapters/parsers/pptx.py
+  s_ad962c4c3ae8de::t_53d259efac433e 44-51
+tests/test_ontology_discovery_release.py
+  s_ad962c4c3ae8de::t_5d532df8d2874f 12
+  s_ad962c4c3ae8de::t_f712ad299f8073 72-105
+  s_ad962c4c3ae8de::t_d8d0f1777362c9 325-328
+  s_ad962c4c3ae8de::t_062eba27b229a8 510-571
+docs/SECURITY.md
+  s_ad962c4c3ae8de::t_6dd99afecd8412 183-191
+tests/test_ontology_auto_approve.py
+  s_ad962c4c3ae8de::t_e828b96fe006de 134-136
+  s_ad962c4c3ae8de::t_fbfd46faf1ffc7 541-543
+  s_ad962c4c3ae8de::t_583e8df355bf76 228-230
+  s_ad962c4c3ae8de::t_d57cf51546ff65 492-531
+tests/test_production_search_contract.py
+  s_ad962c4c3ae8de::t_0998d97a0a95e8 170,172-176
+src/kip/adapters/parsers/docx.py
+  s_ad962c4c3ae8de::t_b26a42adaf22f0 40-50
+  s_ad962c4c3ae8de::t_5b33a70f1ea7fc 281,291-313
+  s_ad962c4c3ae8de::t_73d92446795bed 495-501,504,513-517,523-525
+  s_ad962c4c3ae8de::t_3932f63f7ba320 155,157-159,171,184,186
+  s_ad962c4c3ae8de::t_18f2c1d7b05164 126
+  s_ad962c4c3ae8de::t_98ad90c7f79383 474-475,479-488
+  s_ad962c4c3ae8de::t_2f975c061b4faf 552-561,563,565-566,569-574
+  s_ad962c4c3ae8de::t_a7ba380edb358e 85
+  s_ad962c4c3ae8de::t_bfcae209a6b1ff 409,411-423,440,443-451,453-454
+  s_ad962c4c3ae8de::t_f8dae4f66f85b6 135
+  s_ad962c4c3ae8de::t_56bd004ca95223 33-36
+  s_ad962c4c3ae8de::t_52d84d2a6de255 361,370-371,373-376,394,403
+  s_ad962c4c3ae8de::t_08aa09a28f9cca 671-672,688-692
+  s_ad962c4c3ae8de::t_9bccfe495ef994 749-761,763-764,768
+  s_ad962c4c3ae8de::t_f34d45807cae44 11
+  s_ad962c4c3ae8de::t_a71af7f0b34e0e 424-427
+  s_ad962c4c3ae8de::t_9eac175ac8d2a6 314-315
+tests/test_text_quality.py
+  s_ad962c4c3ae8de::t_0ad4d0d2364ab2 76-88
+src/kip/domain/interactions.py
+  s_ad962c4c3ae8de::t_e3b8c7b80b4d8b 403,407-411
+  s_ad962c4c3ae8de::t_2e2f6dfe61a231 317,322,327
+  s_ad962c4c3ae8de::t_0fa6d0109268b0 69-84
+  s_ad962c4c3ae8de::t_4c2b0d14229f46 395-402,404-406,412-427
+  s_ad962c4c3ae8de::t_d36b457ef39f71 43-68
+src/kip/domain/models.py
+  s_ad962c4c3ae8de::t_b84fc7ac6fd306 331
+src/kip/api.py
+  s_ad962c4c3ae8de::t_3074b47299761a 49-50
+  s_ad962c4c3ae8de::t_22362b60400bfc 4,13
+  s_ad962c4c3ae8de::t_22d7c2097cf042 94
+  s_ad962c4c3ae8de::t_46158bba884b3b 107-112
+  s_ad962c4c3ae8de::t_fb70132a5bb2e3 175-188
+tests/test_pptx_parser.py
+  s_ad962c4c3ae8de::t_b11f753e0bc34f 665-689
+tests/test_hwp_parser.py
+  s_ad962c4c3ae8de::t_62123c48c1bc7d 8-10,15
+  s_ad962c4c3ae8de::t_1d44dfdb24c2c6 163-203
+tests/test_filesystem_deletion_reconciliation.py
+  s_ad962c4c3ae8de::t_051d6f2dc7a00f 139-193
+src/kip/adapters/parsers/xlsx_read.py
+  s_ad962c4c3ae8de::t_29876f9c449bf8 207
+  s_ad962c4c3ae8de::t_2511e0440868aa 25
+tests/characterization/test_edge_contract_parity.py
+  s_ad962c4c3ae8de::t_00d73336d72245 18
+docs/adr/ADR-048-adversarial-audit-hardening.md
+  s_ad962c4c3ae8de::t_4f05ab96dc21cd 1-99
+src/kip/adapters/parsers/xlsx.py
+  s_ad962c4c3ae8de::t_b9c766cc206f9b 144
+  s_ad962c4c3ae8de::t_a972af45ac6edc 10,13
+tests/test_mcp_envelope_contract.py
+  s_ad962c4c3ae8de::t_4a1370dcbeda98 1-53
+src/kip/application/ingestion.py
+  s_ad962c4c3ae8de::t_f8098be0254b0e 124-134,136-149
+src/kip/application/knowledge.py
+  s_ad962c4c3ae8de::t_1268e8bf04e26a 332-336,350-354,362-368
+  s_ad962c4c3ae8de::t_07b27979daee27 205-213
+  s_ad962c4c3ae8de::t_6f1b813ae2e5f6 265
+  s_ad962c4c3ae8de::t_24398a1dc216db 17
+  s_ad962c4c3ae8de::t_9a01dbb9835c2a 285
+contracts/openapi.yaml
+  s_ad962c4c3ae8de::t_944a4c22aa5a40 6
+tests/test_setup_writer.py
+  s_ad962c4c3ae8de::t_cc26d3c8296412 175-206
+src/kip/application/ontology_rag.py
+  s_ad962c4c3ae8de::t_b9a02110cc432c 45
+  s_ad962c4c3ae8de::t_e63f6fb59b1534 525-532,534-537
+  s_ad962c4c3ae8de::t_3a53c61975e523 163,177,190
+  s_ad962c4c3ae8de::t_9103ad3fdf00f2 100-105
+  s_ad962c4c3ae8de::t_dedb07f77e669e 775-781
+src/kip/adapters/parsers/zip_guard.py
+  s_ad962c4c3ae8de::t_93f462f4cf72d2 1-48
+tests/test_plain_text_parser.py
+  s_ad962c4c3ae8de::t_d5f554c825a3a6 122
+  s_ad962c4c3ae8de::t_df4d25c445e964 89-121,123-137
+  s_ad962c4c3ae8de::t_d3b6ccbea692bc 5-7,9
+  s_ad962c4c3ae8de::t_344864ff108875 138-155
+src/kip/ontology_discovery_release.py
+  s_ad962c4c3ae8de::t_54c06909ddbc01 486-491
+  s_ad962c4c3ae8de::t_5ec8a0690fedea 43-52
+  s_ad962c4c3ae8de::t_3db1cc1047fbd5 105-109
+  s_ad962c4c3ae8de::t_c6e4830164c7e4 197-206,214,216-218,222-226,228,231-235,238-264,270-303
+  s_ad962c4c3ae8de::t_e44801fc42d1c5 404-409
+  s_ad962c4c3ae8de::t_23748d530f4d78 304-305
+tests/test_ingestion_resilience.py
+  s_ad962c4c3ae8de::t_6cb893bf50a25b 5
+  s_ad962c4c3ae8de::t_829bb7d6e1c3fe 46
+  s_ad962c4c3ae8de::t_33059bf0729702 1-4,6-45,47-100
+src/kip/container.py
+  s_ad962c4c3ae8de::t_5b802107de3497 314-318
+src/kip/adapters/repository/postgres/database.py
+  s_ad962c4c3ae8de::t_73504a297ac103 3423-3425,3428-3438
+  s_ad962c4c3ae8de::t_a169f63bcc90f9 3229-3245,3250-3259,3267-3269,3274-3276,3279-3280
+  s_ad962c4c3ae8de::t_3e254501389e33 3270-3273
+docs/adr/ADR-047-measured-auto-approve-policy.md
+  s_ad962c4c3ae8de::t_37532fc78b6389 3-4,7-13
+  s_ad962c4c3ae8de::t_6b4e0cb1790d22 38-41
+  s_ad962c4c3ae8de::t_417dc632f52024 14
+tests/test_interaction_edges.py
+  s_ad962c4c3ae8de::t_f936a11e0df8d9 232-235
+  s_ad962c4c3ae8de::t_1bd786a7d1a702 204-207
+src/kip/setup/writer.py
+  s_ad962c4c3ae8de::t_efebfddda5fb18 201-212
+  s_ad962c4c3ae8de::t_9f94a8b1586a87 269-273
+tests/test_relation_candidate_idempotency.py
+  s_ad962c4c3ae8de::t_9a664eae1da93b 49
+src/kip/application/answer_adequacy.py
+  s_ad962c4c3ae8de::t_30073fedad033a 220-228
+  s_ad962c4c3ae8de::t_eaf4af9f66d4ec 171-187
+src/kip/adapters/parsers/text_quality.py
+  s_ad962c4c3ae8de::t_f5f161ec6dc9b3 80-84
+tests/contract/test_repository_behavior_parity.py
+  s_ad962c4c3ae8de::t_fd3f853b964d2c 691-773
+  s_ad962c4c3ae8de::t_c875cd0a44f677 554-662
+tests/test_ontology_rag_cli.py
+  s_ad962c4c3ae8de::t_9ab29e70b08c33 17-18,24-30
+  s_ad962c4c3ae8de::t_3d89eb1fc5465f 62
+  s_ad962c4c3ae8de::t_82ac786adc98db 76,85-94
+  s_ad962c4c3ae8de::t_f4d68bffde7e5e 95-96
+contracts/openapi.json
+  s_ad962c4c3ae8de::t_944a4c22aa5a40 1098
+src/kip/adapters/repository/memory/state.py
+  s_ad962c4c3ae8de::t_d1dd6ff4e238b3 44-52
+contracts/answer-response.schema.json
+  s_ad962c4c3ae8de::t_f836042fa7e122 615
+tests/test_cli_envelope_contract.py
+  s_ad962c4c3ae8de::t_67fe5972f5d3e9 68-86
+tests/test_vocabulary_and_assertions.py
+  s_ad962c4c3ae8de::t_923e400a86141e 13
+config/kip.container.toml
+  s_ad962c4c3ae8de::t_a622c7a17831b8 46-50
+  s_ad962c4c3ae8de::t_8bfb930a993041 26
+src/kip/adapters/parsers/hwp_native.py
+  s_ad962c4c3ae8de::t_4a4e7ed77d7adc 120,125,128
+  s_ad962c4c3ae8de::t_b363ea25962cf5 7
+tests/test_answer_adequacy.py
+  s_ad962c4c3ae8de::t_200ae39ed29be2 70,212-261
+  s_ad962c4c3ae8de::t_cc31b6d0e22b3a 3,42-66
+  s_ad962c4c3ae8de::t_d1c046a4da8636 67-69
+  s_ad962c4c3ae8de::t_4838a488b8d395 71-72
+tests/test_docx_parser.py
+  s_ad962c4c3ae8de::t_b74b8a74e54c0d 365-383
+  s_ad962c4c3ae8de::t_b87bd98230db9c 122-126
+  s_ad962c4c3ae8de::t_626b4c713e3973 12
+  s_ad962c4c3ae8de::t_0138a4c887612a 14
+  s_ad962c4c3ae8de::t_85a13e8dc959cb 621-629
+  s_ad962c4c3ae8de::t_fcaec478d84d4e 384-468
+  s_ad962c4c3ae8de::t_cce4545d40e5ab 469-506,508-620
+  s_ad962c4c3ae8de::t_d5f554c825a3a6 507
+src/kip/adapters/connectors/registry.py
+  s_ad962c4c3ae8de::t_be5ffdd5183899 93-96
+src/kip/adapters/parsers/plain.py
+  s_ad962c4c3ae8de::t_31e44c11d20ecb 24-27,37
+  s_ad962c4c3ae8de::t_b5f96b81c55694 199-204
+  s_ad962c4c3ae8de::t_1c3e060d1147f4 63-136,143-144,149,154-156,169-171,180
+  s_ad962c4c3ae8de::t_926f99cdff7202 10,13-21
+  s_ad962c4c3ae8de::t_d321efb2614970 22
+tests/test_ontology_answer_context.py
+  s_ad962c4c3ae8de::t_799bf444079927 234
+  s_ad962c4c3ae8de::t_168fcdc78fe538 296
+  s_ad962c4c3ae8de::t_1f7c01d346fd5a 126-128
+src/kip/adapters/repository/memory/knowledge.py
+  s_ad962c4c3ae8de::t_35ddd3053f4fdd 385-402,405,408-409,413-418,425-426
+  s_ad962c4c3ae8de::t_7584bd39d979af 420-423
+  s_ad962c4c3ae8de::t_9aece5d1a247fd 500-505
+  s_ad962c4c3ae8de::t_31c2ac3c331e87 314-317
+migrations/0023_assertion_candidate_decision_source.sql
+  s_ad962c4c3ae8de::t_5842b81531203c 1-21
+src/kip/ports/ingestion.py
+  s_ad962c4c3ae8de::t_5478ec77b54fca 77-86
+src/kip/worker.py
+  s_ad962c4c3ae8de::t_2f8df29be7dff8 15-27,30
+  s_ad962c4c3ae8de::t_de9bfe7c28bf0a 28-29
+  s_ad962c4c3ae8de::t_a407e1d4a18d09 86-93,112-123
+tests/test_ontology_review_governance.py
+  s_ad962c4c3ae8de::t_37a2cbe01bff52 465-467
+  s_ad962c4c3ae8de::t_a5670bac8d81a4 472-475
+  s_ad962c4c3ae8de::t_64628f61c46e5e 497-628
+  s_ad962c4c3ae8de::t_8493c31a08d720 75-77
+  s_ad962c4c3ae8de::t_4dcbfe69d961de 29
+  s_ad962c4c3ae8de::t_bc2809ac04dbaf 13,15,18-19,26
+  s_ad962c4c3ae8de::t_ad464fb29b99de 629-684
+docs/IMPLEMENTATION_STATUS.md
+  s_ad962c4c3ae8de::t_ceb3f77ff2df39 41
+tests/test_api.py
+  s_ad962c4c3ae8de::t_f440c2dd1e8697 258-260
+  s_ad962c4c3ae8de::t_c541ebc9210760 7
+  s_ad962c4c3ae8de::t_50e8642cf3ccaa 508-551
+tests/test_ontology_mining_workflow.py
+  s_ad962c4c3ae8de::t_c3b7a7bddef6bc 137-138
+.aio/doc-reports/20260815T130850-report.json
+  s_ad962c4c3ae8de::t_35d942c55a9aff 1-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "0dbc6c904db947eaaebcd56c9956dbe80e5e8941",
+  "prompts": {},
+  "sessions": {
+    "s_ad962c4c3ae8de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7b5ac8f7-2921-4c40-a768-515e565b34b7",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

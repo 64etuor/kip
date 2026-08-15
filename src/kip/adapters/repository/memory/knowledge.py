@@ -17,6 +17,7 @@ from kip.domain.knowledge import (
     stable_entity_id,
 )
 from kip.domain.models import (
+    GRAPH_PATH_RESULT_CAP,
     ApprovedAssertion,
     AssertionCandidate,
     GraphEdge,
@@ -587,11 +588,13 @@ def _bounded_paths(
     )
     visited_depth: dict[str, int] = {request.from_node_id: 0}
     paths: list[GraphPath] = []
-    while queue and len(paths) < 20:
+    while queue and len(paths) < GRAPH_PATH_RESULT_CAP:
         node, nodes, assertion_ids, predicates = queue.popleft()
         if len(assertion_ids) >= request.max_depth:
             continue
         for neighbor, assertion in adjacency.get(node, []):
+            if len(paths) >= GRAPH_PATH_RESULT_CAP:
+                break
             if neighbor in nodes:
                 continue
             next_nodes = [*nodes, neighbor]

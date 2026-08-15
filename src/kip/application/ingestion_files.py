@@ -48,23 +48,6 @@ def _logical_key(relative_path: str) -> str:
     return f"{parent}/{stem}" if parent not in {"", "."} else stem
 
 
-def _representation_role(extension: str) -> str:
-    return {
-        ".hwp": "editable_original",
-        ".hwpx": "editable_original",
-        ".pdf": "searchable_representation",
-        ".xlsx": "workbook",
-        ".xlsm": "workbook",
-        ".xls": "workbook",
-        ".pptx": "presentation",
-        ".pptm": "presentation",
-        ".ppsx": "presentation",
-        ".ppsm": "presentation",
-        ".potx": "presentation",
-        ".potm": "presentation",
-    }.get(extension.lower(), "primary")
-
-
 @dataclass(frozen=True, slots=True)
 class _FileIdentity:
     path: Path
@@ -423,7 +406,7 @@ class FileIngestionWorkflow:
                 byte_size=record.size,
                 sha256=record.sha256,
                 source_path=str(path),
-                representation_role=_representation_role(extension),
+                representation_role=self._parsers.representation_role(extension),
                 metadata={"source_root": str(source_root.resolve())},
             ),
             extraction=extraction,

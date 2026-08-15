@@ -143,9 +143,6 @@ max_assertions = 10000
 enabled = true
 clarification_ttl_seconds = 3600
 
-[graph]
-backend = "postgres"
-
 [sync]
 # Filesystem deletion grace policy: an indexed file is soft-tombstoned only
 # after this many CONSECUTIVE COMPLETE scans of its source confirm absence.

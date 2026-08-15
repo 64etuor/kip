@@ -10,6 +10,10 @@ from kip.adapters.embeddings.http import HttpEmbeddingAdapter
 from kip.adapters.embeddings.noop import DisabledEmbeddingAdapter
 from kip.adapters.generators.anthropic import AnthropicGenerationAdapter
 from kip.adapters.generators.openai_compatible import OpenAICompatibleGenerationAdapter
+from kip.adapters.generators.provider import (
+    GenerationProviderKind,
+    parse_generation_provider_kind,
+)
 from kip.adapters.identity import (
     ApiKeyIdentityAdapter,
     JwtIdentityAdapter,
@@ -498,48 +502,50 @@ def _build_generator(
         )
     timeout_seconds = float(str(raw.get("timeout_seconds", 60)))
     max_response_bytes = int(str(raw.get("max_response_bytes", 1024 * 1024)))
-    if provider == "local":
-        return OpenAICompatibleGenerationAdapter(
-            base_url=str(raw.get("base_url", "http://127.0.0.1:7998")),
-            api_key="",
-            model=model,
-            revision=revision,
-            provider="local",
-            allow_remote_egress=False,
-            timeout_seconds=timeout_seconds,
-            max_response_bytes=max_response_bytes,
-        )
-    if provider not in {"openai", "anthropic"}:
-        raise ConfigurationError(f"unsupported generation provider: {provider or 'missing'}")
+    kind = parse_generation_provider_kind(provider)
+    match kind:
+        case GenerationProviderKind.LOCAL:
+            return OpenAICompatibleGenerationAdapter(
+                base_url=str(raw.get("base_url", "http://127.0.0.1:7998")),
+                api_key="",
+                model=model,
+                revision=revision,
+                provider="local",
+                allow_remote_egress=False,
+                timeout_seconds=timeout_seconds,
+                max_response_bytes=max_response_bytes,
+            )
+        case GenerationProviderKind.OPENAI:
+            api_key = _resolve_remote_generation_secret(settings, raw)
+            return OpenAICompatibleGenerationAdapter(
+                base_url=str(raw.get("base_url", "https://api.openai.com")),
+                api_key=api_key,
+                model=model,
+                revision=revision,
+                allow_remote_egress=allow_remote_egress,
+                timeout_seconds=timeout_seconds,
+                max_response_bytes=max_response_bytes,
+            )
+        case GenerationProviderKind.ANTHROPIC:
+            api_key = _resolve_remote_generation_secret(settings, raw)
+            return AnthropicGenerationAdapter(
+                base_url=str(raw.get("base_url", "https://api.anthropic.com")),
+                api_key=api_key,
+                model=model,
+                revision=revision,
+                allow_remote_egress=allow_remote_egress,
+                timeout_seconds=timeout_seconds,
+                max_response_bytes=max_response_bytes,
+            )
+        case unreachable:
+            assert_never(unreachable)
+
+
+def _resolve_remote_generation_secret(settings: Settings, raw: dict[str, object]) -> str:
     secret_reference = str(raw.get("secret_ref", "")).strip()
     if not secret_reference:
         raise ConfigurationError("remote generation requires secret_ref")
-    api_key = settings.resolve_secret_reference(secret_reference)
-    base_url = str(
-        raw.get(
-            "base_url",
-            "https://api.openai.com" if provider == "openai" else "https://api.anthropic.com",
-        )
-    )
-    if provider == "openai":
-        return OpenAICompatibleGenerationAdapter(
-            base_url=base_url,
-            api_key=api_key,
-            model=model,
-            revision=revision,
-            allow_remote_egress=allow_remote_egress,
-            timeout_seconds=timeout_seconds,
-            max_response_bytes=max_response_bytes,
-        )
-    return AnthropicGenerationAdapter(
-        base_url=base_url,
-        api_key=api_key,
-        model=model,
-        revision=revision,
-        allow_remote_egress=allow_remote_egress,
-        timeout_seconds=timeout_seconds,
-        max_response_bytes=max_response_bytes,
-    )
+    return settings.resolve_secret_reference(secret_reference)
 
 
 def _build_identity(settings: Settings) -> IdentityResolverPort:

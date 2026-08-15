@@ -123,7 +123,6 @@ def run_portable_gate(path: Path, *, project_root: Path) -> dict[str, Any]:
         raw={
             "app": {"workspace": suite.workspace},
             "search": {"semantic_enabled": False},
-            "graph": {"backend": "memory"},
         },
         environment="test",
         workspace=suite.workspace,

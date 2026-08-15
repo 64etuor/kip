@@ -66,7 +66,7 @@ class OperationsUseCases:
         context: RequestContext | None = None,
     ) -> Capabilities:
         warnings: list[str] = []
-        if self._settings.database_url.startswith("memory://"):
+        if self._settings.is_memory:
             warnings.append(
                 "memory repository is non-durable and intended only for tests or demos"
             )
@@ -120,7 +120,7 @@ class OperationsUseCases:
             semantic_search=semantic_ready,
             semantic_search_configured=semantic_configured,
             semantic_projection_status=projection_status,
-            graph_backend=str(self._settings.get("graph.backend", "postgres")),
+            graph_backend=self._store.name,
             api=True,
             mcp=True,
             parsers=self._parsers.capabilities(),

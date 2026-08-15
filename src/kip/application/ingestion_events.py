@@ -31,9 +31,6 @@ class EventFamily(StrEnum):
     CONNECTOR = "connector"
 
 
-_EVENT_FAMILIES = {"slack": EventFamily.SLACK, "imap": EventFamily.MAIL, "apple-mail": EventFamily.MAIL}
-
-
 class EventIngestionWorkflow:
     def __init__(
         self,
@@ -51,6 +48,7 @@ class EventIngestionWorkflow:
         event: ConnectorEvent,
         *,
         classification: DataClassification,
+        family: EventFamily,
     ) -> IngestResult:
         payload_bytes = json.dumps(
             event.payload,
@@ -62,7 +60,6 @@ class EventIngestionWorkflow:
         revision_hash = sha256_bytes(
             payload_bytes + b"\0" + event.operation.encode("utf-8")
         )
-        family = _EVENT_FAMILIES.get(event.connector_name, EventFamily.CONNECTOR)
         system_kind = str(event.payload.get("source_kind") or family.value)
         system_id = stable_id("srcsys", context.workspace, event.connector_name)
         object_id = stable_id("srcobj", system_id, event.external_id)

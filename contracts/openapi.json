@@ -634,6 +634,7 @@
       },
       "GraphPathRequest": {
         "additionalProperties": false,
+        "description": "A bounded-depth path search between two graph nodes.\n\nBoth repository adapters cap the number of returned paths at\n`GRAPH_PATH_RESULT_CAP`.",
         "properties": {
           "approved_only": {
             "default": true,

@@ -30,6 +30,16 @@ class RemoteSourceName(StrEnum):
     IMAP = "imap"
 
 
+def _remote_event_family(source_name: RemoteSourceName) -> str:
+    match source_name:
+        case RemoteSourceName.SLACK:
+            return "slack"
+        case RemoteSourceName.APPLE_MAIL | RemoteSourceName.IMAP:
+            return "mail"
+        case unreachable:
+            assert_never(unreachable)
+
+
 class SlackSourceConfig(BaseModel):
     model_config = ConfigDict(extra="ignore", frozen=True)
 
@@ -86,20 +96,16 @@ class ConfiguredSourceCatalog:
     settings: Settings
 
     def capabilities(self) -> dict[str, str]:
-        return {
+        capabilities = {
             "filesystem": "configured"
             if self.settings.get("sources.filesystem", [])
             else "disabled",
-            "slack": "configured"
-            if self.settings.get("sources.slack.enabled", False)
-            else "disabled",
-            "apple_mail": "configured"
-            if self.settings.get("sources.apple_mail.enabled", False)
-            else "disabled",
-            "imap": "configured"
-            if self.settings.get("sources.imap.enabled", False)
-            else "disabled",
         }
+        for name in RemoteSourceName:
+            capabilities[_remote_config_key(name.value)] = (
+                "configured" if self._remote_source_enabled(name) else "disabled"
+            )
+        return capabilities
 
     def enabled_names(self) -> list[str]:
         names = [
@@ -109,13 +115,15 @@ class ConfiguredSourceCatalog:
             and source.get("enabled", True)
             and source.get("name")
         ]
-        remote = (
-            (RemoteSourceName.SLACK, "sources.slack.enabled"),
-            (RemoteSourceName.APPLE_MAIL, "sources.apple_mail.enabled"),
-            (RemoteSourceName.IMAP, "sources.imap.enabled"),
+        names.extend(
+            name.value for name in RemoteSourceName if self._remote_source_enabled(name)
         )
-        names.extend(name.value for name, key in remote if self.settings.get(key, False))
         return names
+
+    def _remote_source_enabled(self, name: RemoteSourceName) -> bool:
+        return bool(
+            self.settings.get(f"sources.{_remote_config_key(name.value)}.enabled", False)
+        )
 
     def filesystem(self, source_name: str) -> FilesystemSourcePort:
         source = self.settings.filesystem_source(source_name)
@@ -200,6 +208,14 @@ class ConfiguredSourceCatalog:
             raise ConfigurationError(
                 f"connector classification is invalid: {event.connector_name}"
             ) from exc
+
+    def event_family(self, source_name: str) -> str:
+        if source_name in {item.value for item in RemoteSourceName}:
+            return _remote_event_family(RemoteSourceName(source_name))
+        policy = self._connector_policy(source_name)
+        if policy is not None and policy.get("event_family"):
+            return str(policy["event_family"])
+        return "connector"
 
     def _connector_policy(self, connector_name: str) -> dict[str, object] | None:
         policies = self.settings.get("sources.connector_policies", []) or []

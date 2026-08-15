@@ -325,17 +325,10 @@ def _sync_one(
     selected = _resolve_sync_source(runtime, source)
     if selected == "all":
         results: list[Any] = []
-        for name in _enabled_filesystem_sources(runtime):
-            results.append(_sync_one(runtime, name, enqueue=enqueue, dry_run=dry_run, since=since))
-        for name, enabled in [
-            ("slack", runtime.container.settings.get("sources.slack.enabled", False)),
-            ("apple-mail", runtime.container.settings.get("sources.apple_mail.enabled", False)),
-            ("imap", runtime.container.settings.get("sources.imap.enabled", False)),
-        ]:
-            if enabled:
-                results.append(
-                    _sync_one(runtime, name, enqueue=enqueue, dry_run=dry_run, since=since)
-                )
+        for name in runtime.container.application.ingestion.enabled_sync_sources():
+            results.append(
+                _sync_one(runtime, name, enqueue=enqueue, dry_run=dry_run, since=since)
+            )
         return results
     if enqueue:
         if dry_run:
@@ -352,13 +345,13 @@ def _sync_one(
         )
     if dry_run:
         raise ValidationError("--dry-run is currently supported only for filesystem sources")
-    if selected == "slack":
-        return runtime.container.application.ingestion.sync_slack(runtime.context, oldest=since)
-    if selected == "apple-mail":
-        return runtime.container.application.ingestion.sync_apple_mail(runtime.context)
-    if selected == "imap":
-        return runtime.container.application.ingestion.sync_imap(runtime.context)
-    raise ValidationError(f"unsupported source: {selected}")
+    # `_resolve_sync_source` only ever returns a filesystem source name, "all"
+    # (handled above), or one of the known remote source names; anything else
+    # already raised ValidationError there. Dispatch generically so adding a
+    # remote connector requires no edit here.
+    return runtime.container.application.ingestion.sync_remote(
+        runtime.context, selected, since=since
+    )
 
 
 @app.command()
@@ -996,6 +989,7 @@ def projection_status(ctx: typer.Context) -> None:
 
     def action(runtime: Runtime) -> Any:
         status_report = runtime.container.application.operations.status(runtime.context)
+        capabilities = runtime.container.application.operations.capabilities(runtime.context)
         return {
             "lexical": {
                 "content_units": status_report.content_units,
@@ -1003,7 +997,7 @@ def projection_status(ctx: typer.Context) -> None:
                 "in_sync": status_report.content_units == status_report.lexical_units,
             },
             "graph": {
-                "backend": runtime.container.settings.get("graph.backend", "postgres"),
+                "backend": capabilities.graph_backend,
                 "approved_assertions": status_report.approved_assertions,
                 "canonical_query": True,
             },
@@ -1060,10 +1054,11 @@ def projection_verify(ctx: typer.Context, name: str = typer.Option("lexical", "-
                 "lexical_units": report.lexical_units,
             }
         if name == "graph":
+            capabilities = runtime.container.application.operations.capabilities(runtime.context)
             return {
                 "projection": name,
                 "ok": True,
-                "backend": runtime.container.settings.get("graph.backend", "postgres"),
+                "backend": capabilities.graph_backend,
                 "approved_assertions": report.approved_assertions,
                 "note": "the baseline queries canonical PostgreSQL assertions directly",
             }

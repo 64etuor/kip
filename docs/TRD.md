@@ -105,7 +105,7 @@ Neo4j는 source of truth가 아니다. 언제든 PostgreSQL에서 재구축해�
 
 ### 1.5 Apache AGE 판단
 
-Apache AGE는 SQL과 openCypher를 한 PostgreSQL에 둘 수 있다는 장점이 있다. 반면 PostgreSQL major version과 extension build compatibility를 함께 관리해야 한다. v3는 `GraphQueryPort`를 제공하되 AGE를 기준 runtime에 포함하지 않는다. 단일 서버 graph 요구가 강해질 때 Neo4j와 AGE를 동일 contract test로 비교한다.
+Apache AGE는 SQL과 openCypher를 한 PostgreSQL에 둘 수 있다는 장점이 있다. 반면 PostgreSQL major version과 extension build compatibility를 함께 관리해야 한다. v3는 그래프 탐색을 repository 능력(`graph_neighbors`/`graph_path`)으로 제공하며 별도 graph 포트를 미리 배포하지 않는다. 단일 서버 graph 요구가 강해질 때 전용 포트를 도입하고 Neo4j와 AGE를 동일 contract test로 비교한다.
 
 ---
 
@@ -480,9 +480,6 @@ revision = "replace-with-immutable-revision"
 dimensions = 1024
 max_document_chars = 4000
 space_name = "replace-with-versioned-space"
-
-[graph]
-backend = "postgres"
 
 [security]
 allow_remote_model_egress = false

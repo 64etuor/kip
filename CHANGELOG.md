@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- Consolidated the adapter seams for tool swappability (ADR-046): removed
+  the decorative graph port/adapter/config triad (`capabilities.
+  graph_backend` now reports the active repository backend; the dead
+  `[graph]` config section and unused `neo4j` packaging extra are gone);
+  parameterized the Postgres embedding projection over provisioned
+  dimensions (1024 and new migration-0022 1536 table with HNSW; unsupported
+  dimensions fail with the provisioned list; status queries now count every
+  provisioned table); genericized event-connector fan-out (one
+  `sync_remote`, adapter-declared event families, enum-derived
+  capabilities — a new connector needs zero application edits); moved
+  representation-role and XLSX range-read capability behind their ports;
+  documented and defensively enforced the reranker best-first ordering;
+  switched generation-provider dispatch to an exhaustive enum; hoisted the
+  graph-path result cap into a shared domain constant (fixing a memory
+  adapter bug that let a single BFS fan-out exceed the cap); added a
+  memory/Postgres behavior-parity contract suite and extended the layering
+  rule check to the domain layer and direct vendor-SDK imports;
+  `scripts/semantic-smoke.sh` honors `KIP_EMBEDDING_DIMENSIONS`.
 - Excluded the private reviewed golden corpus
   (`evaluation/golden/private-onedrive-nl.yaml` + floor file) from the
   starter release bundle; the release verifier now fails a bundle that

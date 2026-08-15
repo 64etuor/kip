@@ -76,7 +76,7 @@ class EvidenceUseCases:
         if not path_value:
             raise ValidationError("artifact has no live source path")
         path = Path(path_value).resolve()
-        if path.suffix.lower() not in {".xlsx", ".xlsm"}:
+        if not self._workbooks.supports(path):
             raise ValidationError("artifact is not an XLSX/XLSM workbook")
         current_hash = self._source_files.require_sha256(path)
         if require_fresh and current_hash != view.artifact.sha256:

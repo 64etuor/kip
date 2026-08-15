@@ -122,4 +122,4 @@ Approval is not irreversible:
 
 ## Graph projection
 
-PostgreSQL and optional Neo4j adapters compile from the same approved assertion set. Neo4j labels and relationship types are mappings, not the ontology source of truth.
+Graph traversal compiles from the approved assertion set inside the active repository backend. If a Neo4j read projection is adopted later, its labels and relationship types are mappings, not the ontology source of truth.

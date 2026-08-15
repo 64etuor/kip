@@ -28,6 +28,7 @@ from kip.domain.knowledge import (
     stable_entity_id,
 )
 from kip.domain.models import (
+    GRAPH_PATH_RESULT_CAP,
     ApprovedAssertion,
     Artifact,
     ArtifactView,
@@ -97,6 +98,44 @@ def _vector_literal(values: list[float]) -> str:
     if any(not math.isfinite(value) for value in values):
         raise ValidationError("embedding contains non-finite values")
     return "[" + ",".join(format(value, ".9g") for value in values) + "]"
+
+
+# Single source of truth for which fixed-width `pgvector` table backs a given
+# embedding dimensionality. Adding a new provisioned dimension means adding a
+# migration (mirroring 0006 + 0018) plus one entry here -- no dynamic DDL.
+# Table names are drawn only from this closed dict (never from user input),
+# so f-string interpolation of the resolved value into SQL is safe and is
+# used throughout this module instead of psycopg identifier composition.
+_EMBEDDING_TABLES: dict[int, str] = {
+    1024: "search.embeddings_1024",
+    1536: "search.embeddings_1536",
+}
+
+
+def _embeddings_table(dimensions: int) -> str:
+    """Resolve the provisioned `pgvector` table for an embedding dimension.
+
+    Raises `ValidationError` listing the provisioned dimensions when
+    `dimensions` has no matching table.
+    """
+    table = _EMBEDDING_TABLES.get(dimensions)
+    if table is None:
+        provisioned = ", ".join(str(value) for value in sorted(_EMBEDDING_TABLES))
+        raise ValidationError(
+            f"unsupported embedding dimensions: {dimensions}; the PostgreSQL "
+            f"semantic projection is provisioned for: {provisioned}"
+        )
+    return table
+
+
+def _embeddings_union_sql(columns: str) -> str:
+    """Build a `UNION ALL` projection of `columns` across every provisioned
+    embeddings table, so callers that only know a `space_id` (not its
+    dimensionality) can join against whichever table actually holds it.
+    """
+    return " UNION ALL ".join(
+        f"SELECT {columns} FROM {table}" for table in _EMBEDDING_TABLES.values()
+    )
 
 
 def _websearch_or_query(lexemes: str, *, max_terms: int = 64) -> str:
@@ -1327,8 +1366,9 @@ class PostgresDatabase:
         context: RequestContext,
         space: EmbeddingSpace,
     ) -> EmbeddingSpace:
-        if space.dimensions != 1024:
-            raise ValidationError("the PostgreSQL semantic projection requires 1024 dimensions")
+        # Validates that a provisioned embeddings table exists for this
+        # dimensionality; the table itself is not needed here.
+        _embeddings_table(space.dimensions)
         with self._connection(context) as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -1444,8 +1484,7 @@ class PostgresDatabase:
             if not row:
                 raise NotFoundError(f"embedding space not found: {space_id}")
             dimensions = int(row["dimensions"])
-            if dimensions != 1024:
-                raise ValidationError("the PostgreSQL semantic projection requires 1024 dimensions")
+            table = _embeddings_table(dimensions)
             values = []
             for record in records:
                 if len(record.embedding) != dimensions:
@@ -1462,8 +1501,8 @@ class PostgresDatabase:
                     )
                 )
             cursor.executemany(
-                """
-                INSERT INTO search.embeddings_1024(
+                f"""
+                INSERT INTO {table}(
                     workspace_id,unit_id,space_id,embedding,source_hash
                 ) VALUES (%s,%s,%s,%s::vector,%s)
                 ON CONFLICT (workspace_id,unit_id,space_id) DO UPDATE SET
@@ -1485,8 +1524,7 @@ class PostgresDatabase:
         space_id: str,
         limit: int,
     ) -> list[SearchHit]:
-        if len(query_embedding) != 1024:
-            raise ValidationError("the PostgreSQL semantic projection requires 1024 dimensions")
+        table = _embeddings_table(len(query_embedding))
         eligibility_conditions = [
             "u.id=v.unit_id",
             "v.source_hash=r.sha256",
@@ -1511,7 +1549,7 @@ class PostgresDatabase:
                 SELECT
                     v.unit_id,
                     v.embedding <=> %s::vector AS distance
-                FROM search.embeddings_1024 v
+                FROM {table} v
                 WHERE v.workspace_id=%s
                   AND v.space_id=%s
                   AND EXISTS (
@@ -1605,12 +1643,17 @@ class PostgresDatabase:
         ]
 
     def semantic_status(self, context: RequestContext) -> dict[str, Any]:
+        # A workspace can have coexisting spaces of different dimensions
+        # (each backed by its own provisioned table), so the vector count is
+        # a UNION ALL across every provisioned table rather than one fixed
+        # table.
+        embeddings_union = _embeddings_union_sql("workspace_id, space_id, unit_id")
         with self._connection(context) as connection, connection.cursor() as cursor:
             cursor.execute(
-                """
+                f"""
                 SELECT s.id, s.status, count(e.unit_id)::int AS vectors
                 FROM search.embedding_spaces s
-                LEFT JOIN search.embeddings_1024 e
+                LEFT JOIN ({embeddings_union}) e
                   ON e.workspace_id=s.workspace_id AND e.space_id=s.id
                 WHERE s.workspace_id=%s
                 GROUP BY s.id, s.status
@@ -1965,7 +2008,7 @@ class PostgresDatabase:
             FROM walk
             WHERE current_node=%s AND depth>0
             ORDER BY depth
-            LIMIT 20
+            LIMIT {GRAPH_PATH_RESULT_CAP}
         """
         params: list[Any] = [request.from_node_id, request.from_node_id, context.workspace]
         params.extend(ontology_params)

@@ -62,8 +62,14 @@ class LocalSourceFileInspector:
         return value
 
 
+_SUPPORTED_WORKBOOK_EXTENSIONS: Final = {".xlsx", ".xlsm"}
+
+
 @dataclass(frozen=True, slots=True)
 class LocalWorkbookReader:
     def read(self, path: Path, sheet: str, cell_range: str) -> list[list[XlsxCell]]:
         result = read_xlsx_range(path, sheet, cell_range)
         return _CELL_MATRIX.validate_python(result["cells"])
+
+    def supports(self, path: Path) -> bool:
+        return path.suffix.lower() in _SUPPORTED_WORKBOOK_EXTENSIONS

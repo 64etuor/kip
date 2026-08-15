@@ -15,6 +15,21 @@ from kip.errors import ConfigurationError, ParserError
 from kip.ports.parser import ParserPort
 from kip.settings import Settings
 
+_REPRESENTATION_ROLE_BY_EXTENSION: dict[str, str] = {
+    ".hwp": "editable_original",
+    ".hwpx": "editable_original",
+    ".pdf": "searchable_representation",
+    ".xlsx": "workbook",
+    ".xlsm": "workbook",
+    ".xls": "workbook",
+    ".pptx": "presentation",
+    ".pptm": "presentation",
+    ".ppsx": "presentation",
+    ".ppsm": "presentation",
+    ".potx": "presentation",
+    ".potm": "presentation",
+}
+
 
 class ParserRegistry:
     def __init__(self, parsers: list[ParserPort]) -> None:
@@ -69,6 +84,9 @@ class ParserRegistry:
         for parser in self.parsers:
             result[parser.name] = parser.version
         return result
+
+    def representation_role(self, extension: str) -> str:
+        return _REPRESENTATION_ROLE_BY_EXTENSION.get(extension.lower(), "primary")
 
 
 def _kordoc_ocr(settings: Settings) -> KordocOcrAdapter | None:

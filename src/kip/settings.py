@@ -236,7 +236,6 @@ class Settings:
             config_path=root / "config/kip.example.toml",
             raw={
                 "search": {"semantic_enabled": False, "context_max_chars": 120000},
-                "graph": {"backend": "memory"},
             },
             environment="test",
             workspace="default",

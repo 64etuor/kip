@@ -46,7 +46,7 @@ target-to-current matrix and ordered gap register live in
 | Alias query expansion | Active for the lexical path | Human-approved entity aliases (ACL-prefiltered `resolve_entities`) expand candidate retrieval only; reranking keeps the user's original wording. It lifted RapidFuzz on the grounded draft set and is aggregate-neutral-to-positive under the now-active BM25 backend; re-evaluate if candidate generation changes (`evaluation/reports/alias-expansion-20260811/decision.md`) |
 | Ontology contract | Ready for pilot | YAML entity inheritance and predicate contracts; collision-safe validation (ADR-043: a domain profile redefining a core entity type or predicate, or a `sources/*.yaml` object type with an unknown parent, fails `kip ontology validate` and container startup); ACL-bound mining jobs; strict structured-output validation; reviewed entities/relations; exact evidence; deterministic fingerprints; current approved-graph answers; and idempotent predicate migration materialization with source-assertion lineage. The curation loop is reviewable end to end (ADR-038): approved-entity-aware mining digests make the two-pass mine -> approve entities -> re-mine loop run, invalid/duplicate/stale proposals are skipped with per-proposal reasons on a durable `kip.ontology-mining-result.v1` job payload, evidence/review enforcement is derived from the catalog and pinned to `predicates.yaml` by a contract test, candidate listings ship as triage-ordered `kip.assertion-candidate-listing.v1` with Korean labels and ACL-gated snippets, audited revocation and supersede-on-approve exist (migration 0019), and `include_candidate_assertions` populates clearly-marked proposed candidates on ontology-context surfaces only |
 | Agent-guided setup | Ready for starter acceptance | Fail-fast Python 3.12+ bootstrap, `env:`/`file:`-only secret references rejected at answer time, runtime-readiness verify checks (python, docker, DB secret, source readability) that never flip `verified` on environmental failures, receipt `next_steps` and a configuration-only limitation entry, host-path MCP config, and `scripts/app-up.sh` layering `compose.generated.yaml` over the base Compose file; setup remains configuration-only until the next steps run |
-| Neo4j | Port only | Do not deploy before adoption gate |
+| Neo4j | Not shipped | Graph traversal runs inside the active repository backend (`capabilities.graph_backend` reports it); a Neo4j read projection would introduce its own port at adoption time. Do not deploy before the adoption gate |
 | Review UI | Not included | CLI/API review workflow only |
 | Starter-kit adoption guide | Ready | Environment decisions, AI change contract, real-corpus acceptance evidence, upgrade and handoff rules |
 | Upstream update watch | Ready for GitHub-hosted repositories | Dependabot covers Python/Actions/Docker; a behavior-tested daily workflow reads the OCR `expected_version`, reports Kordoc and Hugging Face revision drift in one GitHub issue, and closes it when pins match again without activating an update |
@@ -124,7 +124,10 @@ target-to-current matrix and ordered gap register live in
   model cache are installed and verified before offline indexing. Audio/video transcription,
   embedded OLE/package expansion, modern threaded comments, formula OCR, and
   legacy binary `.ppt` remain unsupported.
-- Neo4j remains an adoption-gate adapter stub; canonical assertions are queried from PostgreSQL.
+- Neo4j is not shipped (no port or adapter scaffolding); graph traversal is a
+  repository capability and canonical assertions are queried from PostgreSQL.
+  A Neo4j read projection would be introduced behind a new port at adoption
+  time.
 - The current public pilot is small and lexically distinctive. Its
   `keep_disabled` semantic decision must not be generalized to a private corpus
   without reviewed internal golden cases. The reviewed private OneDrive set now

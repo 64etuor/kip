@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
-from kip.application.ingestion_events import EventIngestionWorkflow
+from kip.application.ingestion_events import EventFamily, EventIngestionWorkflow
 from kip.application.ingestion_files import FileIngestionWorkflow
 from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
@@ -14,7 +14,7 @@ from kip.domain.models import (
     RequestContext,
     SyncSummary,
 )
-from kip.errors import KipError, ValidationError
+from kip.errors import ConfigurationError, KipError, ValidationError
 from kip.ids import stable_id
 from kip.ports.evidence import EvidenceStore, SourceFileInspectorPort
 from kip.ports.ingestion import (
@@ -26,6 +26,8 @@ from kip.ports.ingestion import (
 )
 from kip.ports.jobs import JobStore
 from kip.ports.text_analyzer import TextAnalyzerPort
+
+_DEFAULT_REEXTRACTION_EXTENSIONS: frozenset[str] = frozenset({".hwp", ".hwpx"})
 
 
 class IngestionUseCases:
@@ -180,13 +182,14 @@ class IngestionUseCases:
         source_name: str,
         *,
         activate: bool = False,
+        extensions: frozenset[str] = _DEFAULT_REEXTRACTION_EXTENSIONS,
     ) -> ReextractionSummary:
         source = self._sources.filesystem(source_name)
         scope = source.acl_scope or f"workspace:{context.workspace}"
         summary = ReextractionSummary(source=source_name, activate=activate)
-        for record in source.scan(include_extensions={".hwp", ".hwpx"}):
+        for record in source.scan(include_extensions=set(extensions)):
             summary.scanned += 1
-            if record.path.suffix.lower() not in {".hwp", ".hwpx"}:
+            if record.path.suffix.lower() not in extensions:
                 summary.skipped += 1
                 continue
             summary.eligible += 1
@@ -235,26 +238,17 @@ class IngestionUseCases:
             summary.activated += 1
         return summary
 
-    def sync_slack(
+    def sync_remote(
         self,
         context: RequestContext,
+        source_name: str,
         *,
-        oldest: str | None = None,
+        since: str | None = None,
     ) -> SyncSummary:
         return self._sync_events(
             context,
-            "slack",
-            self._sources.events("slack", since=oldest),
-        )
-
-    def sync_imap(self, context: RequestContext) -> SyncSummary:
-        return self._sync_events(context, "imap", self._sources.events("imap"))
-
-    def sync_apple_mail(self, context: RequestContext) -> SyncSummary:
-        return self._sync_events(
-            context,
-            "apple-mail",
-            self._sources.events("apple-mail"),
+            source_name,
+            self._sources.events(source_name, since=since),
         )
 
     def _sync_events(
@@ -289,7 +283,17 @@ class IngestionUseCases:
             context,
             selected,
             classification=self._sources.event_classification(event),
+            family=self._resolve_event_family(event.connector_name),
         )
+
+    def _resolve_event_family(self, connector_name: str) -> EventFamily:
+        declared = self._sources.event_family(connector_name)
+        try:
+            return EventFamily(declared)
+        except ValueError as exc:
+            raise ConfigurationError(
+                f"connector event family is invalid: {connector_name} -> {declared}"
+            ) from exc
 
     @staticmethod
     def _record_result(summary: SyncSummary, result: IngestResult) -> None:

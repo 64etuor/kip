@@ -21,16 +21,8 @@ def process_job(container: Container, job: JobRecord) -> None:
         if source:
             container.application.ingestion.sync_filesystem(context, source_name)
             return
-        if source_name == "slack":
-            container.application.ingestion.sync_slack(context)
-            return
-        if source_name == "imap":
-            container.application.ingestion.sync_imap(context)
-            return
-        if source_name == "apple-mail":
-            container.application.ingestion.sync_apple_mail(context)
-            return
-        raise ValidationError(f"unknown source: {source_name}")
+        container.application.ingestion.sync_remote(context, source_name)
+        return
     if job.job_type == "rebuild.projection":
         projection = str(job.payload["projection"])
         if projection in {"semantic", "vector"}:

@@ -33,3 +33,24 @@ def imports_matching_prefixes(
 
 def application_adapter_imports(root: Path, base: Path) -> list[str]:
     return imports_matching_prefixes(root, base, ("kip.adapters",))
+
+
+def domain_adapter_imports(root: Path, base: Path) -> list[str]:
+    return imports_matching_prefixes(root, base, ("kip.adapters",))
+
+
+# Vendor SDKs must stay behind adapters. Application and domain code should
+# depend only on ports, never import a vendor client library directly.
+VENDOR_SDK_PREFIXES: tuple[str, ...] = (
+    "psycopg",
+    "httpx",
+    "anthropic",
+    "openai",
+    "neo4j",
+    "slack_sdk",
+    "rapidfuzz",
+)
+
+
+def vendor_sdk_imports(root: Path, base: Path) -> list[str]:
+    return imports_matching_prefixes(root, base, VENDOR_SDK_PREFIXES)

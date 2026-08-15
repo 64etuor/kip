@@ -93,11 +93,24 @@ class SourceCatalogPort(Protocol):
 
     def event_classification(self, event: ConnectorEvent) -> DataClassification: ...
 
+    def event_family(self, source_name: str) -> str:
+        """Declare the event-formatting family for a connector's events.
+
+        The value must match one of `kip.application.ingestion_events.EventFamily`
+        (e.g. "slack", "mail", "connector"). The application event workflow
+        branches on this declared family instead of the connector name, so a
+        new connector only needs an adapter-side declaration here to format
+        correctly.
+        """
+        ...
+
 
 class ParserRegistryPort(Protocol):
     def find(self, path: Path) -> ParserPort: ...
 
     def capabilities(self) -> dict[str, str]: ...
+
+    def representation_role(self, extension: str) -> str: ...
 
 
 class ContentAddressedStorePort(Protocol):

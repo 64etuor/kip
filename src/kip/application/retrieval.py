@@ -64,8 +64,12 @@ def apply_rerank(
     *,
     limit: int,
 ) -> list[SearchHit]:
+    # `RerankerPort.rerank` documents a best-first (descending score)
+    # ordering guarantee, but this sort is applied defensively so an
+    # adapter that forgets to honor it cannot corrupt ranking here.
+    ordered_scores = sorted(scores, key=lambda score: (-score.score, score.index))
     result: list[SearchHit] = []
-    for rank, score in enumerate(scores[:limit], start=1):
+    for rank, score in enumerate(ordered_scores[:limit], start=1):
         hit = hits[score.index]
         result.append(
             hit.model_copy(

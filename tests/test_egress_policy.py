@@ -9,7 +9,7 @@ from kip.adapters.connectors.registry import ConfiguredSourceCatalog
 from kip.adapters.repository.memory import MemoryRepository
 from kip.adapters.storage import LocalContentAddressedStore
 from kip.application.egress import EgressPolicyUseCases
-from kip.application.ingestion_events import EventIngestionWorkflow
+from kip.application.ingestion_events import EventFamily, EventIngestionWorkflow
 from kip.container import build_container
 from kip.domain.egress import (
     ClassifiedEvidence,
@@ -257,6 +257,7 @@ def test_connector_payload_cannot_downgrade_configured_classification(
         RequestContext(workspace="acme", acl_scopes=["workspace:acme"]),
         selected,
         classification=catalog.event_classification(event),
+        family=EventFamily(catalog.event_family(event.connector_name)),
     )
 
     unit = repository.state.units[

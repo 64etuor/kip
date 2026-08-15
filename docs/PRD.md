@@ -93,7 +93,7 @@ Claude Code / Codex / 기타 AI agent
 | SQLite 단일 DB | 소형·오프라인·개인용 경량 배포의 미래 옵션 | 기준 구현에서 제외 |
 | PostgreSQL | canonical state, 동시 수집, ACL, 감사, 검색 projection의 기준 저장소 | **채택** |
 | pgvector | 의미 검색용 재생성 가능한 projection | **PostgreSQL 프로덕션 참조 profile에 필수; 의미 검색은 기본 비활성** |
-| Neo4j | 깊은 경로 탐색·그래프 알고리즘이 입증된 뒤 붙이는 read projection | **MVP 제외, 확장 포트만 제공** |
+| Neo4j | 깊은 경로 탐색·그래프 알고리즘이 입증된 뒤 붙이는 read projection | **MVP 제외, 도입 게이트 통과 시 전용 포트와 함께 도입** |
 | Apache AGE | PostgreSQL 내부 graph adapter 후보 | 기본 제외 |
 
 PostgreSQL을 채택하는 이유는 단순 파일 색인을 넘어 Slack·메일·복수 worker·리비전·삭제·권한·감사·관계 검토를 함께 처리해야 하기 때문이다. SQLite는 5천 개 파일 검색만 놓고 보면 충분하지만, KIP v3의 전체 범위에서는 운영 제약이 빠르게 커진다.

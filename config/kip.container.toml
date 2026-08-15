@@ -37,9 +37,6 @@ backend = "bm25"  # promoted 2026-08-11 on the reviewed NL set (ADR-034); rapidf
 max_document_chars = 8000
 baseline_weight = 0.15
 
-[graph]
-backend = "postgres"
-
 [ontology]
 domain_profile = "research-project"
 adaptive_discovery = true

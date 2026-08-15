@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Any, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -378,7 +378,18 @@ class GraphEdge(StrictModel):
     evidence_unit_ids: list[str] = Field(default_factory=list)
 
 
+# Maximum number of paths a graph-path query returns, shared by the
+# PostgreSQL and in-memory graph adapters so both cap search identically.
+GRAPH_PATH_RESULT_CAP: Final = 20
+
+
 class GraphPathRequest(StrictModel):
+    """A bounded-depth path search between two graph nodes.
+
+    Both repository adapters cap the number of returned paths at
+    `GRAPH_PATH_RESULT_CAP`.
+    """
+
     from_node_id: str
     to_node_id: str
     predicates: list[str] = Field(default_factory=list)

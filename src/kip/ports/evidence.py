@@ -29,6 +29,8 @@ class SourceFileInspectorPort(Protocol):
 class WorkbookReaderPort(Protocol):
     def read(self, path: Path, sheet: str, cell_range: str) -> list[list[XlsxCell]]: ...
 
+    def supports(self, path: Path) -> bool: ...
+
 
 class EvidenceReaderPort(Protocol):
     def read_unit(

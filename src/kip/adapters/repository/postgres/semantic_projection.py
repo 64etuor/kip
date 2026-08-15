@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from kip.adapters.repository.postgres.database import PostgresDatabase
+from kip.adapters.repository.postgres.database import (
+    PostgresDatabase,
+    _embeddings_union_sql,
+)
 from kip.domain.embedding import EmbeddingProjectionProgress
 from kip.domain.models import (
     EmbeddableUnit,
@@ -19,9 +22,14 @@ class PostgresSemanticProjectionStore:
         context: RequestContext,
         space_id: str,
     ) -> list[EmbeddableUnit]:
+        # A space's dimensionality (and therefore its backing table) is not
+        # known here, so join against a UNION ALL of every provisioned
+        # embeddings table; at most one contributes rows for a given
+        # `space_id`.
+        embeddings_union = _embeddings_union_sql("workspace_id, unit_id, space_id, source_hash")
         with self.database._connection(context) as connection, connection.cursor() as cursor:
             cursor.execute(
-                """
+                f"""
                 SELECT
                     u.id AS unit_id,
                     u.document_id,
@@ -34,7 +42,7 @@ class PostgresSemanticProjectionStore:
                 JOIN source.revisions r ON r.id=a.revision_id
                 JOIN source.objects o ON o.id=r.object_id AND o.current_revision_id=r.id
                 LEFT JOIN content.logical_documents d ON d.id=u.document_id
-                LEFT JOIN search.embeddings_1024 v
+                LEFT JOIN ({embeddings_union}) v
                   ON v.workspace_id=u.workspace_id
                  AND v.unit_id=u.id
                  AND v.space_id=%s
@@ -54,9 +62,10 @@ class PostgresSemanticProjectionStore:
         context: RequestContext,
         space_id: str | None,
     ) -> EmbeddingProjectionProgress:
+        embeddings_union = _embeddings_union_sql("workspace_id, unit_id, space_id, source_hash")
         with self.database._connection(context) as connection, connection.cursor() as cursor:
             cursor.execute(
-                """
+                f"""
                 SELECT
                     count(*)::int AS content_units,
                     count(v.unit_id) FILTER (WHERE v.source_hash=r.sha256)::int
@@ -66,7 +75,7 @@ class PostgresSemanticProjectionStore:
                 JOIN content.artifacts a ON a.id=u.artifact_id
                 JOIN source.revisions r ON r.id=a.revision_id
                 JOIN source.objects o ON o.id=r.object_id AND o.current_revision_id=r.id
-                LEFT JOIN search.embeddings_1024 v
+                LEFT JOIN ({embeddings_union}) v
                   ON v.workspace_id=u.workspace_id
                  AND v.unit_id=u.id
                  AND v.space_id=%s

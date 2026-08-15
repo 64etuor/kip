@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from openpyxl import Workbook
 
+import kip
 from kip.adapters.identity.api_key import ApiKeyIdentityAdapter
 from kip.adapters.repository.memory import MemoryRepository
 from kip.api import create_app
@@ -254,7 +255,9 @@ def test_rest_answer_does_not_cite_generic_approval_document(test_container):
 def test_rest_explains_approved_assertion_with_evidence(test_container):
     path = test_container.settings.project_root / "source" / "승인.txt"
     path.write_text("A과제 참여율 변경을 승인한다.", encoding="utf-8")
-    context = test_container.application.operations.request_context()
+    context = test_container.application.operations.request_context(
+        roles=["admin"]
+    )
     test_container.application.ingestion.sync_filesystem(context, "fixture")
     unit_id = test_container.application.retrieval.search(
         context,
@@ -502,3 +505,47 @@ def test_readyz_fails_closed_when_repository_is_unreachable(test_container):
     }
     # Liveness must stay green: a broken database is not a process failure.
     assert liveness.status_code == 200
+
+
+def test_oversized_request_gets_the_envelope_not_a_bare_detail(test_container):
+    small_limit_settings = replace(test_container.settings, max_request_bytes=1)
+    container = build_container(small_limit_settings, repository=test_container.repository)
+    client = TestClient(create_app(container))
+    headers = {"X-KIP-API-Key": "test-key"}
+
+    response = client.post(
+        "/v1/search",
+        headers=headers,
+        json={"query": "정산", "limit": 3},
+    )
+
+    assert response.status_code == 413
+    payload = response.json()
+    assert payload["schema_version"] == "kip.envelope.v1"
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "request_too_large"
+
+
+def test_unhandled_exception_still_answers_with_an_envelope(test_container, monkeypatch):
+    def _boom(*args, **kwargs):
+        raise RuntimeError("a very specific internal detail that must not leak")
+
+    monkeypatch.setattr(test_container.application.operations, "capabilities", _boom)
+    client = TestClient(create_app(test_container), raise_server_exceptions=False)
+    headers = {"X-KIP-API-Key": "test-key"}
+
+    response = client.get("/v1/capabilities", headers=headers)
+
+    assert response.status_code == 500
+    payload = response.json()
+    assert payload["schema_version"] == "kip.envelope.v1"
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "internal_error"
+    # The unhandled exception's message must never reach the client.
+    assert "very specific internal detail" not in response.text
+
+
+def test_fastapi_app_version_matches_the_package_version(test_container):
+    app = create_app(test_container)
+
+    assert app.version == kip.__version__

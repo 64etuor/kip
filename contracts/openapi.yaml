@@ -3,7 +3,7 @@ info:
   title: KIP Knowledge Fabric API
   description: Optional REST edge adapter over the same application services used
     by the CLI and MCP.
-  version: 3.1.0
+  version: 3.3.0
 paths:
   /healthz:
     get:

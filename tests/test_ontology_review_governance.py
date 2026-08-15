@@ -10,18 +10,23 @@ import yaml
 from kip.adapters.repository.memory import MemoryRepository
 from kip.container import build_container
 from kip.domain.knowledge import (
+    EntityCandidate,
     KnowledgeEntity,
+    MinedEntityProposal,
     RelationDerivation,
     RelationProposal,
+    entity_candidate_fingerprint,
+    stable_entity_candidate_id,
 )
 from kip.domain.models import (
     AnswerRequest,
     AssertionCandidate,
     CandidateEvidence,
     GraphNeighborsRequest,
+    GraphPathRequest,
     SearchRequest,
 )
-from kip.errors import ConflictError, ValidationError
+from kip.errors import AuthorizationError, ConflictError, ValidationError
 from kip.ids import new_id
 from kip.ontology import FALLBACK_EVIDENCE_REQUIRED_PREDICATES, OntologyCatalog
 from kip.settings import Settings
@@ -67,7 +72,9 @@ def governance_container(tmp_path: Path):
 
 
 def _seed(container, tmp_path: Path):
-    context = container.application.operations.request_context(acl_scopes=_SCOPES)
+    context = container.application.operations.request_context(
+        acl_scopes=_SCOPES, roles=["admin"]
+    )
     for entity_id, entity_type, name in (
         ("ent_letter", "OfficialLetter", "A과제 승인 공문"),
         ("ent_agreement", "Agreement", "A과제 협약서"),
@@ -455,11 +462,17 @@ def test_mcp_exposes_revocation_and_job_status_over_the_same_services(
         "KIP_ACL_SCOPES", "workspace:default,group:ontology-reviewers"
     )
     monkeypatch.setenv("KIP_PRINCIPAL_ID", context.principal_id)
+    # `kip_ontology_assertion_revoke` calls `KnowledgeUseCases.revoke_assertion`,
+    # which now requires the admin role at the shared application layer.
+    monkeypatch.setenv("KIP_ROLES", "admin")
     server = create_server()
 
     async def invoke(tool: str, arguments: dict[str, object]) -> object:
         result = await server.call_tool(tool, arguments)
-        return json.loads(result[0][0].text)
+        envelope = json.loads(result[0][0].text)
+        assert envelope["schema_version"] == "kip.envelope.v1"
+        assert envelope["ok"] is True
+        return envelope["data"]
 
     revoked = anyio.run(
         lambda: invoke(
@@ -481,3 +494,191 @@ def test_mcp_exposes_revocation_and_job_status_over_the_same_services(
     approved_view = candidates["relations"][0]
     assert approved_view["subject_display_name"] == "A과제 승인 공문"
     assert approved_view["predicate_label_ko"] == "의사결정 기록"
+
+
+def _non_admin(context):
+    return context.model_copy(update={"roles": []})
+
+
+def test_review_approve_reject_and_revoke_require_admin_at_the_shared_service(
+    governance_container,
+    tmp_path: Path,
+) -> None:
+    """CLI and MCP call `KnowledgeUseCases` directly (REST gates it at the
+    edge via `admin_context`); the admin check must live in the shared
+    application service so all three edges enforce it uniformly
+    (architecture rule 6).
+    """
+    context, unit_id = _seed(governance_container, tmp_path)
+    knowledge = governance_container.application.knowledge
+    non_admin = _non_admin(context)
+
+    approve_candidate = knowledge.create_candidate(context, _candidate(unit_id))
+    with pytest.raises(AuthorizationError):
+        knowledge.review_approve(non_admin, approve_candidate.id)
+    # A non-admin refusal must not silently approve; the candidate is
+    # unaffected and an admin can still approve it afterward.
+    assert knowledge.get_candidate(context, approve_candidate.id).status == "proposed"
+    approved = knowledge.review_approve(context, approve_candidate.id)
+    assert approved.status == "active"
+
+    reject_candidate = knowledge.create_candidate(
+        context,
+        _candidate(
+            unit_id,
+            predicate="responds_to",
+            subject_id="ent_letter",
+            object_entity_id="ent_agreement",
+        ),
+    )
+    with pytest.raises(AuthorizationError):
+        knowledge.review_reject(non_admin, reject_candidate.id)
+    assert knowledge.get_candidate(context, reject_candidate.id).status == "proposed"
+    rejected = knowledge.review_reject(context, reject_candidate.id)
+    assert rejected.status == "rejected"
+
+    with pytest.raises(AuthorizationError):
+        knowledge.revoke_assertion(non_admin, approved.id, "should be refused")
+    assert knowledge.get_assertion(context, approved.id).status == "active"
+    revoked = knowledge.revoke_assertion(context, approved.id, "admin revoke")
+    assert revoked.status == "revoked"
+
+
+def test_graph_approved_only_false_requires_admin(
+    governance_container,
+    tmp_path: Path,
+) -> None:
+    context, unit_id = _seed(governance_container, tmp_path)
+    knowledge = governance_container.application.knowledge
+    non_admin = _non_admin(context)
+    assertion = knowledge.review_approve(
+        context,
+        knowledge.create_candidate(context, _candidate(unit_id)).id,
+    )
+    revoked = knowledge.revoke_assertion(context, assertion.id, "gate fixture revoke")
+    assert revoked.status == "revoked"
+
+    # A non-admin caller always gets approved-only results, whichever flag
+    # value it requests.
+    assert (
+        knowledge.graph_neighbors(
+            non_admin,
+            GraphNeighborsRequest(node_id="ent_letter", approved_only=True),
+        )
+        == []
+    )
+    with pytest.raises(AuthorizationError):
+        knowledge.graph_neighbors(
+            non_admin,
+            GraphNeighborsRequest(node_id="ent_letter", approved_only=False),
+        )
+    with pytest.raises(AuthorizationError):
+        knowledge.graph_path(
+            non_admin,
+            GraphPathRequest(
+                from_node_id="ent_letter",
+                to_node_id="ent_decision",
+                approved_only=False,
+            ),
+        )
+
+    # An admin caller can see the revoked (non-approved-only) assertion.
+    unfiltered = knowledge.graph_neighbors(
+        context,
+        GraphNeighborsRequest(node_id="ent_letter", approved_only=False),
+    )
+    assert [edge.assertion_id for edge in unfiltered] == [assertion.id]
+    assert unfiltered[0].status == "revoked"
+
+
+def test_ontology_rag_curation_operations_require_admin_at_the_shared_service(
+    governance_container,
+    tmp_path: Path,
+) -> None:
+    """`create_entity`, `enqueue_mining`, `approve_entity_candidate`, and
+    `reject_entity_candidate` are gated the same way (architecture rule 6).
+    """
+    context, unit_id = _seed(governance_container, tmp_path)
+    ontology_rag = governance_container.application.ontology_rag
+    non_admin = _non_admin(context)
+
+    with pytest.raises(AuthorizationError):
+        ontology_rag.create_entity(
+            non_admin,
+            KnowledgeEntity(
+                id="ent_gate_test",
+                entity_type="OfficialLetter",
+                canonical_name="게이트 테스트 공문",
+                acl_scopes=["group:ontology-reviewers"],
+            ),
+        )
+    created = ontology_rag.create_entity(
+        context,
+        KnowledgeEntity(
+            id="ent_gate_test",
+            entity_type="OfficialLetter",
+            canonical_name="게이트 테스트 공문",
+            acl_scopes=["group:ontology-reviewers"],
+        ),
+    )
+    assert created.id == "ent_gate_test"
+
+    with pytest.raises(AuthorizationError):
+        ontology_rag.enqueue_mining(non_admin, [unit_id])
+
+    # `approve_entity_candidate`/`reject_entity_candidate` operate on an
+    # already-proposed entity candidate; seeded directly through the store
+    # port (the same shape `_process_mining` produces), so this test does
+    # not depend on wiring a relation miner.
+    derivation = RelationDerivation(kind="manual", name="gate-fixture", revision="v1")
+    evidence = (
+        CandidateEvidence(content_unit_id=unit_id),
+    )
+
+    def _seed_entity_candidate(suffix: str):
+        proposal = MinedEntityProposal(
+            entity_type="Person",
+            canonical_name=f"게이트 담당자 {suffix}",
+            evidence_ids=(unit_id,),
+            confidence=0.9,
+        )
+        fingerprint = entity_candidate_fingerprint(
+            proposal,
+            ontology_version="core/1.0.0",
+            evidence=evidence,
+            derivation=derivation,
+        )
+        return governance_container.repository.knowledge.save_entity_candidate(
+            context,
+            EntityCandidate(
+                id=stable_entity_candidate_id(fingerprint),
+                fingerprint=fingerprint,
+                entity_type=proposal.entity_type,
+                canonical_name=proposal.canonical_name,
+                origin="model:gate-fixture",
+                confidence=proposal.confidence,
+                ontology_version="core/1.0.0",
+                evidence=list(evidence),
+                derivation=derivation,
+            ),
+        )
+
+    approve_target = _seed_entity_candidate("approve")
+    with pytest.raises(AuthorizationError):
+        ontology_rag.approve_entity_candidate(non_admin, approve_target.id)
+    assert (
+        ontology_rag.get_entity_candidate(context, approve_target.id).status
+        == "proposed"
+    )
+    approved_entity = ontology_rag.approve_entity_candidate(context, approve_target.id)
+    assert approved_entity.canonical_name == "게이트 담당자 approve"
+
+    reject_target = _seed_entity_candidate("reject")
+    with pytest.raises(AuthorizationError):
+        ontology_rag.reject_entity_candidate(non_admin, reject_target.id)
+    assert (
+        ontology_rag.get_entity_candidate(context, reject_target.id).status
+        == "proposed"
+    )
+    rejected_entity = ontology_rag.reject_entity_candidate(context, reject_target.id)
+    assert rejected_entity.status == "rejected"

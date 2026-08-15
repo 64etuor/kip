@@ -134,7 +134,8 @@ def _container(
 
 def _seed(container, tmp_path: Path):
     context = container.application.operations.request_context(
-        acl_scopes=["workspace:default", "group:ontology-reviewers"]
+        acl_scopes=["workspace:default", "group:ontology-reviewers"],
+        roles=["admin"],
     )
     container.application.ontology_rag.create_entity(
         context,

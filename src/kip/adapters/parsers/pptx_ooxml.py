@@ -8,8 +8,8 @@ from pathlib import Path, PurePosixPath
 from typing import Final
 from xml.etree import ElementTree as ET
 
+from kip.adapters.parsers.zip_guard import check_zip_bomb_guard
 from kip.domain.json_types import JsonObject
-from kip.errors import ValidationError
 
 _REL_NS: Final = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 _PACKAGE_REL_NS: Final = "http://schemas.openxmlformats.org/package/2006/relationships"
@@ -134,13 +134,13 @@ def scan_pptx_package(path: Path) -> PptxPackageInfo:
 
 
 def _check_archive(archive: zipfile.ZipFile) -> None:
-    infos = archive.infolist()
-    if len(infos) > _MAX_ENTRIES:
-        raise ValidationError("PPTX has too many ZIP entries")
-    uncompressed = sum(info.file_size for info in infos)
-    compressed = max(1, sum(info.compress_size for info in infos))
-    if uncompressed > _MAX_UNCOMPRESSED or uncompressed / compressed > _MAX_RATIO:
-        raise ValidationError("PPTX decompression limits exceeded")
+    check_zip_bomb_guard(
+        archive,
+        format_name="PPTX",
+        max_entries=_MAX_ENTRIES,
+        max_uncompressed=_MAX_UNCOMPRESSED,
+        max_ratio=_MAX_RATIO,
+    )
 
 
 def _slide_paths(archive: zipfile.ZipFile) -> list[str]:

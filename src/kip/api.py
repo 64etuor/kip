@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hmac
+import logging
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
@@ -9,6 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
 
+from kip import __version__ as kip_version
 from kip.container import Container, build_container
 from kip.domain.identity import IdentityCredential
 from kip.domain.interactions import (
@@ -43,6 +45,8 @@ from kip.errors import (
 )
 from kip.ids import new_id
 from kip.settings import Settings
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _serializable_errors(errors: Sequence[Any]) -> list[dict[str, Any]]:
@@ -87,7 +91,7 @@ def create_app(container: Container | None = None) -> FastAPI:
     selected = container or build_container()
     app = FastAPI(
         title="KIP Knowledge Fabric API",
-        version="3.1.0",
+        version=kip_version,
         description="Optional REST edge adapter over the same application services used by the CLI and MCP.",
     )
     app.state.container = selected
@@ -100,7 +104,12 @@ def create_app(container: Container | None = None) -> FastAPI:
         length = request.headers.get("content-length")
         if length and int(length) > selected.settings.max_request_bytes:
             return JSONResponse(
-                status_code=413, content={"detail": "request body exceeds configured limit"}
+                status_code=413,
+                content=error_envelope(
+                    request,
+                    "request_too_large",
+                    "request body exceeds configured limit",
+                ),
             )
         return await call_next(request)
 
@@ -161,6 +170,20 @@ def create_app(container: Container | None = None) -> FastAPI:
         return JSONResponse(
             status_code=http_status(exc),
             content=envelope.model_dump(mode="json"),
+        )
+
+    @app.exception_handler(Exception)
+    async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
+        # Any bug that reaches here is unexpected: log it server-side with
+        # full detail, but never leak the exception message or traceback to
+        # the client. Every edge must always answer with the envelope
+        # contract, even on a code path nobody anticipated.
+        LOGGER.exception(
+            "unhandled error while processing %s %s", request.method, request.url.path
+        )
+        return JSONResponse(
+            status_code=500,
+            content=error_envelope(request, "internal_error", "an internal error occurred"),
         )
 
     async def authenticated_context(

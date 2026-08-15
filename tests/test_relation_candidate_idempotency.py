@@ -46,7 +46,7 @@ def test_relation_candidate_fingerprint_is_idempotent_and_revision_bound(
     )
     repository = MemoryRepository()
     container = build_container(settings, repository=repository)
-    context = container.application.operations.request_context()
+    context = container.application.operations.request_context(roles=["admin"])
     for entity in (
         KnowledgeEntity(
             id="ent_document",

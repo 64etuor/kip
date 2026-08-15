@@ -77,7 +77,11 @@ def hwp_text_quality(text: str, *, warning_count: int = 0) -> float:
     if not text:
         return 0.0
     length_confidence = min(1.0, len(text) / 2000)
-    warning_penalty = min(0.3, warning_count * 0.03)
+    # A negative warning_count (a caller bug, e.g. passing a delta instead of
+    # a total) must never increase the score: without the lower clamp,
+    # min(0.3, negative) stays negative, and subtracting a negative penalty
+    # below adds to the score instead of reducing it.
+    warning_penalty = max(0.0, min(0.3, warning_count * 0.03))
     return max(
         0.0,
         min(

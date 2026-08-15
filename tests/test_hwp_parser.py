@@ -5,10 +5,14 @@ import sys
 import zipfile
 from pathlib import Path
 from types import SimpleNamespace
+from xml.etree import ElementTree as ET
+
+import pytest
 
 from kip.adapters.parsers.hwp_broker import CommandParserConfig, HwpParserBroker
 from kip.adapters.parsers.hwp_native import HwpNativeParser, split_text
 from kip.adapters.parsers.registry import ParserRegistry
+from kip.errors import ParserError
 from kip.settings import Settings
 
 
@@ -154,6 +158,47 @@ def test_native_parser_scores_garbled_replacement_riddled_text_lower_than_clean_
 
     # Then the degraded content drags quality well below a clean document's score.
     assert extraction.quality_score < 0.5
+
+
+def test_native_parser_wraps_corrupted_section_xml_as_typed_parser_error(
+    monkeypatch, tmp_path
+) -> None:
+    # Given a valid .hwpx whose section XML the underlying reader library
+    # reports as corrupted while parsing (xml.etree.ElementTree.ParseError
+    # is the same sibling-parser exception docx/xlsx/pptx_ooxml already
+    # catch, but it was previously missing here).
+    class FakeReader:
+        def __init__(self, filepath):
+            self.filepath = filepath
+            self.tables: list[object] = []
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return None
+
+        def extract_text(self):
+            raise ET.ParseError("no element found: line 1, column 0")
+
+        def get_images(self):
+            return []
+
+    monkeypatch.setitem(sys.modules, "hwp_hwpx_parser", SimpleNamespace(Reader=FakeReader))
+    path = tmp_path / "corrupted.hwpx"
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("mimetype", "application/hwp+zip")
+        archive.writestr("Contents/content.hpf", "<package />")
+
+    # When the native parser reaches the corrupted section XML.
+    # Then callers receive the stable parser error instead of a raw ET.ParseError.
+    with pytest.raises(ParserError, match="native HWP parse failed"):
+        HwpNativeParser().parse(
+            path,
+            artifact_id="art_corrupted",
+            document_id="doc_corrupted",
+            acl_scopes=["workspace:default"],
+        )
 
 
 def test_registry_places_native_parser_in_the_hwp_chain(tmp_path: Path):

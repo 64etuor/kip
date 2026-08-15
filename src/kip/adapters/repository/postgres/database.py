@@ -3226,37 +3226,58 @@ class PostgresDatabase:
     ) -> PredicateReviewStats:
         """Human review outcome counts for one predicate, workspace-scoped.
 
-        Existing `assertion_candidates.status`/`review_note` columns are
-        sufficient (no migration, no new column): candidates whose
-        `review_note` carries the auto-approve policy marker are excluded so
-        the measured precision can never be reinforced by its own automated
-        decisions. This is an aggregate count only -- it never returns
-        candidate content -- so it is scoped by workspace like every other
-        candidate query, without joining evidence-level ACL visibility.
+        Excludes auto-approved decisions via the `auto_approved` column
+        (migration 0023), set ONLY by `approve_candidate` from the reviewer
+        identity (never derived from caller-supplied `review_note` text), so
+        a human reviewer cannot erase their own decision from the
+        denominator by prefixing their note with the policy marker.
+
+        Revocation-aware: a human-approved candidate whose resulting
+        assertion has since been revoked no longer counts as a correct
+        approval -- it stays part of the human-reviewed sample, but is
+        counted as a failed outcome (the statistically honest reading, since
+        a later revocation means the original approval was wrong).
+        Superseded assertions (a legitimate correction/replacement path, not
+        a wrongness signal) are NOT treated as failures.
+
+        This is an aggregate count only -- it never returns candidate
+        content -- so it is scoped by workspace like every other candidate
+        query, without joining evidence-level ACL visibility.
         """
         with self._connection(context) as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT status, count(*) AS n
-                FROM knowledge.assertion_candidates
-                WHERE workspace_id=%s
-                  AND predicate=%s
-                  AND status IN ('approved','rejected')
-                  AND (review_note IS NULL OR review_note NOT LIKE %s)
-                GROUP BY status
+                SELECT candidate.status AS candidate_status,
+                       assertion.status AS assertion_status
+                FROM knowledge.assertion_candidates candidate
+                LEFT JOIN knowledge.assertions assertion
+                  ON assertion.workspace_id = candidate.workspace_id
+                 AND assertion.source_candidate_id = candidate.id
+                WHERE candidate.workspace_id=%s
+                  AND candidate.predicate=%s
+                  AND candidate.status IN ('approved','rejected')
+                  AND candidate.auto_approved = false
                 """,
                 (
                     context.workspace,
                     predicate,
-                    f"{AUTO_APPROVE_POLICY_PRINCIPAL}%",
                 ),
             )
             rows = cursor.fetchall()
-        counts = {row["status"]: int(row["n"]) for row in rows}
+        approved = 0
+        rejected = 0
+        for row in rows:
+            if (
+                row["candidate_status"] == "rejected"
+                or row["assertion_status"] == "revoked"
+            ):
+                rejected += 1
+            else:
+                approved += 1
         return PredicateReviewStats(
             predicate=predicate,
-            approved=counts.get("approved", 0),
-            rejected=counts.get("rejected", 0),
+            approved=approved,
+            rejected=rejected,
         )
 
     def approve_candidate(
@@ -3399,10 +3420,22 @@ class PostgresDatabase:
                     )
                 cursor.execute(
                     """
-                    UPDATE knowledge.assertion_candidates SET status='approved', reviewed_at=now(), reviewed_by=%s, review_note=%s
+                    UPDATE knowledge.assertion_candidates
+                    SET status='approved', reviewed_at=now(), reviewed_by=%s, review_note=%s,
+                        auto_approved=%s
                     WHERE workspace_id=%s AND id=%s
                     """,
-                    (reviewer_id, note, context.workspace, candidate_id),
+                    (
+                        reviewer_id,
+                        note,
+                        # Set ONLY from the reviewer identity, never from
+                        # caller-supplied `review_note` text, so it cannot be
+                        # spoofed by a human decision whose note happens to
+                        # start with the policy marker.
+                        reviewer_id == AUTO_APPROVE_POLICY_PRINCIPAL,
+                        context.workspace,
+                        candidate_id,
+                    ),
                 )
                 for superseded_id in supersede_assertion_ids:
                     cursor.execute(

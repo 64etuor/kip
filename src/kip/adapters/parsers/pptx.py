@@ -41,13 +41,14 @@ class PptxParser:
         self._ocr_limits = ocr_limits
 
     def supports(self, path: Path) -> bool:
-        if path.suffix.lower() not in _PPTX_EXTENSIONS:
-            return False
-        try:
-            with zipfile.ZipFile(path) as archive:
-                return "ppt/presentation.xml" in archive.namelist()
-        except (OSError, zipfile.BadZipFile):
-            return False
+        # A pure suffix check, matching XlsxShallowParser/DocxParser. The
+        # previous version opened the archive here and swallowed
+        # BadZipFile/OSError into a bare False, so a corrupted .pptx made
+        # ParserRegistry.find() raise the misleading "no parser registered
+        # for .pptx" instead of routing to this parser and letting parse()
+        # report a clear, typed "PPTX parse failed" error (parse() already
+        # catches zipfile.BadZipFile and wraps it as ParserError).
+        return path.suffix.lower() in _PPTX_EXTENSIONS
 
     def parse(
         self,

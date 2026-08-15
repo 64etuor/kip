@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import fitz
+import pytest
 
 from kip.adapters.parsers import pdf as pdf_module
 from kip.adapters.parsers.pdf import PdfParser
@@ -135,3 +136,24 @@ def test_pdf_preserves_native_pages_when_ocr_fails(tmp_path: Path) -> None:
     assert [unit.unit_type for unit in units] == ["pdf_page", "pdf_page"]
     assert extraction.status == "partial"
     assert extraction.warnings[-1] == "OCR_FAILED: fixture OCR unavailable"
+
+
+def test_pdf_raises_typed_error_for_non_pdf_content_with_pdf_extension(
+    tmp_path: Path,
+) -> None:
+    # Given a file whose content is a PNG image but whose extension is .pdf
+    # (pymupdf 1.28.0 raises its own pymupdf.mupdf.FzErrorFormat - not a
+    # stdlib OSError/RuntimeError/ValueError - once it discovers the page
+    # content does not match the format it inferred from the file).
+    path = tmp_path / "fake.pdf"
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 200)
+
+    # When the parser attempts to extract page text.
+    # Then it fails cleanly as a typed ParserError instead of an uncaught crash.
+    with pytest.raises(ParserError, match="PDF parse failed"):
+        PdfParser().parse(
+            path,
+            artifact_id="art_fake_pdf",
+            document_id="doc_fake_pdf",
+            acl_scopes=["workspace:default"],
+        )

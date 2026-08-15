@@ -123,7 +123,9 @@ def _seed_relation(
     valid_from: datetime | None = None,
     valid_to: datetime | None = None,
 ):
-    context = context or container.application.operations.request_context()
+    context = context or container.application.operations.request_context(
+        roles=["admin"]
+    )
     document = container.application.ontology_rag.create_entity(
         context,
         KnowledgeEntity(
@@ -229,7 +231,7 @@ def test_expired_and_future_assertions_are_not_current_graph_context(
 def test_graph_context_is_acl_filtered_before_entity_resolution(tmp_path: Path) -> None:
     container = _container(tmp_path, acl_scope="group:secret")
     owner = container.application.operations.request_context(
-        acl_scopes=["group:secret"]
+        acl_scopes=["group:secret"], roles=["admin"]
     )
     _, _, candidate = _seed_relation(container, tmp_path, context=owner)
     container.application.knowledge.review_approve(owner, candidate.id)
@@ -291,7 +293,7 @@ def test_ontology_context_returns_current_multi_hop_path_with_exact_evidence(
     tmp_path: Path,
 ) -> None:
     container = _container(tmp_path)
-    context = container.application.operations.request_context()
+    context = container.application.operations.request_context(roles=["admin"])
     for entity_id, name, alias in (
         ("ent_latest", "최신 계약서", "최신계약"),
         ("ent_middle", "중간 계약서", "중간계약"),

@@ -65,6 +65,25 @@ def test_rest_rejects_a_blank_query_with_a_serializable_envelope(test_container)
     assert good.status_code == 200
 
 
+def test_cli_search_rejects_a_whitespace_only_query_with_a_clean_enveloped_message(
+    monkeypatch,
+    test_container,
+    tmp_path: Path,
+):
+    # SearchRequest's own field validator raises this, not the CLI's
+    # `provide QUERY or --query` guard (the string is non-empty).
+    result = _invoke(monkeypatch, test_container, tmp_path, ["search", "   "])
+
+    assert result.exit_code == 3
+    payload = json.loads(result.stderr)
+    assert payload["schema_version"] == "kip.envelope.v1"
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "validation_error"
+    # The raw pydantic blob (multi-line, with a docs URL) must not leak.
+    assert "https://errors.pydantic.dev" not in payload["error"]["message"]
+    assert "\n" not in payload["error"]["message"]
+
+
 def test_error_code_mapping_is_shared_across_edges():
     from pydantic import ValidationError as PydanticValidationError
 

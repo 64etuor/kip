@@ -90,6 +90,10 @@ class ConfiguredFilesystemSource:
     ) -> Iterable[DiscoveredFile]:
         return self.connector.scan(include_extensions=include_extensions)
 
+    @property
+    def skipped_present_relative_paths(self) -> frozenset[str]:
+        return self.connector.skipped_present_relative_paths
+
 
 @dataclass(frozen=True, slots=True)
 class ConfiguredSourceCatalog:

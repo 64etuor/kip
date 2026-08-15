@@ -83,7 +83,7 @@ def _entities(container, context):
 
 def test_entity_names_and_aliases_are_normalized_and_resolvable(tmp_path: Path) -> None:
     container = _container(tmp_path)
-    context = container.application.operations.request_context()
+    context = container.application.operations.request_context(roles=["admin"])
     subject, _ = _entities(container, context)
 
     assert subject.canonical_name == "A과제 승인 공문"
@@ -162,7 +162,7 @@ def test_typed_candidate_contains_exact_evidence_risk_and_acl_intersection(
     tmp_path: Path,
 ) -> None:
     container = _container(tmp_path)
-    context = container.application.operations.request_context()
+    context = container.application.operations.request_context(roles=["admin"])
     subject, decision = _entities(container, context)
     path = tmp_path / "source" / "승인.txt"
     path.write_text("A과제 참여율 변경을 승인하고 기록한다.", encoding="utf-8")
@@ -205,7 +205,7 @@ def test_relation_proposal_rejects_domain_mismatch_before_persistence(
     tmp_path: Path,
 ) -> None:
     container = _container(tmp_path)
-    context = container.application.operations.request_context()
+    context = container.application.operations.request_context(roles=["admin"])
     project = container.application.ontology_rag.create_entity(
         context,
         KnowledgeEntity(
@@ -252,7 +252,7 @@ def test_overlapping_different_object_is_marked_as_contradiction(
     tmp_path: Path,
 ) -> None:
     container = _container(tmp_path)
-    context = container.application.operations.request_context()
+    context = container.application.operations.request_context(roles=["admin"])
     subject, first_decision = _entities(container, context)
     second_decision = container.application.ontology_rag.create_entity(
         context,

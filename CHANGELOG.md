@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+- Hardened the system against a nine-lane adversarial audit (ADR-048):
+  - Auto-approve precision is now tamper-resistant (a dedicated
+    `assertion_candidates.auto_approved` column via migration 0023, not a
+    spoofable free-text note prefix) and revocation-aware (a later
+    revocation counts the original approval against precision); the policy
+    defaults **off** (opt-in) and guided setup no longer silently enables
+    candidate promotion.
+  - Ontology mutation (review approve/reject, revoke, mining, entity
+    create, entity-candidate review) now requires the admin role at the
+    shared application layer, so CLI, REST, and MCP all fail closed for
+    non-admins; `graph_neighbors`/`graph_path` require admin to request
+    `approved_only=false`.
+  - CLI/REST/MCP present the same `kip.envelope.v1` contract: REST wraps
+    the 413 size guard and any unhandled exception (no bare traceback),
+    MCP wraps every tool result and error (typed `code`, not an opaque
+    ToolError — an MCP output-shape change), the CLI maps raw pydantic
+    validation errors to `validation_error`/exit 3, and the OpenAPI
+    version tracks the package version.
+  - Ontology loading/release fail closed: a null-valued predicate no
+    longer crashes container startup, a corrupt/invalid pending-release
+    journal is re-validated on a shadow tree and quarantined instead of
+    written or crashing every startup, and discovery candidates carry the
+    proposal's field validators.
+  - Parsers always fail as typed `ParserError` and no longer silently lose
+    content at high confidence: broadened pymupdf/`ElementTree` exception
+    capture, CSV `\r`-only handling, UTF-16/NUL detection with NUL-safe
+    bodies, DOCX nested-table/textbox and `mc:AlternateContent` recovery,
+    content-derived quality, a file-size backstop, a shared zip-bomb and
+    recursion-depth guard, and a `csv_full_table_required` refusal for
+    aggregate questions answered from a partial CSV chunk.
+  - Ingestion isolates a bad file instead of aborting the whole sync,
+    stops false-tombstoning present-but-skipped (oversize/filtered) files,
+    and retries jobs with bounded backoff.
+  - Config cleanup: removed dead keys and orphaned Neo4j env/compose
+    artifacts; the setup writer emits the promoted bm25 reranker.
+
 - Fixed silent Korean-encoding corruption in text parsing: plain text,
   Markdown, and CSV now decode through a bounded ladder (BOM strip, UTF-8
   strict, CP949 strict, then a visible degraded fallback with

@@ -41,6 +41,15 @@ class MemoryState:
         self.entity_candidate_ids_by_fingerprint: dict[str, str] = {}
         self.candidates: dict[str, AssertionCandidate] = {}
         self.candidate_ids_by_fingerprint: dict[str, str] = {}
+        # Workspace-scoping and auto-approve-marker bookkeeping for
+        # `MemoryKnowledgeStore.predicate_review_precision`, kept out of the
+        # `AssertionCandidate` domain model itself (no schema/contract
+        # change): `candidate_workspaces` is set once at `save_candidate`
+        # time; `candidate_auto_approved` is set ONLY by `approve_candidate`
+        # when the reviewer identity is the dedicated policy marker, never
+        # derived from caller-supplied `review_note` text.
+        self.candidate_workspaces: dict[str, str] = {}
+        self.candidate_auto_approved: dict[str, bool] = {}
         self.assertions: dict[str, ApprovedAssertion] = {}
         self.jobs: dict[str, JobRecord] = {}
         self.job_order: list[str] = []

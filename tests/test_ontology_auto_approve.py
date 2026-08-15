@@ -131,7 +131,9 @@ def _container(
 
 
 def _seed(container, tmp_path: Path):
-    context = container.application.operations.request_context(acl_scopes=_SCOPES)
+    context = container.application.operations.request_context(
+        acl_scopes=_SCOPES, roles=["admin"]
+    )
     container.application.ontology_rag.create_entity(
         context,
         KnowledgeEntity(
@@ -223,7 +225,9 @@ def test_qualifying_candidate_auto_approves_with_marker_and_stays_revocable(
         object_entity_id="ent_author_new",
         confidence=0.9,
     )
-    container = _container(tmp_path, miner)
+    # Auto-approve is opt-in by default (container.py): this test exercises
+    # the enabled path, so it must request it explicitly.
+    container = _container(tmp_path, miner, auto_approve={"enabled": True})
     context, unit_id = _seed(container, tmp_path)
     _entity(container, context, "ent_author_new", "Person", "신규 작성자")
     _build_review_history(
@@ -485,6 +489,46 @@ def test_disabled_policy_never_auto_approves_even_when_fully_qualified(
     assert candidate.status == "proposed"
 
 
+def test_auto_approve_defaults_off_without_explicit_opt_in(tmp_path: Path) -> None:
+    """A deployment that never configures `[ontology.auto_approve]` at all
+    must never silently auto-promote candidates, even when every other axis
+    (predicate risk/review tier, confidence, measured precision) fully
+    qualifies. `container.py` defaults `enabled` to False both when the
+    section is entirely absent and when it is present without `enabled`.
+    """
+    miner = ConfigurableRelationMiner(
+        subject_entity_id="ent_letter",
+        predicate="authored_by",
+        object_entity_id="ent_author_default_off",
+        confidence=0.95,
+    )
+    # No `auto_approve=` override at all: exercises the container's own
+    # default, not a test-supplied one.
+    container = _container(tmp_path, miner)
+    context, unit_id = _seed(container, tmp_path)
+    _entity(container, context, "ent_author_default_off", "Person", "기본값비활성")
+    _build_review_history(
+        container,
+        context,
+        unit_id,
+        subject_id="ent_letter",
+        predicate="authored_by",
+        object_type="Person",
+        approved=19,
+        rejected=1,
+    )
+
+    summary = container.application.ontology_rag.process_mining(context, [unit_id])
+
+    assert summary.auto_approved == []
+    [candidate] = [
+        item
+        for item in summary.relation_candidates
+        if item.object_entity_id == "ent_author_default_off"
+    ]
+    assert candidate.status == "proposed"
+
+
 def test_precision_excludes_auto_approved_decisions_from_their_own_denominator(
     tmp_path: Path,
 ) -> None:
@@ -494,7 +538,9 @@ def test_precision_excludes_auto_approved_decisions_from_their_own_denominator(
         object_entity_id="ent_author_selfreinforce",
         confidence=0.95,
     )
-    container = _container(tmp_path, miner)
+    # Auto-approve is opt-in by default (container.py): this test exercises
+    # the enabled path, so it must request it explicitly.
+    container = _container(tmp_path, miner, auto_approve={"enabled": True})
     context, unit_id = _seed(container, tmp_path)
     _entity(container, context, "ent_author_selfreinforce", "Person", "자기강화")
     _build_review_history(

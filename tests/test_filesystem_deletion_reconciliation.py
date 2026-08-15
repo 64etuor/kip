@@ -136,6 +136,61 @@ def test_dry_run_scan_does_not_touch_absence_state(test_container):
     assert test_container.repository.state.absent_scan_counts == {}
 
 
+def test_file_grown_past_size_cap_is_not_tombstoned(test_container):
+    _write_keeper(test_container)
+    target = _write_target(test_container)
+    # Shrink the cap below the target's current size after the first sync
+    # so subsequent scans see it as "grown too big", not "gone".
+    test_container.settings.raw["security"] = {
+        "max_file_bytes": target.stat().st_size + 20
+    }
+    context, first = _sync(test_container)
+    assert first.inserted == 2
+    unit_id = _search(test_container, context)[0].unit_id
+
+    target.write_text(
+        "정산 증빙 제출기한은 2026년 8월 15일이다. " + ("여백 " * 200),
+        encoding="utf-8",
+    )
+
+    for _ in range(3):
+        _, summary = _sync(test_container)
+        assert summary.absent == 0
+        assert summary.tombstoned == 0
+        assert any(
+            "삭제대상.txt" in warning and "skipped" in warning
+            for warning in summary.warnings
+        )
+
+    # The prior revision must remain active: still searchable and readable.
+    hits = _search(test_container, context)
+    assert any(hit.unit_id == unit_id for hit in hits)
+    test_container.application.evidence.read_unit(context, unit_id)
+
+
+def test_genuinely_deleted_file_is_still_tombstoned_with_a_size_cap_configured(
+    test_container,
+):
+    # Regression guard: fixing the oversize false-tombstone must not weaken
+    # the existing deletion-grace behavior for files that are truly gone.
+    _write_keeper(test_container)
+    target = _write_target(test_container)
+    test_container.settings.raw["security"] = {"max_file_bytes": 10_000_000}
+    context, first = _sync(test_container)
+    assert first.inserted == 2
+
+    target.unlink()
+    _, second = _sync(test_container)
+    assert second.absent == 1
+    assert second.tombstoned == 0
+    assert _search(test_container, context)
+
+    _, third = _sync(test_container)
+    assert third.absent == 1
+    assert third.tombstoned == 1
+    assert _search(test_container, context) == []
+
+
 def test_tombstoned_unit_leaves_context_and_ontology_evidence(test_container):
     _write_keeper(test_container)
     target = _write_target(test_container)

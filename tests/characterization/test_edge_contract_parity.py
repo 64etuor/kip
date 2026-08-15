@@ -15,7 +15,7 @@ def test_cli_and_rest_preserve_stable_edge_semantics(test_container, monkeypatch
     # Given one indexed corpus and one approved, evidence-backed assertion
     path = test_container.settings.project_root / "source" / "승인.txt"
     path.write_text("A과제 참여율 변경을 승인한다.", encoding="utf-8")
-    context = test_container.application.operations.request_context()
+    context = test_container.application.operations.request_context(roles=["admin"])
     test_container.application.ingestion.sync_filesystem(context, "fixture")
     unit_id = test_container.application.retrieval.search(
         context,

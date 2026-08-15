@@ -9,8 +9,9 @@ from docx import Document
 from docx.oxml.ns import qn
 from PIL import Image
 
+from kip.adapters.parsers import docx as docx_module
 from kip.adapters.parsers.docx import DocxParser
-from kip.errors import ParserError
+from kip.errors import ParserError, ValidationError
 
 
 def _replace_zip_members(path: Path, replacements: Mapping[str, bytes]) -> None:
@@ -118,7 +119,11 @@ def test_docx_parser_renders_table_with_gridspan_and_vmerge_without_duplication(
     assert table_units[0].locator.data == {"table_index": 0}
     assert table_units[0].body == "일정\n계획\t\n\t\n실적\n완료\t"
     assert "DUPLICATE" not in table_units[0].body
-    assert table_units[0].metadata == {"row_count": 3, "col_count": 2}
+    assert table_units[0].metadata == {
+        "row_count": 3,
+        "col_count": 2,
+        "nested_table_count": 0,
+    }
 
 
 def test_docx_parser_emits_nonempty_header_and_footer_units(tmp_path: Path) -> None:
@@ -355,6 +360,271 @@ def test_docx_parser_quality_degrades_on_replacement_character_content(tmp_path:
     assert clean_extraction.quality_score is not None
     assert corrupt_extraction.quality_score is not None
     assert corrupt_extraction.quality_score < clean_extraction.quality_score
+
+
+def test_docx_parser_quality_is_not_tanked_by_normal_blank_paragraph_spacing(
+    tmp_path: Path,
+) -> None:
+    # Given a document with one real paragraph and fifty blank ones (normal
+    # spacing/formatting, not an extraction failure).
+    path = tmp_path / "blank_spacing.docx"
+    document = Document()
+    document.add_paragraph("정상적인 본문 내용입니다")
+    for _ in range(50):
+        document.add_paragraph("")
+    document.save(path)
+
+    # When the document is parsed.
+    extraction, _units = _parse(path)
+
+    # Then quality stays near the clean-document ceiling instead of being
+    # tanked by paragraph density (1 real / 51 total previously scored
+    # ~0.018).
+    assert extraction.quality_score >= 0.9
+    # Given a DOCX whose primary document part is a small-on-disk, highly
+    # compressible payload that would expand to gigabytes in memory (the
+    # same style of attack XlsxShallowParser and PptxParser already guard
+    # against via a zip-bomb ratio/size check).
+    path = tmp_path / "bomb.docx"
+    document_xml = (
+        b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        b'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        b"<w:body><w:p><w:r><w:t>" + b"A" * (50 * 1024 * 1024) + b"</w:t></w:r></w:p>"
+        b"</w:body></w:document>"
+    )
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            '<Override PartName="/word/document.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+            "</Types>",
+        )
+        archive.writestr(
+            "_rels/.rels",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+            'Target="word/document.xml"/></Relationships>',
+        )
+        archive.writestr("word/document.xml", document_xml)
+
+    # When the parser inspects the package.
+    # Then it stops before expanding the archive into memory, mirroring the
+    # XLSX/PPTX zip-bomb guard instead of decompressing an unbounded payload.
+    with pytest.raises(ValidationError, match="decompression limits"):
+        _parse(path)
+
+
+def test_docx_parser_rejects_excessively_nested_document_xml(tmp_path: Path) -> None:
+    # Given a small, low-compression-ratio DOCX whose primary document part
+    # wraps a single run in thousands of nested elements. ET.fromstring
+    # parses this fine (expat is iterative), but the hand-written run/textbox
+    # walkers recurse in Python and would otherwise crash with an uncaught
+    # RecursionError instead of a typed parser error.
+    path = tmp_path / "deepnest.docx"
+    depth = 3000
+    open_tags = "".join(
+        f'<w:x xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" w:val="v{i}">'
+        for i in range(depth)
+    )
+    close_tags = "</w:x>" * depth
+    document_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        "<w:body><w:p>" + open_tags + "<w:r><w:t>hi</w:t></w:r>" + close_tags + "</w:p></w:body>"
+        "</w:document>"
+    ).encode("utf-8")
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            '<Override PartName="/word/document.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+            "</Types>",
+        )
+        archive.writestr(
+            "_rels/.rels",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+            'Target="word/document.xml"/></Relationships>',
+        )
+        archive.writestr("word/document.xml", document_xml)
+
+    # When the parser walks the deeply nested run.
+    # Then it raises a typed parser error instead of an uncaught RecursionError.
+    with pytest.raises(ParserError, match="nesting exceeds"):
+        _parse(path)
+
+
+def _write_minimal_docx(path: Path, document_xml: bytes) -> None:
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            '<Override PartName="/word/document.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+            "</Types>",
+        )
+        archive.writestr(
+            "_rels/.rels",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+            'Target="word/document.xml"/></Relationships>',
+        )
+        archive.writestr("word/document.xml", document_xml)
+
+
+def test_docx_parser_recovers_table_nested_inside_a_cell_inside_a_table(tmp_path: Path) -> None:
+    # Given a table whose single cell contains another, fully nested table
+    # (table-in-cell-in-table) instead of only a paragraph.
+    path = tmp_path / "nested_table.docx"
+    document_xml = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        "<w:body>"
+        "<w:tbl><w:tr><w:tc>"
+        "<w:p><w:r><w:t>바깥 텍스트</w:t></w:r></w:p>"
+        "<w:tbl><w:tr><w:tc>"
+        "<w:p><w:r><w:t>안쪽 값</w:t></w:r></w:p>"
+        "</w:tc></w:tr></w:tbl>"
+        "</w:tc></w:tr></w:tbl>"
+        "</w:body></w:document>"
+    ).encode()
+    _write_minimal_docx(path, document_xml)
+
+    # When the document is parsed.
+    extraction, units = _parse(path)
+
+    # Then a single top-level table unit is emitted (the nested table is not
+    # a direct child of the body) whose rendered text recovers both the
+    # outer and the inner table's content, and the nesting is counted.
+    table_units = [unit for unit in units if unit.unit_type == "docx_table"]
+    assert len(table_units) == 1
+    assert "바깥 텍스트" in table_units[0].body
+    assert "안쪽 값" in table_units[0].body
+    assert table_units[0].metadata["nested_table_count"] == 1
+    assert extraction.metadata["table_count"] == 1
+    assert extraction.metadata["nested_table_count"] == 1
+
+
+def test_docx_parser_recovers_textbox_nested_inside_a_table_inside_a_textbox(
+    tmp_path: Path,
+) -> None:
+    # Given a text box whose content includes a table, one of whose cells
+    # holds another, independently nested text box (textbox -> table ->
+    # textbox), built with plain DrawingML (no mc:AlternateContent wrapper)
+    # so the test isolates the txbxContent-nesting bug from Choice/Fallback
+    # de-duplication.
+    path = tmp_path / "nested_textbox.docx"
+    document = Document()
+    document.add_paragraph("OUTERPLACEHOLDER")
+    document.save(path)
+    with zipfile.ZipFile(path) as archive:
+        document_xml = archive.read("word/document.xml")
+
+    inner_text = "안쪽 텍스트상자"
+    outer_text = "바깥 텍스트상자"
+    inner_drawing = (
+        "<w:p><w:r>"
+        '<w:drawing><wp:anchor><wp:docPr id="2" name="TextBox 2"/>'
+        '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+        '<a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">'
+        "<wps:wsp><wps:txbx><w:txbxContent>"
+        f"<w:p><w:r><w:t>{inner_text}</w:t></w:r></w:p>"
+        "</w:txbxContent></wps:txbx></wps:wsp>"
+        "</a:graphicData></a:graphic></wp:anchor></w:drawing>"
+        "</w:r></w:p>"
+    )
+    outer_drawing = (
+        "<w:p><w:r>"
+        '<w:drawing><wp:anchor><wp:docPr id="1" name="TextBox 1"/>'
+        '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+        '<a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">'
+        "<wps:wsp><wps:txbx><w:txbxContent>"
+        f"<w:p><w:r><w:t>{outer_text}</w:t></w:r></w:p>"
+        "<w:tbl><w:tr><w:tc>" + inner_drawing + "</w:tc></w:tr></w:tbl>"
+        "</w:txbxContent></wps:txbx></wps:wsp>"
+        "</a:graphicData></a:graphic></wp:anchor></w:drawing>"
+        "</w:r></w:p>"
+    ).encode()
+    document_xml = document_xml.replace(
+        b"<w:p><w:r><w:t>OUTERPLACEHOLDER</w:t></w:r></w:p>", outer_drawing
+    )
+    _replace_zip_members(path, {"word/document.xml": document_xml})
+
+    # When the document is parsed.
+    extraction, units = _parse(path)
+
+    # Then both the outer and the inner text box are recovered as their own
+    # units (previously the walk returned immediately on finding a
+    # txbxContent, so the inner one was silently dropped), the inner text is
+    # not duplicated into the outer unit's body, and the nesting is counted.
+    textbox_units = [unit for unit in units if unit.unit_type == "docx_textbox"]
+    assert len(textbox_units) == 2
+    assert textbox_units[0].body == outer_text
+    assert textbox_units[1].body == inner_text
+    assert inner_text not in textbox_units[0].body
+    assert extraction.metadata["textbox_count"] == 2
+    assert extraction.metadata["nested_textbox_count"] == 1
+
+
+def test_docx_parser_captures_body_level_alternate_content_paragraph(tmp_path: Path) -> None:
+    # Given a body-level paragraph wrapped in mc:AlternateContent (Word
+    # sometimes wraps content that differs between application versions;
+    # only text boxes handled this construct before this fix).
+    path = tmp_path / "alternate_paragraph.docx"
+    document = Document()
+    document.add_paragraph("PLACEHOLDER")
+    document.save(path)
+    with zipfile.ZipFile(path) as archive:
+        document_xml = archive.read("word/document.xml")
+    wrapped_paragraph = (
+        "<mc:AlternateContent>"
+        '<mc:Choice Requires="w16se">'
+        "<w:p><w:r><w:t>대체 콘텐츠 본문</w:t></w:r></w:p>"
+        "</mc:Choice>"
+        "<mc:Fallback>"
+        "<w:p><w:r><w:t>대체 콘텐츠 폴백</w:t></w:r></w:p>"
+        "</mc:Fallback>"
+        "</mc:AlternateContent>"
+    ).encode()
+    document_xml = document_xml.replace(
+        b"<w:p><w:r><w:t>PLACEHOLDER</w:t></w:r></w:p>", wrapped_paragraph
+    )
+    _replace_zip_members(path, {"word/document.xml": document_xml})
+
+    # When the document is parsed.
+    _extraction, units = _parse(path)
+
+    # Then the Choice paragraph's text is captured as ordinary body text
+    # instead of being silently dropped because it is not a direct "p"
+    # child of the body.
+    assert any("대체 콘텐츠 본문" in unit.body for unit in units)
+    assert not any("대체 콘텐츠 폴백" in unit.body for unit in units)
+
+
+def test_docx_heading_style_level_is_capped_to_nine() -> None:
+    # Given a bogus two-digit heading style id (Word only defines levels 1-9).
+    # When the style id is resolved to a heading level.
+    # Then it is rejected instead of yielding a nonsensical level 99.
+    assert docx_module._heading_level("Heading99") is None
+    assert docx_module._heading_level("Heading9") == 9
+    assert docx_module._heading_level("Heading1") == 1
 
 
 def test_registry_selects_docx_parser_for_docx_extension(tmp_path: Path) -> None:

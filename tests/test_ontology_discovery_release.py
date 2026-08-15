@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from pydantic import ValidationError as PydanticValidationError
 
 from kip.domain.interactions import (
     DiscoveryKind,
@@ -66,6 +67,40 @@ def _candidate(
         extraction=extraction,
         fingerprint="sha256:" + "0" * 64,
     )
+
+
+def test_candidate_construction_rejects_a_yaml_hostile_symbol() -> None:
+    # `_materialize_predicate`/`_materialize_entity_type` interpolate
+    # `candidate.symbol` as a raw YAML mapping key. A candidate reconstructed
+    # from a store adapter row (or built directly) with a symbol that would
+    # break out of the intended YAML key position must be rejected at model
+    # construction, not deep inside the materializer.
+    with pytest.raises(PydanticValidationError, match="ontology discovery symbol is invalid"):
+        _candidate(kind="predicate", symbol="cites:\n  evil: true")
+
+
+def test_candidate_construction_rejects_an_invalid_parent_reference() -> None:
+    with pytest.raises(
+        PydanticValidationError, match="ontology discovery parent is invalid"
+    ):
+        _candidate(
+            kind="entity_type",
+            symbol="contract",
+            parent="Document\nrogue_key: true",
+        )
+
+
+def test_candidate_construction_rejects_an_invalid_domain_reference() -> None:
+    with pytest.raises(
+        PydanticValidationError,
+        match="ontology discovery entity type reference is invalid",
+    ):
+        _candidate(kind="predicate", symbol="cites", domain=["EvidenceObject]\ninjected: true"])
+
+
+def test_candidate_construction_rejects_an_invalid_inverse_symbol() -> None:
+    with pytest.raises(PydanticValidationError, match="ontology discovery symbol is invalid"):
+        _candidate(kind="predicate", symbol="cites", inverse="cited by")
 
 
 def test_new_entity_type_into_an_empty_profile_becomes_a_root(tmp_path: Path) -> None:
@@ -287,7 +322,10 @@ def test_unreleasable_kind_raises_without_touching_files(tmp_path: Path) -> None
     candidate = _candidate(
         kind="alias",
         symbol="agreement_alias",
-        target_symbol="Agreement",
+        # `target_symbol` for an `alias`/`controlled_value` candidate names an
+        # existing lowercase symbol (mirrors `OntologyDiscoveryProposal`,
+        # which already rejects a PascalCase entity-type reference here).
+        target_symbol="amends",
         label="별칭",
         definition="d",
     )
@@ -467,6 +505,68 @@ def test_complete_pending_release_rejects_a_malformed_journal(tmp_path: Path) ->
 
     with pytest.raises(ValidationError, match="corrupt"):
         complete_pending_release(ontology_root)
+
+
+def test_complete_pending_release_quarantines_a_corrupt_json_journal(
+    tmp_path: Path,
+) -> None:
+    ontology_root = _ontology_root(tmp_path)
+    predicates_path = ontology_root / "core" / "predicates.yaml"
+    predicates_before = predicates_path.read_text(encoding="utf-8")
+    journal_path = ontology_root / RELEASE_JOURNAL_FILENAME
+    journal_path.write_text("not json", encoding="utf-8")
+
+    with pytest.raises(ValidationError, match="corrupt"):
+        complete_pending_release(ontology_root)
+
+    # The corrupt journal must be renamed aside so it never bricks a future
+    # start-up again, and the real tree must be left untouched.
+    assert not journal_path.is_file()
+    quarantined = ontology_root / (RELEASE_JOURNAL_FILENAME + ".rejected")
+    assert quarantined.read_text(encoding="utf-8") == "not json"
+    assert has_pending_release(ontology_root) is False
+    assert predicates_path.read_text(encoding="utf-8") == predicates_before
+    # A subsequent call is a clean no-op: no journal left to crash on again.
+    assert complete_pending_release(ontology_root) is False
+
+
+def test_complete_pending_release_quarantines_valid_json_that_fails_validation(
+    tmp_path: Path,
+) -> None:
+    ontology_root = _ontology_root(tmp_path)
+    predicates_path = ontology_root / "core" / "predicates.yaml"
+    predicates_before = predicates_path.read_text(encoding="utf-8")
+    # Valid JSON, but the journaled predicates.yaml content fails
+    # `validate_ontology` (a `null` predicate definition, as if the journal
+    # was hand-edited or torn between the journal write and the apply).
+    broken_predicates_text = predicates_before.replace(
+        "predicates:\n", "predicates:\n  broken_predicate:\n", 1
+    )
+    journal_path = ontology_root / RELEASE_JOURNAL_FILENAME
+    journal_path.write_text(
+        json.dumps(
+            {
+                "release": {
+                    "kind": "predicate",
+                    "symbol": "broken_predicate",
+                    "version": "1.1.0",
+                    "domain_profile": "research-project",
+                },
+                "files": {"core/predicates.yaml": broken_predicates_text},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError, match="invalid ontology tree"):
+        complete_pending_release(ontology_root)
+
+    assert not journal_path.is_file()
+    quarantined = ontology_root / (RELEASE_JOURNAL_FILENAME + ".rejected")
+    assert quarantined.is_file()
+    # The real tree must not be corrupted by a journal that fails validation.
+    assert predicates_path.read_text(encoding="utf-8") == predicates_before
+    assert has_pending_release(ontology_root) is False
 
 
 def test_concurrent_materialization_is_serialized_by_the_release_lock(

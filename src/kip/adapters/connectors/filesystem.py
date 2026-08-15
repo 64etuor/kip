@@ -32,6 +32,13 @@ class FileSystemConnector:
         self.settle_seconds = settle_seconds
         self.follow_symlinks = follow_symlinks
         self.max_file_bytes = max_file_bytes
+        # Populated by the most recent completed `scan()` call: relative
+        # paths of files that are still present on disk but were excluded
+        # from ingestion by a config filter (extension/exclude-glob) or by
+        # `max_file_bytes`. Deletion reconciliation must treat these as
+        # "seen" so a file that merely grew too big, or fell outside a
+        # narrowed include/exclude filter, is never tombstoned as deleted.
+        self.skipped_present_relative_paths: frozenset[str] = frozenset()
 
     def scan(
         self,
@@ -50,15 +57,22 @@ class FileSystemConnector:
                 else requested
             )
             restrict_extensions = True
+        # Reset for this scan; only reassigned to the populated set once the
+        # walk below completes, so a partially-consumed scan reports empty
+        # (never stale data from a prior scan) rather than partial data.
+        self.skipped_present_relative_paths = frozenset()
+        skipped_present: set[str] = set()
         for dirpath, dirnames, filenames in os.walk(self.root, followlinks=self.follow_symlinks):
             if not self.follow_symlinks:
                 dirnames[:] = [name for name in dirnames if not (Path(dirpath) / name).is_symlink()]
             for name in filenames:
                 path = Path(dirpath) / name
-                if restrict_extensions and path.suffix.lower() not in target_extensions:
-                    continue
                 relative = path.relative_to(self.root).as_posix()
+                if restrict_extensions and path.suffix.lower() not in target_extensions:
+                    skipped_present.add(relative)
+                    continue
                 if any(fnmatch.fnmatch(relative, pattern) for pattern in self.exclude_globs):
+                    skipped_present.add(relative)
                     continue
                 if path.is_symlink() and not self.follow_symlinks:
                     continue
@@ -67,6 +81,7 @@ class FileSystemConnector:
                     raise ValidationError(f"path escaped source root: {path}")
                 stat_before = path.stat()
                 if stat_before.st_size > self.max_file_bytes:
+                    skipped_present.add(relative)
                     continue
                 if self.settle_seconds > 0:
                     age_ns = time.time_ns() - stat_before.st_mtime_ns
@@ -92,4 +107,5 @@ class FileSystemConnector:
                     size=stat_before.st_size,
                     mtime_ns=stat_before.st_mtime_ns,
                 )
+        self.skipped_present_relative_paths = frozenset(skipped_present)
 

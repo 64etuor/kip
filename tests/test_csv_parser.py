@@ -4,8 +4,12 @@ import csv
 import io
 from pathlib import Path
 
+import pytest
+
+from kip.adapters.parsers import csv_table as csv_table_module
 from kip.adapters.parsers.csv_table import CsvTableParser
 from kip.adapters.parsers.registry import ParserRegistry
+from kip.errors import ParserError
 from kip.settings import Settings
 
 
@@ -126,6 +130,35 @@ def test_csv_row_locators_are_correct_across_chunk_boundaries(tmp_path: Path) ->
         assert parsed[0] == ["id", "value"]
 
 
+def test_csv_flags_partial_table_metadata_only_when_chunked(tmp_path: Path) -> None:
+    # Given a small single-chunk CSV and a larger CSV forced into multiple
+    # chunks by a small per-unit character budget.
+    small_path = tmp_path / "small.csv"
+    small_path.write_text("a,b\n1,2\n3,4\n", encoding="utf-8")
+    large_path = tmp_path / "large.csv"
+    lines = ["id,value"] + [f"{i},row-{i}" for i in range(1, 21)]
+    large_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    # When each is parsed.
+    _small_extraction, small_units = CsvTableParser().parse(
+        small_path, artifact_id="art_small", document_id="doc_small", acl_scopes=["workspace:default"]
+    )
+    _large_extraction, large_units = CsvTableParser(max_chars_per_unit=40).parse(
+        large_path, artifact_id="art_large", document_id="doc_large", acl_scopes=["workspace:default"]
+    )
+
+    # Then only the file actually split across multiple chunks is flagged -
+    # a numeric/aggregate question answered from just one of its chunks
+    # (e.g. a total-row chunk) could otherwise look like it covers the
+    # whole table when most line items are in a different chunk.
+    assert len(small_units) == 1
+    assert small_units[0].metadata["csv_partial_table"] is False
+    assert small_units[0].metadata["csv_total_row_count"] == 2
+    assert len(large_units) > 1
+    assert all(unit.metadata["csv_partial_table"] is True for unit in large_units)
+    assert all(unit.metadata["csv_total_row_count"] == 20 for unit in large_units)
+
+
 def test_csv_sniffs_semicolon_delimiter(tmp_path: Path) -> None:
     # Given a semicolon-delimited CSV.
     path = tmp_path / "semicolon.csv"
@@ -171,13 +204,55 @@ def test_csv_ragged_rows_warn_without_failing_the_file(tmp_path: Path) -> None:
         path, artifact_id="art_ragged", document_id="doc_ragged", acl_scopes=["workspace:default"]
     )
 
-    # Then the file still parses (best effort) with a warning, not a failure.
+    # Then the file still parses (best effort) with a warning, not a failure,
+    # and quality is folded down below the clean-file 1.0 ceiling so a
+    # mangled CSV is not reported as fully trustworthy alongside its own
+    # "partial" status.
     assert extraction.status == "partial"
     assert any("ragged rows" in warning for warning in extraction.warnings)
+    assert extraction.quality_score < 1.0
     assert len(units) == 1
     parsed_rows = _rows_from_body(units[0].body)
     assert parsed_rows[-2] == ["4", "5"]
     assert parsed_rows[-1] == ["6", "7", "8", "9"]
+
+
+def test_csv_normalizes_classic_mac_carriage_return_only_line_endings(tmp_path: Path) -> None:
+    # Given a CSV using classic Mac (\r-only) line endings. io.StringIO,
+    # which csv.reader iterates over, does not split lines on a bare \r,
+    # so without normalization this would collapse into one row or crash.
+    path = tmp_path / "classic_mac.csv"
+    path.write_bytes(b"a,b,c\r1,2,3\r")
+
+    # When it is parsed.
+    extraction, units = CsvTableParser().parse(
+        path, artifact_id="art_cr", document_id="doc_cr", acl_scopes=["workspace:default"]
+    )
+
+    # Then the file parses into the expected header and single data row.
+    assert extraction.status == "succeeded"
+    assert len(units) == 1
+    parsed_rows = _rows_from_body(units[0].body)
+    assert parsed_rows == [["a", "b", "c"], ["1", "2", "3"]]
+    assert units[0].metadata["columns"] == ["a", "b", "c"]
+
+
+def test_csv_rejects_files_over_the_size_backstop(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Given a file over a (reduced-for-testing) hard byte-size cap - a
+    # defense-in-depth backstop, since CSV has no structural zip-bomb-style
+    # guard the way XlsxShallowParser does.
+    monkeypatch.setattr(csv_table_module, "_MAX_FILE_BYTES", 16)
+    path = tmp_path / "oversized.csv"
+    path.write_text("a,b,c\n1,2,3\n4,5,6\n", encoding="utf-8")
+
+    # When it is parsed.
+    # Then it fails cleanly as a typed ParserError before reading the file.
+    with pytest.raises(ParserError, match="too large"):
+        CsvTableParser().parse(
+            path, artifact_id="art_big", document_id="doc_big", acl_scopes=["workspace:default"]
+        )
 
 
 def test_csv_routes_to_csv_table_parser_ahead_of_plain_text(tmp_path: Path) -> None:

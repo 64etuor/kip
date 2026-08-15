@@ -311,6 +311,10 @@ class MemoryKnowledgeStore:
                 return self.get_candidate(context, existing_id)
             self.state.candidate_ids_by_fingerprint[candidate.fingerprint] = candidate.id
         self.state.candidates[candidate.id] = candidate.model_copy(deep=True)
+        # Workspace scoping for `predicate_review_precision`: recorded once
+        # at creation time, matching the workspace the candidate was
+        # actually proposed under.
+        self.state.candidate_workspaces[candidate.id] = context.workspace
         return candidate.model_copy(deep=True)
 
     def get_candidate(
@@ -378,25 +382,48 @@ class MemoryKnowledgeStore:
         context: RequestContext,
         predicate: str,
     ) -> PredicateReviewStats:
+        """Human review outcome counts for one predicate, workspace-scoped.
+
+        Revocation-aware: a human-approved candidate whose resulting
+        assertion has since been revoked no longer counts as a correct
+        approval. It stays part of the human-reviewed sample (the reviewer's
+        original decision to approve is still measured), but is counted as a
+        failed outcome instead -- the statistically honest reading, since a
+        later revocation means the original approval was wrong. Superseded
+        assertions (a legitimate correction/replacement path, not a
+        wrongness signal) are NOT treated as failures.
+        """
+        # source_candidate_id -> current assertion status, so an approved
+        # candidate's outcome can be checked for a later revocation.
+        assertion_status_by_candidate: dict[str, str] = {
+            assertion.source_candidate_id: assertion.status
+            for assertion in self.state.assertions.values()
+            if assertion.source_candidate_id is not None
+        }
         approved = 0
         rejected = 0
-        for candidate in self.state.candidates.values():
+        for candidate_id, candidate in self.state.candidates.items():
             if candidate.predicate != predicate:
+                continue
+            if self.state.candidate_workspaces.get(candidate_id) != context.workspace:
                 continue
             if candidate.status not in ("approved", "rejected"):
                 continue
             # The auto-approve policy's own decisions are excluded from the
-            # statistic it feeds, so precision can never be reinforced by
-            # itself. The marker is recorded in `review_note` since
-            # `AssertionCandidate` carries no separate reviewer-identity
-            # field (no schema change).
-            note = candidate.review_note or ""
-            if note.startswith(AUTO_APPROVE_POLICY_PRINCIPAL):
+            # statistic it feeds (via the `auto_approved` flag, set ONLY by
+            # `approve_candidate` from the reviewer identity, never from
+            # caller-supplied `review_note` text), so precision can never be
+            # reinforced by itself or spoofed by a human decision whose note
+            # happens to start with the policy marker.
+            if self.state.candidate_auto_approved.get(candidate_id, False):
                 continue
-            if candidate.status == "approved":
-                approved += 1
-            else:
+            if (
+                candidate.status == "rejected"
+                or assertion_status_by_candidate.get(candidate_id) == "revoked"
+            ):
                 rejected += 1
+            else:
+                approved += 1
         return PredicateReviewStats(
             predicate=predicate,
             approved=approved,
@@ -469,6 +496,12 @@ class MemoryKnowledgeStore:
                 "review_note": note or f"approved by {reviewer_id}",
             },
             deep=True,
+        )
+        # Set ONLY from the reviewer identity, never from caller-supplied
+        # `review_note` text, so it cannot be spoofed by a human decision
+        # whose note happens to start with the policy marker.
+        self.state.candidate_auto_approved[candidate.id] = (
+            reviewer_id == AUTO_APPROVE_POLICY_PRINCIPAL
         )
         self.state.assertions[assertion.id] = assertion
         for target in superseded:

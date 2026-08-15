@@ -14,7 +14,6 @@ cas_path = "./var/cas"
 [api]
 host = "127.0.0.1"
 port = 8080
-require_api_key_outside_development = true
 max_request_bytes = 10485760
 
 [identity]
@@ -60,7 +59,7 @@ endpoint = "http://127.0.0.1:4318"
 [search]
 semantic_enabled = false
 default_mode = "reranked"
-context_max_chars = 120000
+# Overall answer context size is set per request via --max-chars (default 120000), not a config key.
 context_item_max_chars = 16000
 alias_expansion_enabled = true
 alias_expansion_max_terms = 16
@@ -140,8 +139,11 @@ adaptive_discovery = true
 [ontology.auto_approve]
 # Calibrated review tiers (ADR pending, roadmap item 4): audited, measured,
 # revocable auto-approval for low-risk, review-not-required predicates only.
-# enabled=false makes the mechanism fully inert.
-enabled = true
+# Opt-in: promotes candidates to facts without a human reviewer in the loop.
+# Leave enabled=false (the default when this section is absent) until you
+# have reviewed this workspace's predicate precision history; only then
+# switch to enabled=true.
+enabled = false
 min_precision = 0.95
 min_confidence = 0.8
 min_reviewed = 20

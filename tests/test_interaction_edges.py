@@ -201,8 +201,10 @@ def test_mcp_exposes_the_same_clarification_service(tmp_path: Path, monkeypatch)
     tools, result = asyncio.run(invoke())
 
     assert "kip_clarify" in tools
-    payload = json.loads(result[0][0].text)
-    assert payload["schema_version"] == "kip.clarification.v1"
+    envelope = json.loads(result[0][0].text)
+    assert envelope["schema_version"] == "kip.envelope.v1"
+    assert envelope["ok"] is True
+    assert envelope["data"]["schema_version"] == "kip.clarification.v1"
 
 
 def test_mcp_ontology_discovery_propose_threads_the_optional_parent_field(
@@ -227,7 +229,10 @@ def test_mcp_ontology_discovery_propose_threads_the_optional_parent_field(
 
     result = asyncio.run(invoke())
 
-    payload = json.loads(result[0][0].text)
+    envelope = json.loads(result[0][0].text)
+    assert envelope["schema_version"] == "kip.envelope.v1"
+    assert envelope["ok"] is True
+    payload = envelope["data"]
     assert payload["schema_version"] == "kip.ontology-discovery-candidate.v1"
     assert payload["kind"] == "entity_type"
     assert payload["parent"] == "Document"

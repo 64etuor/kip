@@ -172,6 +172,38 @@ def test_generated_configs_enable_pinned_korean_ocr(tmp_path: Path) -> None:
         assert config["parsers"]["hwp"]["hwp-hwpx-parser"]["enabled"] is True
 
 
+def test_generated_config_defaults_auto_approve_to_opt_in_disabled(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    plan = build_setup_plan(_complete_answers(tmp_path), project_root=project_root)
+
+    apply_setup_plan(plan, project_root=project_root)
+
+    for name in ("config/kip.generated.toml", "config/kip.host.generated.toml"):
+        with (project_root / name).open("rb") as handle:
+            config = tomllib.load(handle)
+        assert config["ontology"]["auto_approve"]["enabled"] is False
+
+
+def test_generated_config_enables_the_promoted_bm25_reranker(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    plan = build_setup_plan(_complete_answers(tmp_path), project_root=project_root)
+
+    apply_setup_plan(plan, project_root=project_root)
+
+    for name in ("config/kip.generated.toml", "config/kip.host.generated.toml"):
+        with (project_root / name).open("rb") as handle:
+            config = tomllib.load(handle)
+        reranker = config["models"]["reranker"]
+        assert reranker["enabled"] is True
+        assert reranker["backend"] == "bm25"
+
+
 def test_apply_rejects_tampered_plan_before_writing(tmp_path: Path) -> None:
     project_root = tmp_path / "project"
     project_root.mkdir()

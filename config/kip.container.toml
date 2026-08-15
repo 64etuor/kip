@@ -14,7 +14,6 @@ cas_path = "/data/cas"
 [api]
 host = "0.0.0.0"
 port = 8080
-require_api_key_outside_development = true
 max_request_bytes = 10485760
 
 [security]
@@ -24,7 +23,7 @@ max_file_bytes = 524288000
 
 [search]
 semantic_enabled = false
-context_max_chars = 120000
+# Overall answer context size is set per request via --max-chars (default 120000), not a config key.
 context_item_max_chars = 16000
 korean_ngram_min = 2
 korean_ngram_max = 4
@@ -44,8 +43,11 @@ adaptive_discovery = true
 [ontology.auto_approve]
 # Calibrated review tiers (ADR pending, roadmap item 4): audited, measured,
 # revocable auto-approval for low-risk, review-not-required predicates only.
-# enabled=false makes the mechanism fully inert.
-enabled = true
+# Opt-in: promotes candidates to facts without a human reviewer in the loop.
+# Leave enabled=false (the default when this section is absent) until you
+# have reviewed this workspace's predicate precision history; only then
+# switch to enabled=true.
+enabled = false
 min_precision = 0.95
 min_confidence = 0.8
 min_reviewed = 20

@@ -168,6 +168,23 @@ def _requires_exact_xlsx(request: AnswerRequest, evidence: EvidenceRead) -> bool
     )
 
 
+def _requires_full_csv_read(request: AnswerRequest, evidence: EvidenceRead) -> bool:
+    # Unlike xlsx (whose shallow shared-string index deliberately excludes
+    # numeric values), CsvTableParser indexes CSV numeric content verbatim,
+    # so it never trips exact_xlsx_read_required. But a CSV split into
+    # multiple row chunks (unit.metadata["csv_partial_table"], set by
+    # CsvTableParser) means no single unit's body is the full table: an
+    # aggregate/numeric question answered from one chunk - e.g. a
+    # total-row chunk - can look sufficient while most line items live in a
+    # different, uncited chunk. Reuse the same numeric-intent detection as
+    # the xlsx check instead of a separate vocabulary.
+    return (
+        evidence.unit.locator.type == "csv_rows"
+        and bool(evidence.unit.metadata.get("csv_partial_table"))
+        and any(term in request.query for term in _NUMERIC_INTENT)
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class AnswerPreparation:
     evidence: tuple[EvidenceRead, ...]
@@ -198,6 +215,15 @@ def prepare_answer_evidence(
                 request,
                 "exact_xlsx_read_required",
                 "원본 워크북 범위를 지정해 xlsx-read로 확인해야 합니다.",
+            ),
+        )
+    if any(_requires_full_csv_read(request, item) for item in relevant):
+        return AnswerPreparation(
+            evidence=(),
+            refusal=_refusal(
+                request,
+                "csv_full_table_required",
+                "CSV 파일이 여러 조각으로 분할되어 있어 전체 표를 다시 확인해야 합니다.",
             ),
         )
     identifier_evidence = [

@@ -180,6 +180,15 @@ optional `identity` package extra. Administrative routes require membership in
 a configured, verified JWT group; API-key mode additionally requires the
 separate admin key.
 
+Ontology-mutating operations (assertion review approve/reject, assertion
+revocation, ontology mining, entity creation, and entity-candidate review)
+enforce the admin role in the shared application service, not only at the
+REST edge (ADR-048), so the CLI and MCP surfaces fail closed for non-admin
+principals too; grant reviewers the admin role explicitly. Graph traversal
+requires the admin role to request unapproved (`approved_only=false`)
+results. The MCP adapter returns the same `kip.envelope.v1` result shape as
+CLI and REST, including a typed error `code` on failure.
+
 JWTs must include the configured principal, workspace, groups, ACL snapshot ID,
 snapshot version, capture time, and expiry claims. The identity provider owns
 revocation and refresh. KIP fails closed when a snapshot is stale; extending a

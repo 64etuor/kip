@@ -612,6 +612,7 @@
             "answer_not_present",
             "clarification_required",
             "exact_xlsx_read_required",
+            "csv_full_table_required",
             "insufficient_decision_evidence",
             "model_egress_denied",
             "generation_unavailable",

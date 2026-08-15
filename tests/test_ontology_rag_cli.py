@@ -14,13 +14,20 @@ from kip.domain.knowledge import RelationMiningRequest
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _env() -> dict[str, str]:
-    return {
+def _env(*, admin: bool = False) -> dict[str, str]:
+    env = {
         "KIP_CONFIG": str(ROOT / "config/kip.example.toml"),
         "KIP_DATABASE_URL": "memory://",
         "KIP_PROJECT_ROOT": str(ROOT),
         "KIP_ENV": "test",
     }
+    if admin:
+        # `create_entity`/`enqueue_mining` now require the admin role at the
+        # shared application layer (architecture rule 6); REST gates it at
+        # the edge via `admin_context`, but the CLI edge calls the
+        # application service directly and must supply the role itself.
+        env["KIP_ROLES"] = "admin"
+    return env
 
 
 def test_ontology_cli_exposes_entity_mining_and_candidate_surfaces() -> None:
@@ -52,7 +59,7 @@ def test_ontology_entity_create_emits_versioned_envelope() -> None:
             "--alias",
             "과제 CLI",
         ],
-        env=_env(),
+        env=_env(admin=True),
     )
 
     assert result.exit_code == 0, result.stdout
@@ -66,13 +73,25 @@ def test_ontology_mine_fails_closed_when_no_miner_is_configured() -> None:
     result = CliRunner().invoke(
         app,
         ["ontology", "mine", "--unit-id", "unit_missing"],
-        env=_env(),
+        env=_env(admin=True),
     )
 
     assert result.exit_code == 3
     payload = json.loads(result.stderr)
     assert payload["error"]["code"] == "validation_error"
     assert "relation miner" in payload["error"]["message"]
+
+
+def test_ontology_mine_refuses_a_non_admin_caller_before_the_miner_check() -> None:
+    result = CliRunner().invoke(
+        app,
+        ["ontology", "mine", "--unit-id", "unit_missing"],
+        env=_env(),
+    )
+
+    assert result.exit_code == 3
+    payload = json.loads(result.stderr)
+    assert payload["error"]["code"] == "forbidden"
 
 
 def test_relation_mining_caps_match_example_config() -> None:

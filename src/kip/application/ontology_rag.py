@@ -42,7 +42,7 @@ from kip.domain.telemetry import (
     QueryTraceUsage,
     safe_request_id,
 )
-from kip.errors import ConflictError, NotFoundError, ValidationError
+from kip.errors import AuthorizationError, ConflictError, NotFoundError, ValidationError
 from kip.ontology import OntologyCatalog
 from kip.ports.jobs import JobStore
 from kip.ports.knowledge import KnowledgeStore
@@ -97,6 +97,12 @@ class OntologyRagUseCases:
         context: RequestContext,
         entity: KnowledgeEntity,
     ) -> KnowledgeEntity:
+        # Authorization is checked before any store lookup, per architecture
+        # rule 6: CLI and MCP call this application service directly (REST
+        # gates it at the edge via `admin_context`, which already sets
+        # roles=["admin"]), so the check must live here for all three edges
+        # to enforce it uniformly.
+        self._require_admin(context)
         ontology = self._require_ontology()
         ontology.validate_entity_type(entity.entity_type)
         return self._store.save_entity(context, entity)
@@ -154,6 +160,7 @@ class OntologyRagUseCases:
         candidate_id: str,
         note: str | None = None,
     ) -> KnowledgeEntity:
+        self._require_admin(context)
         return self._store.approve_entity_candidate(
             context,
             candidate_id,
@@ -167,6 +174,7 @@ class OntologyRagUseCases:
         candidate_id: str,
         note: str | None = None,
     ) -> EntityCandidate:
+        self._require_admin(context)
         return self._store.reject_entity_candidate(
             context,
             candidate_id,
@@ -179,6 +187,7 @@ class OntologyRagUseCases:
         context: RequestContext,
         unit_ids: list[str],
     ) -> str:
+        self._require_admin(context)
         ontology = self._require_ontology()
         miner = self._require_relation_miner()
         selected = _validate_mining_unit_ids(unit_ids, self._max_mining_units)
@@ -513,8 +522,19 @@ class OntologyRagUseCases:
             f"{AUTO_APPROVE_POLICY_PRINCIPAL} precision={precision:.4f} "
             f"sample={stats.reviewed}"
         )
+        # `KnowledgeUseCases.review_approve` now requires the admin role
+        # (architecture rule 6, gated at the shared application layer so
+        # CLI/MCP/REST enforce it uniformly). The auto-approve policy's
+        # decision to approve is already fail-closed on predicate risk/review
+        # tier, confidence, and measured precision above -- it is not a
+        # caller-authority check -- so the synthetic policy context is
+        # granted the admin role here rather than requiring every mining
+        # caller (which may be a non-admin principal) to hold it.
         policy_context = context.model_copy(
-            update={"principal_id": AUTO_APPROVE_POLICY_PRINCIPAL}
+            update={
+                "principal_id": AUTO_APPROVE_POLICY_PRINCIPAL,
+                "roles": sorted({*context.roles, "admin"}),
+            }
         )
         try:
             assertion = self._knowledge.review_approve(
@@ -751,6 +771,13 @@ class OntologyRagUseCases:
         if self._ontology is None:
             raise ValidationError("ontology contract is unavailable")
         return self._ontology
+
+    @staticmethod
+    def _require_admin(context: RequestContext) -> None:
+        if "admin" not in context.roles:
+            raise AuthorizationError(
+                "admin role is required for this ontology curation operation"
+            )
 
     def _require_relation_miner(self) -> RelationMinerPort:
         if self._relation_miner is None:

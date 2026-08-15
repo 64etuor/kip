@@ -22,27 +22,12 @@ from kip.adapters.parsers.xlsx_values import (
     formula_details,
     normalize_value,
 )
+from kip.adapters.parsers.zip_guard import check_zip_bomb_guard
 from kip.domain.xlsx import XlsxCell, XlsxRangeData
 from kip.errors import DependencyUnavailableError, ParserError, ValidationError
 
 type ExcelDateValue = date | datetime | time | timedelta
 type ToExcel = Callable[[ExcelDateValue, datetime], float]
-
-
-def _safe_zip_check(
-    archive: zipfile.ZipFile,
-    max_entries: int = 100000,
-    max_uncompressed: int = 2_147_483_648,
-    max_ratio: int = 200,
-) -> None:
-    infos = archive.infolist()
-    if len(infos) > max_entries:
-        raise ValidationError("XLSX has too many ZIP entries")
-    total = sum(info.file_size for info in infos)
-    compressed = max(1, sum(info.compress_size for info in infos))
-    if total > max_uncompressed or total / compressed > max_ratio:
-        raise ValidationError("XLSX decompression limits exceeded")
-
 
 @dataclass(frozen=True, slots=True)
 class WorkbookDependencies:
@@ -219,7 +204,7 @@ def read_xlsx_range(
     bounds = parse_cell_range(cell_range)
     try:
         with zipfile.ZipFile(path) as archive:
-            _safe_zip_check(archive)
+            check_zip_bomb_guard(archive, format_name="XLSX")
             metadata = read_sheet_metadata(archive, sheet)
     except (zipfile.BadZipFile, KeyError, ET.ParseError) as exc:
         raise ParserError(f"XLSX deep read failed: {path}: {exc}") from exc

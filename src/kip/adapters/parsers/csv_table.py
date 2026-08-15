@@ -15,6 +15,15 @@ _SNIFF_DELIMITERS = ",;\t"
 _DEFAULT_DELIMITER: Final = ","
 _SNIFF_SAMPLE_CHARS: Final = 8192
 
+# Simple, defense-in-depth backstop: XlsxShallowParser already guards its
+# ZIP-container input via check_zip_bomb_guard, but CSV has no equivalent
+# structural limit before this parser reads the whole file into memory with
+# `read_bytes()`. This is deliberately not wired to `security.max_file_bytes`
+# (that needs settings plumbing outside this parser's ownership) - just a
+# hard cap matching the documented 500MB default so an unexpectedly huge
+# file fails cleanly instead of exhausting memory.
+_MAX_FILE_BYTES: Final = 500 * 1024 * 1024
+
 
 def _detect_delimiter(sample: str) -> str:
     if not sample.strip():
@@ -74,6 +83,12 @@ class CsvTableParser:
     def parse(
         self, path: Path, *, artifact_id: str, document_id: str, acl_scopes: list[str]
     ) -> tuple[ExtractionRun, list[ContentUnit]]:
+        file_size = path.stat().st_size
+        if file_size > _MAX_FILE_BYTES:
+            raise ParserError(
+                f"CSV file too large: {path}: {file_size} bytes exceeds the "
+                f"{_MAX_FILE_BYTES} byte limit"
+            )
         raw = path.read_bytes()
         decoded = decode_text_bytes(raw)
         # csv.reader raises outright ("line contains NUL") on a raw NUL
@@ -81,6 +96,12 @@ class CsvTableParser:
         # for structural parsing. decoded.text (used above for the
         # encoding-quality calculation) is left untouched.
         csv_source = decoded.text.replace("\x00", "")
+        # io.StringIO (what csv.reader iterates over below) only splits
+        # lines on "\n" and "\r\n", not a bare "\r". Classic Mac-style
+        # \r-only line endings would otherwise collapse into a single
+        # unterminated line and crash/garble the parse. Normalize both
+        # styles to "\n" first, same precedent as the NUL strip above.
+        csv_source = csv_source.replace("\r\n", "\n").replace("\r", "\n")
         delimiter = _detect_delimiter(csv_source[:_SNIFF_SAMPLE_CHARS])
         try:
             rows = list(csv.reader(io.StringIO(csv_source), delimiter=delimiter))
@@ -110,6 +131,15 @@ class CsvTableParser:
 
         extraction_id = new_id("ext")
         units: list[ContentUnit] = []
+        # A multi-chunk CSV means no single unit's body is the full table:
+        # an aggregate/numeric question answered from just one chunk (e.g.
+        # a total-row chunk) can look sufficient while most line items are
+        # in a different chunk the caller never read. Record this in each
+        # unit's own metadata (not just extraction metadata) so
+        # answer_adequacy can gate on the cited evidence unit directly,
+        # mirroring XlsxShallowParser's deep_read_required_for_numbers flag.
+        is_partial_table = len(row_chunks) > 1
+        total_row_count = len(data_rows)
         for ordinal, (start_row, end_row, batch) in enumerate(row_chunks):
             data_text = _serialize_rows(batch, delimiter) if batch else ""
             if header_text and data_text:
@@ -145,17 +175,28 @@ class CsvTableParser:
                         "columns": header,
                         "delimiter": delimiter,
                         "encoding": decoded.encoding,
+                        "csv_partial_table": is_partial_table,
+                        "csv_total_row_count": total_row_count,
                     },
                 )
             )
 
+        # A ragged-row (or other structural) warning means the emitted CSV
+        # rows are already known-mangled, not just decode-uncertain (which
+        # decoded.quality already accounts for). Without this, a file with a
+        # column-count mismatch on nearly every row still reported the full
+        # 1.0 ceiling - fully trustworthy - alongside its own "partial"
+        # status, which is an internally inconsistent signal for callers
+        # that key off quality_score alone.
+        structural_penalty = 0.85 if ragged_rows else 1.0
+        quality_score = round(decoded.quality * structural_penalty, 4)
         extraction = ExtractionRun(
             id=extraction_id,
             artifact_id=artifact_id,
             parser_name=self.name,
             parser_version=self.version,
             status="partial" if (decoded.status == "partial" or ragged_rows) else "succeeded",
-            quality_score=decoded.quality,
+            quality_score=quality_score,
             output_hash=sha256_bytes(csv_source.encode("utf-8")),
             warnings=warnings,
             metadata={

@@ -7,9 +7,10 @@ from xml.etree import ElementTree as ET
 
 from kip.adapters.parsers.text_quality import replacement_ratio
 from kip.adapters.parsers.xlsx_read import read_xlsx_range
+from kip.adapters.parsers.zip_guard import check_zip_bomb_guard
 from kip.domain.models import ContentUnit, EvidenceLocator, ExtractionRun
 from kip.domain.text import normalize_text
-from kip.errors import ParserError, ValidationError
+from kip.errors import ParserError
 from kip.ids import new_id, sha256_bytes, stable_id
 
 __all__ = ["XlsxShallowParser", "read_xlsx_range"]
@@ -39,16 +40,6 @@ def _split_text(text: str, max_chars: int) -> list[str]:
 
 def _tag(local: str) -> str:
     return f"{{{_MAIN_NS}}}{local}"
-
-
-def _safe_zip_check(archive: zipfile.ZipFile, max_entries: int = 100000, max_uncompressed: int = 2_147_483_648, max_ratio: int = 200) -> None:
-    infos = archive.infolist()
-    if len(infos) > max_entries:
-        raise ValidationError("XLSX has too many ZIP entries")
-    total = sum(info.file_size for info in infos)
-    compressed = max(1, sum(info.compress_size for info in infos))
-    if total > max_uncompressed or total / compressed > max_ratio:
-        raise ValidationError("XLSX decompression limits exceeded")
 
 
 def _read_shared_strings(archive: zipfile.ZipFile) -> list[str]:
@@ -150,7 +141,7 @@ class XlsxShallowParser:
         parsed_sheets = 0
         try:
             with zipfile.ZipFile(path) as archive:
-                _safe_zip_check(archive)
+                check_zip_bomb_guard(archive, format_name="XLSX")
                 shared = _read_shared_strings(archive)
                 next_ordinal = 0
                 sheet_paths = _sheet_paths(archive)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Iterator
 from dataclasses import dataclass
 from importlib import import_module
@@ -53,6 +54,19 @@ class PdfParser:
             pymupdf = cast(_PymupdfModule, import_module("pymupdf"))
         except ImportError as exc:
             raise DependencyUnavailableError("Install the extractors extra for PDF parsing") from exc
+        # pymupdf raises its own exception hierarchy (rooted at
+        # pymupdf.mupdf.FzErrorBase, e.g. FzErrorFormat for a file whose
+        # content does not match its declared/expected format - a PNG's
+        # magic bytes saved with a .pdf extension) instead of only the
+        # stdlib OSError/RuntimeError/ValueError this parser originally
+        # guarded against. Broaden the catch so any malformed-content error
+        # from the library always surfaces as a typed ParserError rather
+        # than an uncaught crash. Kept optional/best-effort: an older
+        # pymupdf build without the pymupdf.mupdf submodule still falls
+        # back to the original stdlib-only guard.
+        pdf_error_types: tuple[type[BaseException], ...] = (OSError, RuntimeError, ValueError)
+        with contextlib.suppress(ImportError):
+            pdf_error_types = (*pdf_error_types, import_module("pymupdf.mupdf").FzErrorBase)
         extraction_id = new_id("ext")
         units: list[ContentUnit] = []
         warnings: list[str] = []
@@ -89,7 +103,7 @@ class PdfParser:
                     )
             finally:
                 document.close()
-        except (OSError, RuntimeError, ValueError) as exc:
+        except pdf_error_types as exc:
             raise ParserError(f"PDF parse failed: {path}: {exc}") from exc
         page_count = len(units)
         low_text_page_count = sum(

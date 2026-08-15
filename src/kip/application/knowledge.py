@@ -14,7 +14,7 @@ from kip.domain.models import (
     GraphPathRequest,
     RequestContext,
 )
-from kip.errors import NotFoundError, ValidationError
+from kip.errors import AuthorizationError, NotFoundError, ValidationError
 from kip.ontology import OntologyCatalog
 from kip.ports.evidence import EvidenceReaderPort
 from kip.ports.knowledge import KnowledgeStore
@@ -202,6 +202,15 @@ class KnowledgeUseCases:
         *,
         supersede_contradicted: bool = False,
     ) -> ApprovedAssertion:
+        # Authorization is checked before any store lookup, per architecture
+        # rule 6: CLI and MCP call this application service directly (REST
+        # gates it at the edge via `admin_context`, which already sets
+        # roles=["admin"]), so the check must live here for all three edges
+        # to enforce it uniformly. The auto-approve policy grants its own
+        # synthetic context the admin role
+        # (`OntologyRagUseCases._maybe_auto_approve`), so this never blocks
+        # auto-approval itself.
+        self._require_admin(context)
         candidate = self._store.get_candidate(context, candidate_id)
         if self._ontology is not None:
             self._ontology.validate_candidate(
@@ -253,6 +262,7 @@ class KnowledgeUseCases:
         candidate_id: str,
         note: str | None = None,
     ) -> AssertionCandidate:
+        self._require_admin(context)
         return self._store.reject_candidate(
             context,
             candidate_id,
@@ -272,6 +282,7 @@ class KnowledgeUseCases:
         approved-only consumption path (graph traversal, ontology context,
         contradiction checks, alias-bearing assertion listings).
         """
+        self._require_admin(context)
         if note is None or not note.strip():
             raise ValidationError("a non-empty revocation note is required")
         return self._store.revoke_assertion(
@@ -318,6 +329,11 @@ class KnowledgeUseCases:
         context: RequestContext,
         request: GraphNeighborsRequest,
     ) -> list[GraphEdge]:
+        # `approved_only=False` exposes proposed/rejected/revoked assertions
+        # (not just active ones); a non-admin caller always gets
+        # approved-only results.
+        if not request.approved_only:
+            self._require_admin(context)
         return self._store.graph_neighbors(
             context,
             request,
@@ -331,6 +347,11 @@ class KnowledgeUseCases:
         context: RequestContext,
         request: GraphPathRequest,
     ) -> list[GraphPath]:
+        # `approved_only=False` exposes proposed/rejected/revoked assertions
+        # (not just active ones); a non-admin caller always gets
+        # approved-only results.
+        if not request.approved_only:
+            self._require_admin(context)
         return self._store.graph_path(
             context,
             request,
@@ -338,3 +359,10 @@ class KnowledgeUseCases:
                 self._ontology.version if self._ontology is not None else None
             ),
         )
+
+    @staticmethod
+    def _require_admin(context: RequestContext) -> None:
+        if "admin" not in context.roles:
+            raise AuthorizationError(
+                "admin role is required for this knowledge review operation"
+            )

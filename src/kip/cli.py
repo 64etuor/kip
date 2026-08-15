@@ -220,6 +220,20 @@ def _emit_error(runtime: Runtime | None, exc: BaseException) -> None:
     typer.echo(envelope.model_dump_json(indent=2), err=True)
 
 
+def _clean_validation_message(exc: PydanticValidationError) -> str:
+    """A one-line, envelope-safe message for a raw Pydantic validation error.
+
+    `str(exc)` renders a multi-line blob with a pydantic.dev documentation
+    URL per error, which is unsuitable for a JSON envelope `message` field.
+    """
+    parts: list[str] = []
+    for error in exc.errors():
+        location = ".".join(str(item) for item in error.get("loc", ()))
+        message = str(error.get("msg", "invalid value"))
+        parts.append(f"{location}: {message}" if location else message)
+    return "; ".join(parts) or "validation failed"
+
+
 def _run(ctx: typer.Context, function: Callable[[Runtime], Any]) -> None:
     runtime: Runtime | None = None
     try:
@@ -228,6 +242,12 @@ def _run(ctx: typer.Context, function: Callable[[Runtime], Any]) -> None:
     except KipError as exc:
         _emit_error(runtime, exc)
         raise typer.Exit(code=4 if isinstance(exc, NotFoundError) else 3) from exc
+    except PydanticValidationError as exc:
+        # A request model (e.g. SearchRequest) can raise this directly from a
+        # field validator. Map it the same way KipError's ValidationError is
+        # mapped, so every edge reports the same code and a clean message.
+        _emit_error(runtime, ValidationError(_clean_validation_message(exc)))
+        raise typer.Exit(code=3) from exc
     except KeyboardInterrupt as exc:
         if runtime:
             _emit_error(runtime, exc)

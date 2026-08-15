@@ -40,6 +40,48 @@ def _display(value: str, *, field_name: str) -> str:
     return normalized
 
 
+def _valid_ontology_symbol(value: str | None) -> str | None:
+    if value is not None and _SYMBOL_RE.fullmatch(value) is None:
+        raise ValueError("ontology discovery symbol is invalid")
+    return value
+
+
+def _valid_ontology_parent_reference(value: str | None) -> str | None:
+    # `parent` names an *existing* entity type, and core/domain entity types
+    # are PascalCase (`Document`, `ResearchProject`), unlike the
+    # lowercase-only convention `_SYMBOL_RE` enforces for newly proposed
+    # `symbol`/predicate-shaped fields.
+    if value is not None and _ENTITY_TYPE_REF_RE.fullmatch(value) is None:
+        raise ValueError("ontology discovery parent is invalid")
+    return value
+
+
+def _valid_ontology_entity_type_reference_list(
+    value: list[str] | None,
+) -> list[str] | None:
+    if value is not None:
+        for item in value:
+            if _ENTITY_TYPE_REF_RE.fullmatch(item) is None:
+                raise ValueError("ontology discovery entity type reference is invalid")
+    return value
+
+
+def _valid_ontology_candidate_target_symbol(value: str | None) -> str | None:
+    # `OntologyDiscoveryCandidate.target_symbol` is polymorphic, unlike
+    # `OntologyDiscoveryProposal.target_symbol` (client input, always a
+    # lowercase `_SYMBOL_RE`-shaped alias/controlled_value target): for
+    # `entity_type` with an explicit `parent`,
+    # `InteractionUseCases.propose_ontology_discovery` mirrors the
+    # PascalCase `parent` into `target_symbol` as a legacy hint (see
+    # `application/interactions.py`), so it must also accept an
+    # `_ENTITY_TYPE_REF_RE`-shaped value here.
+    if value is None:
+        return value
+    if _SYMBOL_RE.fullmatch(value) is not None or _ENTITY_TYPE_REF_RE.fullmatch(value) is not None:
+        return value
+    raise ValueError("ontology discovery target symbol is invalid")
+
+
 def _normalized_preference_key(value: str) -> str:
     if _SYMBOL_RE.fullmatch(value) is None:
         raise ValueError("preference key is invalid")
@@ -272,29 +314,17 @@ class OntologyDiscoveryProposal(InteractionModel):
     @field_validator("symbol", "target_symbol", "inverse", "extraction")
     @classmethod
     def valid_symbol(cls, value: str | None) -> str | None:
-        if value is not None and _SYMBOL_RE.fullmatch(value) is None:
-            raise ValueError("ontology discovery symbol is invalid")
-        return value
+        return _valid_ontology_symbol(value)
 
     @field_validator("parent")
     @classmethod
     def valid_parent_reference(cls, value: str | None) -> str | None:
-        # `parent` names an *existing* entity type, and core/domain entity
-        # types are PascalCase (`Document`, `ResearchProject`), unlike the
-        # lowercase-only convention `_SYMBOL_RE` enforces for newly proposed
-        # `symbol`/predicate-shaped fields.
-        if value is not None and _ENTITY_TYPE_REF_RE.fullmatch(value) is None:
-            raise ValueError("ontology discovery parent is invalid")
-        return value
+        return _valid_ontology_parent_reference(value)
 
     @field_validator("domain", "range")
     @classmethod
     def valid_entity_type_reference_list(cls, value: list[str] | None) -> list[str] | None:
-        if value is not None:
-            for item in value:
-                if _ENTITY_TYPE_REF_RE.fullmatch(item) is None:
-                    raise ValueError("ontology discovery entity type reference is invalid")
-        return value
+        return _valid_ontology_entity_type_reference_list(value)
 
     @field_validator("label", "definition")
     @classmethod
@@ -361,6 +391,39 @@ class OntologyDiscoveryCandidate(InteractionModel):
     # Populated only on the in-process response to an approval that
     # materialized a release; never persisted by a store adapter.
     release: OntologyDiscoveryRelease | None = None
+
+    # Defense in depth, mirroring `OntologyDiscoveryProposal`'s validators:
+    # a candidate is reconstructed from a store adapter's row with no
+    # re-validation, and the materializer interpolates `candidate.symbol`
+    # (and `parent`/`domain`/`range`/`inverse`) as raw YAML keys/values
+    # trusting proposal-time validation. A candidate built directly (or
+    # rehydrated from a row written before these checks existed, or by a
+    # store adapter with a bug) must be rejected at construction, not deep
+    # inside `ontology_discovery_release.py`.
+    @field_validator("symbol", "inverse", "extraction")
+    @classmethod
+    def valid_symbol(cls, value: str | None) -> str | None:
+        return _valid_ontology_symbol(value)
+
+    @field_validator("target_symbol")
+    @classmethod
+    def valid_target_symbol(cls, value: str | None) -> str | None:
+        return _valid_ontology_candidate_target_symbol(value)
+
+    @field_validator("parent")
+    @classmethod
+    def valid_parent_reference(cls, value: str | None) -> str | None:
+        return _valid_ontology_parent_reference(value)
+
+    @field_validator("domain", "range")
+    @classmethod
+    def valid_entity_type_reference_list(cls, value: list[str] | None) -> list[str] | None:
+        return _valid_ontology_entity_type_reference_list(value)
+
+    @field_validator("label", "definition")
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        return _display(value, field_name="ontology discovery text")
 
 
 class OntologyDiscoveryReview(InteractionModel):

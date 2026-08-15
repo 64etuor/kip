@@ -167,10 +167,13 @@ def test_mcp_search_accepts_the_complete_search_request(
         return result[0][0].text
 
     # When the complete request is sent through FastMCP.
-    payload = json.loads(anyio.run(invoke))
+    envelope = json.loads(anyio.run(invoke))
 
-    # Then it is accepted as a normal search result.
-    assert isinstance(payload, list)
+    # Then it is accepted and returned inside the same envelope contract
+    # every edge (CLI, REST, MCP) uses.
+    assert envelope["schema_version"] == "kip.envelope.v1"
+    assert envelope["ok"] is True
+    assert isinstance(envelope["data"], list)
     assert captured[0].model_dump(mode="json") == {
         "query": "승인 기준",
         "limit": 7,

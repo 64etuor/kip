@@ -311,7 +311,11 @@ def build_container(
     auto_approve_config = selected.get("ontology.auto_approve", {}) or {}
     if not isinstance(auto_approve_config, dict):
         raise ConfigurationError("ontology.auto_approve must be a table")
-    auto_approve_enabled = auto_approve_config.get("enabled", True)
+    # Opt-in by default: an absent `[ontology.auto_approve]` section (or a
+    # present section that omits `enabled`) must never silently promote
+    # candidates without human review. A deployment must explicitly set
+    # `enabled = true` after reviewing its predicate precision history.
+    auto_approve_enabled = auto_approve_config.get("enabled", False)
     if not isinstance(auto_approve_enabled, bool):
         raise ConfigurationError("ontology.auto_approve.enabled must be boolean")
     ontology_rag = OntologyRagUseCases(

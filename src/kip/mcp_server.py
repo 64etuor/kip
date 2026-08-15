@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import functools
 import json
 import os
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal
 
 from kip.container import build_container
@@ -17,13 +19,17 @@ from kip.domain.knowledge import KnowledgeEntity
 from kip.domain.models import (
     AnswerRequest,
     ContextRequest,
+    Envelope,
+    EnvelopeMeta,
+    ErrorInfo,
     GraphNeighborsRequest,
     GraphPathRequest,
     RequestContext,
     SearchMode,
     SearchRequest,
 )
-from kip.errors import DependencyUnavailableError
+from kip.errors import DependencyUnavailableError, KipError, error_code
+from kip.ids import new_id
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -64,6 +70,41 @@ def create_server() -> FastMCP:
         ]
         return base.model_copy(update={"roles": list(dict.fromkeys(roles))})
 
+    def _enveloped(func: Callable[..., str]) -> Callable[..., str]:
+        """Wrap a tool's `_json(...)` result in the same `kip.envelope.v1`
+        contract the CLI and REST edges return, and translate a `KipError`
+        into an enveloped `ok=false` result instead of an opaque ToolError.
+
+        Applied once to every `@mcp.tool()` function so the three edges never
+        drift on success or error shape.
+        """
+
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> str:
+            workspace = os.environ.get("KIP_WORKSPACE") or container.settings.workspace
+            request_id = new_id("req")
+            try:
+                selected_context = context()
+                request_id = selected_context.request_id or request_id
+                workspace = selected_context.workspace
+                raw = func(*args, **kwargs)
+            except KipError as exc:
+                envelope = Envelope(
+                    ok=False,
+                    error=ErrorInfo(code=error_code(exc), message=str(exc)),
+                    meta=EnvelopeMeta(request_id=request_id, workspace=workspace),
+                )
+                return envelope.model_dump_json()
+            data = json.loads(raw) if isinstance(raw, str) else raw
+            envelope = Envelope(
+                ok=True,
+                data=data,
+                meta=EnvelopeMeta(request_id=request_id, workspace=workspace),
+            )
+            return envelope.model_dump_json()
+
+        return wrapper
+
     def json_array(value: str, name: str) -> list[object]:
         try:
             parsed = json.loads(value)
@@ -74,17 +115,20 @@ def create_server() -> FastMCP:
         return parsed
 
     @mcp.tool()
+    @_enveloped
     def kip_capabilities() -> str:
         """Return available source, parser, search, and graph capabilities."""
         selected_context = context()
         return _json(application.operations.capabilities(selected_context))
 
     @mcp.tool()
+    @_enveloped
     def kip_status() -> str:
         """Return canonical, projection, assertion, and durable job counts."""
         return _json(application.operations.status(context()))
 
     @mcp.tool()
+    @_enveloped
     def kip_search(
         query: str,
         limit: int = 10,
@@ -107,6 +151,7 @@ def create_server() -> FastMCP:
         return _json(application.retrieval.search(context(), request))
 
     @mcp.tool()
+    @_enveloped
     def kip_context(
         query: str,
         limit: int = 5,
@@ -131,6 +176,7 @@ def create_server() -> FastMCP:
         return _json(application.retrieval.context_bundle(context(), request))
 
     @mcp.tool()
+    @_enveloped
     def kip_answer(
         query: str,
         limit: int = 5,
@@ -154,21 +200,25 @@ def create_server() -> FastMCP:
         return _json(application.answering.answer(context(), request))
 
     @mcp.tool()
+    @_enveloped
     def kip_vocabulary(prefix: str, limit: int = 20) -> str:
         """Inspect terms that actually exist in the lexical projection."""
         return _json(application.retrieval.vocabulary(context(), prefix, limit))
 
     @mcp.tool()
+    @_enveloped
     def kip_read(unit_id: str) -> str:
         """Read one exact evidence unit and check whether the source changed since indexing."""
         return _json(application.evidence.read_unit(context(), unit_id))
 
     @mcp.tool()
+    @_enveloped
     def kip_xlsx_read(artifact_id: str, sheet: str, cell_range: str, allow_stale: bool = False) -> str:
         """Read typed cells from an original XLSX range. Use this for numbers and formulas."""
         return _json(application.evidence.read_xlsx(context(), artifact_id, sheet=sheet, cell_range=cell_range, require_fresh=not allow_stale))
 
     @mcp.tool()
+    @_enveloped
     def kip_graph_neighbors(
         node_id: str,
         predicates: list[str] | None = None,
@@ -184,20 +234,24 @@ def create_server() -> FastMCP:
         )
 
     @mcp.tool()
+    @_enveloped
     def kip_graph_path(from_node_id: str, to_node_id: str, max_depth: int = 4, predicates: list[str] | None = None) -> str:
         """Find bounded paths through approved assertions with ACL filtering."""
         return _json(application.knowledge.graph_path(context(), GraphPathRequest(from_node_id=from_node_id, to_node_id=to_node_id, max_depth=max_depth, predicates=predicates or [])))
 
     @mcp.tool()
+    @_enveloped
     def kip_explain_assertion(assertion_id: str) -> str:
         """Explain one approved assertion with exact evidence units and stale-source checks."""
         return _json(application.knowledge.explain_assertion(context(), assertion_id))
 
     @mcp.tool()
+    @_enveloped
     def kip_ontology_entities(limit: int = 100) -> str:
         return _json(application.ontology_rag.list_entities(context(), limit=limit))
 
     @mcp.tool()
+    @_enveloped
     def kip_ontology_context(
         query: str,
         include_candidate_assertions: bool = False,
@@ -212,6 +266,7 @@ def create_server() -> FastMCP:
         )
 
     @mcp.tool()
+    @_enveloped
     def kip_ontology_entity_create(
         entity_id: str,
         entity_type: str,
@@ -233,6 +288,7 @@ def create_server() -> FastMCP:
         )
 
     @mcp.tool()
+    @_enveloped
     def kip_ontology_mine(unit_ids: list[str]) -> str:
         selected_context = context()
         return _json(
@@ -245,6 +301,7 @@ def create_server() -> FastMCP:
         )
 
     @mcp.tool()
+    @_enveloped
     def kip_ontology_candidates(
         status: str = "proposed",
         limit: int = 100,
@@ -278,6 +335,7 @@ def create_server() -> FastMCP:
         )
 
     @mcp.tool()
+    @_enveloped
     def kip_ontology_entity_candidate_approve(
         candidate_id: str,
         note: str | None = None,
@@ -291,6 +349,7 @@ def create_server() -> FastMCP:
         )
 
     @mcp.tool()
+    @_enveloped
     def kip_ontology_entity_candidate_reject(
         candidate_id: str,
         note: str | None = None,
@@ -304,6 +363,7 @@ def create_server() -> FastMCP:
         )
 
     @mcp.tool()
+    @_enveloped
     def kip_ontology_relation_candidate_approve(
         candidate_id: str,
         note: str | None = None,
@@ -320,6 +380,7 @@ def create_server() -> FastMCP:
         )
 
     @mcp.tool()
+    @_enveloped
     def kip_ontology_assertion_revoke(assertion_id: str, note: str) -> str:
         """Revoke an approved assertion with a required note; it leaves approved-only surfaces."""
         return _json(
@@ -331,11 +392,13 @@ def create_server() -> FastMCP:
         )
 
     @mcp.tool()
+    @_enveloped
     def kip_jobs(status: str | None = None, limit: int = 100) -> str:
         """List durable jobs with status, last error, and recorded mining results."""
         return _json(application.operations.list_jobs(context(), status, limit))
 
     @mcp.tool()
+    @_enveloped
     def kip_ontology_relation_candidate_reject(
         candidate_id: str,
         note: str | None = None,
@@ -349,6 +412,7 @@ def create_server() -> FastMCP:
         )
 
     @mcp.tool()
+    @_enveloped
     def kip_clarify(
         reason: str,
         prompt: str,
@@ -375,6 +439,7 @@ def create_server() -> FastMCP:
         )
 
     @mcp.tool()
+    @_enveloped
     def kip_answer_clarification(
         question_id: str,
         option_ids: list[str] | None = None,
@@ -395,11 +460,13 @@ def create_server() -> FastMCP:
         )
 
     @mcp.tool()
+    @_enveloped
     def kip_preferences() -> str:
         """List only the caller's explicit interaction preferences."""
         return _json(application.interactions.list_preferences(context()))
 
     @mcp.tool()
+    @_enveloped
     def kip_remember_preference(
         key: str,
         values: list[str],
@@ -416,6 +483,7 @@ def create_server() -> FastMCP:
         )
 
     @mcp.tool()
+    @_enveloped
     def kip_forget_preference(key: str) -> str:
         """Delete one explicit preference owned by the current caller."""
         return _json(
@@ -423,6 +491,7 @@ def create_server() -> FastMCP:
         )
 
     @mcp.tool()
+    @_enveloped
     def kip_feedback(
         outcome: str,
         reason_codes: list[str] | None = None,
@@ -443,6 +512,7 @@ def create_server() -> FastMCP:
         )
 
     @mcp.tool()
+    @_enveloped
     def kip_ontology_discovery_propose(
         kind: str,
         symbol: str,
@@ -490,6 +560,7 @@ def create_server() -> FastMCP:
         )
 
     @mcp.tool()
+    @_enveloped
     def kip_ontology_discovery_candidates(
         status: str | None = "proposed",
         limit: int = 100,
@@ -504,6 +575,7 @@ def create_server() -> FastMCP:
         )
 
     @mcp.tool()
+    @_enveloped
     def kip_ontology_discovery_review(
         candidate_id: str,
         action: str,

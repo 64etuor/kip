@@ -4,6 +4,7 @@ import zipfile
 from importlib import import_module
 from pathlib import Path
 from typing import Any, Literal
+from xml.etree import ElementTree as ET
 
 from kip.adapters.parsers.text_quality import hwp_text_quality
 from kip.domain.models import ContentUnit, EvidenceLocator, ExtractionRun
@@ -116,15 +117,15 @@ class HwpNativeParser:
                 text = reader.extract_text() or ""
                 try:
                     table_count = len(reader.tables)
-                except (OSError, RuntimeError, ValueError) as exc:
+                except (OSError, RuntimeError, ValueError, ET.ParseError) as exc:
                     table_count = 0
                     warnings.append(f"table metadata unavailable: {exc}")
                 try:
                     image_count = len(reader.get_images())
-                except (OSError, RuntimeError, ValueError) as exc:
+                except (OSError, RuntimeError, ValueError, ET.ParseError) as exc:
                     image_count = 0
                     warnings.append(f"image metadata unavailable: {exc}")
-        except (OSError, RuntimeError, ValueError, EOFError, KeyError) as exc:
+        except (OSError, RuntimeError, ValueError, EOFError, KeyError, ET.ParseError) as exc:
             raise ParserError(f"native HWP parse failed: {path}: {exc}") from exc
 
         if not text.strip():

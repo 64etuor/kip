@@ -662,6 +662,31 @@ def test_pptx_parser_rejects_archive_over_expansion_limit(tmp_path: Path) -> Non
         )
 
 
+def test_registry_routes_corrupt_pptx_to_parser_with_clear_error(tmp_path: Path) -> None:
+    # Given a file with a .pptx extension whose content is not a valid ZIP
+    # archive at all (supports() previously opened the archive and
+    # swallowed BadZipFile into a bare False, making the registry report
+    # the misleading "no parser registered for .pptx").
+    path = tmp_path / "corrupt.pptx"
+    path.write_bytes(b"not a zip archive")
+    settings = Settings(project_root=tmp_path, config_path=tmp_path / "kip.toml", raw={})
+
+    # When the registry resolves a parser purely from the extension.
+    parser = ParserRegistry.from_settings(settings).find(path)
+
+    # Then the structural PPTX adapter still claims the file...
+    assert parser.name == "python-pptx"
+    # ...and parsing it raises the clear, typed PPTX error instead of the
+    # registry ever seeing a "no parser registered" failure.
+    with pytest.raises(ParserError, match="PPTX parse failed"):
+        parser.parse(
+            path,
+            artifact_id="art_corrupt",
+            document_id="doc_corrupt",
+            acl_scopes=["workspace:default"],
+        )
+
+
 def test_pptx_parser_returns_typed_error_for_malformed_core_xml(tmp_path: Path) -> None:
     # Given a PresentationML package with malformed core presentation XML.
     path = tmp_path / "malformed.pptx"

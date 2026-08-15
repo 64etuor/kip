@@ -1,7 +1,16 @@
 # ADR-047: Measured, audited auto-approve policy for low-risk mined relations
 
-- **Status:** Accepted (owner-approved evolution of architecture rule 10)
+- **Status:** Accepted (owner-approved evolution of architecture rule 10);
+  default made opt-in and precision hardened 2026-08-15 (see ADR-048)
 - **Date:** 2026-08-15
+
+> Amendment (2026-08-15, ADR-048): after an adversarial audit the policy
+> defaults **off** (opt-in) instead of on — guided setup and the shipped
+> configs never silently enable candidate auto-promotion — and the precision
+> statistic was made tamper-resistant (a dedicated `auto_approved` column,
+> not a free-text note prefix) and revocation-aware (a later revocation
+> counts the original approval against precision). The eligibility rules,
+> marker, reporting, and revocability below are unchanged.
 
 ## Context
 
@@ -26,10 +35,10 @@ measured, revocable policy; silent promotion is forbidden."
      `>= min_precision` with at least `min_reviewed` decisions.
      Auto-approved decisions are excluded from their own denominator, so
      the policy cannot reinforce itself; with no data it stays inert.
-2. Configuration `[ontology.auto_approve]`: `enabled` (default true),
-   `min_precision` 0.95, `min_confidence` 0.8, `min_reviewed` 20 — bounds
-   validated at container build; `enabled = false` disables the mechanism
-   entirely.
+2. Configuration `[ontology.auto_approve]`: `enabled` (default **false** —
+   opt-in, amended 2026-08-15; see below), `min_precision` 0.95,
+   `min_confidence` 0.8, `min_reviewed` 20 — bounds validated at container
+   build; `enabled = false` disables the mechanism entirely.
 3. Qualifying candidates are approved through the SAME approval path human
    review uses (ontology validation, evidence checks, and supersession
    semantics all apply), with the acting principal

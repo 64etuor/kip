@@ -12,6 +12,22 @@ from kip.errors import ValidationError
 
 LOGGER = logging.getLogger(__name__)
 
+_DEFAULT_RETRY_BACKOFF_SECONDS = 0.05
+_DEFAULT_RETRY_BACKOFF_MAX_SECONDS = 1.0
+
+
+def _retry_backoff_seconds(attempts: int, *, base: float, cap: float) -> float:
+    """Escalating pause before the next retry attempt of a failed job.
+
+    `attempts` is the number of attempts already made (as recorded by
+    `claim_job`, which increments before returning the job), so the first
+    failure (attempts == 1) waits `base` seconds, the second `base * 2`,
+    and so on, capped at `cap` so a misconfigured base/cap combination can
+    never stall the worker indefinitely.
+    """
+    escalated = base * float(2 ** max(attempts - 1, 0))
+    return min(escalated, cap)
+
 
 def process_job(container: Container, job: JobRecord) -> None:
     context = container.application.operations.request_context(workspace=job.payload.get("workspace") or container.settings.workspace)
@@ -67,7 +83,14 @@ def _mining_context(job: JobRecord) -> RequestContext:
     return context
 
 
-def run_worker(container: Container, *, once: bool = False, poll_seconds: float = 2.0) -> None:
+def run_worker(
+    container: Container,
+    *,
+    once: bool = False,
+    poll_seconds: float = 2.0,
+    retry_backoff_seconds: float = _DEFAULT_RETRY_BACKOFF_SECONDS,
+    retry_backoff_max_seconds: float = _DEFAULT_RETRY_BACKOFF_MAX_SECONDS,
+) -> None:
     worker_id = f"worker-{uuid.uuid4().hex[:12]}"
     while True:
         context = container.application.operations.request_context()
@@ -86,6 +109,18 @@ def run_worker(container: Container, *, once: bool = False, poll_seconds: float 
                 job.id,
                 f"{type(exc).__name__}: {exc}",
             )
+            # Only pause when the job will actually be retried (attempts
+            # short of max_attempts). A persistently-broken source used to
+            # get re-claimed back-to-back with no delay between attempts;
+            # this bounded, escalating backoff spaces retries out instead.
+            if job.attempts < job.max_attempts:
+                time.sleep(
+                    _retry_backoff_seconds(
+                        job.attempts,
+                        base=retry_backoff_seconds,
+                        cap=retry_backoff_max_seconds,
+                    )
+                )
         else:
             container.application.operations.complete_job(context, job.id)
         if once:

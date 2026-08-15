@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from kip.application.answer_adequacy import prepare_answer_evidence
 from kip.application.answers import assemble_answer
 from kip.domain.models import (
     AnswerRequest,
@@ -32,6 +33,37 @@ def _evidence(
             ),
         ),
         source_uri=f"file:///{unit_id}.txt",
+        indexed_source_sha256=unit_id * 8,
+        current_source_sha256=unit_id * 8,
+        source_changed_since_index=False,
+    )
+
+
+def _csv_evidence(
+    unit_id: str,
+    body: str,
+    *,
+    document_id: str,
+    csv_partial_table: bool,
+) -> EvidenceRead:
+    return EvidenceRead(
+        unit=ContentUnit(
+            id=unit_id,
+            extraction_id=f"ext_{unit_id}",
+            document_id=document_id,
+            artifact_id=f"art_{unit_id}",
+            ordinal=0,
+            unit_type="csv_rows",
+            body=body,
+            body_normalized=body,
+            lexical_text=body,
+            locator=EvidenceLocator(
+                type="csv_rows",
+                data={"start_row": 2, "end_row": 3},
+            ),
+            metadata={"csv_partial_table": csv_partial_table, "csv_total_row_count": 40},
+        ),
+        source_uri=f"file:///{unit_id}.csv",
         indexed_source_sha256=unit_id * 8,
         current_source_sha256=unit_id * 8,
         source_changed_since_index=False,
@@ -177,3 +209,53 @@ def test_answer_requests_clarification_for_short_multi_document_topic() -> None:
     assert response.refused is True
     assert response.refusal_reason == "clarification_required"
     assert response.citations == []
+
+
+def test_answer_refuses_numeric_question_answered_from_a_partial_csv_chunk() -> None:
+    # Given a CSV total-row chunk (CsvTableParser flags csv_partial_table
+    # when the source file was split into multiple row chunks - this one
+    # chunk alone is not the full table).
+    evidence = _csv_evidence(
+        "csv-total",
+        "합계\n1,200,000",
+        document_id="doc_expense_csv",
+        csv_partial_table=True,
+    )
+
+    # When a numeric/aggregate question cites only that partial chunk.
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query="비용 합계 얼마야?"),
+        [evidence],
+        had_stale_evidence=False,
+        apply_lexical_gate=False,
+    )
+
+    # Then the answer refuses instead of trusting one chunk for the total,
+    # unlike xlsx's exact_xlsx_read_required this is CSV-specific.
+    assert prepared.refusal is not None
+    assert prepared.refusal.refused is True
+    assert prepared.refusal.refusal_reason == "csv_full_table_required"
+    assert prepared.evidence == ()
+
+
+def test_answer_does_not_require_full_csv_read_for_a_single_chunk_file() -> None:
+    # Given a CSV that fit entirely in one chunk (csv_partial_table is
+    # False - the cited unit's body already is the whole table).
+    evidence = _csv_evidence(
+        "csv-total",
+        "합계\n1,200,000",
+        document_id="doc_expense_csv",
+        csv_partial_table=False,
+    )
+
+    # When a numeric/aggregate question cites that complete chunk.
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query="비용 합계 얼마야?"),
+        [evidence],
+        had_stale_evidence=False,
+        apply_lexical_gate=False,
+    )
+
+    # Then the CSV-specific refusal does not trigger.
+    assert prepared.refusal is None
+    assert [item.unit.id for item in prepared.evidence] == ["csv-total"]

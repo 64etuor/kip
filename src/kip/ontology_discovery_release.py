@@ -40,6 +40,16 @@ Concurrency and crash safety, single-host deployment:
    every materialization, and once at container start-up before the eager
    `OntologyCatalog.load`) re-applies it idempotently, healing the tree
    without operator intervention.
+3. `complete_pending_release` never trusts a journal blindly. A corrupt-JSON
+   or structurally malformed journal (including a path-traversal attempt in
+   a journaled file key) is renamed aside to
+   `<ontology_root>/.pending-release.json.rejected` and a clear
+   `ValidationError` is raised instead of crashing every future container
+   start-up. A journal that is valid JSON but would, once applied, fail
+   `validate_ontology` (e.g. a hand-edited or torn journal) is applied to a
+   shadow copy of the tree first; on failure it is quarantined the same way
+   and the real tree is left untouched. Only a journal that both parses and
+   passes shadow validation is applied to the real files.
 """
 
 from __future__ import annotations
@@ -92,6 +102,11 @@ _VERSION_LINE_RE = re.compile(
 # them.
 RELEASE_LOCK_FILENAME = ".release.lock"
 RELEASE_JOURNAL_FILENAME = ".pending-release.json"
+# Suffix a corrupt or invalid journal is renamed to so it stops being picked
+# up by `has_pending_release`/`complete_pending_release` on every subsequent
+# start-up. Not a `*.yaml` file either, so it is invisible to
+# `validate_ontology`'s tree scan and to any shadow copy of the tree.
+REJECTED_RELEASE_JOURNAL_SUFFIX = ".rejected"
 _LOCK_TIMEOUT_SECONDS = 10.0
 _LOCK_POLL_INTERVAL_SECONDS = 0.05
 
@@ -179,6 +194,16 @@ def complete_pending_release(ontology_root: Path) -> bool:
     regardless). Returns `True` if a journal was found and healed, `False`
     if there was nothing to do (the common case: near-zero overhead, a
     single `Path.is_file` check).
+
+    Never trusts the journal blindly: a corrupt-JSON or structurally
+    malformed journal (including a path-traversal file key) is quarantined
+    to `<ontology_root>/.pending-release.json.rejected` and a clear
+    `ValidationError` is raised, instead of crashing every future
+    container start-up on the same journal. A well-formed journal is applied
+    to a shadow copy of the tree and re-validated with `validate_ontology`
+    before touching a single real file; if the resulting tree would be
+    invalid the journal is quarantined the same way and the real tree is
+    left untouched.
     """
     journal_path = ontology_root / RELEASE_JOURNAL_FILENAME
     if not journal_path.is_file():
@@ -186,22 +211,96 @@ def complete_pending_release(ontology_root: Path) -> bool:
     try:
         payload = json.loads(journal_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
+        quarantine_path = _quarantine_journal(journal_path)
         raise ValidationError(
-            f"ontology release journal at {journal_path} is corrupt: {exc}"
+            f"ontology release journal at {journal_path} is corrupt and was "
+            f"quarantined to {quarantine_path} without modifying the ontology "
+            f"tree; inspect and discard it before releasing again: {exc}"
         ) from exc
     files = payload.get("files") if isinstance(payload, dict) else None
     if not isinstance(files, dict):
-        raise ValidationError(f"ontology release journal at {journal_path} is malformed")
+        quarantine_path = _quarantine_journal(journal_path)
+        raise ValidationError(
+            f"ontology release journal at {journal_path} is malformed and was "
+            f"quarantined to {quarantine_path} without modifying the ontology tree"
+        )
     root_resolved = ontology_root.resolve()
+    edits: dict[Path, str] = {}
     for relative, new_text in files.items():
         if not isinstance(relative, str) or not isinstance(new_text, str):
-            raise ValidationError(f"ontology release journal at {journal_path} is malformed")
+            quarantine_path = _quarantine_journal(journal_path)
+            raise ValidationError(
+                f"ontology release journal at {journal_path} is malformed and was "
+                f"quarantined to {quarantine_path} without modifying the ontology tree"
+            )
         real_path = (ontology_root / relative).resolve()
         if not real_path.is_relative_to(root_resolved):
-            raise ValidationError(f"ontology release journal at {journal_path} is malformed")
+            quarantine_path = _quarantine_journal(journal_path)
+            raise ValidationError(
+                f"ontology release journal at {journal_path} is malformed and was "
+                f"quarantined to {quarantine_path} without modifying the ontology tree"
+            )
+        edits[real_path] = new_text
+
+    domain_profile = _resolve_journal_domain_profile(
+        ontology_root, payload.get("release") if isinstance(payload, dict) else None
+    )
+    with tempfile.TemporaryDirectory(prefix="kip-ontology-heal-") as tmp:
+        shadow_root = Path(tmp) / "ontology"
+        shutil.copytree(ontology_root, shadow_root)
+        for real_path, new_text in edits.items():
+            shadow_path = shadow_root / real_path.relative_to(ontology_root)
+            shadow_path.parent.mkdir(parents=True, exist_ok=True)
+            shadow_path.write_text(new_text, encoding="utf-8")
+        errors = validate_ontology(shadow_root, domain_profile=domain_profile)
+    if errors:
+        quarantine_path = _quarantine_journal(journal_path)
+        raise ValidationError(
+            f"ontology release journal at {journal_path} would produce an "
+            f"invalid ontology tree and was quarantined to {quarantine_path} "
+            "without modifying the ontology tree: " + "; ".join(errors)
+        )
+
+    for real_path, new_text in edits.items():
         _atomic_write(real_path, new_text)
     journal_path.unlink()
     return True
+
+
+def _quarantine_journal(journal_path: Path) -> Path:
+    """Rename a rejected journal aside so it is never re-applied automatically.
+
+    Overwrites any previously quarantined journal at the same path: only the
+    most recent rejection matters for diagnosing why healing keeps failing,
+    and leaving a stale `.rejected` file around would not add information.
+    """
+    quarantine_path = journal_path.with_name(
+        journal_path.name + REJECTED_RELEASE_JOURNAL_SUFFIX
+    )
+    os.replace(journal_path, quarantine_path)
+    return quarantine_path
+
+
+def _resolve_journal_domain_profile(ontology_root: Path, release_info: object) -> str:
+    """Best-effort domain profile to shadow-validate a journal's resulting tree.
+
+    Predicate/entity-type releases record the real `domain_profile` used at
+    materialization time under `release.domain_profile` (see
+    `_apply_via_shadow`). Older journals (or a hand-written one, as in
+    crash-recovery tests) may omit it; fall back to any domain profile
+    shipped on disk, the same fallback `_resolve_predicate_shadow_profile`
+    uses when the caller's profile does not exist.
+    """
+    if isinstance(release_info, dict):
+        candidate = release_info.get("domain_profile")
+        if isinstance(candidate, str):
+            try:
+                domain_profile_path(ontology_root, candidate)
+            except ValidationError:
+                pass
+            else:
+                return candidate
+    return _any_domain_profile(ontology_root)
 
 
 def complete_pending_release_locked(ontology_root: Path) -> bool:
@@ -302,7 +401,12 @@ def _materialize_entity_type(
         ontology_root,
         domain_profile,
         {domain_path: new_text},
-        release_info={"kind": "entity_type", "symbol": candidate.symbol, "version": new_version},
+        release_info={
+            "kind": "entity_type",
+            "symbol": candidate.symbol,
+            "version": new_version,
+            "domain_profile": domain_profile,
+        },
     )
     return _release("entity_type", candidate.symbol, relative_path, new_version)
 
@@ -379,7 +483,12 @@ def _materialize_predicate(
         ontology_root,
         domain_profile_for_shadow,
         edits,
-        release_info={"kind": "predicate", "symbol": candidate.symbol, "version": new_version},
+        release_info={
+            "kind": "predicate",
+            "symbol": candidate.symbol,
+            "version": new_version,
+            "domain_profile": domain_profile_for_shadow,
+        },
     )
     return _release("predicate", candidate.symbol, relative_path, new_version)
 

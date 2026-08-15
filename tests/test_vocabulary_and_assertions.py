@@ -10,7 +10,7 @@ from kip.ids import new_id
 def test_vocabulary_and_high_risk_assertion_review(test_container):
     path = test_container.settings.project_root / "source" / "공문.txt"
     path.write_text("참여연구원 참여율 변경 승인 공문", encoding="utf-8")
-    context = test_container.application.operations.request_context()
+    context = test_container.application.operations.request_context(roles=["admin"])
     test_container.application.ingestion.sync_filesystem(context, "fixture")
 
     terms = test_container.application.retrieval.vocabulary(context, "참여", 20)

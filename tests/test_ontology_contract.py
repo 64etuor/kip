@@ -62,6 +62,25 @@ def test_ontology_contract_detects_missing_predicate_risk(tmp_path: Path) -> Non
     assert "predicate authored_by: invalid risk level" in validate_ontology(copied)
 
 
+def test_ontology_contract_reports_null_predicate_definition_without_crashing(
+    tmp_path: Path,
+) -> None:
+    copied = tmp_path / "ontology"
+    shutil.copytree(ROOT / "ontology", copied)
+    predicates_path = copied / "core/predicates.yaml"
+    payload = _yaml(predicates_path)
+    definitions = payload["predicates"]
+    assert isinstance(definitions, dict)
+    definitions["some_predicate"] = None
+    _write_yaml(predicates_path, payload)
+
+    errors = validate_ontology(copied)
+
+    assert "predicate some_predicate: definition must be a mapping" in errors
+    with pytest.raises(ValidationError, match="invalid ontology contract"):
+        OntologyCatalog.load(copied)
+
+
 def test_ontology_contract_detects_domain_entity_type_shadowing_core(tmp_path: Path) -> None:
     copied = tmp_path / "ontology"
     shutil.copytree(ROOT / "ontology", copied)

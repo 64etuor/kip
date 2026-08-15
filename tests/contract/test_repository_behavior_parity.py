@@ -551,6 +551,115 @@ def test_predicate_review_precision_counts_human_decisions_and_excludes_auto_app
     assert stats.precision == pytest.approx(2 / 3)
 
 
+def test_predicate_review_precision_spoofed_marker_in_human_note_still_counts(
+    harness: Harness,
+) -> None:
+    """A HUMAN reviewer (reviewer_id != the policy marker) cannot erase their
+    own decision from the precision denominator by prefixing their
+    `review_note` with the auto-approve policy marker string. The exclusion
+    is keyed off the `auto_approved` column (migration 0023), set ONLY from
+    the reviewer identity passed to `approve_candidate`, never from
+    caller-supplied free text.
+    """
+    scope = f"workspace:{harness.workspace}"
+    context = harness.context(acl_scopes=[scope])
+    evidence = harness.ingest(
+        "spoof-evidence",
+        body="spoofed marker fixture text",
+        acl_scopes=[scope],
+    )
+    predicate = "spoof_marker_predicate"
+    subject = f"spoof_subject_{harness.workspace}"
+
+    def _candidate(suffix: str) -> AssertionCandidate:
+        return AssertionCandidate(
+            id=new_id("cand"),
+            subject_id=subject,
+            predicate=predicate,
+            object_entity_id=f"spoof_object_{suffix}_{harness.workspace}",
+            origin="human",
+            confidence=0.9,
+            ontology_version="core/1.0.0",
+            evidence=[CandidateEvidence(content_unit_id=evidence.unit_id)],
+        )
+
+    spoofed = harness.repository.knowledge.save_candidate(
+        context, _candidate("spoofed")
+    )
+
+    # A genuinely human reviewer (`reviewer_id="principal_contract"`, not the
+    # policy marker) sets a `review_note` that starts with the exact policy
+    # marker string. Free text alone must never suppress the count.
+    harness.repository.knowledge.approve_candidate(
+        context,
+        spoofed.id,
+        context.principal_id,
+        f"{AUTO_APPROVE_POLICY_PRINCIPAL} precision=1.0000 sample=999",
+    )
+
+    stats = harness.repository.knowledge.predicate_review_precision(context, predicate)
+
+    assert stats.approved == 1
+    assert stats.rejected == 0
+    assert stats.reviewed == 1
+    assert stats.precision == pytest.approx(1.0)
+
+
+def test_predicate_review_precision_is_revocation_aware(harness: Harness) -> None:
+    """20 human approvals measure precision 1.0; revoking every one of those
+    approved assertions must drop precision (never stay pinned at 1.0),
+    because a later revocation means the original approval was wrong. The
+    revoked candidates stay part of the human-reviewed sample -- they are
+    counted as a failed outcome, not dropped from the denominator.
+    """
+    scope = f"workspace:{harness.workspace}"
+    context = harness.context(acl_scopes=[scope])
+    evidence = harness.ingest(
+        "revocation-precision-evidence",
+        body="revocation precision fixture text",
+        acl_scopes=[scope],
+    )
+    predicate = "revocation_precision_predicate"
+    subject = f"revocation_subject_{harness.workspace}"
+
+    assertions = []
+    for index in range(20):
+        candidate = harness.repository.knowledge.save_candidate(
+            context,
+            AssertionCandidate(
+                id=new_id("cand"),
+                subject_id=subject,
+                predicate=predicate,
+                object_entity_id=f"revocation_object_{index}_{harness.workspace}",
+                origin="human",
+                confidence=0.9,
+                ontology_version="core/1.0.0",
+                evidence=[CandidateEvidence(content_unit_id=evidence.unit_id)],
+            ),
+        )
+        assertion = harness.repository.knowledge.approve_candidate(
+            context, candidate.id, context.principal_id
+        )
+        assertions.append(assertion)
+
+    before = harness.repository.knowledge.predicate_review_precision(context, predicate)
+    assert before.approved == 20
+    assert before.rejected == 0
+    assert before.reviewed == 20
+    assert before.precision == pytest.approx(1.0)
+
+    for assertion in assertions:
+        harness.repository.knowledge.revoke_assertion(
+            context, assertion.id, context.principal_id, "precision regression test revoke"
+        )
+
+    after = harness.repository.knowledge.predicate_review_precision(context, predicate)
+    assert after.approved == 0
+    assert after.rejected == 20
+    assert after.reviewed == 20
+    assert after.precision == pytest.approx(0.0)
+
+
 def test_job_enqueue_claim_complete_lifecycle(harness: Harness) -> None:
     context = harness.context()
 
@@ -579,3 +688,86 @@ def test_job_enqueue_claim_complete_lifecycle(harness: Harness) -> None:
     ]
     assert len(succeeded) == 1
     assert succeeded[0].payload.get("result") == {"outcome": "ok"}
+
+
+def test_memory_predicate_review_precision_is_workspace_scoped() -> None:
+    """`PostgresKnowledgeStore.predicate_review_precision` is scoped by
+    `workspace_id` (+ RLS); `MemoryKnowledgeStore` must match. A single
+    memory repository holding decisions for the same predicate under two
+    different workspaces must never let one workspace's decisions leak into
+    another workspace's measured precision.
+    """
+    repository = MemoryRepository()
+    predicate = "workspace_scoping_predicate"
+
+    def _decide(*, workspace: str, suffix: str, status: str) -> None:
+        context = RequestContext(
+            workspace=workspace,
+            principal_id="principal_scope_test",
+            acl_scopes=[f"workspace:{workspace}"],
+            request_id=new_id("req"),
+        )
+        candidate = repository.knowledge.save_candidate(
+            context,
+            AssertionCandidate(
+                id=new_id("cand"),
+                subject_id=f"scope_subject_{workspace}",
+                predicate=predicate,
+                object_entity_id=f"scope_object_{suffix}_{workspace}",
+                origin="human",
+                confidence=0.9,
+                ontology_version="core/1.0.0",
+                review_risk="low",
+                evidence=[],
+            ),
+        )
+        if status == "approved":
+            repository.knowledge.approve_candidate(
+                context, candidate.id, context.principal_id
+            )
+        else:
+            repository.knowledge.reject_candidate(
+                context, candidate.id, context.principal_id
+            )
+
+    # Workspace alpha: 3 approved, 1 rejected.
+    for index in range(3):
+        _decide(workspace="scope_alpha", suffix=f"approved-{index}", status="approved")
+    _decide(workspace="scope_alpha", suffix="rejected-1", status="rejected")
+
+    # Workspace beta: 1 approved, 4 rejected (would swing alpha's precision
+    # sharply if it leaked in).
+    _decide(workspace="scope_beta", suffix="approved-1", status="approved")
+    for index in range(4):
+        _decide(workspace="scope_beta", suffix=f"rejected-{index}", status="rejected")
+
+    alpha_context = RequestContext(
+        workspace="scope_alpha",
+        principal_id="principal_scope_test",
+        acl_scopes=["workspace:scope_alpha"],
+        request_id=new_id("req"),
+    )
+    beta_context = RequestContext(
+        workspace="scope_beta",
+        principal_id="principal_scope_test",
+        acl_scopes=["workspace:scope_beta"],
+        request_id=new_id("req"),
+    )
+
+    alpha_stats = repository.knowledge.predicate_review_precision(
+        alpha_context, predicate
+    )
+    beta_stats = repository.knowledge.predicate_review_precision(
+        beta_context, predicate
+    )
+
+    assert (alpha_stats.approved, alpha_stats.rejected, alpha_stats.reviewed) == (
+        3,
+        1,
+        4,
+    )
+    assert (beta_stats.approved, beta_stats.rejected, beta_stats.reviewed) == (
+        1,
+        4,
+        5,
+    )

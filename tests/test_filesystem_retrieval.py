@@ -147,6 +147,61 @@ def test_settle_window_skips_recently_modified_files(tmp_path: Path) -> None:
     assert [record.relative_path for record in records] == ["settled.txt"]
 
 
+def test_scan_reports_oversize_and_filtered_files_as_present_but_skipped(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "small.txt").write_text("작은 파일", encoding="utf-8")
+    big = tmp_path / "big.txt"
+    big.write_text("큰 파일 내용 " * 50, encoding="utf-8")
+    (tmp_path / "excluded.log").write_text("제외 대상", encoding="utf-8")
+    connector = FileSystemConnector(
+        tmp_path,
+        settle_seconds=0,
+        max_file_bytes=len("작은 파일".encode()) + 10,
+        exclude_globs=["*.log"],
+    )
+
+    records = list(connector.scan())
+
+    assert [record.relative_path for record in records] == ["small.txt"]
+    assert connector.skipped_present_relative_paths == frozenset(
+        {"big.txt", "excluded.log"}
+    )
+
+
+def test_scan_reports_extension_filtered_files_as_present_but_skipped(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "keep.txt").write_text("유지 대상", encoding="utf-8")
+    (tmp_path / "ignore.bin").write_text("무시 대상", encoding="utf-8")
+    connector = FileSystemConnector(
+        tmp_path, settle_seconds=0, include_extensions={".txt"}
+    )
+
+    records = list(connector.scan())
+
+    assert [record.relative_path for record in records] == ["keep.txt"]
+    assert connector.skipped_present_relative_paths == frozenset({"ignore.bin"})
+
+
+def test_scan_skipped_present_paths_reflect_only_the_latest_scan(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "a.txt").write_text("a", encoding="utf-8")
+    (tmp_path / "big.txt").write_text("x" * 1000, encoding="utf-8")
+    connector = FileSystemConnector(tmp_path, settle_seconds=0, max_file_bytes=10)
+
+    list(connector.scan())
+    assert connector.skipped_present_relative_paths == frozenset({"big.txt"})
+
+    iterator = connector.scan()
+    next(iterator)
+    # A new scan resets the skip set as soon as it starts (even before the
+    # walk finishes), so a partially-consumed scan never reports stale data
+    # left over from the previous one.
+    assert connector.skipped_present_relative_paths == frozenset()
+
+
 def test_scan_defers_content_hashing_until_first_use(tmp_path: Path) -> None:
     path = tmp_path / "지연해시.txt"
     path.write_text("본문", encoding="utf-8")

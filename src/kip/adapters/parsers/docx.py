@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Final
 from xml.etree import ElementTree as ET
 
+from kip.adapters.parsers.zip_guard import check_zip_bomb_guard
 from kip.domain.json_types import JsonObject, JsonValue
 from kip.domain.models import ContentUnit, EvidenceLocator, ExtractionRun
 from kip.domain.text import normalize_text
@@ -29,10 +30,24 @@ _W_NS: Final = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _R_NS: Final = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 _PKG_REL_NS: Final = "http://schemas.openxmlformats.org/package/2006/relationships"
 
-_HEADING_STYLE_RE: Final = re.compile(r"^Heading\s*([1-9][0-9]?)$", re.IGNORECASE)
+# Word only defines heading levels 1-9; drop the former two-digit branch
+# ("[1-9][0-9]?") so a bogus style id like "Heading99" cannot yield a
+# nonsensical level 99.
+_HEADING_STYLE_RE: Final = re.compile(r"^Heading\s*([1-9])$", re.IGNORECASE)
 _HEADER_FOOTER_RE: Final = re.compile(r"^word/(header|footer)\d*\.xml$")
 _REPLACEMENT_CHAR: Final = "�"
 _DEFAULT_MAX_CHARS_PER_UNIT: Final = 4000
+# ET.fromstring accepts arbitrarily deep XML nesting (expat parses
+# iteratively), but the run/textbox walkers below are hand-written Python
+# recursion over the resulting Element tree. A crafted document.xml with a
+# few thousand nested wrapper elements around a single run - small on disk,
+# well under the zip-bomb ratio/size guard - hits CPython's default
+# recursion limit and crashes the whole parse with an uncaught
+# RecursionError instead of a clean, caught ParserError. This cap keeps the
+# walk inside a safe budget; legitimate DOCX content (paragraphs, runs,
+# hyperlinks, a handful of smart-tag/proofing wrappers) never nests this
+# deep.
+_MAX_ELEMENT_DEPTH: Final = 500
 
 
 def _w(local: str) -> str:
@@ -67,6 +82,7 @@ class _TableRender:
     body: str
     row_count: int
     col_count: int
+    nested_table_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +123,7 @@ class DocxParser:
         warnings: list[str] = []
         try:
             with zipfile.ZipFile(path) as archive:
+                check_zip_bomb_guard(archive, format_name="DOCX")
                 names = set(archive.namelist())
                 document_root = ET.fromstring(archive.read("word/document.xml"))
                 body = document_root.find(_w("body"))
@@ -115,7 +132,7 @@ class DocxParser:
                 rels = _read_relationships(archive, "word/_rels/document.xml.rels")
                 content_types = _read_content_types(archive)
                 paragraphs, tables = _walk_body(body, rels)
-                textboxes = _collect_textboxes(body)
+                textboxes, nested_textbox_count = _collect_textboxes(body)
                 header_footer_texts = _read_header_footer_parts(archive, names, warnings)
                 images = _collect_image_relationships(rels, content_types)
         except (zipfile.BadZipFile, KeyError, ET.ParseError) as exc:
@@ -135,8 +152,11 @@ class DocxParser:
             unit = _paragraph_chunk_unit(chunk, context, ordinal=len(units))
             if unit is not None:
                 units.append(unit)
+        table_renders: list[_TableRender] = []
         for index, table in enumerate(tables):
-            units.append(_table_unit(table, index, context, ordinal=len(units)))
+            rendered = _render_table(table, context.rels)
+            table_renders.append(rendered)
+            units.append(_table_unit_from_render(rendered, index, context, ordinal=len(units)))
         for index, txbx_content in enumerate(textboxes):
             unit = _textbox_unit(txbx_content, index, context, ordinal=len(units))
             if unit is not None:
@@ -148,6 +168,7 @@ class DocxParser:
 
         aggregate = "\n".join(unit.body for unit in units)
         quality = _compute_quality(paragraphs, aggregate) if units else 0.0
+        nested_table_count = sum(rendered.nested_table_count for rendered in table_renders)
         extraction = ExtractionRun(
             id=extraction_id,
             artifact_id=artifact_id,
@@ -160,7 +181,9 @@ class DocxParser:
             metadata={
                 "paragraph_count": len(paragraphs),
                 "table_count": len(tables),
+                "nested_table_count": nested_table_count,
                 "textbox_count": len(textboxes),
+                "nested_textbox_count": nested_textbox_count,
                 "image_count": len(images),
                 "images": images,
             },
@@ -255,7 +278,7 @@ def _walk_body(
     paragraphs: list[_ParagraphRecord] = []
     tables: list[ET.Element] = []
     number = 0
-    for child in body:
+    for child in _resolve_body_children(body):
         tag = _local_name(child.tag)
         if tag == "p":
             number += 1
@@ -263,6 +286,31 @@ def _walk_body(
         elif tag == "tbl":
             tables.append(child)
     return paragraphs, tables
+
+
+def _resolve_body_children(body: ET.Element) -> list[ET.Element]:
+    """Flatten mc:AlternateContent-wrapped body children into their content.
+
+    Word occasionally wraps a body-level paragraph or table in
+    mc:AlternateContent (e.g. content that differs between application
+    versions), the same construct already handled for text boxes. A direct
+    `for child in body` walk would see only the wrapper element - neither
+    "p" nor "tbl" - and silently drop the paragraph/table inside. Take
+    Choice's direct children, else Fallback's, exactly as the text box
+    Choice/Fallback resolution does.
+    """
+    resolved: list[ET.Element] = []
+    for child in body:
+        if _local_name(child.tag) != "AlternateContent":
+            resolved.append(child)
+            continue
+        choice = _first_child_local(child, "Choice")
+        chosen = list(choice) if choice is not None else []
+        if not chosen:
+            fallback = _first_child_local(child, "Fallback")
+            chosen = list(fallback) if fallback is not None else []
+        resolved.extend(chosen)
+    return resolved
 
 
 def _paragraph_record(
@@ -310,7 +358,7 @@ def _extract_text_and_links(
     texts: list[str] = []
     links: list[JsonValue] = []
     for child in elem:
-        _walk_run(child, texts, links, rels)
+        _walk_run(child, texts, links, rels, depth=0)
     return "".join(texts), links
 
 
@@ -319,7 +367,13 @@ def _walk_run(
     texts: list[str],
     links: list[JsonValue],
     rels: dict[str, _Relationship],
+    *,
+    depth: int,
 ) -> None:
+    if depth > _MAX_ELEMENT_DEPTH:
+        raise ParserError(
+            f"DOCX element nesting exceeds {_MAX_ELEMENT_DEPTH} levels"
+        )
     tag = _local_name(elem.tag)
     # Text boxes are extracted as their own docx_textbox units; skip their
     # descendants here so body text never duplicates textbox content.
@@ -337,7 +391,7 @@ def _walk_run(
     if tag == "hyperlink":
         start = len(texts)
         for child in elem:
-            _walk_run(child, texts, links, rels)
+            _walk_run(child, texts, links, rels, depth=depth + 1)
         anchor_text = "".join(texts[start:])
         rel_id = elem.attrib.get(_r_attr("id"))
         if rel_id and anchor_text.strip():
@@ -346,19 +400,31 @@ def _walk_run(
                 links.append({"text": anchor_text, "target": relationship.target})
         return
     for child in elem:
-        _walk_run(child, texts, links, rels)
+        _walk_run(child, texts, links, rels, depth=depth + 1)
 
 
 # --- text boxes: mc:AlternateContent Choice/Fallback de-duplication -------------------------
 
 
-def _collect_textboxes(body: ET.Element) -> list[ET.Element]:
+def _collect_textboxes(body: ET.Element) -> tuple[list[ET.Element], int]:
     found: list[ET.Element] = []
-    _walk_textboxes(body, found)
-    return found
+    nested_count = _walk_textboxes(body, found, depth=0, inside_textbox=False)
+    return found, nested_count
 
 
-def _walk_textboxes(elem: ET.Element, out: list[ET.Element]) -> None:
+def _walk_textboxes(
+    elem: ET.Element, out: list[ET.Element], *, depth: int, inside_textbox: bool = False
+) -> int:
+    """Collect every text box, including one nested inside another.
+
+    Returns the count of text boxes discovered while ``inside_textbox`` is
+    already true - i.e. a text box (directly, or via a table cell) inside
+    another text box's content - for extraction metadata.
+    """
+    if depth > _MAX_ELEMENT_DEPTH:
+        raise ParserError(
+            f"DOCX element nesting exceeds {_MAX_ELEMENT_DEPTH} levels"
+        )
     tag = _local_name(elem.tag)
     if tag == "AlternateContent":
         # Word emits the same text box twice under mc:AlternateContent: once as
@@ -371,12 +437,21 @@ def _walk_textboxes(elem: ET.Element, out: list[ET.Element]) -> None:
             fallback = _first_child_local(elem, "Fallback")
             chosen = _descendant_textboxes(fallback) if fallback is not None else []
         out.extend(chosen)
-        return
+        return len(chosen) if inside_textbox else 0
     if tag == "txbxContent":
         out.append(elem)
-        return
+        nested_count = 1 if inside_textbox else 0
+        # Keep walking this text box's own content instead of returning
+        # immediately: a text box can itself contain a table whose cell
+        # holds another, independently-nested text box, and that inner text
+        # box must still be discovered as its own unit.
+        for child in elem:
+            nested_count += _walk_textboxes(child, out, depth=depth + 1, inside_textbox=True)
+        return nested_count
+    nested_count = 0
     for child in elem:
-        _walk_textboxes(child, out)
+        nested_count += _walk_textboxes(child, out, depth=depth + 1, inside_textbox=inside_textbox)
+    return nested_count
 
 
 def _descendant_textboxes(elem: ET.Element) -> list[ET.Element]:
@@ -396,19 +471,37 @@ def _textbox_text(
     parts: list[str] = []
     links: list[JsonValue] = []
     for child in txbx_content:
-        if _local_name(child.tag) == "p":
+        tag = _local_name(child.tag)
+        if tag == "p":
             text, para_links = _extract_text_and_links(child, rels)
             parts.append(text)
             links.extend(para_links)
+        elif tag == "tbl":
+            # A text box can itself contain a table (e.g. a callout box
+            # with a small data grid). Render it the same way a body-level
+            # table is rendered instead of silently dropping it; any text
+            # box nested inside one of *its* cells is still collected
+            # separately by _walk_textboxes and excluded here via the
+            # txbxContent early-return in _walk_run.
+            rendered = _render_table(child, rels)
+            if rendered.body:
+                parts.append(rendered.body)
     return "\n".join(parts), links
 
 
 # --- tables: gridSpan/vMerge aware tab-delimited rendering ----------------------------------
 
 
-def _render_table(table: ET.Element, rels: dict[str, _Relationship]) -> _TableRender:
+def _render_table(
+    table: ET.Element, rels: dict[str, _Relationship], *, depth: int = 0
+) -> _TableRender:
+    if depth > _MAX_ELEMENT_DEPTH:
+        raise ParserError(
+            f"DOCX table nesting exceeds {_MAX_ELEMENT_DEPTH} levels"
+        )
     rows: list[list[str]] = []
     max_cols = 0
+    nested_table_count = 0
     for tr in table:
         if _local_name(tr.tag) != "tr":
             continue
@@ -417,13 +510,19 @@ def _render_table(table: ET.Element, rels: dict[str, _Relationship]) -> _TableRe
             if _local_name(tc.tag) != "tc":
                 continue
             span = _grid_span(tc)
-            text = "" if _is_vmerge_continuation(tc) else _cell_text(tc, rels)
+            if _is_vmerge_continuation(tc):
+                text = ""
+            else:
+                text, cell_nested_count = _cell_text(tc, rels, depth=depth + 1)
+                nested_table_count += cell_nested_count
             cells.append(text)
             cells.extend([""] * max(0, span - 1))
         rows.append(cells)
         max_cols = max(max_cols, len(cells))
     body = "\n".join("\t".join(row) for row in rows)
-    return _TableRender(body=body, row_count=len(rows), col_count=max_cols)
+    return _TableRender(
+        body=body, row_count=len(rows), col_count=max_cols, nested_table_count=nested_table_count
+    )
 
 
 def _grid_span(tc: ET.Element) -> int:
@@ -450,13 +549,29 @@ def _is_vmerge_continuation(tc: ET.Element) -> bool:
     return value is None or value.lower() != "restart"
 
 
-def _cell_text(tc: ET.Element, rels: dict[str, _Relationship]) -> str:
+def _cell_text(
+    tc: ET.Element, rels: dict[str, _Relationship], *, depth: int
+) -> tuple[str, int]:
+    """Render a cell's paragraphs and any table(s) nested directly inside it.
+
+    Returns the rendered text and the count of nested tables found (this
+    cell's own nested tables plus theirs, recursively), so a table-in-a-cell
+    -in-a-table is fully recovered instead of the innermost table silently
+    disappearing.
+    """
     parts: list[str] = []
+    nested_table_count = 0
     for child in tc:
-        if _local_name(child.tag) == "p":
+        tag = _local_name(child.tag)
+        if tag == "p":
             text, _links = _extract_text_and_links(child, rels)
             parts.append(text)
-    return "\n".join(parts)
+        elif tag == "tbl":
+            nested = _render_table(child, rels, depth=depth)
+            nested_table_count += 1 + nested.nested_table_count
+            if nested.body:
+                parts.append(nested.body)
+    return "\n".join(parts), nested_table_count
 
 
 # --- header/footer parts: per-part isolation -------------------------------------------------
@@ -553,10 +668,9 @@ def _paragraph_chunk_unit(
     )
 
 
-def _table_unit(
-    table: ET.Element, index: int, context: _DocxContext, *, ordinal: int
+def _table_unit_from_render(
+    rendered: _TableRender, index: int, context: _DocxContext, *, ordinal: int
 ) -> ContentUnit:
-    rendered = _render_table(table, context.rels)
     normalized = normalize_text(rendered.body)
     return ContentUnit(
         id=stable_id("unit", context.extraction_id, str(ordinal)),
@@ -571,7 +685,11 @@ def _table_unit(
         lexical_text=normalized,
         locator=EvidenceLocator(type="docx_table", data={"table_index": index}),
         acl_scopes=context.acl_scopes,
-        metadata={"row_count": rendered.row_count, "col_count": rendered.col_count},
+        metadata={
+            "row_count": rendered.row_count,
+            "col_count": rendered.col_count,
+            "nested_table_count": rendered.nested_table_count,
+        },
     )
 
 
@@ -628,16 +746,24 @@ def _header_footer_unit(
 
 
 def _compute_quality(paragraphs: list[_ParagraphRecord], aggregate_text: str) -> float:
+    # Blank paragraphs are ordinary formatting (spacing between sections,
+    # a template's unused lines), not an extraction failure. Scoring on
+    # non_empty/total paragraph density (the previous formula) unfairly
+    # tanks quality for a legitimately blank-paragraph-heavy document - one
+    # real paragraph plus 50 blank ones scored ~0.018 even though the real
+    # paragraph extracted perfectly. This parser has no per-paragraph
+    # extraction-failure signal (unlike pptx's failed-part tracking or the
+    # header/footer PARTIAL_PARSE warnings this parser already has), so the
+    # only content-derived signal available here is binary: did any
+    # non-empty paragraph extract when the document actually has
+    # paragraphs at all. A document with zero body paragraphs (all content
+    # in tables/textboxes/header-footer) still earns full credit for this
+    # factor instead of being zeroed out.
     total = len(paragraphs)
-    if total:
-        non_empty = sum(1 for record in paragraphs if record.text.strip())
-        fraction = non_empty / total
-    else:
-        # No body paragraphs to fail; let table/textbox/header-footer content
-        # carry full credit for this factor instead of zeroing it out.
-        fraction = 1.0
+    non_empty = sum(1 for record in paragraphs if record.text.strip())
+    extracted_content = 1.0 if (total == 0 or non_empty > 0) else 0.0
     replacement_ratio = (
         aggregate_text.count(_REPLACEMENT_CHAR) / len(aggregate_text) if aggregate_text else 0.0
     )
-    quality = 0.95 * fraction * (1 - min(replacement_ratio, 1.0))
+    quality = 0.95 * extracted_content * (1 - min(replacement_ratio, 1.0))
     return round(max(0.0, min(1.0, quality)), 4)

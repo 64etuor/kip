@@ -665,6 +665,7 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
     context = container.application.operations.request_context(
         workspace=workspace,
         acl_scopes=[f"workspace:{workspace}"],
+        roles=["admin"],
     )
     try:
         summary = container.application.ingestion.sync_filesystem(context, "fixture")
@@ -1132,6 +1133,7 @@ def test_postgres_review_governance_lifecycle(tmp_path: Path):
     context = container.application.operations.request_context(
         workspace=workspace,
         acl_scopes=[f"workspace:{workspace}"],
+        roles=["admin"],
     )
     try:
         container.application.ingestion.sync_filesystem(context, "fixture")
@@ -1287,6 +1289,7 @@ def test_postgres_cross_scope_acl_denies_search_read_and_graph(tmp_path: Path):
         workspace=workspace,
         principal_id="principal_owner",
         acl_scopes=[scope_alpha, scope_beta],
+        roles=["admin"],
     )
     alpha_context = container.application.operations.request_context(
         workspace=workspace,

@@ -92,7 +92,7 @@ def _rename_predicate(
 
 
 def _seed_approved_assertion(container, tmp_path: Path):
-    context = container.application.operations.request_context()
+    context = container.application.operations.request_context(roles=["admin"])
     for entity in (
         KnowledgeEntity(
             id="doc_new",

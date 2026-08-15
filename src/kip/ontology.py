@@ -137,7 +137,9 @@ def validate_ontology(
             errors.append(f"predicate {name}: invalid risk level")
 
     required_review = {
-        name for name, definition in predicates.items() if definition.get("review") == "required"
+        name
+        for name, definition in predicates.items()
+        if isinstance(definition, dict) and definition.get("review") == "required"
     }
     policy_values = payloads["review"].get("human_review_required", {})
     policy_predicates = (

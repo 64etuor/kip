@@ -177,7 +177,6 @@ def _config_payload(plan: SetupPlan, *, container: bool) -> dict[str, object]:
         "api": {
             "host": "0.0.0.0" if container else "127.0.0.1",
             "port": 8080,
-            "require_api_key_outside_development": True,
             "max_request_bytes": 10 * 1024 * 1024,
         },
         "identity": identity,
@@ -199,7 +198,18 @@ def _config_payload(plan: SetupPlan, *, container: bool) -> dict[str, object]:
             "default_mode": "reranked",
             "context_max_chars": 120000,
         },
-        "models": {"generation": model},
+        "models": {
+            "generation": model,
+            # Matches the promoted default in config/kip.example.toml and
+            # config/kip.container.toml (ADR-034): the bm25 reranker, not
+            # silently disabled.
+            "reranker": {
+                "enabled": True,
+                "backend": "bm25",
+                "max_document_chars": 8000,
+                "baseline_weight": 0.15,
+            },
+        },
         "parsers": {
             "parser_timeout_seconds": 120,
             "minimum_quality_score": 0.70,
@@ -256,6 +266,11 @@ def _config_payload(plan: SetupPlan, *, container: bool) -> dict[str, object]:
             "domain_profile": plan.ontology_profile,
             "adaptive_discovery": plan.interaction_memory_mode == "explicit_consent",
             "reviewers": plan.ontology_reviewers,
+            # Opt-in: promotes candidates to facts without a human reviewer
+            # in the loop. `container.py` already defaults to disabled when
+            # this section is absent; emitted explicitly here so a generated
+            # deployment's intent is visible in the config file itself.
+            "auto_approve": {"enabled": False},
         },
         "interaction": {
             "enabled": plan.interaction_memory_mode == "explicit_consent",

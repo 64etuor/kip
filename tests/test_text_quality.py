@@ -73,6 +73,19 @@ def test_hwp_text_quality_penalizes_parser_warnings() -> None:
     assert with_warnings < without_warnings
 
 
+def test_hwp_text_quality_negative_warning_count_does_not_increase_score() -> None:
+    # Given a negative warning_count (a caller bug, e.g. a delta instead of
+    # a total), which would otherwise make warning_penalty negative and
+    # subtracting it *raise* the score above the same text's zero-warning
+    # baseline.
+    text = "정상적으로 추출된 계약 문서 본문입니다. " * 100
+
+    baseline = hwp_text_quality(text, warning_count=0)
+    negative = hwp_text_quality(text, warning_count=-5)
+
+    assert negative <= baseline
+
+
 def test_hwp_text_quality_stays_bounded_to_zero_and_one() -> None:
     huge = "가" * 100_000
 

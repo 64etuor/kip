@@ -74,6 +74,16 @@ class FilesystemSourcePort(Protocol):
         include_extensions: set[str] | None = None,
     ) -> Iterable[DiscoveredFile]: ...
 
+    @property
+    def skipped_present_relative_paths(self) -> frozenset[str]:
+        """Files still present on disk from the most recent `scan()` call
+
+        that were excluded from ingestion by a config filter or by
+        `max_file_bytes`. Deletion reconciliation must count these as seen
+        so an oversize or filtered-out file is never tombstoned as deleted.
+        """
+        ...
+
 
 class SourceCatalogPort(Protocol):
     def capabilities(self) -> dict[str, str]: ...

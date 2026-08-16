@@ -404,9 +404,10 @@ workers  → application
 | Identity and graph projection | `IdentityResolverPort` and `GraphProjectionPort` |
 | Redacted telemetry | `QueryTraceStore` and `QueryTraceExporter` |
 
-### 7.3 Adapter process contract
+### 7.3 Adapter process contracts
 
-외부 parser와 model adapter는 subprocess로도 연결할 수 있다.
+외부 parser와 model adapter는 subprocess로도 연결할 수 있다. 외부 command
+adapter의 line-oriented contract는 다음과 같다.
 
 ```text
 stdin: JSON object or JSONL
@@ -419,6 +420,13 @@ exit 30: quality below threshold
 exit 40: corrupted input
 exit 50: transient dependency error
 ```
+
+KIP가 직접 관리하는 filesystem parser worker는 stdout/stderr pipe에 payload를
+싣지 않는다. Private temp directory 안의 `kip.parser-request.v1` JSON file을
+읽고 `kip.parser-response.v1` JSON file을 작업 결과로 반환한다. Parent는 응답
+file 크기를 읽기 전에 검사하고 stderr는 tail만 bounded diagnostic으로 읽는다.
+이 내부 process contract는 `ParserPort` 또는 public CLI/REST/MCP contract를
+바꾸지 않는다.
 
 ---
 
@@ -478,7 +486,7 @@ enabled = false
 model = "replace-with-pinned-local-model"
 revision = "replace-with-immutable-revision"
 dimensions = 1024
-max_document_chars = 4000
+max_document_chars = 12000
 space_name = "replace-with-versioned-space"
 
 [security]
@@ -1527,12 +1535,15 @@ Unique constraint는 다음을 보장한다.
 1. source root mount와 identity를 확인한다.
 2. exclude pattern을 적용한다.
 3. 파일 metadata snapshot을 수집한다.
-4. 기존 catalog와 `(relative_path, size, mtime_ns)`를 비교한다.
-5. 변경 후보만 hash한다.
-6. hash가 동일하면 path move 또는 metadata-only change로 처리한다.
-7. 새 revision과 Artifact를 생성한다.
-8. 현재 scan에서 보이지 않은 파일은 source root가 정상일 때만 missing 후보로 표시한다.
-9. grace scan 이후 tombstone 처리한다.
+4. settle/symlink/filter/size 정책으로 parsing을 미룬 present path도 scan의
+   존재 집합에 포함한다.
+5. directory walk error가 하나라도 있으면 incomplete scan으로 실패한다.
+6. 기존 catalog와 `(relative_path, size, mtime_ns)`를 비교한다.
+7. 변경 후보만 hash한다.
+8. hash가 동일하면 path move 또는 metadata-only change로 처리한다.
+9. 새 revision과 Artifact를 생성한다.
+10. 현재 scan에서 보이지 않은 파일은 source root가 정상일 때만 missing 후보로 표시한다.
+11. grace scan 이후 tombstone 처리한다.
 
 ### 14.2 Path identity
 
@@ -1828,6 +1839,14 @@ Weight는 fixture 평가로 조정한다.
 - max extracted bytes
 - archive expansion ratio limit
 - sanitized environment
+
+Reference filesystem registry는 각 document를 fresh child process로 실행한다.
+macOS에서는 parent가 100 ms 간격으로 child와 descendants의 aggregate RSS를
+감독하고 limit 초과 시 process group 전체를 종료한다. Linux는 같은 감독에
+`RLIMIT_AS`/`RLIMIT_DATA`를 추가한다. 두 플랫폼 모두 `RLIMIT_CPU`,
+`RLIMIT_FSIZE`, `RLIMIT_NOFILE`, core dump 금지, wall timeout, private temp
+directory, bounded response를 적용한다. Source read-only와 no-network는 child가
+임의로 우회할 수 없는 deployment/container policy로 계속 강제한다.
 
 ---
 
@@ -3838,6 +3857,21 @@ Parser worker controls:
 - path traversal rejection
 - MIME/extension mismatch logging
 
+Reference profile (`[parsers.isolation]`) defaults to serial one-document
+workers with 180 s wall, 120 s CPU, 6144 MiB process-tree RSS, 256 MiB response,
+16 KiB retained diagnostic, four native-library threads, and nice 5. The
+registry wraps concrete parsers at composition time; the worker reconstructs
+the selected raw adapter so application/domain code and `ParserPort` remain
+unchanged. Timeout, memory excess, malformed/oversized response, or abnormal
+exit becomes a typed per-file `ParserError`, so normal ingestion preserves the
+previous active extraction and continues with other files.
+
+The Python worker does not itself create a macOS network namespace or revoke
+write permission on an already-writable source mount. Production therefore
+still requires the source bind mounted read-only and egress denied by the
+outer runtime. Resource isolation is an additional containment layer, not a
+replacement for those deployment controls.
+
 ### 32.9 Mail security
 
 - encrypted or signed mail status is stored.
@@ -4954,7 +4988,7 @@ Acceptance:
 - unauthorized source existence is not leaked
 - graph traversal enforces ACL at each step
 - source prompt injection tests pass
-- parser sandbox and archive limits pass
+- parser process-isolation and archive limits pass
 - egress-disabled mode passes all baseline functions
 
 ### 39.5 Operations

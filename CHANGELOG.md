@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+- Filesystem deletion reconciliation now treats files deferred by the settle
+  window or symlink policy as present, matching the existing filtered/oversize
+  protection, so a live NAS file cannot age into a false tombstone. Directory
+  walk errors now fail the scan before absence reconciliation instead of being
+  mistaken for a complete scan.
+- Regenerated the production runtime lock so the parser supervisor's `psutil`
+  dependency is installed in container images, added a parity regression test,
+  and raised the opt-in semantic Transformers floor from the vulnerable 4.57
+  line to `>=5.5.4,<6` (currently locked at 5.15.0). Runtime and full installed
+  dependency audits report no known vulnerabilities.
+- Fixed the base wheel startup contract: PPTX OCR now imports Pillow only when
+  it must transcode a non-pass-through image, so a clean core-wheel install can
+  run `kip capabilities` without the optional extractor extra. Production and
+  parser deployments still install the pinned extractor set.
+- Corrected current documentation to distinguish the historical evaluated
+  `c4000` semantic space from the configured `c12000` identity, which still
+  requires a fresh rebuild and fingerprint-matched evaluation before any
+  activation claim.
+- Added bounded one-document parser workers (ADR-050) for every filesystem
+  parser while preserving the existing `ParserPort` and extraction contracts.
+  The M4 Pro 24 GB reference profile runs serially with four native-library
+  threads, 6 GiB aggregate process-tree RSS, 120 CPU seconds, 180 wall seconds,
+  256 MiB capped file response, bounded diagnostics, process-group teardown,
+  open-file/output/core limits, and lower child priority. macOS uses parent RSS
+  supervision; Linux adds address/data-space rlimits. Source read-only and
+  network denial remain deployment responsibilities. No embedding scope or
+  activation policy changed. An independent scoped Luna rerun across 10
+  locally allocated samples in all seven configured formats matched raw and
+  isolated contracts with unchanged source hashes (8 succeeded, 2 partial,
+  0 failed), a 155 MiB peak on that set, and 94 focused tests passing.
 - Closed two measured parsing gaps (ADR-049), both decided by A/B study
   against candidates already pinned in-tree, so neither adds a dependency:
   - PDF tables are extracted as additive `pdf_table` evidence units

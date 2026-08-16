@@ -60,8 +60,9 @@ unchanged.
    and recursion-depth limit protect every OOXML parser.
 6. **Ingestion isolates and never false-tombstones.** A defensive per-file
    catch keeps one unparseable file from aborting a whole sync; files that
-   are present on disk but skipped (oversize or filtered) are no longer
-   reconciled as deletions; worker retries use bounded backoff.
+   are present on disk but skipped (settle, symlink, oversize, or filter) are
+   no longer reconciled as deletions; directory walk errors fail the scan;
+   worker retries use bounded backoff.
 7. **Config surface is honest.** Dead keys removed, orphaned Neo4j env/
    compose artifacts deleted, and the guided-setup writer emits the
    promoted bm25 reranker and the opt-in auto-approve section.

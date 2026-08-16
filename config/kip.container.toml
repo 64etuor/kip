@@ -61,12 +61,23 @@ parser_timeout_seconds = 120
 minimum_quality_score = 0.70
 shadow_parse_critical_documents = true
 
+[parsers.isolation]
+enabled = true
+wall_seconds = 180
+cpu_seconds = 120
+memory_mib = 6144
+result_mib = 256
+diagnostic_kib = 16
+cpu_threads = 4
+nice = 5
+
 [parsers.pdf]
 # Additive pdf_table evidence units via PyMuPDF find_tables(lines_strict).
 # Measured cost: PDF parsing rises from ~3.4 ms/page (text only) to
-# ~57 ms/page with table detection on, in-process (see ADR-049). Existing
-# pdf_page text output is unaffected either way; turn off only to shed the
-# extra per-page cost on table-light corpora.
+# ~57 ms/page with table detection on in the raw parser path (see ADR-049),
+# before the fixed one-document isolation startup cost. Existing pdf_page text
+# output is unaffected either way; turn off only to shed the extra per-page
+# cost on table-light corpora.
 tables_enabled = true
 
 [parsers.ocr]

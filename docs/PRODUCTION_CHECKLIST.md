@@ -41,6 +41,8 @@ The default Compose profile is a local pilot profile. Before serving multiple us
 ## Sources
 
 - Mount NAS read-only and add a source-outage guard before any absence reconciliation.
+- Confirm directory walk errors abort reconciliation and settle/filter/size/
+  symlink-policy deferrals remain present instead of aging into tombstones.
 - Set `${KIP_NAS_PATH}` for `compose.production.yaml`; it is bind-mounted
   read-only into both the worker and the API. The API needs the live source
   tree for evidence freshness checks and `xlsx-read`; without it every unit
@@ -55,6 +57,11 @@ The default Compose profile is a local pilot profile. Before serving multiple us
 
 ## Data quality
 
+- Keep `[parsers.isolation]` enabled for production sync. On the M4 Pro 24 GB
+  reference host, validate serial parsing with four native threads, 6 GiB
+  aggregate process-tree RSS, 120 CPU seconds, 180 wall seconds, and a 256 MiB
+  response cap against locally allocated real samples. Treat source read-only
+  mounts and network denial as separate deployment gates.
 - Benchmark HWP adapters on real HWP/HWPX samples before selecting a default.
 - Keep previous extraction active until shadow output passes quality and contract tests.
 - Maintain 30-50 pilot golden questions, then at least 100 before broad rollout.
@@ -74,6 +81,9 @@ The default Compose profile is a local pilot profile. Before serving multiple us
 - Require the current commit to pass Python 3.12 and 3.13 CI, generated-contract
   and architecture checks, Ruff, mypy, runtime dependency audit, migrations,
   tests, and the 75% coverage floor.
+- Regenerate `requirements/runtime.txt` from the frozen lock, prove every core
+  dependency is present, and audit both the production lock and any optional
+  extra environment shipped to operators.
 - Verify both the release directory and archive. Record the wheel, archive,
   SPDX SBOM, SLSA provenance, image lock, manifest, and checksums.
 - Publish only from a `v$(cat VERSION)` tag after quality and distribution jobs

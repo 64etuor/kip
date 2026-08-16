@@ -13,6 +13,7 @@ license-files = ["LICENSE"]
 authors = [{name = "KIP Project"}]
 dependencies = [
   "pydantic>=2.10,<3",
+  "psutil>=6.1,<8",
   "typer>=0.15,<1",
   "PyYAML>=6,<7",
   "tomli-w>=1.2,<2",
@@ -30,7 +31,7 @@ extractors = [
   "python-pptx>=1.0.2,<2",
   "hwp-hwpx-parser>=1,<2",
 ]
-semantic = ["torch>=2.5,<3", "transformers>=4.57,<5", "einops>=0.8,<1"]
+semantic = ["torch>=2.5,<3", "transformers>=5.5.4,<6", "einops>=0.8,<1"]
 mcp = ["mcp>=1.0,<2"]
 telemetry = [
   "opentelemetry-api>=1.30,<2",
@@ -45,6 +46,7 @@ dev = [
   "mypy>=1.14,<2",
   "pip-audit==2.10.1",
   "types-PyYAML>=6.0,<7",
+  "types-psutil>=7.0,<8",
 ]
 all = [
   "psycopg[binary]>=3.2,<4",
@@ -57,7 +59,7 @@ all = [
   "python-pptx>=1.0.2,<2",
   "hwp-hwpx-parser>=1,<2",
   "torch>=2.5,<3",
-  "transformers>=4.57,<5",
+  "transformers>=5.5.4,<6",
   "einops>=0.8,<1",
   "mcp>=1.0,<2",
   "opentelemetry-api>=1.30,<2",

@@ -41,7 +41,9 @@ Run from the repository root. `scripts/common.sh` loads `.env`; prefer `./script
 ./scripts/kip status
 ```
 
-The local ignored file `config/kip.toml` must contain an enabled filesystem source with these properties:
+The local ignored file `config/kip.toml` must contain an enabled filesystem
+source. The current parser-focused OneDrive profile intentionally uses these
+seven extensions:
 
 ```toml
 [[sources.filesystem]]
@@ -49,7 +51,7 @@ name = "onedrive-personal"
 root = "/absolute/path/to/OneDrive-root"
 enabled = true
 read_only = true
-include_extensions = [".md", ".txt", ".pdf", ".pptx", ".xlsx", ".xlsm", ".hwp", ".hwpx", ".docx", ".csv"]
+include_extensions = [".pdf", ".pptx", ".xlsx", ".xlsm", ".hwp", ".hwpx", ".docx"]
 acl_scope = "workspace:default"
 ```
 
@@ -57,13 +59,53 @@ Use the actual local OneDrive root, not a path copied from another machine. Veri
 
 ```bash
 test -d "/absolute/path/to/OneDrive-root"
-find "/absolute/path/to/OneDrive-root" -type f \( -iname '*.hwp' -o -iname '*.hwpx' -o -iname '*.pptx' -o -iname '*.xlsx' -o -iname '*.xlsm' \) -print | head
+find "/absolute/path/to/OneDrive-root" -type f \( -iname '*.pdf' -o -iname '*.pptx' -o -iname '*.xlsx' -o -iname '*.xlsm' -o -iname '*.hwp' -o -iname '*.hwpx' -o -iname '*.docx' \) -print0 | tr -cd '\0' | wc -c
 ./scripts/kip doctor
 ```
 
 The current reference local profile uses the `onedrive-personal` source and excludes common generated/cache trees (`.Trash`, `.git`, `.omc`, `node_modules`, `__pycache__`, `.venv`, `build`, and `dist`). Keep the scope explicit when a different OneDrive folder is intended.
 
-For the first parser-focused audit, the local profile may intentionally narrow `include_extensions` to `.hwp`, `.hwpx`, `.pptx`, `.xlsx`, `.xlsm`, and `.docx`. This keeps large unrelated Markdown/PDF/code trees from hiding format failures. Report the exact scope and counts; do not interpret a scoped cycle as full OneDrive coverage.
+This seven-format profile is intentionally narrow. It keeps unrelated
+Markdown, text, image, archive, media, and code trees from hiding parser
+failures. Report the exact scope and counts; do not interpret this parser audit
+as full OneDrive coverage or embedding completeness.
+
+## Filesystem parser isolation validation
+
+Reference and generated configurations enable `[parsers.isolation]`. Exercise
+the registry returned by `ParserRegistry.from_settings(Settings.load())`, not a
+raw concrete parser, when validating the deployed path. The M4 Pro 24 GB
+reference budget is serial parsing, four native-library threads, 6144 MiB
+aggregate process-tree RSS, 120 CPU seconds, 180 wall seconds, a 256 MiB result
+file, a 16 KiB retained diagnostic tail, and nice 5.
+
+Run the deterministic containment tests before touching private documents:
+
+```bash
+uv run pytest tests/test_parser_isolation.py tests/test_process_supervisor.py -q
+```
+
+Then select locally allocated samples across PDF, PPTX, XLSX, XLSM, HWP, HWPX,
+and DOCX. Do not deliberately open cloud placeholders. Record only anonymized
+format, size, status, unit/warning counts, elapsed time, peak process-tree RSS,
+locator/ordinal invariants, and whether SHA-256 stayed unchanged. A parser
+timeout, RSS excess, oversized/malformed result, or abnormal child exit must be
+a typed per-file failure and must not replace the previous active extraction.
+After the run, confirm no parser child or `kip-parser-*` temp directory remains.
+
+This process boundary contains resource lifetime; it is not a permission or
+network sandbox. Keep the source mount read-only and enforce network denial in
+the launch/container policy. OCR text still needs rendered or human ground
+truth, and spreadsheet numbers still need `xlsx-read`; successful isolated
+execution alone proves neither.
+
+The independent 2026-08-16 scoped reference run used 10 locally allocated
+anonymized samples across the seven configured formats. Raw and isolated
+contracts matched with 8 succeeded, 2 partial, and 0 failed on both paths; all
+source hashes were unchanged, peak process-tree RSS was 155 MiB, 94 focused
+tests passed, and synthetic timeout/RSS/result/diagnostic/cleanup probes passed.
+Treat this as a reproducible isolation and extraction-contract baseline, not as
+OCR semantic, deep spreadsheet, placeholder, or full-corpus acceptance.
 
 ## Semantic setup (optional but required for semantic RAG claims)
 
@@ -257,7 +299,7 @@ Classify each observation, with exact command and redacted output:
 | P2 retrieval | exact identifier miss, Korean paraphrase miss, wrong ranking, empty context, semantic fallback not surfaced |
 | P2 evidence | `read` body differs from source, XLSX range/formula/date mismatch, missing sheet/range locator |
 | P3 operations | setup command mismatch, exit 0 with failed items, service/worker startup ambiguity, undocumented prerequisite |
-| P3 quality | noisy corpus, duplicate revisions, low-quality extraction, latency or memory issue |
+| P3 quality | noisy corpus, duplicate revisions, low-quality extraction, parser timeout/RSS/result-cap breach, latency or memory issue |
 
 For each finding record:
 
@@ -281,7 +323,8 @@ Before any fix, the AI must be able to answer:
 3. Which XLSX text query hit, and did exact `xlsx-read` return the original range values/formulas?
 4. Did `read` and `context` preserve locator, ACL, hash, and stale-source semantics?
 5. Was semantic retrieval actually exercised, or did the run remain lexical/degraded?
-6. What is the smallest reproducible command for every defect?
+6. Did the isolated registry preserve parser output, locators, source hashes, and bounded process cleanup?
+7. What is the smallest reproducible command for every defect?
 
 Report the answers first. After the operator approves a repair cycle, apply only findings tied to those answers and append post-fix sync, parser, evidence, and semantic verification to the same audit record.
 

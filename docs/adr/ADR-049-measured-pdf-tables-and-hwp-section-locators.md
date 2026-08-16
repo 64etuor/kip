@@ -34,7 +34,7 @@ neither decision adds a dependency.
 | False tables, real narrative PDF (19 p) | n/a | 4 detected, all decorative 1-row boxes | **23 of 24 were 1×1 footer boxes (95.8%)** |
 | Page-break table | n/a | 1.00/1.00 per physical page (never merges) | merges across pages into one logical table |
 | Effect on existing page text | baseline | **byte-identical on 100% of files** | forcing tables off *breaks* reading order |
-| Runtime (study set) | **3.4 ms/page** | 57.2 ms/page, in-process | ~57 ms/page **plus ~0.24–0.3 s fixed process start per document** |
+| Runtime (study set) | **3.4 ms/page** | 57.2 ms/page in the raw parser path | ~57 ms/page **plus ~0.24–0.3 s fixed process start per document** |
 | Runtime (post-implementation re-measure, same 6 real PDFs / 70 pages) | **3.95 ms/page** (0.28 s total) | **149.7 ms/page average, 61–468 ms/page per file** (10.5 s total) | not re-run |
 | Encrypted PDF | clean typed failure | opens after `authenticate()` | **cannot open at all** (`--password` is HWP-family only) |
 | Damaged PDF | partial recovery | partial recovery | **hard fail, exit 1, no output** |
@@ -78,7 +78,7 @@ kordoc as the *primary* HWP parser regressing retrieval from Recall@5/MRR
    on damaged files, and a fixed ~0.25 s per-document process cost are worse
    trade-offs than the gap being closed. Revisit only for pages already
    routed to OCR, where kordoc is the sole candidate that can see text.
-3. **Fill `section` in `hwp_structure` locators in-process.** The
+3. **Fill `section` in `hwp_structure` locators in the native parser.** The
    reconstruction replays the dependency's own per-section extraction and is
    verified at runtime against its public `extract_text()`; on any mismatch
    the parser falls back to `section: null` with a

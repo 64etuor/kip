@@ -9,7 +9,7 @@ import pytest
 
 from kip.adapters.parsers.pdf import PdfParser
 from kip.adapters.parsers.pptx import PptxParser
-from kip.adapters.parsers.registry import ParserRegistry
+from kip.adapters.parsers.registry import ParserRegistry, raw_parser_by_key
 from kip.settings import Settings
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,13 +27,16 @@ def test_reference_configs_enable_pinned_kordoc_ocr_by_default(
 
     # When the parser registry is composed from that configuration.
     registry = ParserRegistry.from_settings(settings)
-    pdf = next(parser for parser in registry.parsers if isinstance(parser, PdfParser))
-    pptx = next(parser for parser in registry.parsers if isinstance(parser, PptxParser))
+    pdf = raw_parser_by_key(settings, "pdf")
+    pptx = raw_parser_by_key(settings, "pptx")
     kordoc = settings.get("parsers.ocr.kordoc", {}) or {}
 
     # Then Korean OCR is active and pinned for both image-bearing formats.
     assert kordoc["enabled"] is True
     assert kordoc["expected_version"] == "4.7.3"
+    assert all(parser.__class__.__name__ == "IsolatedParserAdapter" for parser in registry.parsers)
+    assert isinstance(pdf, PdfParser)
+    assert isinstance(pptx, PptxParser)
     assert pdf._ocr is not None
     assert pptx._ocr is not None
 

@@ -78,9 +78,10 @@ class FilesystemSourcePort(Protocol):
     def skipped_present_relative_paths(self) -> frozenset[str]:
         """Files still present on disk from the most recent `scan()` call
 
-        that were excluded from ingestion by a config filter or by
-        `max_file_bytes`. Deletion reconciliation must count these as seen
-        so an oversize or filtered-out file is never tombstoned as deleted.
+        that were excluded from ingestion by a config filter,
+        `max_file_bytes`, symlink policy, or the settle window. Deletion
+        reconciliation must count these as seen so a present file is never
+        tombstoned as deleted.
         """
         ...
 

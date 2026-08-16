@@ -432,7 +432,10 @@ Agent 흐름:
 - **FR-EXT-004 MUST**: 새 extraction은 shadow 상태로 생성한 뒤 active pointer를 원자적으로 전환해야 한다.
 - **FR-EXT-005 MUST**: 새 결과가 품질 기준을 충족하지 못하면 기존 active extraction을 유지해야 한다.
 - **FR-EXT-006 MUST**: 페이지, 섹션, 표, 셀, 메시지, MIME part locator를 보존해야 한다.
-- **FR-EXT-007 SHOULD**: 위험한 parser는 별도 process 또는 container에서 실행해야 한다.
+- **FR-EXT-007 MUST**: filesystem/NAS 문서 parser는 별도 process에서 실행하고
+  wall-clock, CPU, process-tree memory, 결과 byte, 진단 byte, open-file, core-dump
+  제한을 적용해야 한다. 이 process 격리는 source read-only mount와 network
+  egress policy를 대체하지 않는다.
 - **FR-EXT-008 SHOULD**: parser별 conformance test를 제공해야 한다.
 
 ### 9.5 HWP/HWPX
@@ -873,6 +876,14 @@ KIP v3 baseline은 다음을 모두 만족해야 인수된다.
 | ADR-040 | Make guided setup end in a runnable deployment | Accepted |
 | ADR-041 | Structured PPTX extraction preserves presentation evidence | Accepted |
 | ADR-042 | Korean OCR enriches candidate pages and presentation images | Accepted |
+| ADR-043 | Reject ontology core shadowing and unknown source parents | Accepted |
+| ADR-044 | Materialize discovery approvals as additive ontology releases | Accepted |
+| ADR-045 | Grow golden datasets through sampled human audit | Accepted |
+| ADR-046 | Consolidate adapter seams for tool swappability | Accepted |
+| ADR-047 | Measured auto-approval for low-risk mined relations | Accepted |
+| ADR-048 | Harden trust, resilience, and edge contracts | Accepted |
+| ADR-049 | Measure PDF tables and HWP section locators | Accepted |
+| ADR-050 | Bound filesystem parser processes | Accepted |
 
 ---
 

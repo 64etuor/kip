@@ -34,10 +34,9 @@ class FileSystemConnector:
         self.max_file_bytes = max_file_bytes
         # Populated by the most recent completed `scan()` call: relative
         # paths of files that are still present on disk but were excluded
-        # from ingestion by a config filter (extension/exclude-glob) or by
-        # `max_file_bytes`. Deletion reconciliation must treat these as
-        # "seen" so a file that merely grew too big, or fell outside a
-        # narrowed include/exclude filter, is never tombstoned as deleted.
+        # from ingestion by a config filter, `max_file_bytes`, or the settle
+        # window. Deletion reconciliation must treat these as "seen" so a
+        # present file is never tombstoned as deleted.
         self.skipped_present_relative_paths: frozenset[str] = frozenset()
 
     def scan(
@@ -62,7 +61,12 @@ class FileSystemConnector:
         # (never stale data from a prior scan) rather than partial data.
         self.skipped_present_relative_paths = frozenset()
         skipped_present: set[str] = set()
-        for dirpath, dirnames, filenames in os.walk(self.root, followlinks=self.follow_symlinks):
+        walk_errors: list[OSError] = []
+        for dirpath, dirnames, filenames in os.walk(
+            self.root,
+            onerror=walk_errors.append,
+            followlinks=self.follow_symlinks,
+        ):
             if not self.follow_symlinks:
                 dirnames[:] = [name for name in dirnames if not (Path(dirpath) / name).is_symlink()]
             for name in filenames:
@@ -75,6 +79,7 @@ class FileSystemConnector:
                     skipped_present.add(relative)
                     continue
                 if path.is_symlink() and not self.follow_symlinks:
+                    skipped_present.add(relative)
                     continue
                 resolved = path.resolve()
                 if self.root not in resolved.parents and resolved != self.root:
@@ -88,6 +93,7 @@ class FileSystemConnector:
                     if 0 <= age_ns < int(self.settle_seconds * 1_000_000_000):
                         # Modified inside the settle window; the next scan
                         # picks it up without sleeping the whole walk.
+                        skipped_present.add(relative)
                         continue
                     if age_ns < 0:
                         # Future mtime (clock skew): fall back to a short
@@ -98,6 +104,7 @@ class FileSystemConnector:
                             stat_after.st_size,
                             stat_after.st_mtime_ns,
                         ):
+                            skipped_present.add(relative)
                             continue
                 # The content hash is computed lazily on first access so
                 # unchanged files can be skipped by size/mtime alone.
@@ -107,5 +114,6 @@ class FileSystemConnector:
                     size=stat_before.st_size,
                     mtime_ns=stat_before.st_mtime_ns,
                 )
+        if walk_errors:
+            raise SourceUnavailableError("filesystem scan incomplete") from walk_errors[0]
         self.skipped_present_relative_paths = frozenset(skipped_present)
-

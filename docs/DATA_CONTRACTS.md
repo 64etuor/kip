@@ -88,6 +88,20 @@ lexical projection. It is stored with the extraction because normalized body
 text alone cannot reproduce Korean n-grams, title tokens, and stable source
 identifiers. The `search.lexical_units` row remains a disposable projection.
 
+## Internal parser-worker boundary
+
+Filesystem parser isolation uses a private, versioned file contract rather
+than stdout capture. `kip.parser-request.v1` carries the stable parser key,
+source path, project root, parser configuration, artifact/document IDs, and
+ACL scopes. `kip.parser-response.v1` is either a successful canonical
+`ExtractionRun` plus `ContentUnit[]`, or a bounded failure with one of
+`configuration_error`, `internal_error`, `memory_limit`, or `parser_error`.
+
+Both models reject unknown fields. The parent validates response bytes before
+acceptance and caps the response file before reading it. This is an internal
+adapter contract: CLI, REST, MCP, generated schemas, and the `ParserPort`
+signature are unchanged.
+
 ## PPTX evidence boundary
 
 PPTX extraction emits `pptx_text`, `pptx_table`, `pptx_chart`, `pptx_image`,
@@ -157,7 +171,8 @@ counters and bounded `warnings` strings:
   each increments that object's consecutive-absence counter. Only a complete,
   successful, non-dry-run scan contributes absence evidence, and a scan that
   sees zero files skips reconciliation with a warning instead of marking
-  anything.
+  anything. Directory walk errors make a scan incomplete, while paths deferred
+  by settle, symlink, filter, or size policy count as seen.
 - `tombstoned`: objects whose consecutive absence reached
   `[sync] deletion_grace_scans` and were soft-deleted through the shared
   tombstone-revision path; prior revisions and approved assertions are

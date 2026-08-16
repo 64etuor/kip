@@ -90,11 +90,21 @@ PowerShell/cmd에서는 동작하지 않습니다. WSL2(Ubuntu)를 설치하고 
 | `PDF parse failed` / `DOCX parse failed` | 파일이 손상되었거나 암호가 걸려 있습니다. 원본을 열어보세요. |
 | `ENCODING_UNCERTAIN` | 글자 인코딩을 자동 판별하지 못했습니다(대개 오래된 CSV/TXT). 파일을 UTF-8로 다시 저장하면 해결됩니다. |
 | `OCR_FAILED` | 스캔 이미지 문자 인식 도구(Kordoc)를 찾지 못했습니다. 아래 4장 참고. |
-| `present but skipped (oversize or filtered)` | 파일이 용량 상한을 넘었거나 제외 패턴에 걸렸습니다. 원본은 그대로 있고 삭제로 처리되지 않습니다. |
+| `parser process timed out` | 파일 하나가 `[parsers.isolation].wall_seconds`를 넘었습니다. 원본은 바뀌지 않고 이전 active extraction이 유지됩니다. 같은 파일을 읽기 전용으로 재현해 시간/RSS를 측정한 뒤에만 한도를 조정하세요. |
+| `parser process exceeded memory budget` | child와 descendants의 합산 RSS가 `memory_mib`를 넘었습니다. 동시 실행을 늘리지 말고 파일 크기·형식·peak RSS를 기록한 뒤 `OPERATIONS.md`의 headroom 규칙으로 조정하세요. |
+| `parser process response exceeded` / `invalid response` | 결과 파일이 `result_mib`를 넘었거나 child contract가 손상됐습니다. 한도를 무작정 풀지 말고 해당 parser/version과 unit 수를 격리 표본으로 재현하세요. |
+| `present but skipped from ingestion (filter, size, symlink, or settle policy)` | 파일이 아직 안정화 대기 중이거나 필터·용량·symlink 정책에 걸렸습니다. 원본과 이전 active extraction은 그대로 있고 삭제로 처리되지 않습니다. |
+| `filesystem scan incomplete` | 하위 디렉터리를 읽지 못해 삭제 조정을 중단했습니다. NAS mount와 디렉터리 권한을 복구한 뒤 다시 sync하세요. |
 | `partial` 상태 + 낮은 quality | 일부만 추출되었습니다. 원본 확인 후 필요하면 다시 저장해서 재수집하세요. |
 
 파서를 개선한 뒤 기존 파일에도 반영하려면 재수집이 필요합니다
 (`./scripts/kip sync run --source 이름` 재실행).
+
+Reference 설정에서는 모든 filesystem parser가 파일 하나당 fresh child에서
+실행됩니다. 개발 비교가 아니라면 `[parsers.isolation].enabled = false`로 우회하지
+마세요. Timeout이나 memory failure 뒤 `ps`에
+`kip.adapters.parsers.isolated_worker`가 남거나 임시 디렉터리가 정리되지 않으면
+운영 결함으로 보고해야 합니다.
 
 ---
 

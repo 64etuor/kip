@@ -13,29 +13,32 @@ import inspect
 import re
 import tomllib
 from pathlib import Path
+from typing import Never
 
 import typer.main
 
 from kip.cli import app as cli_app
+from kip.domain.json_types import JsonObject
 from kip.domain.models import AnswerRequest, ContextRequest
+from kip.setup.config_payload import build_config_payload
 from kip.setup.models import FilesystemSourceAnswer, SecretReference, SetupAnswers
 from kip.setup.planner import build_setup_plan
-from kip.setup.writer import _config_payload
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _click_command_default(command_name: str, option_name: str) -> object:
+def _click_command_default(command_name: str, option_name: str) -> int:
     group = typer.main.get_command(cli_app)
     assert hasattr(group, "commands"), "typer app did not resolve to a command group"
     command = group.commands[command_name]
     for param in command.params:
         if param.name == option_name:
+            assert isinstance(param.default, int)
             return param.default
     raise AssertionError(f"no option {option_name!r} on command {command_name!r}")
 
 
-def _mcp_tool_default(tool_name: str, parameter_name: str) -> object:
+def _mcp_tool_default(tool_name: str, parameter_name: str) -> int:
     from mcp.server.fastmcp import FastMCP
 
     from kip import mcp_server
@@ -49,11 +52,13 @@ def _mcp_tool_default(tool_name: str, parameter_name: str) -> object:
     assert isinstance(server, FastMCP)
     tool = server._tool_manager._tools[tool_name]
     signature = inspect.signature(tool.fn)
-    return signature.parameters[parameter_name].default
+    default = signature.parameters[parameter_name].default
+    assert isinstance(default, int)
+    return default
 
 
 class _StubApplication:
-    def __getattr__(self, name: str) -> object:  # pragma: no cover - never invoked
+    def __getattr__(self, name: str) -> Never:  # pragma: no cover - never invoked
         raise AssertionError("stub application is only used for signature inspection")
 
 
@@ -66,7 +71,7 @@ class _StubContainer:
     settings = _StubSettings()
 
 
-def _setup_config_payload(tmp_root: Path) -> dict[str, object]:
+def _setup_config_payload(tmp_root: Path) -> JsonObject:
     source = tmp_root / "company-docs"
     source.mkdir(exist_ok=True)
     backup = tmp_root / "backup"
@@ -106,7 +111,7 @@ def _setup_config_payload(tmp_root: Path) -> dict[str, object]:
         ontology_reviewers=["knowledge-owner@example.invalid"],
     )
     plan = build_setup_plan(answers, project_root=tmp_root / "project")
-    return _config_payload(plan, container=True)
+    return build_config_payload(plan, container=True)
 
 
 def test_context_max_chars_default_agrees_across_model_cli_mcp_and_writer(

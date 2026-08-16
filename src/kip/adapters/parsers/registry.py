@@ -2,16 +2,21 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pydantic import TypeAdapter
+
 from kip.adapters.ocr.kordoc import KordocOcrAdapter, KordocOcrConfig
 from kip.adapters.parsers.csv_table import CsvTableParser
 from kip.adapters.parsers.docx import DocxParser
 from kip.adapters.parsers.hwp_broker import CommandParserConfig, HwpParserBroker
 from kip.adapters.parsers.hwp_native import HwpNativeParser, HwpParserChain
+from kip.adapters.parsers.isolation import IsolatedParserAdapter
 from kip.adapters.parsers.pdf import PdfParser
 from kip.adapters.parsers.plain import PlainTextParser
 from kip.adapters.parsers.pptx import PptxParser
 from kip.adapters.parsers.pptx_ocr import PptxOcrLimits
+from kip.adapters.parsers.process_supervisor import ParserIsolationLimits
 from kip.adapters.parsers.xlsx import XlsxShallowParser
+from kip.domain.json_types import JsonObject
 from kip.errors import ConfigurationError, ParserError
 from kip.ports.parser import ParserPort
 from kip.settings import Settings
@@ -39,43 +44,23 @@ class ParserRegistry:
 
     @classmethod
     def from_settings(cls, settings: Settings) -> ParserRegistry:
-        ocr = _kordoc_ocr(settings)
-        pdf = PdfParser(
-            ocr=ocr,
-            tables_enabled=bool(settings.get("parsers.pdf.tables_enabled", True)),
+        registrations = _raw_parser_registrations(settings)
+        if not bool(settings.get("parsers.isolation.enabled", False)):
+            return cls([parser for _, parser in registrations])
+        parser_config: JsonObject = TypeAdapter(JsonObject).validate_python(
+            settings.get("parsers", {}) or {}
         )
-        hwp_configs: list[CommandParserConfig] = []
-        native_parser: HwpNativeParser | None = None
-        for name in settings.get("parsers.hwp.order", ["kordoc", "unhwp"]):
-            if name == "paired_pdf":
-                continue
-            config = settings.get(f"parsers.hwp.{name}", {}) or {}
-            if name == "hwp-hwpx-parser":
-                if bool(config.get("enabled", False)):
-                    native_parser = HwpNativeParser(
-                        max_chars_per_unit=int(config.get("max_chars_per_unit", 4000))
-                    )
-                continue
-            hwp_configs.append(
-                CommandParserConfig(
-                    name=name,
-                    argv=[str(item) for item in config.get("argv", [])],
-                    enabled=bool(config.get("enabled", False)) and bool(config.get("argv")),
-                    timeout_seconds=int(settings.get("parsers.parser_timeout_seconds", 120)),
-                )
-            )
+        limits = _isolation_limits(settings)
         return cls(
             [
-                CsvTableParser(),
-                PlainTextParser(),
-                XlsxShallowParser(),
-                DocxParser(),
-                PptxParser(ocr=ocr, ocr_limits=_pptx_ocr_limits(settings)),
-                pdf,
-                HwpParserChain(
-                    native_parser,
-                    HwpParserBroker(hwp_configs, paired_pdf_parser=pdf),
-                ),
+                IsolatedParserAdapter(
+                    parser_key=key,
+                    delegate=parser,
+                    project_root=settings.project_root,
+                    parser_config=parser_config,
+                    limits=limits,
+                )
+                for key, parser in registrations
             ]
         )
 
@@ -93,6 +78,73 @@ class ParserRegistry:
 
     def representation_role(self, extension: str) -> str:
         return _REPRESENTATION_ROLE_BY_EXTENSION.get(extension.lower(), "primary")
+
+
+def raw_parser_by_key(settings: Settings, parser_key: str) -> ParserPort:
+    for key, parser in _raw_parser_registrations(settings):
+        if key == parser_key:
+            return parser
+    raise ConfigurationError(f"unknown isolated parser key: {parser_key}")
+
+
+def _raw_parser_registrations(settings: Settings) -> list[tuple[str, ParserPort]]:
+    ocr = _kordoc_ocr(settings)
+    pdf = PdfParser(
+        ocr=ocr,
+        tables_enabled=bool(settings.get("parsers.pdf.tables_enabled", True)),
+    )
+    hwp_configs: list[CommandParserConfig] = []
+    native_parser: HwpNativeParser | None = None
+    for name in settings.get("parsers.hwp.order", ["kordoc", "unhwp"]):
+        if name == "paired_pdf":
+            continue
+        config = settings.get(f"parsers.hwp.{name}", {}) or {}
+        if name == "hwp-hwpx-parser":
+            if bool(config.get("enabled", False)):
+                native_parser = HwpNativeParser(
+                    max_chars_per_unit=int(config.get("max_chars_per_unit", 4000))
+                )
+            continue
+        hwp_configs.append(
+            CommandParserConfig(
+                name=name,
+                argv=[str(item) for item in config.get("argv", [])],
+                enabled=bool(config.get("enabled", False)) and bool(config.get("argv")),
+                timeout_seconds=int(settings.get("parsers.parser_timeout_seconds", 120)),
+            )
+        )
+    return [
+        ("csv", CsvTableParser()),
+        ("plain", PlainTextParser()),
+        ("xlsx", XlsxShallowParser()),
+        ("docx", DocxParser()),
+        ("pptx", PptxParser(ocr=ocr, ocr_limits=_pptx_ocr_limits(settings))),
+        ("pdf", pdf),
+        (
+            "hwp",
+            HwpParserChain(
+                native_parser,
+                HwpParserBroker(hwp_configs, paired_pdf_parser=pdf),
+            ),
+        ),
+    ]
+
+
+def _isolation_limits(settings: Settings) -> ParserIsolationLimits:
+    return ParserIsolationLimits(
+        wall_seconds=float(settings.get("parsers.isolation.wall_seconds", 180)),
+        cpu_seconds=int(settings.get("parsers.isolation.cpu_seconds", 120)),
+        memory_bytes=int(settings.get("parsers.isolation.memory_mib", 6144))
+        * 1024
+        * 1024,
+        result_bytes=int(settings.get("parsers.isolation.result_mib", 256))
+        * 1024
+        * 1024,
+        diagnostic_bytes=int(settings.get("parsers.isolation.diagnostic_kib", 16))
+        * 1024,
+        cpu_threads=int(settings.get("parsers.isolation.cpu_threads", 4)),
+        nice=int(settings.get("parsers.isolation.nice", 5)),
+    )
 
 
 def _kordoc_ocr(settings: Settings) -> KordocOcrAdapter | None:

@@ -134,18 +134,17 @@ class IngestionUseCases:
                 continue
             self._record_result(summary, result)
         for skipped_relative_path in source.skipped_present_relative_paths:
-            # Present on disk but excluded from ingestion this scan (oversize
-            # per `max_file_bytes`, or filtered out by an include/exclude
-            # config change). It must still count as "seen" for deletion
-            # reconciliation so its prior active revision, if any, is never
-            # tombstoned as deleted (rule 12).
+            # Present on disk but not eligible for ingestion in this scan. It
+            # must still count as "seen" for deletion reconciliation so its
+            # prior active revision, if any, is never tombstoned as deleted
+            # (rule 12).
             seen_object_ids.add(
                 stable_id("srcobj", system_id, skipped_relative_path)
             )
             summary.warnings.append(
                 f"{skipped_relative_path}: present but skipped from ingestion "
-                "(oversize or filtered by config); prior revision, if any, "
-                "stays active"
+                "(filter, size, symlink, or settle policy); prior revision, "
+                "if any, stays active"
             )
         if not dry_run:
             self._reconcile_filesystem_deletions(

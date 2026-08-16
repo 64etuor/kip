@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import shutil
+import time
 
 import pytest
 
@@ -166,6 +168,30 @@ def test_file_grown_past_size_cap_is_not_tombstoned(test_container):
     hits = _search(test_container, context)
     assert any(hit.unit_id == unit_id for hit in hits)
     test_container.application.evidence.read_unit(context, unit_id)
+
+
+def test_file_inside_settle_window_is_not_tombstoned(test_container):
+    keeper = test_container.settings.project_root / "source" / "잔류문서.txt"
+    keeper.write_text("이 문서는 계속 보관한다.", encoding="utf-8")
+    target = _write_target(test_container)
+    context, first = _sync(test_container)
+    assert first.inserted == 2
+
+    old_ns = time.time_ns() - 60 * 1_000_000_000
+    os.utime(keeper, ns=(old_ns, old_ns))
+    target.write_text(
+        "정산 증빙 제출기한은 변경 검토 중이다.",
+        encoding="utf-8",
+    )
+    source = test_container.settings.raw["sources"]["filesystem"][0]
+    source["settle_seconds"] = 30
+
+    for _ in range(3):
+        _, summary = _sync(test_container)
+        assert summary.absent == 0
+        assert summary.tombstoned == 0
+
+    assert _search(test_container, context)
 
 
 def test_genuinely_deleted_file_is_still_tombstoned_with_a_size_cap_configured(

@@ -75,7 +75,7 @@ Filesystem deletion is reconciled by consecutive complete scans, controlled by
 `[sync] deletion_grace_scans` (default `2`, minimum `1`):
 
 - Only a COMPLETE, successful scan contributes absence evidence. A scan that
-  fails or aborts mid-walk (for example an unavailable mount) changes nothing,
+  fails, encounters a directory walk error, or aborts mid-walk changes nothing,
   and a scan that sees zero files is treated as a possible mount outage: it
   skips deletion reconciliation entirely and records a warning.
 - After each complete scan, every active indexed object the scan did not see
@@ -91,10 +91,11 @@ Filesystem deletion is reconciled by consecutive complete scans, controlled by
   and the source tree is never written.
 - A file that reappears after tombstoning is re-indexed by the next sync and
   becomes searchable again.
-- Dry-run syncs never mark absences and never tombstone. A file removed from
-  the configured collection scope (`include_extensions`/`exclude_globs`)
-  follows the same policy: content outside the approved scope leaves the
-  active index after the grace window.
+- Dry-run syncs never mark absences and never tombstone. Files still present
+  but deferred by the settle window, symlink policy, extension/exclusion
+  filters, or the size limit count as seen and retain any prior active
+  extraction. Scope changes therefore stop future ingestion without silently
+  turning a present source into a deletion event.
 
 ## Production deployment
 
@@ -145,6 +146,11 @@ unreachable. `/healthz` remains a process-liveness probe only.
 Run the local gates and build a reproducible handoff bundle from a clean tree:
 
 ```bash
+uv export --frozen --no-dev --no-emit-project --extra postgres --extra api \
+  --extra identity --extra extractors --extra telemetry --extra mcp \
+  --output-file requirements/runtime.txt
+uv run pytest tests/test_release_bundle.py::test_runtime_lock_contains_every_core_dependency
+uv run pip-audit --requirement requirements/runtime.txt --disable-pip
 make audit
 make coverage
 export KIP_API_IMAGE='registry.example/kip@sha256:<verified-digest>'
@@ -511,12 +517,14 @@ Apple MPS also runs with BetterTransformer disabled because Infinity's optional
 Optimum precheck is invalid on that path. Defaults of four embedding inputs and
 two reranking pairs per server batch fit the validated 24 GB Apple Silicon
 profile. The application also bounds each document input to the configured
-`models.embedding.max_document_chars` (default 4000); this preprocessing value
+`models.embedding.max_document_chars` (default 12000); this preprocessing value
 uses the versioned `head_tail_v1` strategy, preserving the title and sampling
 both ends of oversized units. The cap and strategy are part of the
 embedding-space identity, so changing either creates a new shadow space instead
 of mixing incompatible vectors. Adjust either batch size or input cap only
-after measuring.
+after measuring. The completed 2026-08-13 private report used the former 4000
+character identity and is historical evidence; rebuild and evaluate a fresh
+`c12000` space before making any current activation claim.
 
 The reference HNSW query settings are:
 
@@ -639,6 +647,40 @@ reviewable ranges. Date/time values are ISO 8601 strings, durations are ISO
 Formula source and cached values are separate, and KIP does not recalculate the
 workbook. Treat a cached result as workbook state that may be stale, not as a
 fresh calculation.
+
+## Filesystem parser resource isolation
+
+Reference configurations enable `[parsers.isolation]`. Each NAS document is
+parsed serially in a fresh child with the following M4 Pro 24 GB defaults:
+
+```toml
+[parsers.isolation]
+enabled = true
+wall_seconds = 180
+cpu_seconds = 120
+memory_mib = 6144
+result_mib = 256
+diagnostic_kib = 16
+cpu_threads = 4
+nice = 5
+```
+
+The parent observes aggregate RSS for the child and all descendants every
+100 ms and kills the process group on memory or wall-time excess. The child
+also limits CPU, result-file bytes, open descriptors, and core dumps; Linux
+adds address/data-space rlimits. A limit breach is a per-file parser failure,
+not a worker crash, and cannot activate a worse extraction.
+
+Tune upward only after recording source hash before/after, elapsed time, peak
+RSS, extraction status, unit count, and warnings on representative large
+documents. Keep at least 2x measured peak RSS and leave enough unified memory
+for PostgreSQL, the OS, and OCR. Tune downward by format only through a future
+adapter profile; the current profile is intentionally uniform and serial.
+
+This worker is not a permission sandbox. Keep the NAS mount read-only and use
+the launch/container network policy for egress denial. Disabling isolation is
+appropriate only for deterministic parser development and comparison, not a
+production sync. Search and `xlsx-read` never launch these workers.
 
 ## PPTX parser validation
 

@@ -61,6 +61,11 @@ cp config/kip.example.toml config/kip.toml
 ./scripts/kip xlsx-read --artifact-id ARTIFACT_ID --sheet "정산" --range "A1:F40"
 ```
 
+Reference 설정은 filesystem parser를 파일 하나당 bounded child에서 직렬
+실행하도록 `[parsers.isolation]`을 활성화한다. 이 설정을 끄는 것은 raw/isolated
+개발 비교에만 사용한다. NAS/OneDrive 운영에서는 source를 별도로 read-only로
+마운트해야 하며, 검색과 `xlsx-read`는 parser child를 실행하지 않는다.
+
 For a real read-only OneDrive audit, use [`docs/AI_OPERATOR_RUNBOOK.md`](AI_OPERATOR_RUNBOOK.md); it defines parser comparison, source-grounded validation, A/B scoring, and the post-fix cycle.
 
 ## 어떤 명령을 쓸까 (Which command?)

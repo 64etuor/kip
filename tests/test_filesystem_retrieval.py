@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import os
 import time
+from collections.abc import Callable, Iterator
 from pathlib import Path
+
+import pytest
 
 from kip.adapters.connectors.filesystem import FileSystemConnector
 from kip.domain.models import ContextRequest, SearchRequest
+from kip.errors import SourceUnavailableError
 
 
 def test_sync_search_context_and_stale_detection(test_container):
@@ -145,6 +149,29 @@ def test_settle_window_skips_recently_modified_files(tmp_path: Path) -> None:
     records = list(connector.scan())
 
     assert [record.relative_path for record in records] == ["settled.txt"]
+    assert connector.skipped_present_relative_paths == frozenset({"fresh.txt"})
+
+
+def test_scan_fails_closed_when_directory_walk_is_incomplete(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def failed_walk(
+        _root: Path,
+        *,
+        onerror: Callable[[OSError], None] | None = None,
+        followlinks: bool = False,
+    ) -> Iterator[tuple[str, list[str], list[str]]]:
+        del followlinks
+        assert onerror is not None
+        onerror(PermissionError("directory denied"))
+        return iter(())
+
+    connector = FileSystemConnector(tmp_path, settle_seconds=0)
+    monkeypatch.setattr(os, "walk", failed_walk)
+
+    with pytest.raises(SourceUnavailableError, match="filesystem scan incomplete"):
+        list(connector.scan())
 
 
 def test_scan_reports_oversize_and_filtered_files_as_present_but_skipped(

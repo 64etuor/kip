@@ -33,6 +33,8 @@ Do not infer current readiness from PRD/TRD target language alone.
 - `AGENTS.md` and `CLAUDE.md` are at the project root.
 - `CLAUDE.md` imports `AGENTS.md` with `@AGENTS.md`.
 - NAS and connector sources are read-only.
+- Reference filesystem parsers run one document per bounded child process;
+  source permissions and network denial remain deployment controls.
 - HWP/HWPX uses the measured native `hwp-hwpx-parser` adapter first, with replaceable command and paired-PDF fallbacks.
 - XLSX uses shallow-all / deep-candidate retrieval.
 - PPTX preserves slide/shape structure, tables, chart caches, image metadata,
@@ -297,7 +299,9 @@ changes. The same operations are exposed over REST and MCP
 - Files deleted from a filesystem source are tombstoned only after they stay
   absent for `[sync] deletion_grace_scans` consecutive complete scans
   (default 2); failed or empty scans never trigger deletion, and reappearing
-  files re-index automatically.
+  files re-index automatically. Directory walk errors fail the scan, while
+  settle/filter/size/symlink-policy deferrals remain present and cannot become
+  false tombstones.
 
 Details are in `docs/OPERATIONS.md` and `docs/AI_OPERATOR_RUNBOOK.md`.
 
@@ -361,10 +365,12 @@ make evaluate
 
 The current public result keeps semantic search disabled: corrected lexical
 retrieval reached Recall@10 and MRR 1.000 with zero ACL leaks, while the
-semantic variants did not improve quality. The reviewed private result is
-different: vector-only Recall@10/MRR reached `0.947/0.822` versus lexical
+semantic variants did not improve quality. The historical reviewed private
+`c4000` result is different: vector-only Recall@10/MRR reached `0.947/0.822` versus lexical
 `0.789/0.646`, with HNSW P95 `133.75 ms` and zero ACL leaks. Stale-warning
-coverage is still absent, so it remains disabled under the fail-closed gate.
+coverage is absent, and the current 12,000-character `c12000` identity has not
+been rebuilt/evaluated, so semantic search remains disabled under the
+fail-closed gate.
 Exact results, latency, fingerprints, target gaps,
 and improvement history are in `docs/PRODUCTION_DESIGN_ALIGNMENT.md`,
 `docs/RAG_EVALUATION.md` and `evaluation/reports/`.

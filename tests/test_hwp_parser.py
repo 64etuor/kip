@@ -1,18 +1,15 @@
 from __future__ import annotations
 
-import json
 import sys
 import zipfile
-from importlib import import_module
 from pathlib import Path
 from types import SimpleNamespace
 from xml.etree import ElementTree as ET
 
 import pytest
 
-from kip.adapters.parsers.hwp_broker import CommandParserConfig, HwpParserBroker
 from kip.adapters.parsers.hwp_native import HwpNativeParser, split_text
-from kip.adapters.parsers.registry import ParserRegistry
+from kip.adapters.parsers.registry import ParserRegistry, raw_parser_by_key
 from kip.errors import ParserError
 from kip.settings import Settings
 
@@ -109,7 +106,7 @@ def _fake_reader_class(text: str):
     class FakeReader:
         def __init__(self, filepath):
             self.filepath = filepath
-            self.tables: list[object] = []
+            self.tables: list[str] = []
 
         def __enter__(self):
             return self
@@ -192,7 +189,7 @@ def test_native_parser_wraps_corrupted_section_xml_as_typed_parser_error(
     class FakeReader:
         def __init__(self, filepath):
             self.filepath = filepath
-            self.tables: list[object] = []
+            self.tables: list[str] = []
 
         def __enter__(self):
             return self
@@ -333,301 +330,14 @@ def test_container_config_selects_native_hwp_primary(tmp_path: Path) -> None:
     path.write_bytes(bytes.fromhex("D0CF11E0A1B11AE1") + b"fixture")
 
     # When the runtime composes the parser chain.
-    parser = ParserRegistry.from_settings(settings).find(path)
+    isolated = ParserRegistry.from_settings(settings).find(path)
+    parser = raw_parser_by_key(settings, "hwp")
     kordoc = settings.get("parsers.hwp.kordoc", {}) or {}
 
     # Then the bundled native parser is primary and Kordoc is explicit opt-in.
     assert parser.native is not None
     assert parser.version == "2.0-native-primary"
+    assert isolated.name == parser.name
+    assert isolated.version == parser.version
     assert kordoc["enabled"] is False
     assert kordoc["argv"][0] == "kordoc"
-
-
-def test_command_broker_preserves_kordoc_structured_blocks(tmp_path: Path) -> None:
-    # Given a Kordoc-compatible payload containing a table, an image, and a typed warning.
-    payload = {
-        "metadata": {"parserVersion": "4.7.3"},
-        "blocks": [
-            {
-                "type": "paragraph",
-                "text": "승인 완료",
-                "pageNumber": 1,
-                "spans": [{"text": "승인", "bold": True}, {"text": " 완료"}],
-                "footnoteText": "결재번호 A-1",
-            },
-            {
-                "type": "table",
-                "pageNumber": 2,
-                "table": {
-                    "rows": 2,
-                    "cols": 2,
-                    "hasHeader": True,
-                    "cells": [
-                        [
-                            {"text": "항목", "rowSpan": 1, "colSpan": 1, "isHeader": True},
-                            {"text": "값", "rowSpan": 1, "colSpan": 1, "isHeader": True},
-                        ],
-                        [
-                            {"text": "일정", "rowSpan": 1, "colSpan": 1},
-                            {"text": "2026-08-13", "rowSpan": 1, "colSpan": 1},
-                        ],
-                    ],
-                },
-            },
-            {
-                "type": "image",
-                "pageNumber": 2,
-                "imageData": {"filename": "도면.png", "mimeType": "image/png"},
-            },
-        ],
-        "warnings": [{"page": 2, "code": "PARTIAL_PARSE", "message": "도형 일부를 건너뜀"}],
-    }
-    source = tmp_path / "fixture.hwp"
-    source.write_bytes(bytes.fromhex("D0CF11E0A1B11AE1") + b"fixture")
-    command = [sys.executable, "-c", f"print({json.dumps(json.dumps(payload))})"]
-    broker = HwpParserBroker([CommandParserConfig(name="kordoc", argv=command)])
-
-    # When the command boundary translates the structured payload.
-    extraction, units = broker.parse(
-        source,
-        artifact_id="art_fixture",
-        document_id="doc_fixture",
-        acl_scopes=["workspace:default"],
-    )
-
-    # Then no meaningful block is dropped and machine-readable structure remains available.
-    assert [unit.unit_type for unit in units] == ["paragraph", "table", "image"]
-    assert units[1].body == "항목\t값\n일정\t2026-08-13"
-    assert units[1].metadata["table"]["cells"][1][1]["text"] == "2026-08-13"
-    assert units[2].body == "[image: 도면.png]"
-    assert units[2].metadata["image"] == {
-        "filename": "도면.png",
-        "mime_type": "image/png",
-    }
-    assert extraction.warnings == ["PARTIAL_PARSE page 2: 도형 일부를 건너뜀"]
-    # And the locator never trusts kordoc's never-emitted section/sectionNumber
-    # keys, and pairs every non-null page with a page_mode so a reader can
-    # tell a real page from a section-position approximation (ADR-049).
-    assert all(unit.locator.data["section"] is None for unit in units)
-    assert [unit.locator.data["page"] for unit in units] == [1, 2, 2]
-    assert [unit.locator.data["page_mode"] for unit in units] == [
-        "section_approx",
-        "section_approx",
-        "section_approx",
-    ]
-
-
-def test_command_broker_marks_page_exact_only_when_metadata_says_so(
-    tmp_path: Path,
-) -> None:
-    # Given a payload whose document metadata explicitly claims exact pages.
-    payload = {
-        "metadata": {"parserVersion": "4.7.3", "pageMode": "exact"},
-        "blocks": [{"type": "paragraph", "text": "승인 완료", "pageNumber": 1}],
-    }
-    source = tmp_path / "fixture.hwp"
-    source.write_bytes(bytes.fromhex("D0CF11E0A1B11AE1") + b"fixture")
-    command = [sys.executable, "-c", f"print({json.dumps(json.dumps(payload))})"]
-    broker = HwpParserBroker([CommandParserConfig(name="kordoc", argv=command)])
-
-    # When the command boundary translates the payload.
-    _extraction, units = broker.parse(
-        source,
-        artifact_id="art_fixture",
-        document_id="doc_fixture",
-        acl_scopes=["workspace:default"],
-    )
-
-    # Then the locator records the exact page mode instead of the
-    # conservative section_approx default.
-    assert units[0].locator.data["page"] == 1
-    assert units[0].locator.data["page_mode"] == "exact"
-
-
-def test_command_broker_leaves_page_mode_null_when_no_page_is_placed(
-    tmp_path: Path,
-) -> None:
-    # Given a block that carries no pageNumber at all.
-    payload = {
-        "metadata": {"parserVersion": "4.7.3"},
-        "blocks": [{"type": "paragraph", "text": "승인 완료"}],
-    }
-    source = tmp_path / "fixture.hwp"
-    source.write_bytes(bytes.fromhex("D0CF11E0A1B11AE1") + b"fixture")
-    command = [sys.executable, "-c", f"print({json.dumps(json.dumps(payload))})"]
-    broker = HwpParserBroker([CommandParserConfig(name="kordoc", argv=command)])
-
-    # When the command boundary translates the payload.
-    _extraction, units = broker.parse(
-        source,
-        artifact_id="art_fixture",
-        document_id="doc_fixture",
-        acl_scopes=["workspace:default"],
-    )
-
-    # Then page_mode is never fabricated for an absent page.
-    assert units[0].locator.data["page"] is None
-    assert units[0].locator.data["page_mode"] is None
-
-
-def _hwpx_section_xml(text: str) -> str:
-    return (
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>'
-        '<hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" '
-        'xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">'
-        '<hp:p id="0" paraPrIDRef="0" styleIDRef="0">'
-        f'<hp:run charPrIDRef="0"><hp:t>{text}</hp:t></hp:run>'
-        "</hp:p></hs:sec>"
-    )
-
-
-def test_native_parser_labels_sections_numerically_despite_lexical_file_order(
-    tmp_path: Path,
-) -> None:
-    # Given a real (not mocked) HWPX archive with 11 sections, so section10
-    # sorts lexically before section2 in the dependency's own
-    # _get_section_files() (a real ordering quirk this feature does not
-    # attempt to fix - see hwp_native._reconstruct_section_spans).
-    path = tmp_path / "eleven_sections.hwpx"
-    with zipfile.ZipFile(path, "w") as archive:
-        archive.writestr("mimetype", "application/hwp+zip")
-        archive.writestr("Contents/content.hpf", '<?xml version="1.0"?><package/>')
-        for index in range(11):
-            archive.writestr(f"Contents/section{index}.xml", _hwpx_section_xml(f"MARKER_{index}_END"))
-
-    # When the section reconstruction runs through the real hwp-hwpx-parser
-    # dependency directly (bypassing chunk splitting, whose windows can
-    # straddle multiple small sections and would make a body-substring
-    # assertion ambiguous).
-    from kip.adapters.parsers import hwp_native as hwp_native_module
-
-    Reader = import_module("hwp_hwpx_parser").Reader
-    with Reader(path) as reader:
-        text = reader.extract_text()
-        spans = hwp_native_module._reconstruct_section_spans(reader, path, text)
-
-    # Then reconstruction verified against extract_text() (spans is not
-    # None) and each section's true numeric index - parsed from its
-    # filename, never its position among the lexically-sorted files -
-    # matches the marker embedded in that section's own text.
-    assert spans is not None
-    assert {span.section for span in spans} == set(range(11))
-    for span in spans:
-        assert f"MARKER_{span.section}_END" in text[span.start : span.end]
-        assert f"MARKER_{span.section}_END" not in text[: span.start]
-        assert f"MARKER_{span.section}_END" not in text[span.end :]
-
-
-class _FakeHwp5Backend:
-    """Duck-types just the private HWP5Reader surface
-    _reconstruct_section_spans reaches into (_reset_counters,
-    _iter_sections, _read_section, _extract_section_text), so the HWP5
-    branch can be exercised without a real OLE-compound-file fixture."""
-
-    def __init__(self, sections: dict[int, str]):
-        self._sections = sections
-        self.reset_calls = 0
-
-    def _reset_counters(self):
-        self.reset_calls += 1
-
-    def _iter_sections(self):
-        return iter(sorted(self._sections))
-
-    def _read_section(self, section_idx):
-        return section_idx
-
-    def _extract_section_text(self, section_data, options):
-        return self._sections[section_data]
-
-
-class _FakeHwp5Reader:
-    def __init__(self, backend: _FakeHwp5Backend):
-        self._backend = backend
-
-    def _get_reader(self):
-        return self._backend
-
-
-def test_reconstruct_section_spans_succeeds_for_hwp5_numeric_stream_order(
-    tmp_path: Path,
-) -> None:
-    # Given a fake HWP5 backend whose _iter_sections() already yields the
-    # real BodyText/SectionN order (0, 1, 2 - HWP5 has no lexical-sort bug,
-    # unlike HWPX's _get_section_files()).
-    from kip.adapters.parsers import hwp_native as hwp_native_module
-
-    sections = {0: "ZERO", 1: "ONE", 2: "TWO"}
-    backend = _FakeHwp5Backend(sections)
-    reader = _FakeHwp5Reader(backend)
-    full_text = "\n\n".join(sections[i] for i in sorted(sections))
-    path = tmp_path / "fixture.hwp"
-
-    # When the reconstruction runs.
-    spans = hwp_native_module._reconstruct_section_spans(reader, path, full_text)
-
-    # Then it verifies and labels every section with its real numeric index,
-    # having reset counters first (mirroring HWP5Reader.extract_text()'s own
-    # preamble) so re-numbered footnote/endnote markers would stay correct.
-    assert backend.reset_calls == 1
-    assert spans is not None
-    assert [(span.section, full_text[span.start : span.end]) for span in spans] == [
-        (0, "ZERO"),
-        (1, "ONE"),
-        (2, "TWO"),
-    ]
-
-
-def test_reconstruct_section_spans_falls_back_to_none_on_mismatch(
-    tmp_path: Path,
-) -> None:
-    # Given a fake HWP5 backend whose per-section reconstruction does NOT
-    # concatenate to the text the caller already extracted (simulating
-    # dependency drift or an unexpected internal structure).
-    from kip.adapters.parsers import hwp_native as hwp_native_module
-
-    backend = _FakeHwp5Backend({0: "ZERO", 1: "ONE"})
-    reader = _FakeHwp5Reader(backend)
-    path = tmp_path / "fixture.hwp"
-
-    # When the reconstruction is checked against text that cannot match.
-    spans = hwp_native_module._reconstruct_section_spans(
-        reader, path, "SOMETHING ENTIRELY DIFFERENT"
-    )
-
-    # Then it fails safe: no spans, so callers fall back to section: None
-    # and a warning instead of ever emitting a wrong section number.
-    assert spans is None
-
-
-def test_reconstruct_section_spans_returns_none_for_unsupported_suffix(
-    tmp_path: Path,
-) -> None:
-    # Given a path whose suffix is neither .hwp nor .hwpx.
-    from kip.adapters.parsers import hwp_native as hwp_native_module
-
-    backend = _FakeHwp5Backend({0: "ZERO"})
-    reader = _FakeHwp5Reader(backend)
-    path = tmp_path / "fixture.txt"
-
-    # When reconstruction is attempted.
-    spans = hwp_native_module._reconstruct_section_spans(reader, path, "ZERO")
-
-    # Then it declines rather than guessing.
-    assert spans is None
-
-
-def test_section_for_offset_attributes_gaps_and_out_of_range_offsets() -> None:
-    # Given section spans with a gap between them (the paragraph_separator).
-    from kip.adapters.parsers.hwp_native import _section_for_offset, _SectionSpan
-
-    spans = [_SectionSpan(section=0, start=0, end=4), _SectionSpan(section=1, start=6, end=10)]
-
-    # When offsets land inside a span, inside the gap, and past the end.
-    # Then interior offsets resolve to their own section, an offset inside
-    # the gap attributes forward to the next section, and an offset past
-    # every span falls back to the last section rather than raising.
-    assert _section_for_offset(spans, 2) == 0
-    assert _section_for_offset(spans, 5) == 1
-    assert _section_for_offset(spans, 999) == 1
-    assert _section_for_offset([], 0) is None

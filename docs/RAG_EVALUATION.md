@@ -4,9 +4,11 @@
 
 Keep semantic search disabled by default. The reason is no longer “semantic
 quality did not improve” for every corpus. On the reviewed 19-case private
-OneDrive set, vector-only retrieval materially beats the active lexical path,
-and its HNSW P95 passes, but its stale-warning gate fails closed. On the six-document public
-pilot, lexical remains equal or better. These are separate corpus decisions.
+OneDrive set, the historical `c4000` vector-only run materially beat the active
+lexical path and its HNSW P95 passed, but the current reference cap is 12,000
+characters and has not been rebuilt/evaluated. Its stale-warning gate also
+fails closed. On the six-document public pilot, lexical remains equal or
+better. These are separate corpus decisions.
 
 Public v1 `SearchRequest.mode` exposes `lexical`, `vector`, `hybrid`, and
 `reranked` consistently across the four edges. `kip evaluate run` remains the
@@ -17,12 +19,18 @@ The latest loaded-corpus audit, including the corrected unmeasured-metric
 semantics and all four retrieval variants, is
 [`RAG_QUALITY_AUDIT_2026-08-06.md`](RAG_QUALITY_AUDIT_2026-08-06.md).
 
-## Reviewed private shadow: 2026-08-13
+## Reviewed private shadow: 2026-08-13 historical `c4000` run
 
-The current Qwen3 space
-`qwen3-embedding-0.6b-1024-c4000-ht1` is complete at 30,565/30,565 current
-active ACL-fresh units. It uses the pinned local Infinity sidecar and versioned
+The evaluated Qwen3 space
+`qwen3-embedding-0.6b-1024-c4000-ht1` completed 30,565/30,565 then-current
+active ACL-fresh units. It used the pinned local Infinity sidecar and versioned
 `head_tail_v1` input policy from ADR-035.
+
+The current code and reference configuration use a 12,000-character cap, which
+creates a distinct `c12000` space identity. Therefore this table is historical
+quality evidence, not a current compatible projection or activation report. A
+fresh `c12000` rebuild, verification, fingerprint-matched evaluation, and stale
+source cases are required before promotion can be reconsidered.
 
 | Variant | Recall@10 | MRR | nDCG@10 | P95 ms | ACL leaks |
 |---|---:|---:|---:|---:|---:|

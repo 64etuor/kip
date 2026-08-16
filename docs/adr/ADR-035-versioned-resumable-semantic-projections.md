@@ -31,7 +31,8 @@ vectors even when the model and dimensions remained the same.
 ## Decision
 
 - The current document input is `title + normalized body`, bounded by
-  `models.embedding.max_document_chars` (default 4,000).
+  `models.embedding.max_document_chars` (default 12,000 after the amendment
+  above; the accepted original default was 4,000).
 - Oversized bodies use the named `head_tail_v1` strategy: preserve the title,
   then sample both the head and tail around an explicit truncation marker.
 - The input cap and strategy are part of the embedding-space configuration,
@@ -58,9 +59,11 @@ vectors even when the model and dimensions remained the same.
 - The bounded input avoids sidecar stalls but can omit middle content. Richer
   source-aware chunking is a future evaluated design change, not an implicit
   extension of `head_tail_v1`.
-- The 2026-08-13 private space completed at 30,565/30,565. HNSW vector P95 is
-  133.75 ms with preserved quality, but the space remains disabled because the
-  stale-warning gate has no observation and fails closed.
+- The 2026-08-13 `c4000` private space completed at 30,565/30,565. HNSW vector
+  P95 was 133.75 ms with preserved quality, but that report predates the
+  12,000-character amendment and remains historical. A new `c12000` shadow
+  space must be rebuilt and evaluated; semantic search also remains disabled
+  because the stale-warning gate has no observation and fails closed.
 
 ## References
 

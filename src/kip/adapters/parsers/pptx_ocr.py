@@ -7,8 +7,6 @@ from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING, assert_never
 
-from PIL import Image, UnidentifiedImageError
-
 from kip.adapters.parsers.pptx_units import PptxUnitContext
 from kip.domain.json_types import JsonObject
 from kip.domain.models import ContentUnit, EvidenceLocator
@@ -269,6 +267,10 @@ def _ocr_payload(blob: bytes, extension: str) -> tuple[bytes, str] | None:
     suffix = f".{extension.lower()}"
     if suffix in {".png", ".jpg", ".jpeg", ".webp"}:
         return blob, suffix
+    try:
+        from PIL import Image, UnidentifiedImageError
+    except ImportError:
+        return None
     try:
         with Image.open(BytesIO(blob)) as image:
             output = BytesIO()

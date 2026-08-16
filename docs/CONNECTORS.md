@@ -12,6 +12,9 @@ A connector discovers immutable source revisions and emits canonical source even
 - Do not treat an unavailable mount as mass deletion. A failed or aborted scan
   never contributes deletion evidence, and a scan that sees zero files skips
   deletion reconciliation entirely.
+- Treat a directory walk error as an incomplete scan. Files deferred by settle,
+  symlink, filter, or size policy remain present for deletion accounting even
+  though they are not parsed in that scan.
 - Hash content for revision identity.
 - Deletion is reconciled per complete scan with a grace policy
   (`[sync] deletion_grace_scans`, default 2): an indexed file absent from that
@@ -21,9 +24,25 @@ A connector discovers immutable source revisions and emits canonical source even
   mark and is re-indexed. See `docs/OPERATIONS.md` "Filesystem deletion grace
   policy" for the operational details.
 
+### Parser process isolation
+
+The reference profiles wrap every registered filesystem parser behind the
+same `ParserPort` adapter and execute one document in a fresh bounded child.
+The M4 Pro 24 GB profile is intentionally serial: four native-library threads,
+6144 MiB aggregate process-tree RSS, 120 CPU seconds, 180 wall seconds, a
+256 MiB response cap, and nice 5. The parent kills the full process group on a
+timeout or memory breach, validates the versioned response file, and exposes a
+typed per-file parser failure without replacing an active extraction.
+
+This changes execution containment, not format coverage or embedding policy.
+The child opens the configured source path, so the source root must still be
+mounted read-only. Network denial also remains an outer runtime/container
+responsibility.
+
 ## HWP/HWPX parser broker
 
-The reference profile uses the in-process `hwp-hwpx-parser` adapter first.
+The reference profile uses the native `hwp-hwpx-parser` adapter first, inside
+the same bounded parser child used for the other filesystem formats.
 Command parsers are optional, explicitly installed fallbacks; their templates
 remain configuration, not Core code. Runtime indexing must never download or
 execute an unpinned package installer.
@@ -74,13 +93,16 @@ Keep production parser versions pinned. Upgrade a pin only after the parser conf
 ## PPTX parser
 
 Install `python-pptx` through the pinned `extractors` extra and add `.pptx` to
-the filesystem source. The in-process adapter emits shape-level evidence for
-text, merged tables, chart caches, image metadata, nested groups, notes,
-comments, and SmartArt. It preserves exact slide/shape coordinates and never
-fetches external relationships or executes macros. Optional OOXML failures are
-visible as partial warnings; embedded objects are counted but not expanded.
-Legacy `.ppt`, media transcription, and modern threaded comments require a
-separate evaluated adapter.
+the filesystem source. The native adapter, invoked inside the bounded parser
+child, emits shape-level evidence for text, merged tables, chart caches, image
+metadata, nested groups, notes, comments, and SmartArt. It preserves exact
+slide/shape coordinates and never fetches external relationships or executes
+macros. Optional OOXML failures are visible as partial warnings; embedded
+objects are counted but not expanded. Legacy `.ppt`, media transcription, and
+modern threaded comments require a separate evaluated adapter.
+The base wheel can start its CLI without the extractor extra; Pillow is loaded
+only when PPTX OCR must transcode a non-PNG/JPEG/WebP image. Actual PPTX parsing
+and production indexing still require the pinned `extractors` extra.
 
 ## Local Korean OCR adapter
 

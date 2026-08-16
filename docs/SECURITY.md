@@ -154,6 +154,17 @@
 - Reject path traversal and files outside configured roots.
 - Do not follow symlinks unless explicitly enabled.
 - Enforce file-size, ZIP entry-count, decompression-ratio, and timeout limits.
+- Reference filesystem parsers run one document per child process. The parent
+  enforces wall-clock and aggregate process-tree RSS limits and kills the
+  process group on excess; POSIX children additionally receive CPU, output,
+  descriptor, and core-dump limits. Parser responses use capped private files,
+  not unbounded stdout capture, and only a bounded diagnostic tail is retained.
+- On the M4 Pro 24 GB reference host the default profile is 180 s wall,
+  120 s CPU, 6144 MiB RSS, 256 MiB response, four library threads, and nice 5.
+  macOS memory enforcement is parent-observed RSS; Linux additionally applies
+  address/data-space rlimits. These controls do not revoke source permissions
+  or create a network namespace: keep NAS mounts read-only and enforce egress
+  denial in the outer launch/container policy.
 - PPTX parsing reads OOXML locally, never executes VBA or fetches external
   relationships, and records rather than expands embedded OLE/package objects.
 - Default PDF/PPTX OCR accepts only an installed Kordoc 4.7.3 binary with an
@@ -165,6 +176,19 @@
   removes it after the batch, deduplicates by SHA-256, and enforces image count,
   per-image bytes, total bytes, and minimum dimensions. OCR failure never
   replaces native extraction or mutates a source file.
+
+## Dependency safety
+
+- The production image installs only hash-locked `requirements/runtime.txt`.
+  A contract test requires every core project dependency to appear in that
+  lock, preventing a wheel-only dependency from being absent at runtime.
+- Audit the production lock directly and audit the installed optional-extra
+  environment separately. The opt-in semantic extra requires Transformers
+  `>=5.5.4,<6` and is currently locked at 5.15.0; semantic activation still
+  requires its independent shadow quality and compatibility gates.
+- Optional extractor imports must not make the base CLI fail at module import
+  time. The clean-wheel smoke blocks that regression; parser execution still
+  fails explicitly when its declared extra is unavailable.
 - Store parser stderr as sanitized diagnostics, not as user-visible content.
 - Fetch public evaluation files only through the explicit government-host
   manifest, enforce the 25 MiB limit, PDF signature, and pinned SHA-256, and

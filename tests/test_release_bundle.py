@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
+import tomllib
 import zipfile
 from pathlib import Path
 
@@ -11,6 +13,25 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 PINNED_IMAGE = "registry.example/kip@sha256:" + "1" * 64
+
+
+def test_runtime_lock_contains_every_core_dependency() -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    core_names = {
+        re.split(r"[<>=!~; \[]", requirement, maxsplit=1)[0]
+        .lower()
+        .replace("_", "-")
+        for requirement in project["project"]["dependencies"]
+    }
+    runtime_names = {
+        line.split("==", maxsplit=1)[0].lower().replace("_", "-")
+        for line in (ROOT / "requirements/runtime.txt")
+        .read_text(encoding="utf-8")
+        .splitlines()
+        if line and not line.startswith(("#", " ")) and "==" in line
+    }
+
+    assert core_names <= runtime_names
 
 
 def _test_wheel(path: Path) -> None:

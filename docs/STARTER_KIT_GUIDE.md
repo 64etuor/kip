@@ -105,6 +105,12 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 - 지원 확장자만이 아니라 암호화, 손상, 빈 페이지, 표, 이미지, 수식 표본을 포함한다.
 - page/section/sheet/cell 등 source-reproducible locator와 parser version을 남긴다.
 - 시간·파일 크기·ZIP bomb 제한과 실패 시 이전 active extraction 보존을 검증한다.
+- `[parsers.isolation]`을 기본 활성화하고 대상 장비에서 wall/CPU/RSS/result
+  cap을 실측한다. M4 Pro 24 GB의 검증 기준값은 serial parse, 4 threads,
+  6144 MiB RSS, 120 CPU seconds, 180 wall seconds, 256 MiB result, nice 5다.
+  macOS는 parent RSS 감독, Linux는 RSS 감독과 address/data rlimit을 함께 쓴다.
+  이 설정은 read-only source mount와 outer-runtime network denial을 대신하지
+  않는다.
 - HWP/HWPX upgrade는 먼저 `./scripts/kip parser reextract --source SOURCE`로
   shadow parsing을 실행한다. `rejected=0`, `failed=0`, 원본 hash 불변, golden
   evidence 비교를 확인한 뒤에만 `--activate`한다.
@@ -172,6 +178,9 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 
 1. changelog, license, Python/PostgreSQL/OS compatibility와 old-version literal을 검색한다.
 2. lockfile은 resolver로 재생성하고 container/model digest를 함께 갱신한다.
+   core dependency를 바꿨다면 `requirements/runtime.txt`도 frozen lock에서
+   다시 export하고 core/runtime parity test와 production/full-extra
+   `pip-audit`를 모두 통과시킨다.
 3. parser/model을 shadow에서 실행한다.
 4. `quality validate-manifest`, 동일 golden dataset 평가, `quality recommend`를 실행한다.
 5. `keep_disabled`이면 종료하고, `promote`도 사람의 별도 activation 승인을 받는다.
@@ -194,6 +203,8 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 - backup/restore drill과 projection rebuild 결과
 - CLI/REST/MCP contract parity, 비소유 DB role RLS 검증
 - `./scripts/verify.sh` 결과와 알려진 제한 목록
+- frozen runtime requirements의 core dependency parity와 production/optional
+  dependency audit 결과
 - `docs/PRODUCTION_DESIGN_ALIGNMENT.md`의 target/current/gap 판정과 skip된
   gate 목록
 
@@ -233,6 +244,8 @@ make verify-release BUNDLE="dist/kip-$(tr -d '[:space:]' < VERSION).tar.gz"
 패키지는 설치 가능한 wheel, digest image lock, SPDX SBOM, SLSA provenance,
 release manifest와 SHA-256 checksums, 독립 starter tree를 포함한다. verifier는
 비밀·사내 절대 경로·DB dump·CAS·개인 평가 자료가 섞이면 실패한다.
+배포 전 clean venv에서 base wheel만 설치한 `kip capabilities`와, pinned
+runtime requirements를 설치한 hardened image의 동일 명령을 각각 실행한다.
 
 branch/PR CI 결과는 검증용 candidate다. `v$(cat VERSION)` tag가 `VERSION`과
 정확히 일치할 때만 CI가 GHCR에 image를 push하고 wheel 및 archive provenance와

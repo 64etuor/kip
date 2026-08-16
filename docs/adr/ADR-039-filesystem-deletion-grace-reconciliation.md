@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-13
+- **Safety clarification:** 2026-08-16
 
 ## Context
 
@@ -32,6 +33,9 @@ tombstone-revision semantics.
 4. A file that reappears — or that was seen but failed to parse — clears its
    absence mark; a reappearing tombstoned file is re-indexed by the next sync.
    Nothing is ever hard-deleted and the source tree is never written.
+5. A directory walk error makes the scan incomplete and blocks reconciliation.
+   A present file deferred by settle, symlink, filter, or size policy counts as
+   seen even though that scan does not parse it.
 
 ## Consequences
 
@@ -39,9 +43,10 @@ tombstone-revision semantics.
   window, with an auditable revision history instead of row deletion.
 - Empty scans never contribute deletion evidence, so a truly emptied source
   tree is never tombstoned automatically; that requires operator action.
-- Narrowing `include_extensions` or `exclude_globs` tombstones now-out-of-scope
-  content after the grace window; collection-scope changes need review before
-  the next sync.
+- Narrowing `include_extensions` or `exclude_globs` stops future ingestion but
+  preserves the prior active extraction while the source file remains present.
+  Explicit deletion or a separate reviewed retirement workflow is required to
+  remove it from the active index.
 - The TRD's additional sentinel-file, count-drop, and permission-ratio mount
   guards remain unimplemented and are recorded as a limitation in
   `docs/IMPLEMENTATION_STATUS.md`.

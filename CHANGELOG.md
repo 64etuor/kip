@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Guided setup now asks explicitly whether ontology entity/relation mining
+  should be enabled. The choice is fingerprinted in the versioned setup plan
+  and written to `[models.relation_mining]` in both generated configs;
+  enabling it with a disabled generation provider fails at the answer boundary.
 - Filesystem deletion reconciliation now treats files deferred by the settle
   window or symlink policy as present, matching the existing filtered/oversize
   protection, so a live NAS file cannot age into a false tombstone. Directory

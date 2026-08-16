@@ -327,6 +327,7 @@ class SetupService:
             "ontology_profile",
             "model_provider",
             "model_retention_policy",
+            "relation_mining_mode",
             "interaction_memory_mode",
         }:
             return value

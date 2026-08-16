@@ -39,6 +39,11 @@ could resolve — deferring the failure to runtime instead of the answer.
    `verified`.
 6. The generated retrieval default is `mode = "reranked"`, matching the
    promoted BM25 default of ADR-034.
+7. Setup asks explicitly whether ontology relation mining is enabled. The
+   decision is plan-fingerprinted and written to both generated configs;
+   enabling mining with a disabled generation provider is rejected before
+   plan creation. This switch only enables candidate creation and does not
+   bypass assertion review.
 
 ## Consequences
 

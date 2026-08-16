@@ -56,9 +56,10 @@ Following `skills/kip-setup/SKILL.md`, the agent asks the questions returned by
 `kip setup inspect` strictly one at a time. It settles the organization
 workspace, identity verification, the absolute path of every folder to index
 with its extension/exclusion scope, classification, and ACL, the model egress
-policy, secret references, CAS/backup paths, the evaluation dataset, an empty
-starter or example ontology profile, explicit interaction-memory consent, and
-the ontology reviewers. It then previews file counts, sizes, extension
+policy, whether reviewed ontology relation mining is enabled, secret
+references, CAS/backup paths, the evaluation dataset, an empty starter or
+example ontology profile, explicit interaction-memory consent, and the
+ontology reviewers. It then previews file counts, sizes, extension
 distribution, exclusions, and symlinks, and only after the user approves the
 plan fingerprint and read-only mounts does it atomically generate and verify:
 

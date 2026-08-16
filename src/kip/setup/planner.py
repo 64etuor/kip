@@ -50,6 +50,7 @@ def build_setup_plan(
         or answers.ontology_profile is None
         or answers.filesystem_sources is None
         or answers.model_provider is None
+        or answers.relation_mining_mode is None
         or answers.database_secret_ref is None
         or answers.cas_path is None
         or answers.backup_path is None
@@ -142,6 +143,7 @@ def build_setup_plan(
         ),
         model_retention_policy=answers.model_retention_policy,
         model_secret_ref=answers.model_secret_ref,
+        relation_mining_mode=answers.relation_mining_mode,
         database_secret_ref=answers.database_secret_ref,
         cas_path=answers.cas_path,
         backup_path=answers.backup_path,
@@ -206,6 +208,8 @@ def _first_missing_question(answers: SetupAnswers) -> SetupQuestion | None:
             return _question("model_retention_policy")
         if answers.model_secret_ref is None:
             return _question("model_secret_ref")
+    if answers.relation_mining_mode is None:
+        return _question("relation_mining_mode")
     trailing: list[tuple[str, object | None]] = [
         ("database_secret_ref", answers.database_secret_ref),
         ("cas_path", answers.cas_path),
@@ -371,6 +375,17 @@ _QUESTIONS = {
         answer_format="env: or file: reference",
         example="env:KIP_OPENAI_API_KEY",
         why="셋업 상태와 생성 파일에 credential 원문을 남기지 않습니다.",
+    ),
+    "relation_mining_mode": SetupQuestion(
+        id="relation_mining_mode",
+        prompt="온톨로지 entity·relation 후보 자동 추출을 활성화할까요?",
+        answer_format="one choice",
+        choices=["enabled", "disabled"],
+        why=(
+            "활성화하면 선택한 생성 모델이 색인 근거에서 검토 후보를 만듭니다. "
+            "후보는 승인 전까지 사실이나 검색 그래프로 승격되지 않으며, "
+            "disabled 모델 공급자와 함께 사용할 수 없습니다."
+        ),
     ),
     "database_secret_ref": SetupQuestion(
         id="database_secret_ref",

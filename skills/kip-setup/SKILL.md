@@ -9,6 +9,9 @@ Make the CLI state machine the only configuration writer. Never infer missing de
 
 0. Prerequisite: confirm `./scripts/kip setup inspect` runs at all. On a fresh clone it fails (missing `.venv`, `SyntaxError`, or import errors) until bootstrap has run. First check `python3 --version`: if it is older than 3.12, tell the user to install Python 3.12+ (for example `brew install python@3.12`, or set `KIP_PYTHON=/path/to/python3.12`) before anything else. Then run `./scripts/bootstrap.sh` and retry the inspect command.
 1. Run `kip setup inspect`. Read the versioned JSON envelope.
+   When `relation_mining_mode` is asked, explain that `enabled` requires an
+   active generation provider and creates review candidates only; it never
+   auto-promotes conditional or required relations into graph facts.
 2. If `complete=false`, ask exactly one question: the sole item in `data.questions`. Include its reason and answer format without combining it with later questions.
 3. Record only that response with `kip setup answer --question ID --value VALUE`.
 4. Repeat inspect and answer until complete. Do not request credential values; accept only secret references. The runtime resolves `env:NAME` references everywhere and `file:/absolute/path` references only where the question's answer format allows it (the model credential). The database URL and bootstrap identity keys accept `env:` only. `keychain:` and `secret-manager:` references are rejected by the CLI because no runtime resolver exists.

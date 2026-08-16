@@ -121,6 +121,13 @@ def build_config_payload(plan: SetupPlan, *, container: bool) -> JsonObject:
         },
         "models": {
             "generation": model,
+            "relation_mining": {
+                "enabled": plan.relation_mining_mode == "enabled",
+                "max_units": 200,
+                "max_characters": 480000,
+                "max_entity_proposals": 128,
+                "max_relation_proposals": 256,
+            },
             "reranker": {
                 "enabled": True,
                 "backend": "bm25",

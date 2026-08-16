@@ -321,6 +321,13 @@ Rebuild lexical, vector, and graph projections independently. Never delete appro
 
 ## Ontology mining and review
 
+Guided setup asks for `relation_mining_mode` after the generation-provider and
+provider-specific egress questions. `enabled` writes
+`[models.relation_mining].enabled=true` to both generated configs; `disabled`
+writes false. Enabling mining while `models.generation` is disabled is rejected
+before a setup plan can be created. A resumed pre-change setup state receives
+this question before it can produce a new plan.
+
 Enable `[models.relation_mining]` only after the generation destination and
 egress policy pass the target corpus review. Mining is never triggered by
 search or answer requests.

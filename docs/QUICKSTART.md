@@ -21,7 +21,7 @@ agent는 `kip-setup` Skill에 따라 매번 하나의 누락된 결정만 질문
 # inspect와 answer를 complete=true까지 반복
 ./scripts/kip setup preview
 ./scripts/kip setup plan --output .kip/setup-plan.json
-# plan의 scope, read-only mounts, egress, warnings를 사람이 승인
+# plan의 scope, read-only mounts, egress, relation mining 선택, warnings를 사람이 승인
 ./scripts/kip setup apply --plan .kip/setup-plan.json
 ./scripts/kip setup verify --plan .kip/setup-plan.json
 ```

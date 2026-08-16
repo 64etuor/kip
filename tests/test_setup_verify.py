@@ -176,6 +176,7 @@ def _complete_answers(tmp_path: Path) -> SetupAnswers:
         model_egress_classifications=["public", "internal"],
         model_retention_policy="zero_retention",
         model_secret_ref=SecretReference.parse("env:KIP_OPENAI_API_KEY"),
+        relation_mining_mode="enabled",
         database_secret_ref=SecretReference.parse("env:KIP_DATABASE_URL"),
         cas_path=str((tmp_path / "cas").resolve()),
         backup_path=str(backup.resolve()),

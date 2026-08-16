@@ -336,6 +336,22 @@
       "title": "Plan Fingerprint",
       "type": "string"
     },
+    "relation_mining_mode": {
+      "anyOf": [
+        {
+          "enum": [
+            "disabled",
+            "enabled"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Relation Mining Mode"
+    },
     "retention_days": {
       "title": "Retention Days",
       "type": "integer"

@@ -369,6 +369,22 @@
       "default": null,
       "title": "Ontology Reviewers"
     },
+    "relation_mining_mode": {
+      "anyOf": [
+        {
+          "enum": [
+            "disabled",
+            "enabled"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Relation Mining Mode"
+    },
     "retention_days": {
       "anyOf": [
         {

@@ -20,6 +20,20 @@ consumes the REST JSON contract. Static JSON Schema files are generated into
 }
 ```
 
+## Guided setup boundary
+
+`SetupAnswers` and `SetupPlan` use their existing v1 contracts with an additive
+`relation_mining_mode` choice (`enabled` or `disabled`). New plans always carry
+the explicit choice. Legacy plan payloads may omit it and retain the fail-closed
+disabled behavior, while a resumed answer state is incomplete until the user
+answers the new question. `enabled` is invalid when `model_provider=disabled`.
+
+The generated container and host TOML files materialize the decision as
+`models.relation_mining.enabled` together with the bounded unit, character,
+entity-proposal, and relation-proposal caps. This enables candidate mining only;
+the candidate, evidence, review, approval, and revocation contracts are
+unchanged.
+
 ## Search boundary
 
 `SearchRequest` is the canonical application search request. Its versioned

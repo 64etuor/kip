@@ -159,6 +159,7 @@ class SetupAnswers(StrictModel):
     ] | None = None
     model_retention_policy: Literal["provider_default", "zero_retention"] | None = None
     model_secret_ref: SecretReference | None = None
+    relation_mining_mode: Literal["disabled", "enabled"] | None = None
     database_secret_ref: SecretReference | None = None
     cas_path: str | None = None
     backup_path: str | None = None
@@ -198,6 +199,17 @@ class SetupAnswers(StrictModel):
         if value is not None and not value.strip():
             raise ValueError("JWT audience cannot be blank")
         return value
+
+    @model_validator(mode="after")
+    def validate_relation_mining_provider(self) -> Self:
+        if (
+            self.relation_mining_mode == "enabled"
+            and self.model_provider == "disabled"
+        ):
+            raise ValueError(
+                "enabled relation mining requires a local or remote model provider"
+            )
+        return self
 
     def fingerprint(self) -> str:
         payload = self.model_dump(mode="json")
@@ -280,6 +292,7 @@ class SetupPlan(StrictModel):
     model_egress_classifications: list[str]
     model_retention_policy: Literal["provider_default", "zero_retention"] | None
     model_secret_ref: SecretReference | None
+    relation_mining_mode: Literal["disabled", "enabled"] | None = None
     database_secret_ref: SecretReference
     cas_path: str
     backup_path: str
@@ -292,9 +305,12 @@ class SetupPlan(StrictModel):
     warnings: list[str] = Field(default_factory=list)
 
     def calculate_fingerprint(self) -> str:
+        excluded_fields = {"plan_fingerprint"}
+        if self.relation_mining_mode is None:
+            excluded_fields.add("relation_mining_mode")
         payload = self.model_dump(
             mode="json",
-            exclude={"plan_fingerprint"},
+            exclude=excluded_fields,
         )
         return hashlib.sha256(_canonical_json(payload).encode()).hexdigest()
 

@@ -193,6 +193,30 @@ def test_generated_config_defaults_auto_approve_to_opt_in_disabled(
         assert config["ontology"]["auto_approve"]["enabled"] is False
 
 
+def test_generated_config_enables_relation_mining_when_setup_selects_it(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    answers = complete_setup_answers(tmp_path).model_copy(
+        update={"relation_mining_mode": "enabled"}
+    )
+    plan = build_setup_plan(answers, project_root=project_root)
+
+    apply_setup_plan(plan, project_root=project_root)
+
+    for name in ("config/kip.generated.toml", "config/kip.host.generated.toml"):
+        with (project_root / name).open("rb") as handle:
+            config = tomllib.load(handle)
+        assert config["models"]["relation_mining"] == {
+            "enabled": True,
+            "max_units": 200,
+            "max_characters": 480000,
+            "max_entity_proposals": 128,
+            "max_relation_proposals": 256,
+        }
+
+
 def test_generated_config_enables_the_promoted_bm25_reranker(
     tmp_path: Path,
 ) -> None:

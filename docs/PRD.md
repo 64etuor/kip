@@ -834,6 +834,8 @@ KIP v3 baseline은 다음을 모두 만족해야 인수된다.
 13. AGENTS.md와 Skills가 검색·읽기·인용 순서를 강제한다.
 14. golden query 품질 목표를 충족한다.
 15. backup, restore, export, projection rebuild가 검증된다.
+16. guided setup이 ontology relation mining 활성 여부를 명시적으로 묻고,
+    활성화를 선택한 경우 generation provider와 egress 계약을 함께 검증한다.
 
 ---
 

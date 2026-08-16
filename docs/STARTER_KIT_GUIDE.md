@@ -30,11 +30,15 @@
    `env:NAME`과 (모델 credential에 한해) `file:/absolute/path`뿐이며,
    `keychain:`/`secret-manager:`는 CLI가 거부한다.
    원격 생성 모델을 고르면 허용 분류, provider retention 정책, credential
-   reference를 각각 별도 질문으로 확인한다.
+   reference를 각각 별도 질문으로 확인한다. 이어서 ontology entity/relation
+   후보 추출을 활성화할지 묻고, `enabled`를 고르면 생성 모델이 반드시
+   활성화되어 있어야 한다. 이 선택은 후보 생성만 허용하며 승인되지 않은
+   관계를 graph fact로 승격하지 않는다.
 4. `setup preview`의 source 이름, 분류, ACL scope, 파일 수, 용량, 확장자,
    제외 건수와 symlink 건수를 확인한다.
 5. `setup plan`의 source scope, read-only mount, egress, ontology profile,
-   interaction-memory consent, reviewer, warning과 fingerprint를 승인한다.
+   relation-mining mode, interaction-memory consent, reviewer, warning과
+   fingerprint를 승인한다.
 6. agent가 `setup apply`와 `setup verify`를 마치고 redacted receipt를
    제시하게 한다. receipt의 `runtime_readiness` 실패 항목과 `limitations`를
    먼저 해결한다. apply/verify는 설정 파일만 생성하며 아직 아무것도 색인되지

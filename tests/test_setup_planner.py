@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 
 from kip.setup.models import (
     FilesystemSourceAnswer,
     SecretReference,
     SetupAnswers,
+    SetupPlan,
 )
 from kip.setup.planner import build_setup_plan, inspect_setup
 
@@ -61,6 +64,46 @@ def test_setup_inspection_resumes_with_dynamic_provider_questions(
     assert [question.id for question in retention.questions] == [
         "model_retention_policy"
     ]
+
+
+def test_setup_asks_whether_to_enable_relation_mining_after_model_provider(
+    tmp_path: Path,
+) -> None:
+    # Given otherwise complete onboarding answers without a Graphify decision
+    answers = _complete_answers(tmp_path).model_copy(
+        update={"relation_mining_mode": None}
+    )
+
+    # When setup resumes the decision flow
+    inspection = inspect_setup(answers, project_root=tmp_path)
+
+    # Then relation mining is an explicit deployment choice
+    assert [question.id for question in inspection.questions] == [
+        "relation_mining_mode"
+    ]
+
+
+def test_legacy_setup_plan_without_relation_mining_keeps_its_fingerprint(
+    tmp_path: Path,
+) -> None:
+    # Given a v1 plan persisted before relation_mining_mode was added
+    current = build_setup_plan(_complete_answers(tmp_path), project_root=tmp_path)
+    payload = current.model_dump(mode="json")
+    payload.pop("relation_mining_mode")
+    fingerprint_payload = {
+        key: value for key, value in payload.items() if key != "plan_fingerprint"
+    }
+    payload["plan_fingerprint"] = hashlib.sha256(
+        json.dumps(
+            fingerprint_payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+
+    # When/Then the additive field is absent, its historical fingerprint stays valid
+    SetupPlan.model_validate(payload).verify_fingerprint()
 
 
 def test_setup_requires_explicit_consent_before_persisting_interaction_memory(
@@ -164,6 +207,7 @@ def _complete_answers(tmp_path: Path) -> SetupAnswers:
         model_egress_classifications=["public", "internal"],
         model_retention_policy="zero_retention",
         model_secret_ref=SecretReference.parse("env:KIP_OPENAI_API_KEY"),
+        relation_mining_mode="enabled",
         database_secret_ref=SecretReference.parse("env:KIP_DATABASE_URL"),
         cas_path=str((tmp_path / "cas").resolve()),
         backup_path=str(backup.resolve()),

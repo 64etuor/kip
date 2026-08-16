@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import tomllib
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -76,6 +77,7 @@ def test_setup_cli_answers_previews_plans_applies_and_verifies(
             ),
         ),
         ("model_provider", "disabled"),
+        ("relation_mining_mode", "disabled"),
         ("database_secret_ref", "env:KIP_DATABASE_URL"),
         ("cas_path", str(tmp_path / "cas")),
         ("backup_path", str(backup)),
@@ -128,6 +130,10 @@ def test_setup_cli_answers_previews_plans_applies_and_verifies(
     assert receipt["source_summaries"][0]["file_count"] == 1
     assert (project_root / "config/kip.generated.toml").is_file()
     assert (project_root / "config/kip.host.generated.toml").is_file()
+    generated_config = tomllib.loads(
+        (project_root / "config/kip.generated.toml").read_text(encoding="utf-8")
+    )
+    assert generated_config["models"]["relation_mining"]["enabled"] is False
     assert (project_root / "compose.generated.yaml").is_file()
     assert (project_root / ".mcp.json").is_file()
     assert any(check["name"] == "mcp_adapter" for check in receipt["checks"])
@@ -228,7 +234,9 @@ def _write_complete_state(
         ],
         "model_provider": "disabled",
         "model_egress_classifications": None,
+        "model_retention_policy": None,
         "model_secret_ref": None,
+        "relation_mining_mode": "disabled",
         "database_secret_ref": {"scheme": "env", "name": "KIP_DATABASE_URL"},
         "cas_path": str((tmp_path / "cas").resolve()),
         "backup_path": str(backup.resolve()),

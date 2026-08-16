@@ -3546,6 +3546,19 @@ The former per-command timeout table is a target, not a current universal CLI
 deadline contract; adding one requires cancellation and adapter propagation
 tests rather than documentation alone.
 
+### 29.19 Guided setup relation mining decision
+
+`setup inspect` asks exactly one `relation_mining_mode` question after the
+generation provider and any provider-specific egress questions. The accepted
+values are `enabled` and `disabled`. `enabled` requires a non-disabled
+generation provider and writes the same bounded `[models.relation_mining]`
+table to the generated host and container configs. The setup plan fingerprint
+binds this decision, so changing it invalidates an older generated plan.
+
+The switch authorizes ontology candidate mining, not assertion approval.
+Search and answer requests never trigger mining, and conditional or required
+predicates still pass through the reviewed candidate lifecycle.
+
 ---
 
 ## 30. Agent instruction architecture

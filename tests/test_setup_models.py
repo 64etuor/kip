@@ -56,6 +56,18 @@ def test_setup_answers_round_trip_uses_versioned_contract() -> None:
     assert "postgresql://" not in restored.model_dump_json()
 
 
+def test_setup_answers_reject_relation_mining_without_generation() -> None:
+    # Given relation mining enabled while generation is disabled
+    payload = {
+        "model_provider": "disabled",
+        "relation_mining_mode": "enabled",
+    }
+
+    # When/Then the setup boundary rejects the unrunnable combination
+    with pytest.raises(PydanticValidationError, match=r"requires.*model provider"):
+        SetupAnswers.model_validate(payload)
+
+
 def test_source_answer_requires_canonical_directory(tmp_path: Path) -> None:
     source = tmp_path / "source"
     source.mkdir()

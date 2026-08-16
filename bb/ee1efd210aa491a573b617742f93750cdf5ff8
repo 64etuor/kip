@@ -1,0 +1,76 @@
+docs/OPERATIONS.md
+  s_5ab53a658242e1::t_e8c08b1c33a412 324-330
+src/kip/setup/config_payload.py
+  s_5ab53a658242e1::t_27c513b2ce37df 124-130
+tests/test_setup_verify.py
+  s_5ab53a658242e1::t_27c513b2ce37df 179
+CHANGELOG.md
+  s_5ab53a658242e1::t_e8c08b1c33a412 5-8
+src/kip/setup/service.py
+  s_5ab53a658242e1::t_27c513b2ce37df 330
+.claude/skills/kip-setup/SKILL.md
+  s_5ab53a658242e1::t_e8c08b1c33a412 12-14
+contracts/setup-plan.schema.json
+  s_5ab53a658242e1::t_7974bce8006c04 339-354
+tests/test_setup_planner.py
+  s_5ab53a658242e1::t_27c513b2ce37df 210
+  s_5ab53a658242e1::t_b13f5dca679296 3-4,11,84-106
+  s_5ab53a658242e1::t_a1044ff9737a60 69-83,107-108
+README.md
+  s_5ab53a658242e1::t_e8c08b1c33a412 59-62
+tests/test_setup_writer.py
+  s_5ab53a658242e1::t_a1044ff9737a60 196-219
+docs/adr/ADR-040-runnable-guided-setup-path.md
+  s_5ab53a658242e1::t_e8c08b1c33a412 42-46
+skills/kip-setup/SKILL.md
+  s_5ab53a658242e1::t_e8c08b1c33a412 12-14
+src/kip/setup/planner.py
+  s_5ab53a658242e1::t_27c513b2ce37df 53,146,211-212,379-388
+  s_5ab53a658242e1::t_4308e1394898a2 389
+docs/QUICKSTART.md
+  s_5ab53a658242e1::t_e8c08b1c33a412 24
+tests/test_capacity_defaults_parity.py
+  s_5ab53a658242e1::t_004e3d9c8d7019 104
+tests/test_setup_cli.py
+  s_5ab53a658242e1::t_05061e03be6d28 4,133-136
+  s_5ab53a658242e1::t_27c513b2ce37df 80,237,239
+docs/DATA_CONTRACTS.md
+  s_5ab53a658242e1::t_e8c08b1c33a412 23-36
+src/kip/setup/models.py
+  s_5ab53a658242e1::t_1089d58783181b 295
+  s_5ab53a658242e1::t_bb283e56fb04e0 308-310,313
+  s_5ab53a658242e1::t_27c513b2ce37df 162,203-213
+docs/PRD.md
+  s_5ab53a658242e1::t_e8c08b1c33a412 837-838
+contracts/setup-answers.schema.json
+  s_5ab53a658242e1::t_7974bce8006c04 372-387
+docs/STARTER_KIT_GUIDE.md
+  s_5ab53a658242e1::t_e8c08b1c33a412 33-36,40-41
+tests/setup_support.py
+  s_5ab53a658242e1::t_27c513b2ce37df 42
+tests/test_setup_models.py
+  s_5ab53a658242e1::t_5e952d3ba46916 59-66,68-70
+  s_5ab53a658242e1::t_7b14fc0bfc0e86 67
+docs/PRODUCTION_DESIGN_ALIGNMENT.md
+  s_5ab53a658242e1::t_e8c08b1c33a412 35
+docs/TRD.md
+  s_5ab53a658242e1::t_e8c08b1c33a412 3549-3561
+docs/IMPLEMENTATION_STATUS.md
+  s_5ab53a658242e1::t_e8c08b1c33a412 42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "bbee1efd210aa491a573b617742f93750cdf5ff8",
+  "prompts": {},
+  "sessions": {
+    "s_5ab53a658242e1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a00911-b012-7b20-afcc-9e4ab3d39c60",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

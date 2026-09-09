@@ -420,3 +420,24 @@ gate에 따라 semantic search는 비활성 상태입니다.
 graph, ontology audit는
 [`docs/RAG_QUALITY_AUDIT_2026-08-06.md`](docs/RAG_QUALITY_AUDIT_2026-08-06.md)에
 기록돼 있습니다.
+
+## 12. 라이선스
+
+KIP 자체는 MIT License입니다. 전문은 [`LICENSE`](LICENSE)에 있습니다.
+
+KIP는 서드파티 구성요소를 사용하며, **그중 두 개는 copyleft라 배포 방식에
+따라 의무가 발생합니다.** 전체 목록과 각 구성요소의 라이선스는
+[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md)에 있고, 특정 릴리스의
+정확한 내역은 `make release`가 생성하는 SPDX SBOM이 기준입니다.
+
+| 구성요소 | 라이선스 | 왜 중요한가 |
+|---|---|---|
+| PyMuPDF | **AGPL-3.0** 또는 Artifex 상용 | `requirements/runtime.txt`에 pin되어 **프로덕션 이미지에 포함**되고, 기본 PDF 경로의 표 fallback이 호출합니다 (ADR-054). AGPL은 네트워크 copyleft라 서비스로 제공할 때 해당 구성요소에 대한 소스 제공 의무가 따릅니다 |
+| psycopg, psycopg-pool | **LGPL-3.0-only** | 공개 API를 그대로 사용하므로 KIP에 전이되지 않지만, 재배포 시 LGPL 고지 의무가 있습니다 |
+
+나머지 의존성은 MIT, BSD, Apache-2.0, PostgreSQL License입니다.
+
+PyMuPDF 없이 배포하려면 `[parsers.pdf] tables_enabled = false`로 두고
+`extractors` extra를 제외한 뒤 runtime lock을 다시 생성하세요. PDF 기본 백엔드
+`pdf-inspector`는 MIT이므로 표 fallback만 사라집니다. 실제 의무 판단은
+법률 자문을 받으시기 바랍니다. 이 문서는 사실 목록이지 법률 자문이 아닙니다.

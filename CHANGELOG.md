@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Added `THIRD-PARTY-NOTICES.md` and a README license section. KIP is MIT, but
+  the pinned runtime installs AGPL-3.0 PyMuPDF into the production image and the
+  default PDF path calls it for table fallback, and psycopg is LGPL-3.0-only.
+  Neither was disclosed anywhere in the repository. The notices file records
+  every declared dependency with its license and names the opt-out for a
+  PyMuPDF-free deployment; the SPDX SBOM from `make release` stays authoritative
+  per release.
+
 - Starter archive manifests now record the source `repository` alongside
   `git_commit`, so an adopter who received only a ZIP can find where the kit
   came from. The value is normalized to scheme, host, and path: an access token

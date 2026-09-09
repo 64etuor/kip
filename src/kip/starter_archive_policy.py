@@ -19,6 +19,7 @@ ROOT_FILES: Final = (
     "LICENSE",
     "Makefile",
     "README.md",
+    "THIRD-PARTY-NOTICES.md",
     "VERSION",
     "compose.production.yaml",
     "compose.yaml",

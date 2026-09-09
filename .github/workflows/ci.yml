@@ -236,7 +236,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: read
+      contents: write
       packages: write
       id-token: write
       attestations: write
@@ -315,12 +315,20 @@ jobs:
             ./scripts/release-bundle.sh dist/release
           ./scripts/verify-release.sh dist/release.tar.gz
 
+      - name: Build and verify starter kit archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./scripts/build-starter-kit.sh
+          ./scripts/verify-starter-kit.sh "dist/kip-starter-kit-${{ steps.release.outputs.version }}.zip"
+
       - name: Attest release provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
             dist/wheels/*.whl
             dist/release.tar.gz
+            dist/kip-starter-kit-${{ steps.release.outputs.version }}.zip
 
       - name: Attest release wheel SBOM
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
@@ -336,5 +344,49 @@ jobs:
             dist/wheels/*.whl
             dist/release.tar.gz
             dist/release/artifacts/*.json
+            dist/kip-starter-kit-${{ steps.release.outputs.version }}.zip
+            dist/kip-starter-kit-${{ steps.release.outputs.version }}.zip.sha256
           if-no-files-found: error
+
+      # A workflow artifact expires and needs a signed-in user who can find the
+      # run. The starter kit is the primary way an adopter installs KIP, so it
+      # is attached to a durable public release instead.
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${{ steps.release.outputs.version }}"
+          notes="$(mktemp)"
+          trap 'rm -f "$notes"' EXIT
+          cat > "$notes" <<NOTES
+          Container image: \`ghcr.io/${{ github.repository }}:$version\`
+
+          ### Install
+          Download \`kip-starter-kit-$version.zip\`, verify it against
+          \`kip-starter-kit-$version.zip.sha256\`, unzip it, then follow
+          \`docs/STARTER_KIT_GUIDE.md\` section 2.
+
+          ### Upgrading an existing deployment
+          Do not unzip over a running deployment. \`docs/STARTER_KIT_GUIDE.md\`
+          section 11 lists which paths the kit replaces, which belong to the
+          deployment and must survive, and why \`.mcp.json\` must not be
+          overwritten.
+
+          ### Licensing
+          KIP is MIT. It ships AGPL-3.0 PyMuPDF and LGPL-3.0 psycopg; see
+          \`THIRD-PARTY-NOTICES.md\` before redistributing or offering KIP as a
+          network service.
+
+          Full changes are in \`CHANGELOG.md\`.
+          NOTES
+          gh release create "v$version" \
+            --title "KIP Knowledge Fabric $version" \
+            --notes-file "$notes" \
+            "dist/kip-starter-kit-$version.zip" \
+            "dist/kip-starter-kit-$version.zip.sha256" \
+            "dist/release.tar.gz" \
+            dist/wheels/*.whl \
+            dist/release/artifacts/*.json
           retention-days: 90

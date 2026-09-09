@@ -4,6 +4,14 @@
 
 ## 3.5.0 - 2026-09-09
 
+- Tagged releases now publish a GitHub release carrying the starter kit ZIP
+  and its `.sha256`, the release tarball, the wheel, and the SBOM, provenance,
+  and manifest JSON. Previously the tag-gated publish job pushed the container
+  image but left the release payload as a workflow artifact that expires and
+  requires a signed-in user to locate the run, so an adopter had no durable way
+  to obtain the starter kit. The starter archive is also built, verified, and
+  covered by the release provenance attestation in the same job.
+
 - Fixed the distribution CI job, which could never succeed: it asked buildx
   for `load: true` together with provenance and SBOM attestations, and
   attestations make buildx emit a manifest list that the docker exporter

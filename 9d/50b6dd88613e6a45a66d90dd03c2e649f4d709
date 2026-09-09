@@ -1,0 +1,94 @@
+tests/test_agent_runtime_scripts.py
+  s_0e5d25024bfaed::t_6461465cc6cbe7 1-7,10-68
+  s_0e5d25024bfaed::t_620d7569643c73 8-9,69-98
+docs/IMPLEMENTATION_STATUS.md
+  s_0e5d25024bfaed::t_5db38b982ff139 9,13
+skills/knowledge-fabric/references/evidence.md
+  s_0e5d25024bfaed::t_faafcdc758ebe2 10-12
+VERSION
+  s_0e5d25024bfaed::t_0cd2723bb31152 1
+docs/SECURITY.md
+  s_0e5d25024bfaed::t_0cd2723bb31152 5-10
+.claude/skills/knowledge-fabric/scripts/kip.sh
+  s_0e5d25024bfaed::t_d78987bdb645dc 5-9
+.claude/skills/knowledge-fabric/references/retrieval.md
+  s_0e5d25024bfaed::t_d78987bdb645dc 6-7
+docs/PRD.md
+  s_0e5d25024bfaed::t_0cd2723bb31152 204-209
+CHANGELOG.md
+  s_0e5d25024bfaed::t_0cd2723bb31152 3-17
+tests/test_skill_installation.py
+  s_0e5d25024bfaed::t_6461465cc6cbe7 1-35,37-67
+  s_0e5d25024bfaed::t_405391c5091c5c 36,68-86
+docs/STARTER_KIT_GUIDE.md
+  s_0e5d25024bfaed::t_0cd2723bb31152 80-90
+skills/knowledge-fabric/references/interaction.md
+  s_0e5d25024bfaed::t_faafcdc758ebe2 1-10
+docs/AI_OPERATOR_RUNBOOK.md
+  s_0e5d25024bfaed::t_0cd2723bb31152 7,9-14,79
+docs/PRODUCTION_DESIGN_ALIGNMENT.md
+  s_0e5d25024bfaed::t_4e33e6a1465af9 4,33,51,110-112
+contracts/openapi.json
+  s_0e5d25024bfaed::t_36f064ac39273e 1098
+.claude/skills/knowledge-fabric/references/interaction.md
+  s_0e5d25024bfaed::t_d78987bdb645dc 1-10
+README.md
+  s_0e5d25024bfaed::t_405391c5091c5c 383-387
+src/kip/__init__.py
+  s_0e5d25024bfaed::t_0cd2723bb31152 3
+scripts/install_agent_files.py
+  s_0e5d25024bfaed::t_ffac7a35c00bbb 1-89
+.claude/skills/knowledge-fabric/SKILL.md
+  s_0e5d25024bfaed::t_d78987bdb645dc 3,8,10-14,16-17,19,21-24,27-29,32-57
+skills/knowledge-fabric/references/ontology.md
+  s_0e5d25024bfaed::t_faafcdc758ebe2 18-40
+skills/knowledge-fabric/references/retrieval.md
+  s_0e5d25024bfaed::t_faafcdc758ebe2 6-7
+pyproject.toml
+  s_0e5d25024bfaed::t_0cd2723bb31152 7
+docs/OPERATIONS.md
+  s_0e5d25024bfaed::t_0cd2723bb31152 47-63
+.claude/skills/knowledge-fabric/references/evidence.md
+  s_0e5d25024bfaed::t_d78987bdb645dc 10-12
+scripts/verify.sh
+  s_0e5d25024bfaed::t_ffac7a35c00bbb 7-19,26,28,32-34
+.claude/skills/knowledge-fabric/references/ontology.md
+  s_0e5d25024bfaed::t_d78987bdb645dc 18-40
+scripts/install-agent-files.sh
+  s_0e5d25024bfaed::t_ffac7a35c00bbb 6
+.claude/skills/kip-setup/SKILL.md
+  s_0e5d25024bfaed::t_d78987bdb645dc 3,8-10,12-25,27-31,33-40
+docs/adr/ADR-055-focused-agent-instructions.md
+  s_0e5d25024bfaed::t_0cd2723bb31152 1-40
+skills/kip-setup/SKILL.md
+  s_0e5d25024bfaed::t_439ad345af70c7 3,8-10,12-25,27-31,33-40
+contracts/openapi.yaml
+  s_0e5d25024bfaed::t_36f064ac39273e 6
+skills/knowledge-fabric/SKILL.md
+  s_0e5d25024bfaed::t_7d230f4de7686a 3,8,10-14,16-17,19,21-24,27-29,32-57
+skills/knowledge-fabric/scripts/kip.sh
+  s_0e5d25024bfaed::t_ffac7a35c00bbb 5-9
+AGENTS.md
+  s_0e5d25024bfaed::t_1b5b2adb5379bf 1-60
+docs/TRD.md
+  s_0e5d25024bfaed::t_405391c5091c5c 5137
+  s_0e5d25024bfaed::t_0cd2723bb31152 3609-3614,3689-3693
+uv.lock
+  s_0e5d25024bfaed::t_c88f4490a81043 928
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "9d50b6dd88613e6a45a66d90dd03c2e649f4d709",
+  "prompts": {},
+  "sessions": {
+    "s_0e5d25024bfaed": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a086c4-a430-7101-a45d-9c050ba0f956",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

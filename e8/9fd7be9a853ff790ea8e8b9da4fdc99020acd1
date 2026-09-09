@@ -1,0 +1,25 @@
+src/kip/starter_archive_policy.py
+  s_d4f896a44f26db::t_8eb7e2104b6c9e 22
+CHANGELOG.md
+  s_d4f896a44f26db::t_d834ae27756670 5-12
+README.md
+  s_d4f896a44f26db::t_d834ae27756670 423-443
+THIRD-PARTY-NOTICES.md
+  s_d4f896a44f26db::t_8eb7e2104b6c9e 1-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "e89fd7be9a853ff790ea8e8b9da4fdc99020acd1",
+  "prompts": {},
+  "sessions": {
+    "s_d4f896a44f26db": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4317375d-72cd-45a5-8145-ba75040e8bf7",
+        "model": "claude-opus-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

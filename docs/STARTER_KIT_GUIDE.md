@@ -306,3 +306,66 @@ wheel SBOM attestation을 발행한다. 운영자는 GitHub repository identity�
 attestation을 검증하고, bundle의 `local/kip` candidate가 아니라 GHCR digest를
 `deploy/production.env`의 세 image 변수에 동일하게 기록한다. 구체적인 역할,
 secret file, 배포, backup, restore drill 명령은 `docs/OPERATIONS.md`를 따른다.
+
+## 11. 기존 배포를 새 버전으로 올리기
+
+새 kit을 기존 배포 위에 그대로 풀면 안 된다. kit이 소유한 경로와 배포가
+소유한 경로가 겹치고, 겹치는 지점에서 오류 없이 설정이 되돌아간다.
+
+### 11.1 경계
+
+세 분류는 `STARTER-KIT-MANIFEST.json`의 `files` 목록에서 기계적으로 도출된다.
+매니페스트에 있으면 kit 소유, 없으면 배포 소유다.
+
+| 분류 | 경로 | 처리 |
+|---|---|---|
+| kit 소유 | `src/` `tests/` `contracts/` `docs/` `scripts/` `migrations/` `evaluation/` `.claude/` `skills/` `examples/` `.github/` `deploy/` `requirements/` `sample-data/` `sdk/`, `config/kip.example.toml`, `config/kip.container.toml`, `config/logging.yaml`, 루트 파일 전체 | 교체 |
+| 배포 소유 | `config/kip.toml`, `config/kip.generated.toml`, `config/kip.host.generated.toml`, `compose.generated.yaml`, `.kip/setup-state.json`, `.env`, `secrets/`, `var/`, `exports/`, `ontology/.release.lock`, `ontology/.pending-release.json`, `.venv/`, PostgreSQL 볼륨 | 보존 |
+| 양쪽 | `.mcp.json` | 11.2 참조 |
+| 기준선 + 확장 | `ontology/domains/`, `ontology/migrations/`, `evaluation/golden/` | 병합 |
+
+### 11.2 `.mcp.json`은 교체하지 않는다
+
+`.mcp.json`은 kit에 포함되지만 guided setup도 같은 경로를 생성한다. 두 값이
+다르다.
+
+| 출처 | `KIP_CONFIG` |
+|---|---|
+| kit 기본값 | `config/kip.toml` |
+| `setup apply` 산출물 | `config/kip.host.generated.toml` + `KIP_WORKSPACE` |
+
+kit 버전으로 덮으면 MCP 서버가 배포의 생성 config 대신 kit 기본값을 읽는다.
+실패하지 않고 다른 설정으로 동작하므로 증상이 늦게 드러난다. 업그레이드는
+배포의 `.mcp.json`을 보존하고, MCP 계약이 바뀐 릴리스에서만 `setup apply`를
+다시 실행해 재생성한다. 어느 경우에도 손으로 편집하지 않는다.
+
+### 11.3 절차
+
+1. 배포 소유 경로와 데이터베이스를 백업한다(`./scripts/backup.sh`).
+2. 새 kit을 기존 배포가 아닌 **별도 디렉터리**에 푼다.
+3. 새 kit의 `VERSION`과 `CHANGELOG.md`를 읽고, 계약·설정·마이그레이션
+   변경과 알려진 한계를 확인한다.
+4. 배포 소유 경로를 새 디렉터리로 옮긴다. `.mcp.json`도 함께 옮긴다.
+5. `./scripts/bootstrap.sh`를 실행한다.
+6. `./scripts/migrate.sh`를 실행한다. 마이그레이션은 append-only이므로
+   기존 데이터는 유지된다.
+7. `./scripts/verify.sh`와 `./scripts/doctor.sh`로 배포를 검증한다.
+8. `sync -> search -> read` 한 사이클로 실제 corpus 응답을 확인한 뒤
+   이전 디렉터리를 폐기한다.
+
+파서나 추출 계약이 바뀐 릴리스는 6단계 뒤에 `parser reextract --source SOURCE`가
+필요하다. 해당 릴리스의 `CHANGELOG.md`가 이를 명시한다.
+
+### 11.4 받은 kit의 출처 확인
+
+`STARTER-KIT-MANIFEST.json`의 `source`가 출처를 기록한다.
+
+```bash
+python3 -c "import json;print(json.load(open('STARTER-KIT-MANIFEST.json'))['source'])"
+```
+
+`repository`는 빌드에 사용된 https origin이고, `git_commit`은 그 시점의 커밋이다.
+`tracked_changes`가 `true`이면 커밋되지 않은 변경이 있는 트리에서 빌드된
+것이므로 `git_commit`만으로 내용을 재현할 수 없다. 배포용 kit은
+`tracked_changes: false`여야 한다. `repository`가 `null`이면 공유 가능한
+http(s) origin이 없는 환경에서 빌드된 것이므로, 전달자에게 출처를 확인한다.

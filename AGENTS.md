@@ -79,6 +79,7 @@ This repository implements an evidence-first knowledge fabric for NAS documents,
     | `contracts/openapi.json`, `contracts/openapi.yaml` | `./scripts/generate-contracts.sh` |
     | `requirements/runtime.txt` | the `uv export` command recorded in its own header |
     | `.claude/skills/**` | mirror of `skills/**`; the two trees must stay byte-identical |
+    | `.mcp.json` | `kip setup apply` (`src/kip/setup/writer.py`); never hand-edit it, and never overwrite a deployment's copy during an upgrade |
 
 18. Prefer the `kip` MCP server (`.mcp.json`, `bash scripts/mcp.sh`) over
     `./scripts/kip` for KIP data whenever it is connected, and fall back to the
@@ -110,8 +111,10 @@ This repository implements an evidence-first knowledge fabric for NAS documents,
 
 23. Adding or changing an MCP tool name, argument, or response envelope
     requires updating `tests/test_mcp_envelope_contract.py` in the same change
-    and keeping the CLI and REST surfaces equivalent (rule 6). `.mcp.json` must
-    keep a valid `mcpServers` object.
+    and keeping the CLI and REST surfaces equivalent (rule 6). If the change
+    alters what `.mcp.json` must contain, change the generator in
+    `src/kip/setup/writer.py`, never the file; `scripts/verify_project.py`
+    requires it to keep a valid `mcpServers` object.
 
 ## Retrieval command examples
 

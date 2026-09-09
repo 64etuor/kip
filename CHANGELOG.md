@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Starter archive manifests now record the source `repository` alongside
+  `git_commit`, so an adopter who received only a ZIP can find where the kit
+  came from. The value is normalized to scheme, host, and path: an access token
+  carried in the remote's userinfo and a local clone path are dropped rather
+  than shipped, and a non-http(s) remote records `null`. `kip-starter-kit build
+  --repository URL` overrides detection. Existing manifests without the field
+  remain valid `kip.starter-archive.v1` documents.
+- Documented the starter-kit upgrade boundary: which paths a new kit replaces,
+  which belong to the deployment and must survive, and the one file that is in
+  both sets. Overwriting a deployment with a newer kit previously reverted the
+  guided-setup MCP configuration with no error.
+
 ## 3.4.0 - 2026-08-17
 
 - Added the local `pdf-inspector` 1.14.2 hybrid PDF backend and made it the

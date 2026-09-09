@@ -7,6 +7,18 @@
           "title": "Git Commit",
           "type": "string"
         },
+        "repository": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Repository"
+        },
         "tracked_changes": {
           "title": "Tracked Changes",
           "type": "boolean"

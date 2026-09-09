@@ -13,6 +13,7 @@ class StarterArchiveModel(BaseModel):
 class StarterArchiveSource(StarterArchiveModel):
     git_commit: str
     tracked_changes: bool
+    repository: str | None = None
 
 
 class StarterArchiveManifest(StarterArchiveModel):

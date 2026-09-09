@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
+from urllib.parse import urlsplit, urlunsplit
 
 from kip.domain.starter_archive import (
     StarterArchiveManifest,
@@ -36,6 +37,7 @@ class StarterArchiveBuildOptions:
     output: Path
     allow_dirty: bool = False
     source_date_epoch: int | None = None
+    repository: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +68,7 @@ def build_starter_archive(options: StarterArchiveBuildOptions) -> StarterArchive
         source=StarterArchiveSource(
             git_commit=commit,
             tracked_changes=tracked_changes,
+            repository=_source_repository(options, root),
         ),
     )
     manifest_entry = ArchiveEntry(
@@ -137,6 +140,42 @@ def _source_state(root: Path) -> tuple[str, bool]:
     commit = _git(root, ("rev-parse", "HEAD")) or "unknown"
     status_text = _git(root, ("status", "--porcelain", "--untracked-files=normal"))
     return commit, bool(status_text)
+
+
+def _source_repository(
+    options: StarterArchiveBuildOptions,
+    root: Path,
+) -> str | None:
+    if options.repository is not None:
+        return _normalize_repository(options.repository)
+    return _normalize_repository(_git(root, ("remote", "get-url", "origin")))
+
+
+def _normalize_repository(raw: str) -> str | None:
+    """Reduce a git remote to a shareable https URL, or drop it.
+
+    A remote can carry an access token in its userinfo and a local clone path
+    exposes an internal filesystem layout. Both would ship inside a manifest
+    that is handed to other organizations, so this rebuilds the URL from the
+    hostname alone and returns None for anything that is not an http(s) remote.
+    """
+    value = raw.strip()
+    if not value:
+        return None
+    scp_like = re.fullmatch(r"(?:ssh://)?[^@/]+@([^:/]+)[:/](.+)", value)
+    if scp_like:
+        value = f"https://{scp_like.group(1)}/{scp_like.group(2)}"
+    parsed = urlsplit(value)
+    if parsed.scheme not in {"http", "https"}:
+        return None
+    host = parsed.hostname
+    if not host:
+        return None
+    port = f":{parsed.port}" if parsed.port else ""
+    path = parsed.path.rstrip("/").removesuffix(".git")
+    if not path:
+        return None
+    return urlunsplit((parsed.scheme, f"{host}{port}", path, "", ""))
 
 
 def _source_epoch(options: StarterArchiveBuildOptions, root: Path) -> int:

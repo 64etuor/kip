@@ -31,7 +31,12 @@ contract. The MCP `serverInfo.version` value is the KIP package version.
 `contracts/starter-archive-manifest.schema.json` and uses
 `kip.starter-archive.v1`. It records the KIP version, UTC creation time, the
 single versioned ZIP root, a `sha256:` digest for every source payload file,
-and source state (`git_commit`, `tracked_changes`). Unknown fields are rejected.
+and source state (`git_commit`, `tracked_changes`, `repository`). Unknown
+fields are rejected. `repository` is the https origin the archive was built
+from, reduced to scheme, host, and path so that an access token in the
+remote's userinfo and a local clone path never reach an archive handed to
+another organization; it is `null` when no shareable http(s) remote exists.
+Older `kip.starter-archive.v1` manifests omit the field and stay valid.
 
 The manifest intentionally excludes itself and `SHA256SUMS` from `files`.
 `SHA256SUMS` covers every payload file and the manifest; the external

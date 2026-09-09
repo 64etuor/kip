@@ -32,6 +32,7 @@ def build_command(
     source_date_epoch: Annotated[
         int | None, typer.Option("--source-date-epoch")
     ] = None,
+    repository: Annotated[str | None, typer.Option("--repository")] = None,
 ) -> None:
     """Build a deterministic source ZIP after applying starter safety policy."""
     resolved_root = root.expanduser().resolve()
@@ -43,6 +44,7 @@ def build_command(
                 output=resolved_output,
                 allow_dirty=allow_dirty,
                 source_date_epoch=source_date_epoch,
+                repository=repository,
             )
         )
     except (KipError, OSError, PydanticValidationError) as error:

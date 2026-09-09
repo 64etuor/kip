@@ -15,6 +15,7 @@ from kip.domain.starter_archive import StarterArchiveManifest
 from kip.errors import ValidationError
 from kip.starter_archive import (
     StarterArchiveBuildOptions,
+    _normalize_repository,
     build_starter_archive,
     verify_starter_archive,
 )
@@ -218,3 +219,56 @@ def test_starter_archive_is_deterministic_and_excludes_local_material(
     assert "docs/plans/2026-08-17-online-zip-starter-kit.md" not in relative_names
     assert "evaluation/golden/private-onedrive-nl.yaml" not in relative_names
     assert not any(".egg-info/" in name for name in relative_names)
+
+
+@pytest.mark.parametrize(
+    ("remote", "expected"),
+    [
+        ("https://github.com/acme/kip.git", "https://github.com/acme/kip"),
+        ("https://github.com/acme/kip", "https://github.com/acme/kip"),
+        ("git@github.com:acme/kip.git", "https://github.com/acme/kip"),
+        ("ssh://git@github.com/acme/kip.git", "https://github.com/acme/kip"),
+        ("https://github.com:8443/acme/kip", "https://github.com:8443/acme/kip"),
+        ("/srv/git/kip", None),
+        ("file:///srv/git/kip.git", None),
+        ("", None),
+    ],
+)
+def test_starter_archive_normalizes_a_remote_into_shareable_provenance(
+    remote: str,
+    expected: str | None,
+) -> None:
+    assert _normalize_repository(remote) == expected
+
+
+def test_starter_archive_repository_drops_remote_credentials() -> None:
+    """A remote can carry an access token; the manifest is handed to others."""
+    normalized = _normalize_repository(
+        "https://x-access-token:ghp_examplesecret@github.com/acme/kip.git"
+    )
+
+    assert normalized == "https://github.com/acme/kip"
+    assert "ghp_examplesecret" not in (normalized or "")
+    assert "@" not in (normalized or "")
+
+
+def test_starter_archive_manifest_records_the_source_repository(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "kip-starter-kit.zip"
+
+    build_starter_archive(
+        StarterArchiveBuildOptions(
+            root=ROOT,
+            output=output,
+            allow_dirty=True,
+            source_date_epoch=1786924800,
+            repository="git@github.com:acme/kip.git",
+        )
+    )
+
+    with zipfile.ZipFile(output) as archive:
+        name = next(n for n in archive.namelist() if n.endswith("STARTER-KIT-MANIFEST.json"))
+        manifest = json.loads(archive.read(name))
+
+    assert manifest["source"]["repository"] == "https://github.com/acme/kip"

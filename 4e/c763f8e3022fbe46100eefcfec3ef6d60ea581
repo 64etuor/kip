@@ -1,0 +1,23 @@
+AGENTS.md
+  s_d4f896a44f26db::t_8a2cafcc374efc 28,116,118-119
+  s_d4f896a44f26db::t_36e10ae1d17237 16
+  s_d4f896a44f26db::t_58f6f3afa3d2ed 41,43-77,79-98,100-114
+  s_d4f896a44f26db::t_67236c83c52e35 78,115,117,142-144,157-158
+  s_d4f896a44f26db::t_dc143217d94238 120-121
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "4ec763f8e3022fbe46100eefcfec3ef6d60ea581",
+  "prompts": {},
+  "sessions": {
+    "s_d4f896a44f26db": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4317375d-72cd-45a5-8145-ba75040e8bf7",
+        "model": "claude-opus-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

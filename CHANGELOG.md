@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 3.5.0 - 2026-09-09
+
 - Added `THIRD-PARTY-NOTICES.md` and a README license section. KIP is MIT, but
   the pinned runtime installs AGPL-3.0 PyMuPDF into the production image and the
   default PDF path calls it for table fallback, and psycopg is LGPL-3.0-only.

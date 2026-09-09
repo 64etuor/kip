@@ -164,7 +164,13 @@ jobs:
             "$smoke_dir/bin/kip" capabilities > "$smoke_dir/capabilities.json"
           "$smoke_dir/bin/python" -c 'import json,sys; payload=json.load(open(sys.argv[1])); assert payload["ok"] and payload["schema_version"] == "kip.envelope.v1"' "$smoke_dir/capabilities.json"
 
-      - name: Build loadable image with provenance and SBOM
+      # Attestations make buildx emit a manifest list, which the docker
+      # exporter cannot export, so `load: true` and provenance/sbom are
+      # mutually exclusive. This image only has to be loadable for the
+      # hardened smoke test below and supply a digest for the bundle; the
+      # published image is built and attested by the publish job, which
+      # pushes to a registry and can carry a manifest list.
+      - name: Build loadable candidate image
         id: image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
@@ -176,8 +182,8 @@ jobs:
             VERSION=${{ steps.version.outputs.value }}
             VCS_REF=${{ github.sha }}
             SOURCE_URL=${{ github.server_url }}/${{ github.repository }}
-          provenance: mode=max
-          sbom: true
+          provenance: false
+          sbom: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

@@ -4,6 +4,14 @@
 
 ## 3.5.0 - 2026-09-09
 
+- Fixed the distribution CI job, which could never succeed: it asked buildx
+  for `load: true` together with provenance and SBOM attestations, and
+  attestations make buildx emit a manifest list that the docker exporter
+  cannot export. The candidate image is now built without attestations,
+  which is all the hardened smoke test and the bundle digest need. The
+  published image is unaffected; the tag-gated publish job still builds with
+  `provenance: mode=max` and `sbom: true` and pushes to a registry.
+
 - Upgraded the pinned `httpx2` transitive dependency of the MCP 2.x SDK from
   2.10.0 to 2.12.0, clearing CVE-2026-84379, CVE-2026-84380, and
   CVE-2026-84382 in the runtime lock. `httpcore2` moves to 2.12.0 with it.

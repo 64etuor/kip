@@ -1,0 +1,322 @@
+docs/adr/ADR-054-pdf-inspector-hybrid-parser.md
+  s_ec2967d0ce35c8::t_8b4a604bbf3877 1-84
+src/kip/starter_archive_cli.py
+  s_ec2967d0ce35c8::t_34bb2a3dfbe58c 16,39
+  s_ec2967d0ce35c8::t_e488e4b556e38a 1-15,17-38,40-90
+tests/test_interaction_edges.py
+  s_ec2967d0ce35c8::t_8b3fb997560071 8,205-208,236-239
+tests/test_hwp_broker.py
+  s_ec2967d0ce35c8::t_67d5187bf2799e 84,87,89,105
+src/kip/adapters/parsers/hwp_broker.py
+  s_ec2967d0ce35c8::t_43ead973ba6bce 137
+  s_ec2967d0ce35c8::t_8e8b86c3cf1eba 154-158
+config/kip.container.toml
+  s_ec2967d0ce35c8::t_f4115fb3b9546e 76-78
+  s_ec2967d0ce35c8::t_f07ccc42cc665a 88
+  s_ec2967d0ce35c8::t_31cd93bbaa8588 75
+docs/DATA_CONTRACTS.md
+  s_ec2967d0ce35c8::t_0ea4e9f2a5f03c 8-12
+  s_ec2967d0ce35c8::t_fc741b09104d45 28-41
+  s_ec2967d0ce35c8::t_db4c14972c7dae 87-102
+  s_ec2967d0ce35c8::t_d2bd68b78e1613 103
+docs/plans/2026-08-17-online-zip-starter-kit.md
+  s_ec2967d0ce35c8::t_116e4137611598 1-87
+src/kip/adapters/parsers/pdf.py
+  s_ec2967d0ce35c8::t_0657d961a42134 9-16,18-19,91,116,118-125,127-129,162,164,195
+  s_ec2967d0ce35c8::t_79dd27c1a064cf 17
+  s_ec2967d0ce35c8::t_293f006fdc1ac1 28
+  s_ec2967d0ce35c8::t_769440c84e1dad 25
+tests/test_mcp_envelope_contract.py
+  s_ec2967d0ce35c8::t_4de2cbd9024d5b 22-26,28-30,42-45,47-50
+  s_ec2967d0ce35c8::t_7bd84211850a9e 17,27,33-41,46
+  s_ec2967d0ce35c8::t_06d2fa4008fee8 5,15,21,31-32,57-60,81-84
+VERSION
+  s_ec2967d0ce35c8::t_d440124b2477a9 1
+docs/PRODUCTION_DESIGN_ALIGNMENT.md
+  s_ec2967d0ce35c8::t_39fe1a6ed1f991 50
+  s_ec2967d0ce35c8::t_4e5aafad3a77af 38
+  s_ec2967d0ce35c8::t_9ea3c746b852e4 34
+src/kip/starter_archive_policy.py
+  s_ec2967d0ce35c8::t_89d547537ab6de 157-159,183-192
+  s_ec2967d0ce35c8::t_bb8c5e0753d935 221-224
+  s_ec2967d0ce35c8::t_e3cd8452fc4958 136
+  s_ec2967d0ce35c8::t_e488e4b556e38a 1-135,137-156,160-178,181-182,193-220,225-231
+  s_ec2967d0ce35c8::t_d5d97a2ce1dcb9 179-180
+src/kip/adapters/parsers/pdf_inspector_runtime.py
+  s_ec2967d0ce35c8::t_8e560a6073f337 1-53,62-68
+  s_ec2967d0ce35c8::t_def1434d7d1dab 54-61
+docs/adr/ADR-052-verified-online-source-zip.md
+  s_ec2967d0ce35c8::t_d5d97a2ce1dcb9 22-23
+  s_ec2967d0ce35c8::t_39fe1a6ed1f991 1-21,24-49
+docs/adr/ADR-053-kordoc-4-8-runtime.md
+  s_ec2967d0ce35c8::t_0250dafe14167c 1-30,35-49,55-64,67-76
+  s_ec2967d0ce35c8::t_43ead973ba6bce 50-51
+  s_ec2967d0ce35c8::t_7f99b3267c3b50 31-34,52-54,65-66
+src/kip/setup/config_payload.py
+  s_ec2967d0ce35c8::t_21002d66501e30 142-145
+  s_ec2967d0ce35c8::t_f07ccc42cc665a 162
+tests/test_kordoc_ocr.py
+  s_ec2967d0ce35c8::t_2672a4a911846e 76,78,85,91,183,199,213,237-239
+  s_ec2967d0ce35c8::t_b1403b0a0f6792 9,194-196
+src/kip/__init__.py
+  s_ec2967d0ce35c8::t_d440124b2477a9 3
+docs/PRODUCTION_CHECKLIST.md
+  s_ec2967d0ce35c8::t_39fe1a6ed1f991 86-89
+  s_ec2967d0ce35c8::t_ecebd7c34d1288 66-70
+tests/test_pdf_parser.py
+  s_ec2967d0ce35c8::t_769440c84e1dad 7,110,414
+docs/plans/2026-08-17-pdf-inspector-hybrid.md
+  s_ec2967d0ce35c8::t_e19a171028ea92 1-100
+tests/test_pdf_inspector_parser.py
+  s_ec2967d0ce35c8::t_10f56696acc4f5 1-7,9,12,14-29,31-170,172-214
+  s_ec2967d0ce35c8::t_3805f2e4dbd1d6 8,11,13,171,215-227,229-248
+  s_ec2967d0ce35c8::t_79dd27c1a064cf 30
+  s_ec2967d0ce35c8::t_da43f0df04904a 10,228
+tests/test_portable_golden_gate.py
+  s_ec2967d0ce35c8::t_a576044225ae73 55,63,73,76-83
+tests/test_ontology_review_governance.py
+  s_ec2967d0ce35c8::t_8b3fb997560071 9,473-476
+docs/adr/ADR-042-korean-ocr-candidate-extraction.md
+  s_ec2967d0ce35c8::t_43ead973ba6bce 3
+scripts/kordoc
+  s_ec2967d0ce35c8::t_8c645449761ebd 6
+  s_ec2967d0ce35c8::t_f07ccc42cc665a 11
+src/kip/adapters/parsers/pdf_tables.py
+  s_ec2967d0ce35c8::t_db6e0f4f53cc4d 1-3,5,7-29,41-138,140-143,146-150,152-172
+  s_ec2967d0ce35c8::t_293f006fdc1ac1 4,6,30-40,139,144-145,151
+docs/CONNECTORS.md
+  s_ec2967d0ce35c8::t_633a99abfc9a9a 107-117
+  s_ec2967d0ce35c8::t_97940d7ec908b3 120,129
+tests/test_setup_writer.py
+  s_ec2967d0ce35c8::t_0ff6c5d329dd93 168-170
+  s_ec2967d0ce35c8::t_a778dc893638a9 166
+  s_4b996d0283753e::t_d5ca2e1c96b9bd 167
+src/kip/cli.py
+  s_ec2967d0ce35c8::t_f07ccc42cc665a 528
+.github/workflows/upstream-watch.yml
+  s_ec2967d0ce35c8::t_0c54f7e691a03d 16
+contracts/openapi.json
+  s_ec2967d0ce35c8::t_d725829711b540 1098
+src/kip/domain/starter_archive.py
+  s_ec2967d0ce35c8::t_aa361463f99737 6,9-13,18,27
+  s_ec2967d0ce35c8::t_f759b54262ab67 1-5,7-8,14-17,19-26,28-36
+requirements/runtime.txt
+  s_ec2967d0ce35c8::t_764d03d56ef5a4 18,113-237,308,314-317,352-355,357-360,371,462-464,466-469,487,678,756-767,776,1015-1017,1026-1031,1042,1044,1058-1060,1073-1075
+  s_ec2967d0ce35c8::t_0bb306a11c49d1 515-522
+docs/plans/2026-08-17-pdf-inspector-hybrid-design.md
+  s_ec2967d0ce35c8::t_e19a171028ea92 1-78
+tests/test_cli_doctor.py
+  s_ec2967d0ce35c8::t_2672a4a911846e 58,65,74,88,116,123,145
+  s_ec2967d0ce35c8::t_8c645449761ebd 81
+tests/test_upstream_watch.py
+  s_ec2967d0ce35c8::t_77cf2b4503df5e 78,94,122,129,144
+  s_ec2967d0ce35c8::t_f641b5485b510f 13-68
+  s_ec2967d0ce35c8::t_c88b20f7347da1 95,145
+docs/plans/2026-08-17-online-zip-starter-kit-design.md
+  s_ec2967d0ce35c8::t_116e4137611598 1-74
+tests/test_kordoc_defaults.py
+  s_ec2967d0ce35c8::t_0ff6c5d329dd93 6,18-23
+  s_ec2967d0ce35c8::t_46e389800b16b9 177
+  s_ec2967d0ce35c8::t_2672a4a911846e 44,118,171,173,185
+  s_ec2967d0ce35c8::t_c2f8f546042046 127-132,134-136,144,147,157-159,174-175
+  s_ec2967d0ce35c8::t_9cfac2f06e6994 169
+  s_ec2967d0ce35c8::t_608e9a070be0d2 45,47
+  s_ec2967d0ce35c8::t_82c071290e859f 133
+  s_4b996d0283753e::t_2f2644bc25e02a 24-25
+scripts/install-kordoc.sh
+  s_ec2967d0ce35c8::t_82c071290e859f 24-29,31-38
+  s_ec2967d0ce35c8::t_842e17096ab1bc 30
+  s_ec2967d0ce35c8::t_9cfac2f06e6994 8-9
+  s_ec2967d0ce35c8::t_f07ccc42cc665a 6
+  s_ec2967d0ce35c8::t_8c645449761ebd 7,10
+src/kip/adapters/parsers/pdf_inspector.py
+  s_ec2967d0ce35c8::t_79dd27c1a064cf 17,141,157-158,189,196,218
+  s_ec2967d0ce35c8::t_31cd93bbaa8588 1-3,5,22-42,222
+  s_ec2967d0ce35c8::t_ec7b3b328eef04 142-145
+  s_ec2967d0ce35c8::t_87af1bd832f938 4,6-16,18-21,43-140,146-156,159-188,190-195,197-217,219-221,223
+CHANGELOG.md
+  s_ec2967d0ce35c8::t_e949532aadb1e1 401-405
+  s_ec2967d0ce35c8::t_d5d97a2ce1dcb9 30-31
+  s_ec2967d0ce35c8::t_0ea4e9f2a5f03c 32-42
+  s_ec2967d0ce35c8::t_8949a02861e854 7-13
+  s_ec2967d0ce35c8::t_97940d7ec908b3 14-18
+  s_ec2967d0ce35c8::t_d440124b2477a9 5-6
+  s_ec2967d0ce35c8::t_fc741b09104d45 24-29
+  s_ec2967d0ce35c8::t_65bf9fa1150a28 43-45
+  s_ec2967d0ce35c8::t_649d6990acaff0 19-23
+docs/TRD.md
+  s_ec2967d0ce35c8::t_a467d00c6882c0 6
+  s_ec2967d0ce35c8::t_db4c14972c7dae 1960,1962-1964,1967-1972,1985,1993-1994,1998-1999
+  s_ec2967d0ce35c8::t_97940d7ec908b3 2001,2003
+  s_ec2967d0ce35c8::t_ddb8c9b220c412 3714-3721,5114-5122
+  s_ec2967d0ce35c8::t_8b4a604bbf3877 5125
+  s_ec2967d0ce35c8::t_39fe1a6ed1f991 5123
+  s_ec2967d0ce35c8::t_0250dafe14167c 5124
+tests/test_pptx_ocr.py
+  s_ec2967d0ce35c8::t_a778dc893638a9 115,147
+scripts/verify.sh
+  s_ec2967d0ce35c8::t_239646cc24c40c 17-18,21-30
+scripts/check-upstream-updates.sh
+  s_ec2967d0ce35c8::t_c88b20f7347da1 8,34-54
+  s_ec2967d0ce35c8::t_61140f8e93cfde 55
+scripts/build-starter-kit.sh
+  s_ec2967d0ce35c8::t_c6c41aac9b2f2a 1-7
+docs/APP_INTEGRATION.md
+  s_ec2967d0ce35c8::t_0ea4e9f2a5f03c 104-108
+contracts/openapi.yaml
+  s_ec2967d0ce35c8::t_d725829711b540 6
+docs/adr/ADR-049-measured-pdf-tables-and-hwp-section-locators.md
+  s_ec2967d0ce35c8::t_4f4bb703f7c548 3,109-111
+  s_c2d1d261a6063e::t_6b2e1d3741434e 112
+src/kip/adapters/ocr/kordoc.py
+  s_ec2967d0ce35c8::t_f07ccc42cc665a 24,82
+Dockerfile
+  s_ec2967d0ce35c8::t_f07ccc42cc665a 7
+  s_ec2967d0ce35c8::t_9cfac2f06e6994 8-9,11-12,14-22,46,57
+  s_ec2967d0ce35c8::t_842e17096ab1bc 13
+docs/adr/ADR-051-mcp-v2-sdk-and-protocol.md
+  s_ec2967d0ce35c8::t_9ea3c746b852e4 1-52
+pyproject.toml
+  s_ec2967d0ce35c8::t_d440124b2477a9 7
+  s_ec2967d0ce35c8::t_c6c41aac9b2f2a 77
+  s_ec2967d0ce35c8::t_21002d66501e30 30,59
+  s_ec2967d0ce35c8::t_ae9dc741e7b8ff 36,47,66
+src/kip/starter_archive_verifier.py
+  s_ec2967d0ce35c8::t_1a8766b91a1b04 1-167
+docs/IMPLEMENTATION_STATUS.md
+  s_ec2967d0ce35c8::t_65bf9fa1150a28 13
+  s_ec2967d0ce35c8::t_9ea3c746b852e4 25
+  s_ec2967d0ce35c8::t_97940d7ec908b3 132
+  s_ec2967d0ce35c8::t_1508e1d9f7023f 31
+  s_ec2967d0ce35c8::t_e8ae6235e51f36 11
+config/kip.example.toml
+  s_ec2967d0ce35c8::t_31cd93bbaa8588 185
+  s_ec2967d0ce35c8::t_f07ccc42cc665a 198
+  s_ec2967d0ce35c8::t_f4115fb3b9546e 186-188
+.github/workflows/ci.yml
+  s_ec2967d0ce35c8::t_0c54f7e691a03d 52,57,62,105,119,124,129,136,215,239,244,249,256,326
+scripts/generate_contracts.py
+  s_ec2967d0ce35c8::t_f759b54262ab67 80,174
+contracts/starter-archive-manifest.schema.json
+  s_ec2967d0ce35c8::t_31937e4eae9ee7 1-3,5-22,24-64
+  s_ec2967d0ce35c8::t_d675ae25af2046 4,23
+tests/test_starter_archive.py
+  s_ec2967d0ce35c8::t_6c8ab0f4229a39 11-12,14,21,29-33,35,37-43
+  s_ec2967d0ce35c8::t_954e0a7046f6d1 4,16-20
+  s_ec2967d0ce35c8::t_e83fc965c310ba 5,138-155
+  s_ec2967d0ce35c8::t_d13d0416316ef2 220
+  s_ec2967d0ce35c8::t_d565b83f83fc39 156-168
+  s_ec2967d0ce35c8::t_c32a11417279fe 194-219
+  s_ec2967d0ce35c8::t_fc80cfd6677a85 3,8,95-136
+  s_ec2967d0ce35c8::t_36caf3e137202e 15,75-94,137
+  s_ec2967d0ce35c8::t_d440124b2477a9 34,36
+  s_ec2967d0ce35c8::t_714d6a8c291d52 1-2,9-10,13,22-28
+  s_ec2967d0ce35c8::t_a46f547addb086 193
+  s_ec2967d0ce35c8::t_f4402e2d65e5a2 6-7,44-74
+  s_ec2967d0ce35c8::t_cc07eea63a0fb6 169-192
+tests/test_optional_parser_dependencies.py
+  s_ec2967d0ce35c8::t_61bd995a4505be 15,34
+docs/PRD.md
+  s_ec2967d0ce35c8::t_8b4a604bbf3877 899
+  s_ec2967d0ce35c8::t_a467d00c6882c0 6
+  s_ec2967d0ce35c8::t_0ea4e9f2a5f03c 568,896
+  s_ec2967d0ce35c8::t_0250dafe14167c 898
+  s_ec2967d0ce35c8::t_9ed2e3b98ab606 462-467
+  s_ec2967d0ce35c8::t_39fe1a6ed1f991 897
+docs/OPERATIONS.md
+  s_ec2967d0ce35c8::t_b1a2faa38ff021 831-834
+  s_ec2967d0ce35c8::t_0ea4e9f2a5f03c 134-140
+  s_ec2967d0ce35c8::t_633a99abfc9a9a 719-740
+  s_ec2967d0ce35c8::t_e8ae6235e51f36 151-160,162-169
+  s_ec2967d0ce35c8::t_0bdefef0153730 161
+  s_ec2967d0ce35c8::t_649d6990acaff0 785-790
+  s_ec2967d0ce35c8::t_97940d7ec908b3 764,776
+  s_ec2967d0ce35c8::t_3c9945a4590fa7 792-794
+  s_ec2967d0ce35c8::t_96b77fd290d356 170
+  s_ec2967d0ce35c8::t_fe0d3cbabf44ad 835
+src/kip/adapters/parsers/pdf_inspector_tables.py
+  s_ec2967d0ce35c8::t_8e560a6073f337 1-88
+docs/SECURITY.md
+  s_ec2967d0ce35c8::t_633a99abfc9a9a 185-191
+  s_ec2967d0ce35c8::t_649d6990acaff0 197-199
+  s_ec2967d0ce35c8::t_e8ae6235e51f36 73-87
+  s_ec2967d0ce35c8::t_0ea4e9f2a5f03c 241-245
+  s_ec2967d0ce35c8::t_97940d7ec908b3 192
+  s_4b996d0283753e::t_c528b7926f8e95 246
+src/kip/mcp_server.py
+  s_ec2967d0ce35c8::t_fe5a50c696d963 9,36,47,49,51,55
+src/kip/starter_archive.py
+  s_ec2967d0ce35c8::t_7220e8b3f21c6c 132
+  s_ec2967d0ce35c8::t_1a8766b91a1b04 13,73,77-84,88,128,137-138,148,155,181-182
+  s_ec2967d0ce35c8::t_fe7dd3125f847f 26
+  s_ec2967d0ce35c8::t_34bb2a3dfbe58c 100-101,167-170
+  s_ec2967d0ce35c8::t_e488e4b556e38a 1-12,14-25,27-72,74-76,85-87,89-99,102-127,129-131,133-136,139-147,149-154,156-166,171-180,183-191
+scripts/doctor.sh
+  s_ec2967d0ce35c8::t_f07ccc42cc665a 34,71
+tests/test_capacity_defaults_parity.py
+  s_ec2967d0ce35c8::t_4e81d471eeebc7 184-188
+  s_ec2967d0ce35c8::t_06d2fa4008fee8 44,54
+  s_ec2967d0ce35c8::t_711c8d0d0e4ac7 14,20,159-181
+  s_ec2967d0ce35c8::t_68b17308cff9ac 182-183
+  s_ec2967d0ce35c8::t_6c260a5634bbd7 189-190
+scripts/verify-starter-kit.sh
+  s_ec2967d0ce35c8::t_c6c41aac9b2f2a 1-7
+src/kip/adapters/parsers/pdf_ocr.py
+  s_ec2967d0ce35c8::t_35f1efc1b911e0 1-86
+tests/test_production_search_contract.py
+  s_ec2967d0ce35c8::t_8b3fb997560071 12,168-171
+  s_ec2967d0ce35c8::t_06d2fa4008fee8 173
+README.md
+  s_ec2967d0ce35c8::t_0445ea649828a8 1,3-5,7-8,10-13,15-17,19,21-22,29-34,36-41,46,48-50,52,54-66,68,70-71,74,77-86,88,90-93,95-98,100,102-105,107,109-111,116,120-123,125-126,139,142,148,150-151,154-155,158-160,162,164,170,179-180,182-183,193-197,199,201-202,208-212,218-221,223-225,227,229-231,235-236,240,242-245,247-248,255-258,262-266,270-275,279-285,293-298,302-303,307-309,313-315,317,319-320,323-327,330-357,359-360,362-391,401,409-422
+  s_ec2967d0ce35c8::t_0ea4e9f2a5f03c 215
+  s_ec2967d0ce35c8::t_e949532aadb1e1 361
+  s_ec2967d0ce35c8::t_8949a02861e854 260-261,267-269
+  s_ec2967d0ce35c8::t_fc741b09104d45 24-28,35
+  s_ec2967d0ce35c8::t_f29cccae0d42ff 259
+docs/STARTER_KIT_GUIDE.md
+  s_ec2967d0ce35c8::t_d5d97a2ce1dcb9 269
+  s_ec2967d0ce35c8::t_ecebd7c34d1288 124-127
+  s_ec2967d0ce35c8::t_b1a2faa38ff021 189-193
+  s_ec2967d0ce35c8::t_97940d7ec908b3 131
+  s_ec2967d0ce35c8::t_9ea3c746b852e4 207-212
+  s_ec2967d0ce35c8::t_ab0764d708490f 254-268,270-283
+  s_ec2967d0ce35c8::t_649d6990acaff0 138-140
+  s_ec2967d0ce35c8::t_3c9945a4590fa7 135-137
+src/kip/adapters/parsers/registry.py
+  s_ec2967d0ce35c8::t_31cd93bbaa8588 14,93-103
+  s_ec2967d0ce35c8::t_f07ccc42cc665a 171,174
+uv.lock
+  s_ec2967d0ce35c8::t_90b5823208ad98 5-7,41-104,237-363,389-483,541,572-573,576,579-580,586,589,592-595,598-599,602,605,608,613,622,624,672,674,676,746-758,811-829,831,833,928,950,977,1012-1014,1023-1024,1058-1154,1326,1330,1332-1333,1344-1357,1359,1434,1437,1443-1483,1506-1574,1582,1621,1633,1663-1665,1677,1858-1870,1999,2001,2003,2264,2266,2268-2277,2721-2741,2770,2772,2774,2810,2816,2818,2999-3007,3034,3036,3038,3052,3057,3059,3082,3088,3090
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "cb046eac7741b9649fbc9338bee1aa36a7db6b08",
+  "prompts": {},
+  "sessions": {
+    "s_4b996d0283753e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a00d4f-4333-78d2-be5d-c388bb1a822c",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_c2d1d261a6063e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a00d07-b1f0-7a43-9a26-b77204cb6772",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_ec2967d0ce35c8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a00a2b-9314-73c0-b203-daac69ce8a5c",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

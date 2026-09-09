@@ -22,11 +22,13 @@ from kip.domain.models import (
     EmbeddingSpace,
     JobRecord,
 )
+from kip.domain.source_access import FilesystemAccessPolicy
 from kip.domain.telemetry import QueryTrace
 
 
 class MemoryState:
     def __init__(self) -> None:
+        self.source_policy: FilesystemAccessPolicy | None = None
         self.packets_by_revision: dict[str, DocumentPacket] = {}
         self.extraction_packets: dict[str, DocumentPacket] = {}
         self.current_revision_by_object: dict[str, str] = {}

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from kip.adapters.repository.memory.acl import unit_is_visible
 from kip.adapters.repository.memory.state import MemoryState
-from kip.domain.json_types import JsonObject
+from kip.domain.json_types import JsonObject, JsonValue
 from kip.domain.models import ArtifactView, ContentUnit, RequestContext
 from kip.errors import NotFoundError
 
@@ -43,6 +43,8 @@ class MemoryEvidenceStore:
         view = self.state.artifacts.get(artifact_id)
         if not view:
             raise NotFoundError(f"artifact not found: {artifact_id}")
+        if self.state.source_policy is not None and not self.state.source_policy.allows_artifact(view):
+            raise NotFoundError(f"artifact not found: {artifact_id}")
         scopes = view.source_object.acl_scopes if view.source_object else []
         if scopes and not set(scopes).issubset(set(context.acl_scopes)):
             raise NotFoundError(f"artifact not found: {artifact_id}")
@@ -59,16 +61,19 @@ class MemoryEvidenceStore:
         document = self.state.documents.get(document_id)
         if not document:
             raise NotFoundError(f"document not found: {document_id}")
-        packet = next(
-            (
-                item
-                for item in self.state.packets_by_revision.values()
-                if item.logical_document.id == document_id
-            ),
-            None,
-        )
-        if packet is None or any(
-            not unit_is_visible(self.state, unit, context) for unit in packet.units
-        ):
+        artifacts: list[JsonValue] = []
+        for packet in self.state.packets_by_revision.values():
+            if packet.logical_document.id != document_id or packet.workspace_id != context.workspace:
+                continue
+            if self.state.current_revision_by_object.get(packet.source_object.id) != packet.revision.id:
+                continue
+            try:
+                view = self.get_artifact(context, packet.artifact.id)
+            except NotFoundError:
+                continue
+            artifacts.append(view.artifact.model_dump(mode="json"))
+        if not artifacts:
             raise NotFoundError(f"document not found: {document_id}")
-        return deepcopy(document)
+        result = deepcopy(document)
+        result["artifacts"] = artifacts
+        return result

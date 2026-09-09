@@ -58,7 +58,34 @@ entity-proposal, and relation-proposal caps. This enables candidate mining only;
 the candidate, evidence, review, approval, and revocation contracts are
 unchanged.
 
+`SourceInventory` adds `local_file_count` and `cloud_placeholder_count` to the
+metadata-only preview. `filesystem_sources` answers accept an absolute folder,
+a JSON array of folders, or the existing explicit objects. Folder shorthand
+derives a stable name and workspace ACL with `personal` classification for
+personal ownership, otherwise `restricted`; preview and plan approval remain
+required. `SetupPlan.runtime_uid` / `runtime_gid` and
+`runtime_supplementary_gids` bind the non-root runtime identity and host group
+memberships into the fingerprint. Legacy plans still deserialize but must be
+regenerated before apply. Generated Compose is a standalone project, never an
+override of the sample mounts. `runtime_readiness` checks resolved credentials,
+key separation, local source availability, and reports an unprovisioned local
+generation service as incomplete. The receipt starts with `app-up.sh`, which
+orders database readiness and migration before services (ADR-057).
+
+Guided `SourcePlan.target_root` equals its canonical `host_root`, preserving
+shared host/container source URIs and snapshot identities. Old plans with split
+source namespaces cannot apply; regenerate and explicitly sync the approved
+scope. Managed CAS/backup paths remain runtime-specific.
+
 ## Search boundary
+
+Filesystem scope is deployment configuration, not a new request filter.
+Repository access combines verified ACLs with the current enabled source name,
+ACL snapshot, and stored descendant path before ranking, limits, vocabulary,
+and graph traversal. Removed or changed scope hides old records after reload;
+exact reads additionally validate the live path and cloud residency. Public IDs
+and versioned envelopes remain unchanged; callers cannot bypass this guard with
+a known unit/artifact ID or a broader request ACL (ADR-056).
 
 `SearchRequest` is the canonical application search request. Its versioned
 fields are `query`, `limit`, optional `mode`, `source_kinds`,
@@ -227,7 +254,7 @@ counters and bounded `warnings` strings:
   successful, non-dry-run scan contributes absence evidence, and a scan that
   sees zero files skips reconciliation with a warning instead of marking
   anything. Directory walk errors make a scan incomplete, while paths deferred
-  by settle, symlink, filter, or size policy count as seen.
+  by settle, symlink, cloud-residency, filter, or size policy count as seen.
 - `tombstoned`: objects whose consecutive absence reached
   `[sync] deletion_grace_scans` and were soft-deleted through the shared
   tombstone-revision path; prior revisions and approved assertions are

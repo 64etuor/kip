@@ -40,9 +40,3 @@ def test_all_skill_files_mirrored_byte_for_byte_into_claude_skills():
         portable_bytes = (portable_root / relative).read_bytes()
         claude_bytes = (claude_root / relative).read_bytes()
         assert portable_bytes == claude_bytes, f"mirror drift: {relative}"
-
-
-def test_bootstrap_installs_agent_identity_and_observability_runtime() -> None:
-    bootstrap = (ROOT / "scripts/bootstrap.sh").read_text(encoding="utf-8")
-
-    assert ".[postgres,api,identity,extractors,mcp,telemetry,dev]" in bootstrap

@@ -1,7 +1,7 @@
 # Production Design Alignment
 
 - **Status:** Living conformance register
-- **Last reviewed:** 2026-09-10 (agent tooling and published v3.5.0 only; corpus measurements retain their dates)
+- **Last reviewed:** 2026-09-10 (source scope, bounded OneDrive probes, and isolated setup runtime; older corpus measurements retain their dates)
 - **Target:** `docs/PRD.md`, `docs/TRD.md`, and the approved
   `docs/plans/2026-08-09-production-rag-starter-kit-design.md`
 - **Current truth:** generated contracts, the current checkout, measured
@@ -27,13 +27,33 @@ and synchronized updates to the affected canonical documents.
 
 ## Current alignment
 
+The isolated 2026-09-10 setup acceptance completed frozen bootstrap, guided
+plan/apply/verify, standalone Compose startup, migration, API/worker operation,
+host-to-API and API-to-host ingestion/search/fresh-read parity, unauthenticated
+401 rejection, REST smoke, and teardown. Source paths are identical across the
+host and generated containers; this fixes the observed split-namespace failure
+without relaxing source authorization. See `IMPLEMENTATION_STATUS.md` for the
+bounded measurements and the unperformed private-corpus floor.
+
+The 2026-09-10 changes close the current-root authorization and approved setup
+handoff gaps (ADR-056/057). Scope checks apply before retrieval/graph processing
+and survive existing indexes; generated Compose is standalone and uses the
+approved identity, database, paths, and runtime owner. Shared host/container
+source paths now preserve URI/snapshot identity. The OneDrive test passed
+search/context/fresh exact read for all seven sample files and fresh workbook
+reads for both spreadsheets, with removed/disabled/narrowed-scope denials and
+repeat-sync idempotency. Its ingestion scope remains seven files/36 units, with
+1,907 cloud-only files deferred from 1,914 eligible. It does not establish broad
+production, model-quality, or all-recipient setup acceptance. Current measured
+details and remaining acceptance limits belong in implementation status.
+
 | Area | Production intent | Current implementation and evidence | Verdict |
 |---|---|---|---|
 | Canonical evidence and ingestion | PostgreSQL owns source identity, immutable revisions, ACL state, active extraction, and approved assertions; parser/projection failures never replace valid state | Implemented for pilot paths, including CAS capture, shadow extraction, guarded activation, current-revision reads, and disposable lexical/vector projections | Aligned for pilot; connector-specific failure semantics still need target-environment validation |
 | Agent instruction scope | Load only task-relevant guidance while preserving evidence and consent boundaries | Compact root/skill entry points route to canonical docs and conditional references; explicit runtime errors and handled installation failures are covered by regression tests (ADR-055) | Aligned for local tooling; no new corpus-quality claim |
 | Application boundaries | Focused use cases depend on capability ports; concrete adapters are selected only at composition | `Application` composes ingestion, retrieval, evidence, answer, knowledge, operations, telemetry, ontology, and interaction use cases. Architecture checks prohibit application-to-adapter imports | Aligned |
 | Edge architecture and filters | CLI, REST, and MCP expose the same use-case semantics; the SDK consumes stable REST/OpenAPI contracts | `SearchRequest` mode and filters have CLI/REST/MCP/SDK parity and every edge calls the same retrieval service. The stdio edge uses MCP 2.0, reports the KIP version, and has current-protocol plus legacy-negotiation client coverage while retaining `kip.envelope.v1`. CLI envelopes retain typed errors although process exit codes are coarse; list/search edges remain limit-only rather than cursor-paginated | Aligned for search semantics; pagination and exit-code granularity remain |
-| Agent-guided setup | One-question-at-a-time inspect/plan/apply/verify flow writes approved local artifacts atomically and emits a redacted receipt | The setup state machine, safe-root checks, `env:`/`file:`-only secret references (unresolvable schemes rejected at answer time), explicit generation-gated relation-mining choice, atomic apply, runtime-readiness verification, and receipt contracts with `next_steps` are implemented. The selected bounded relation-mining table is written to both generated configs. `scripts/app-up.sh` layers the generated Compose override and `.mcp.json` selects the host-path config, so the approved plan is runnable without manual Compose or config edits. A 2026-08-10 ephemeral no-context acceptance passed | Aligned for starter acceptance; each recipient must rerun with its real mounts, identity, backup, egress, and relation-mining decisions |
+| Agent-guided setup | Approved choices determine the effective runtime and missing prerequisites remain visible | Standalone generated Compose, approved host-config and secret selection, non-root owner-bound plans, folder shorthand, local/cloud preview, expanded secret readiness, and app-up-first handoff are implemented (ADR-057). Explicit generation-gated candidate-mining consent and atomic apply remain | Handoff aligned; rerun recipient acceptance with real mounts, identity, DB, backup, egress, and any separately provisioned local generation service |
 | Runtime topology | Digest-pinned non-root API, worker, migration, and PostgreSQL services; sources read-only; identity/TLS/secrets supplied by the deployment | `compose.production.yaml`, role templates, resource limits on all services, read-only containers, private database network, and loopback API binding exist. The API bind-mounts `${KIP_NAS_PATH}` read-only (evidence freshness and `xlsx-read` need the live source tree) and `${KIP_ONTOLOGY_PATH}` read-write (discovery auto-release, ADR-044; read-only on the worker), its healthcheck targets the database round-trip `/readyz`, and the worker has a database-connectivity healthcheck. It is a reference Compose deployment, not an orchestrator, TLS edge, or secret manager | Partial: hardened reference ready, environment control plane remains external |
 | Connector coverage | Filesystem/NAS, Slack, and mail preserve stable IDs, revisions, cursors, tombstones, ACL snapshots, and outage safety | Filesystem is pilot-validated, including complete-scan deletion grace reconciliation with soft tombstone revisions and reappearance re-indexing (migration 0020). Directory walk errors fail closed, and files deferred by settle, symlink, filter, or size policy remain present for deletion accounting. Empty scans never contribute deletion evidence. The TRD's sentinel/count-drop guards and descriptor-pinned source reads remain unimplemented. Slack, Apple Mail, and IMAP are reference adapters requiring provider-specific scope, edit/delete, rate-limit, retention, permission, and UID validation | Partial by design |
 | Parser, OCR, and exact evidence | Parsers emit reproducible locators through shadow activation, cannot exhaust the long-lived worker, OCR candidate evidence is locally available by default, and spreadsheet facts use exact original ranges | Every filesystem parser runs one document per bounded child behind the unchanged `ParserPort` (ADR-050). The new starter PDF default is local `pdf_inspector` 1.14.2 with Markdown-table promotion and selective exact PyMuPDF fallback (ADR-054): separate migrated PostgreSQL A/B runs over six public PDFs preserved 70/70 pages and lexical Recall@10/MRR 1.0000/0.9861 with zero ACL leaks while raw parsing improved 19.2x and isolated sync 3.23x. One garbled page gained OCR evidence; table units changed from 44 to 37. PDF and PPTX share pinned offline Kordoc 4.8.0 PP-OCRv5 Korean, whose compatibility and npm-security gates pass (ADR-053). Native locators are preserved and XLSX exact reads remain bounded. Source read-only and network denial remain outer deployment controls | Partial overall: process containment, public PDF lexical parity, and scoped Kordoc compatibility pass, but semantic/reranked PDF parity was blocked by the absent model sidecar; private table accuracy, OCR CER/WER, deep spreadsheet semantics, placeholders, legacy Office/ODF/MSG/image parsers, PPTX media/OLE/legacy `.ppt`, full-corpus extraction, and broad retrieval quality remain unproven |

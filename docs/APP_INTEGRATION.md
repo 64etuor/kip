@@ -17,6 +17,13 @@ and candidate-assertion inclusion. Missing fields use canonical defaults, and
 every edge delegates ranking, ACL, and refusal behavior to the shared
 application services. See `DATA_CONTRACTS.md` for the exact wire contract.
 
+Allowed filesystem directories come from the deployment's enabled source
+configuration, not REST/SDK request fields. This policy also hides previously
+indexed records after a source is removed or changed and the service reloads.
+Known unit/artifact IDs and broader caller ACLs cannot expand it. Exact reads
+recheck live paths; cloud-only bytes can leave cached text stale, and live XLSX
+reads fail until the operator makes the selected file locally available.
+
 ## Health probes
 
 - `GET /healthz` (process liveness only; no authentication)

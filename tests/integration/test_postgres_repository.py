@@ -1054,6 +1054,16 @@ def test_postgres_migrate_ingest_search_and_status(tmp_path: Path):
             fresh_snapshot,
             source_object.classification,
         )
+        # A fresh foreign snapshot cannot authorize a configured filesystem
+        # source. Restore the deployment-owned policy before testing recovery.
+        assert container.application.retrieval.search(
+            context, SearchRequest(query="참여율 변경 승인", limit=10)
+        ) == []
+        assert source_object.acl_snapshot is not None
+        repository.ingestion.upsert_acl_snapshot(
+            context, source_object.id, source_object.acl_snapshot,
+            source_object.classification,
+        )
         assert container.application.retrieval.search(
             context,
             SearchRequest(query="참여율 변경 승인", limit=10),

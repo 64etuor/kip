@@ -6,8 +6,7 @@ source "$SCRIPT_DIR/common.sh"
 cd "$PROJECT_ROOT"
 
 if [[ ! -f .env ]]; then
-  cp .env.example .env
-  echo "Created .env; change the generated passwords before non-local use." >&2
+  "$(python_cmd)" "$SCRIPT_DIR/bootstrap_env.py" "$PROJECT_ROOT"
 fi
 if [[ ! -f config/kip.toml ]]; then
   cp config/kip.example.toml config/kip.toml
@@ -34,10 +33,23 @@ if [[ ! -d .venv ]]; then
   "$PYTHON_BIN" -m venv .venv
 fi
 . .venv/bin/activate
-python -m pip install --upgrade pip setuptools wheel
-python -m pip install -e '.[postgres,api,identity,extractors,mcp,telemetry,dev]'
+if command -v uv >/dev/null 2>&1; then
+  KIP_BOOTSTRAP_UV="$(command -v uv)"
+else
+  # Keep the bootstrap tool outside .venv: uv sync removes undeclared packages
+  # from that environment. Pin the fallback tool to the same version as CI.
+  KIP_BOOTSTRAP_UV_HOME="$PROJECT_ROOT/var/bootstrap-uv-0.8.22"
+  if [[ ! -x "$KIP_BOOTSTRAP_UV_HOME/bin/uv" ]]; then
+    python -m venv "$KIP_BOOTSTRAP_UV_HOME"
+    "$KIP_BOOTSTRAP_UV_HOME/bin/python" -m pip install --disable-pip-version-check --no-deps 'uv==0.8.22'
+  fi
+  KIP_BOOTSTRAP_UV="$KIP_BOOTSTRAP_UV_HOME/bin/uv"
+fi
+"$KIP_BOOTSTRAP_UV" sync --frozen --python "$PROJECT_ROOT/.venv/bin/python" \
+  --extra postgres --extra api --extra identity --extra extractors \
+  --extra mcp --extra telemetry --extra dev
 "$SCRIPT_DIR/install-kordoc.sh"
 mkdir -p var/cas var/backups var/log
 python scripts/create_sample_xlsx.py
 python scripts/generate_contracts.py
-printf 'Bootstrap complete. Next: ./scripts/dev-up.sh && ./scripts/migrate.sh (full app profile: ./scripts/app-up.sh)\n'
+printf 'Bootstrap complete. Next: ./scripts/kip setup inspect (guided deployment); ./scripts/dev-up.sh && ./scripts/migrate.sh (local sample).\n'

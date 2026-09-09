@@ -4,7 +4,13 @@ Use the exact `answer_format`, `choices`, and `example` returned by `kip setup i
 
 ## Filesystem sources
 
-Pass one JSON array. Each object requires `name`, `root`, `classification`, and `acl_scope`. Optional `include_extensions` and `exclude_globs` narrow collection further.
+Accept an absolute folder path or a JSON array of paths for the simple case.
+KIP proposes a stable source name, workspace ACL, and `personal` classification
+for personal ownership, otherwise `restricted`; inspect preview and obtain plan
+approval. Preview separates locally available files from cloud placeholders,
+which indexing never downloads. For explicit control, pass a JSON object array:
+each object requires `name`, `root`, `classification`, and `acl_scope`.
+Optional `include_extensions` and `exclude_globs` narrow collection further.
 
 ```json
 [{"name":"company-docs","root":"/mnt/nas/team","classification":"internal","acl_scope":"workspace:acme-rnd","include_extensions":[".pdf",".hwpx"],"exclude_globs":["**/archive/**"]}]

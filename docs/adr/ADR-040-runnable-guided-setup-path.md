@@ -3,6 +3,12 @@
 - **Status:** Accepted
 - **Date:** 2026-08-13
 
+Runtime handoff details in decisions 3–5 are superseded by
+[ADR-057](ADR-057-guided-setup-runtime-handoff.md): generated Compose is now
+standalone, receipt startup begins with app-up, and readiness resolves actual
+credentials and source availability. The text below records the original
+decision; current operation follows the starter guide.
+
 ## Context
 
 Guided setup produced approved configuration artifacts but stopped there. A

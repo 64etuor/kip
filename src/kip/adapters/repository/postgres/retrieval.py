@@ -41,6 +41,9 @@ class PostgresRetrievalStore:
     ) -> list[SearchHit]:
         return self.database.search(context, request, lexemes)
 
+    def has_identifier_match(self, context: RequestContext, request: SearchRequest) -> bool:
+        return self.database.has_identifier_match(context, request)
+
     def list_embeddable_units(
         self,
         context: RequestContext,

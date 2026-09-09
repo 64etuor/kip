@@ -3,7 +3,7 @@ document_id: KIP-TRD-003
 title: KIP v3 Agent-First Knowledge Fabric 기술 요구사항 및 설계서
 version: 3.1.0
 status: accepted
-last_updated: 2026-08-17
+last_updated: 2026-09-10
 language: ko-KR
 audience:
   - backend-engineering
@@ -438,6 +438,25 @@ file 크기를 읽기 전에 검사하고 stderr는 tail만 bounded diagnostic�
 root --config > KIP_CONFIG > config/kip.toml
 supported KIP_* value override > loaded TOML value > application default
 ```
+
+Repository wrappers prefer `config/kip.host.generated.toml` after setup when
+no explicit config was selected; bootstrap `.env` defaults do not overwrite
+the approved workspace, identity, ACL, or managed paths. Explicit exported
+overrides and a custom `.env` config remain operator choices. Secret lookup
+uses each configured variable name, not a fallback to an unrelated default.
+Generated Compose is selected alone and gives API, worker, and migration the
+same selected database and approved mounts. Its installer UID/GID belongs to
+the plan fingerprint together with supplementary group memberships; legacy
+plans require regeneration (ADR-057). Missing production or explicitly
+configured custom database secrets fail closed rather than selecting memory.
+
+Guided setup source mounts retain their canonical absolute host path as the
+container target. Both configs therefore produce identical source roots, file
+URIs, and ACL snapshot identities against a shared DB; CAS/backup alone use
+managed container paths. Protected runtime collisions, duplicate targets, and
+source/model-secret overlaps are rejected. Legacy split-path plans require
+regeneration and explicit resync, not automatic provenance rewriting. The
+plain reference Compose's container-only mount layout is a separate profile.
 
 현재 loader는 `kip.local.toml`을 자동 병합하지 않는다. CLI의 workspace,
 principal, scope, role 같은 request-context option은 로드된 application
@@ -1535,15 +1554,25 @@ Unique constraint는 다음을 보장한다.
 1. source root mount와 identity를 확인한다.
 2. exclude pattern을 적용한다.
 3. 파일 metadata snapshot을 수집한다.
-4. settle/symlink/filter/size 정책으로 parsing을 미룬 present path도 scan의
+4. settle/symlink/cloud-residency/filter/size 정책으로 parsing을 미룬 present path도 scan의
    존재 집합에 포함한다.
 5. directory walk error가 하나라도 있으면 incomplete scan으로 실패한다.
-6. 기존 catalog와 `(relative_path, size, mtime_ns)`를 비교한다.
+6. 현재 root/ACL snapshot이 일치하는 경우에만 기존 catalog의 `(relative_path, size, mtime_ns)` cache를 사용한다.
 7. 변경 후보만 hash한다.
 8. hash가 동일하면 path move 또는 metadata-only change로 처리한다.
 9. 새 revision과 Artifact를 생성한다.
 10. 현재 scan에서 보이지 않은 파일은 source root가 정상일 때만 missing 후보로 표시한다.
 11. grace scan 이후 tombstone 처리한다.
+
+Cloud residency는 OS metadata flag로 확인하고 placeholder는 hash/open 전에
+보류한다. 이유별 집계 warning으로 출력 크기를 제한한다. 현재 설정의 활성
+source name/root/snapshot은 검색 전 allowlist이며, Memory와 PostgreSQL 모두
+ranking/limit/graph traversal 전에 검사한다. PostgreSQL은 migrations 0024/0025의
+transaction-local `kip.filesystem_sources`와 query function을 사용하고 assertion의
+모든 근거에 현재 ACL/snapshot freshness/source policy를 확인한다.
+Exact read는 live path/symlink를 재확인한다. 변경된 root의 동일 stat/hash는
+이전 권한을 재사용하지 않고 성공한 parse와 URI-qualified revision이 필요하다.
+설정 변경은 reload 후 적용되고 sync를 자동 시작하지 않는다 (ADR-056).
 
 ### 14.2 Path identity
 
@@ -2367,6 +2396,12 @@ B-tree exact query 대상:
 - content hash
 
 Exact match는 lexical score보다 높은 priority를 가진다.
+
+본문 token/alias의 document frequency가 모두 0이어도 현재 ACL·filesystem
+root·요청 filter 안의 literal filename/identifier 일치를 먼저 확인한다.
+일치가 있으면 기존 ranked-pool/diversity/limit 경로를 그대로 실행하며 별도
+결과를 끼워 넣지 않는다. 파일명은 NFC/NFD를 처리하고 SQL wildcard 문자를
+literal로 escape한다. 기존 색인을 다시 만들 필요는 없다 (ADR-036).
 
 ### 22.5 Search query normalization
 
@@ -5135,6 +5170,8 @@ stand for implicit accepted decisions.
 | ADR-053 | Upgrade the pinned offline Kordoc runtime to 4.8.0 | Accepted |
 | ADR-054 | Use pdf-inspector with selective PyMuPDF table fallback | Accepted for starter and pilot |
 | ADR-055 | Focus agent instructions and harden local entry points | Accepted |
+| ADR-056 | Current filesystem roots authorize existing evidence | Accepted |
+| ADR-057 | Approved setup controls the effective runtime | Accepted |
 
 ---
 

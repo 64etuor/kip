@@ -12,6 +12,7 @@ from kip.domain.models import (
     IngestResult,
     RequestContext,
     SourceObjectAbsence,
+    SourceRevision,
 )
 from kip.errors import ConflictError, ValidationError
 
@@ -19,6 +20,17 @@ from kip.errors import ConflictError, ValidationError
 @dataclass(frozen=True, slots=True)
 class MemoryIngestionStore:
     state: MemoryState
+
+    def current_source_revision(
+        self, context: RequestContext, source_object_id: str
+    ) -> SourceRevision | None:
+        revision_id = self.state.current_revision_by_object.get(source_object_id)
+        packet = self.state.packets_by_revision.get(revision_id or "")
+        if packet is None or packet.workspace_id != context.workspace:
+            return None
+        if not set(packet.source_object.acl_scopes).issubset(context.acl_scopes):
+            return None
+        return packet.revision.model_copy(deep=True)
 
     def upsert_acl_snapshot(
         self,
@@ -33,14 +45,28 @@ class MemoryIngestionStore:
         if packet is None or packet.workspace_id != context.workspace:
             return
         packet.source_object.acl_snapshot = snapshot.model_copy(deep=True)
+        packet.source_object.acl_scopes = list(snapshot.scopes)
         packet.source_object.classification = classification
         for unit in packet.units:
             unit.acl_snapshot_id = snapshot.id
+            unit.acl_scopes = list(snapshot.scopes)
             unit.classification = classification
             self.state.units[unit.id] = unit
         view = self.state.artifacts.get(packet.artifact.id)
         if view is not None:
             view.source_object = packet.source_object.model_copy(deep=True)
+        self._refresh_assertion_access({unit.id for unit in packet.units})
+
+    def _refresh_assertion_access(self, changed_unit_ids: set[str]) -> None:
+        for assertion in self.state.assertions.values():
+            if not changed_unit_ids.intersection(assertion.evidence_unit_ids):
+                continue
+            units = [self.state.units.get(unit_id) for unit_id in assertion.evidence_unit_ids]
+            if any(unit is None for unit in units):
+                # Never derive a broader policy from incomplete evidence.
+                continue
+            assertion.acl_scopes = sorted({scope for unit in units if unit is not None for scope in unit.acl_scopes}) or assertion.acl_scopes
+            assertion.evidence_acl_snapshot_ids = sorted({unit.acl_snapshot_id for unit in units if unit is not None and unit.acl_snapshot_id is not None})
 
     def has_revision(
         self,
@@ -145,15 +171,18 @@ class MemoryIngestionStore:
             packet.source_object.id
         )
         old_packet = self.state.packets_by_revision.get(old_revision_id or "")
-        if old_packet and old_packet.revision.sha256 == packet.revision.sha256:
+        if (old_packet and old_packet.revision.sha256 == packet.revision.sha256
+                and old_packet.revision.raw_object_uri == packet.revision.raw_object_uri):
             if snapshot is not None:
                 old_packet.source_object = packet.source_object.model_copy(deep=True)
                 for unit in old_packet.units:
                     unit.acl_snapshot_id = snapshot.id
+                    unit.acl_scopes = list(snapshot.scopes)
                     unit.classification = packet.source_object.classification
                 view = self.state.artifacts.get(old_packet.artifact.id)
                 if view is not None:
                     view.source_object = packet.source_object.model_copy(deep=True)
+                self._refresh_assertion_access({unit.id for unit in old_packet.units})
             return IngestResult(
                 status="unchanged",
                 source_object_id=packet.source_object.id,

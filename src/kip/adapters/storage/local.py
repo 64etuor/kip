@@ -9,6 +9,8 @@ from typing import Final
 from pydantic import TypeAdapter
 
 from kip.adapters.parsers.xlsx_read import read_xlsx_range
+from kip.adapters.storage.cloud_files import is_cloud_placeholder
+from kip.domain.source_access import FilesystemAccessPolicy
 from kip.domain.xlsx import XlsxCell
 from kip.errors import NotFoundError
 from kip.ids import sha256_bytes
@@ -41,17 +43,30 @@ class LocalContentAddressedStore:
 
 @dataclass(frozen=True, slots=True)
 class LocalSourceFileInspector:
+    source_policy: FilesystemAccessPolicy | None = None
+
+    def _path(self, path: Path) -> Path:
+        if self.source_policy is not None:
+            path = self.source_policy.require_path(path)
+        return path
+
     def sha256(self, path: Path) -> str | None:
+        path = self._path(path)
         if not path.exists() or not path.is_file():
+            return None
+        if is_cloud_placeholder(path.stat()):
             return None
         return _sha256_file(path)
 
     def stat(self, path: Path) -> tuple[int, int] | None:
+        path = self._path(path)
         try:
             info = path.stat()
         except OSError:
             return None
         if not path.is_file():
+            return None
+        if is_cloud_placeholder(info):
             return None
         return (info.st_size, info.st_mtime_ns)
 

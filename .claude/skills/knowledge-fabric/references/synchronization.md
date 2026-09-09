@@ -7,6 +7,12 @@
 - Hash immutable revisions and commit source cursors only after successful ingestion.
 - Keep old active extraction until a new extraction passes quality checks and activates atomically.
 - Treat Slack edits/deletes and mail placements as revisions or tombstones, not destructive updates.
+- Reload services after source configuration changes, then explicitly sync the
+  approved retained scope. Old root/snapshot records remain hidden until current
+  ingestion establishes evidence; a query never reauthorizes them.
+- Cloud placeholders are deferred without hydration. Make only approved files
+  local through the provider first; scan skip aggregates are not parser failures
+  or deletion evidence.
 
 ## XLSX
 

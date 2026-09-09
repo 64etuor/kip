@@ -19,6 +19,7 @@ from kip.setup.models import (
 from kip.setup.planner import build_setup_plan
 from kip.setup.service import SetupService
 from kip.setup.writer import apply_setup_plan
+from tests.setup_support import prepare_setup_project
 
 
 def test_verify_reports_runtime_readiness_without_failing_config_checks(
@@ -48,10 +49,10 @@ def test_verify_reports_runtime_readiness_without_failing_config_checks(
     source = readiness["source_readable:company-docs"]
     assert source.ok is True
     assert receipt.next_steps == [
-        "./scripts/migrate.sh",
         "./scripts/app-up.sh",
         "./scripts/kip sync run --source company-docs",
         './scripts/kip search "smoke test query" --limit 5',
+        "./scripts/kip read UNIT_ID",
     ]
     assert any("configuration" in item for item in receipt.limitations)
 
@@ -147,6 +148,7 @@ def test_egress_gate_matches_runtime_resolvable_secret_schemes() -> None:
 
 
 def _complete_answers(tmp_path: Path) -> SetupAnswers:
+    prepare_setup_project(tmp_path / "project")
     source = tmp_path / "company-docs"
     source.mkdir(exist_ok=True)
     backup = tmp_path / "backup"

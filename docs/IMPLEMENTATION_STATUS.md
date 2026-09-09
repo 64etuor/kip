@@ -4,6 +4,62 @@ This is the current readiness inventory, not the target architecture. The
 target-to-current matrix and ordered gap register live in
 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`.
 
+## 2026-09-10 source scope and setup handoff
+
+Enabled filesystem roots now authorize existing indexed evidence before
+ranking/limits and graph traversal, with Memory/PostgreSQL parity and migration
+0024/0025. Every assertion evidence unit retains current ACL/snapshot/source
+checks. Exact reads add live containment/symlink checks. Reloading removed,
+disabled, or changed source config hides old records; an explicit sync is
+required to establish evidence under changed scope. Cloud placeholders are
+deferred before byte reads and skip diagnostics are aggregated (ADR-056).
+
+Setup now selects standalone generated Compose, honors approved host settings
+and secret references, uses the installer's non-root UID/GID, and orders DB
+readiness/migration before services. Folder shorthand and local/cloud preview
+counts reduce initial input; readiness exposes missing secrets, all-cloud
+sources, and unprovisioned local generation. Old plans require regeneration
+(ADR-057). This is an improved handoff contract, not universal recipient-runtime
+acceptance. Target environments must still verify their mounts, identity,
+external services, backup, and actual evidence quality.
+
+The bounded OneDrive ingestion sample contained one file per seven supported
+office/document formats: 7 inserted, 0 failed, 36 units, and 1,907 cloud-only
+files deferred. Total eligible was 1,914; only the selected 302,208-byte sample
+was made local, and its size/mtime were unchanged. These counters do not prove
+full-corpus retrieval, generated-answer quality, or semantic activation.
+
+OneDrive testing also exposed filenames absent from body vocabulary being
+rejected before ranking. The abstention check now considers literal identifiers
+within current ACL/root/request filters, including NFC/NFD and literal wildcard
+handling, then uses the shared ranking path. Recovered documents required no
+reindex. Final bounded probes passed filename search, context, and fresh exact
+read for 7/7 files; both XLSX/XLSM `A1:F12` live reads were fresh (2/2), and
+direct ACL denials passed for 7/7. Removed, disabled, and narrowed source
+configurations each blocked 7 searches, 7 reads, 7 artifact lookups, and 2
+workbook reads even with `allow_stale`; context/vocabulary were empty and
+answers refused. Repeat sync reported 7 unchanged and 0 failed. These are
+sample retrieval/freshness/access results, not generated-answer or semantic
+quality acceptance.
+
+An isolated source-kit installation also completed frozen bootstrap and the
+18-question guided path using a directory-only source answer, a distinct
+workspace, random local credentials, non-default loopback ports, and the
+installer's UID/GID/groups. The generated standalone stack built and started
+PostgreSQL, completed migration, and started API/worker. Host CLI ingestion was
+visible through authenticated API search and a fresh exact read; API ingestion
+was then searchable and freshly readable through the host CLI. Both directions
+used the same canonical source path and snapshot. Unauthenticated status
+returned 401. The documented REST smoke and teardown wrappers succeeded, and
+the temporary services were stopped after testing. This proves this local
+deployment path, not arbitrary recipient networks, IdPs, or model providers.
+
+The final local `./scripts/verify.sh` run passed 929 tests, Ruff, mypy, runtime
+dependency auditing, and the 120-case portable retrieval/ACL gate. The separate
+historical private golden floor skipped because its default workspace was
+empty; the OneDrive probes above ran in an isolated audit workspace and are not
+substitutes for that full-corpus benchmark.
+
 | Area | Status | Notes |
 |---|---|---|
 | Root agent files | Ready | Task-routed `AGENTS.md`, Claude import, generated MCP config, and compact portable skills with conditional references (ADR-055). Invalid explicit runtime paths fail closed; installation stages both bundles and rolls back handled failures |
@@ -49,7 +105,7 @@ target-to-current matrix and ordered gap register live in
 | Hybrid retrieval | Implementation complete; current shadow unverified | ACL-prefiltered exact vector search, RRF, bounded reranking that preserves the un-reranked fused tail up to the request limit, and explicit activation are implemented. On the historical reviewed 19-case `c4000` run, vector-only Recall@10/MRR was 0.947/0.822, ahead of hybrid at 0.895/0.702 and reranked at 0.842/0.656; the current `c12000` identity has no matching report |
 | Alias query expansion | Active for the lexical path | Human-approved entity aliases (ACL-prefiltered `resolve_entities`) expand candidate retrieval only; reranking keeps the user's original wording. It lifted RapidFuzz on the grounded draft set and is aggregate-neutral-to-positive under the now-active BM25 backend; re-evaluate if candidate generation changes (`evaluation/reports/alias-expansion-20260811/decision.md`) |
 | Ontology contract | Ready for pilot | YAML entity inheritance and predicate contracts; collision-safe validation (ADR-043: a domain profile redefining a core entity type or predicate, or a `sources/*.yaml` object type with an unknown parent, fails `kip ontology validate` and container startup); ACL-bound mining jobs; strict structured-output validation; reviewed entities/relations; exact evidence; deterministic fingerprints; current approved-graph answers; and idempotent predicate migration materialization with source-assertion lineage. The curation loop is reviewable end to end (ADR-038): approved-entity-aware mining digests make the two-pass mine -> approve entities -> re-mine loop run, invalid/duplicate/stale proposals are skipped with per-proposal reasons on a durable `kip.ontology-mining-result.v1` job payload, evidence/review enforcement is derived from the catalog and pinned to `predicates.yaml` by a contract test, candidate listings ship as triage-ordered `kip.assertion-candidate-listing.v1` with Korean labels and ACL-gated snippets, audited revocation and supersede-on-approve exist (migration 0019), and `include_candidate_assertions` populates clearly-marked proposed candidates on ontology-context surfaces only |
-| Agent-guided setup | Ready for starter acceptance | Fail-fast Python 3.12+ bootstrap, `env:`/`file:`-only secret references rejected at answer time, runtime-readiness verify checks (python, docker, DB secret, source readability) that never flip `verified` on environmental failures, receipt `next_steps` and a configuration-only limitation entry, host-path MCP config, and `scripts/app-up.sh` layering `compose.generated.yaml` over the base Compose file; setup remains configuration-only until the next steps run |
+| Agent-guided setup | Handoff implemented; recipient acceptance required | Folder shorthand, metadata-only local/cloud preview, resolved secret/key readiness, owner-bound plans, standalone generated Compose, generated host-config selection, and app-up-first receipts are implemented (ADR-057). Missing readiness does not become `verified`. Local generation provisioning, external controls, and real recipient evidence remain separate |
 | Neo4j | Not shipped | Graph traversal runs inside the active repository backend (`capabilities.graph_backend` reports it); a Neo4j read projection would introduce its own port at adoption time. Do not deploy before the adoption gate |
 | Review UI | Not included | CLI/API review workflow only |
 | Starter-kit adoption guide | Ready | Environment decisions, AI change contract, real-corpus acceptance evidence, upgrade and handoff rules |

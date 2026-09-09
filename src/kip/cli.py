@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -163,11 +164,17 @@ def root(
     if ctx.invoked_subcommand == "setup":
         ctx.obj = None
         return
-    settings = Settings.load(config)
-    container = build_container(
-        settings,
-        load_models=command_loads_models(ctx.invoked_subcommand),
-    )
+    try:
+        settings = Settings.load(config)
+        if workspace is not None:
+            settings = replace(settings, workspace=workspace)
+        container = build_container(
+            settings,
+            load_models=command_loads_models(ctx.invoked_subcommand),
+        )
+    except KipError as exc:
+        _emit_error(None, exc, workspace=workspace)
+        raise typer.Exit(code=3) from exc
     explicit_repeated_scopes = _is_command_line_parameter(ctx, "acl_scope")
     explicit_csv_scopes = _is_command_line_parameter(ctx, "acl_scopes")
     selected_scopes = list(acl_scope or [])
@@ -228,8 +235,12 @@ def _error_message(exc: BaseException) -> str:
     return message
 
 
-def _emit_error(runtime: Runtime | None, exc: BaseException) -> None:
-    context = runtime.context if runtime else RequestContext(request_id=new_id("req"))
+def _emit_error(
+    runtime: Runtime | None, exc: BaseException, *, workspace: str | None = None,
+) -> None:
+    context = runtime.context if runtime else RequestContext(
+        request_id=new_id("req"), workspace=workspace or "default",
+    )
     envelope = Envelope(
         ok=False,
         error=ErrorInfo(code=error_code(exc), message=_error_message(exc)),

@@ -17,6 +17,7 @@ from kip.adapters.connectors.slack import SlackConnector
 from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
 from kip.domain.models import ConnectorEvent
+from kip.domain.source_access import FilesystemAccessPolicy, FilesystemSourceGrant
 from kip.errors import ConfigurationError
 from kip.ids import new_id, sha256_bytes, stable_id
 from kip.ports.ingestion import DiscoveredFile, FilesystemSourcePort
@@ -94,10 +95,34 @@ class ConfiguredFilesystemSource:
     def skipped_present_relative_paths(self) -> frozenset[str]:
         return self.connector.skipped_present_relative_paths
 
+    @property
+    def skipped_reason_counts(self) -> dict[str, int]:
+        return self.connector.skipped_reason_counts
+
+    @property
+    def deferred_relative_prefixes(self) -> frozenset[str]:
+        return self.connector.deferred_relative_prefixes
+
 
 @dataclass(frozen=True, slots=True)
 class ConfiguredSourceCatalog:
     settings: Settings
+
+    def filesystem_access_policy(self) -> FilesystemAccessPolicy:
+        grants: list[FilesystemSourceGrant] = []
+        for item in self.settings.get("sources.filesystem", []) or []:
+            if not item.get("enabled", True):
+                continue
+            source = self.filesystem(str(item["name"]))
+            grants.append(FilesystemSourceGrant(
+                name=source.name,
+                root=source.root.resolve(),
+                snapshot_id=source.acl_snapshot.id,
+            ))
+        return FilesystemAccessPolicy(
+            tuple(grants),
+            follow_symlinks=bool(self.settings.get("security.follow_symlinks", False)),
+        )
 
     def capabilities(self) -> dict[str, str]:
         capabilities = {

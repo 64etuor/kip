@@ -18,6 +18,12 @@ from kip.domain.models import (
 
 
 class RetrievalStore(Protocol):
+    def has_identifier_match(
+        self, context: RequestContext, request: SearchRequest
+    ) -> bool:
+        """Literal, Unicode-equivalent identifier match within the request's scope."""
+        ...
+
     def search(
         self,
         context: RequestContext,

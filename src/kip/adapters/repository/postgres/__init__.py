@@ -11,6 +11,7 @@ from kip.adapters.repository.postgres.knowledge import PostgresKnowledgeStore
 from kip.adapters.repository.postgres.operations import PostgresOperationsStore
 from kip.adapters.repository.postgres.retrieval import PostgresRetrievalStore
 from kip.adapters.telemetry.postgres import PostgresQueryTraceStore
+from kip.domain.source_access import FilesystemAccessPolicy
 
 
 class PostgresRepository:
@@ -24,6 +25,7 @@ class PostgresRepository:
         pool_max_size: int = 10,
         hnsw_ef_search: int = 200,
         hnsw_max_scan_tuples: int = 100_000,
+        source_policy: FilesystemAccessPolicy | None = None,
     ) -> None:
         self.database = PostgresDatabase(
             database_url,
@@ -31,6 +33,7 @@ class PostgresRepository:
             pool_max_size=pool_max_size,
             hnsw_ef_search=hnsw_ef_search,
             hnsw_max_scan_tuples=hnsw_max_scan_tuples,
+            source_policy=source_policy,
         )
         self.ingestion = PostgresIngestionStore(self.database)
         self.retrieval = PostgresRetrievalStore(self.database)
@@ -40,6 +43,9 @@ class PostgresRepository:
         self.operations = PostgresOperationsStore(self.database)
         self.telemetry = PostgresQueryTraceStore(self.database)
         self.interactions = PostgresInteractionStore(self.database)
+
+    def configure_source_access(self, policy: FilesystemAccessPolicy) -> None:
+        self.database.source_policy = policy
 
 
 __all__ = ["PostgresRepository"]

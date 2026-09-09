@@ -13,6 +13,36 @@ canonical sections; read `docs/RAG_EVALUATION.md` for semantic promotion gates.
 The OneDrive profile and historical results below are scoped examples, not
 requirements for every deployment.
 
+## OneDrive availability and scope preflight
+
+Select the permitted directory before scanning; no broader home or cloud drive
+is implied. `setup preview` reports total eligible, local, and cloud-only files
+without opening their content. Cloud-only items are deferred by sync, not
+downloaded. For an authorized real-document test, make only the chosen sample
+locally available through OneDrive first and rerun the preview. Preserve size,
+mtime, and post-download byte hashes around the test; distinguish an explicit
+provider download from a KIP source write.
+
+Record skip aggregates separately from parser failures. A deferred placeholder
+does not contribute deletion evidence. A stale cached text read is not proof
+that its source bytes were reopened; XLSX requires a successful live range
+read. Include negative tests for a sibling/removed/disabled/narrowed source and
+a known old ID after service configuration reload. Changing policy never
+implicitly authorizes a sync or model activation.
+
+The 2026-09-10 bounded preflight found 1,914 eligible files, all cloud-only.
+The explicitly selected seven-format sample (PDF, DOCX, PPTX, XLSX, XLSM, HWP,
+HWPX; 302,208 bytes) was made local for testing. Its first sync inserted 7 files
+with 0 failures and 36 units while deferring 1,907 cloud-only files. The baseline
+173,209 per-file skip warnings became 2 aggregate warnings. Sample size and
+mtime remained unchanged through the test. Final probes passed 7/7 filename
+search/context/fresh exact reads, 2/2 fresh XLSX/XLSM `A1:F12` reads, and 7/7
+direct ACL denials. Each removed/disabled/narrowed scope denied the 7 files and
+2 workbooks, emptied context/vocabulary, and refused answers. Repeat sync was
+7 unchanged, 0 failed. These are bounded sample results, not corpus-wide
+answer-quality or semantic promotion evidence; the detailed access counts are
+recorded in implementation status.
+
 ## Hard rules for an audit cycle
 
 - Never write, rename, delete, or otherwise mutate a source file. The source mount/path must remain read-only in intent and configuration.
@@ -35,7 +65,8 @@ Run from the repository root. `scripts/common.sh` loads `.env`; prefer `./script
 ./scripts/kip status
 ```
 
-The local ignored file `config/kip.toml` must contain an enabled filesystem
+The selected local ignored config (generated host config after setup, otherwise
+the explicitly selected config or `config/kip.toml`) must contain an enabled filesystem
 source. The current parser-focused OneDrive profile intentionally uses these
 seven extensions:
 

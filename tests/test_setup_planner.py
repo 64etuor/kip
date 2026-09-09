@@ -159,7 +159,7 @@ def test_setup_plan_is_deterministic_and_contains_read_only_mounts(
     assert first.plan_fingerprint == second.plan_fingerprint
     assert first.answers_fingerprint == answers.fingerprint()
     assert first.mounts[0].read_only is True
-    assert first.mounts[0].target == "/sources/company-docs"
+    assert first.mounts[0].target == first.sources[0].host_root
     assert first.generated_files == [
         "config/kip.generated.toml",
         "config/kip.host.generated.toml",

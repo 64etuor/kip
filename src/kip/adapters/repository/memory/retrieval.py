@@ -41,6 +41,9 @@ class MemoryRetrievalStore:
     ) -> list[SearchHit]:
         return self.lexical.search(context, request, lexemes)
 
+    def has_identifier_match(self, context: RequestContext, request: SearchRequest) -> bool:
+        return self.lexical.has_identifier_match(context, request)
+
     def list_embeddable_units(
         self,
         context: RequestContext,

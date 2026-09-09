@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
+from unicodedata import normalize
 
 from kip.adapters.repository.memory.acl import unit_is_visible
 from kip.adapters.repository.memory.state import MemoryState
@@ -26,10 +28,46 @@ class MemoryLexicalStore:
         request: SearchRequest,
         lexemes: str,
     ) -> list[SearchHit]:
-        raw_terms = [term for term in request.query.lower().split() if term]
+        normalized_query = normalize("NFC", request.query).lower()
+        raw_terms = [term for term in normalized_query.split() if term]
         lexical_terms = [term for term in lexemes.lower().split() if term]
         unique_terms = list(dict.fromkeys([*raw_terms, *lexical_terms]))
         scored: list[tuple[float, ContentUnit, ArtifactView]] = []
+        for unit, view in self._visible_units(context, request):
+            haystack = normalize(
+                "NFC", f"{unit.title or ''}\n{unit.lexical_text}\n{_identifier_text(view)}"
+            ).lower()
+            score = self._score(
+                haystack,
+                normalized_query,
+                normalize("NFC", view.artifact.file_name).lower(),
+                unique_terms,
+            )
+            if score > 0:
+                scored.append((score, unit, view))
+
+        scored.sort(key=lambda item: (-item[0], item[1].id))
+        return [
+            _search_hit(
+                score,
+                unit,
+                view,
+                raw_terms or unique_terms,
+                is_latest=revision_is_latest(self.state, view),
+            )
+            for score, unit, view in scored[: request.limit]
+        ]
+
+    def has_identifier_match(self, context: RequestContext, request: SearchRequest) -> bool:
+        needle = normalize("NFC", request.query).lower()
+        return bool(needle) and any(
+            needle in normalize("NFC", _identifier_text(view)).lower()
+            for _, view in self._visible_units(context, request)
+        )
+
+    def _visible_units(
+        self, context: RequestContext, request: SearchRequest
+    ) -> Iterator[tuple[ContentUnit, ArtifactView]]:
         for unit in self.state.units.values():
             if not unit_is_visible(self.state, unit, context):
                 continue
@@ -52,30 +90,7 @@ class MemoryLexicalStore:
             )
             if request.project_ids and project_id not in request.project_ids:
                 continue
-            haystack = (
-                f"{unit.title or ''}\n{unit.lexical_text}\n"
-                f"{view.artifact.file_name}"
-            ).lower()
-            score = self._score(
-                haystack,
-                request.query.lower(),
-                view.artifact.file_name.lower(),
-                unique_terms,
-            )
-            if score > 0:
-                scored.append((score, unit, view))
-
-        scored.sort(key=lambda item: (-item[0], item[1].id))
-        return [
-            _search_hit(
-                score,
-                unit,
-                view,
-                raw_terms or unique_terms,
-                is_latest=revision_is_latest(self.state, view),
-            )
-            for score, unit, view in scored[: request.limit]
-        ]
+            yield unit, view
 
     def list_embeddable_units(
         self,
@@ -171,13 +186,22 @@ class MemoryLexicalStore:
         terms: list[str],
     ) -> float:
         score = 12.0 if exact_query in haystack else 0.0
-        if exact_query == file_name:
+        if exact_query in file_name:
             score += 30.0
         return score + sum(
             1.0 + min(3.0, haystack.count(term) * 0.15)
             for term in terms
             if term in haystack
         )
+
+
+def _identifier_text(view: ArtifactView) -> str:
+    return " ".join(filter(None, [
+        view.artifact.file_name,
+        view.document.title if view.document else "",
+        str(view.source_object.metadata.get("document_number", "")) if view.source_object else "",
+        str(view.document.metadata.get("project_id", "")) if view.document else "",
+    ]))
 
 
 def snippet(body: str, terms: list[str], width: int = 360) -> str:

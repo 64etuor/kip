@@ -228,6 +228,8 @@ class SetupQuestion(StrictModel):
 class SourceInventory(StrictModel):
     root: str
     file_count: int = 0
+    local_file_count: int = 0
+    cloud_placeholder_count: int = 0
     byte_count: int = 0
     extension_counts: dict[str, int] = Field(default_factory=dict)
     excluded_count: int = 0
@@ -303,15 +305,28 @@ class SetupPlan(StrictModel):
     ontology_reviewers: list[str]
     generated_files: list[str]
     warnings: list[str] = Field(default_factory=list)
+    runtime_uid: int | None = Field(default=None, ge=1)
+    runtime_gid: int | None = Field(default=None, ge=1)
+    runtime_supplementary_gids: list[int] | None = None
 
     def calculate_fingerprint(self) -> str:
         excluded_fields = {"plan_fingerprint"}
         if self.relation_mining_mode is None:
             excluded_fields.add("relation_mining_mode")
+        if self.runtime_uid is None:
+            excluded_fields.add("runtime_uid")
+        if self.runtime_gid is None:
+            excluded_fields.add("runtime_gid")
+        if self.runtime_supplementary_gids is None:
+            excluded_fields.add("runtime_supplementary_gids")
         payload = self.model_dump(
             mode="json",
             exclude=excluded_fields,
         )
+        if self.runtime_uid is None:
+            for source in payload["sources"]:
+                source["inventory"].pop("local_file_count", None)
+                source["inventory"].pop("cloud_placeholder_count", None)
         return hashlib.sha256(_canonical_json(payload).encode()).hexdigest()
 
     def verify_fingerprint(self) -> None:

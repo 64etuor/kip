@@ -14,6 +14,7 @@ from kip.domain.models import (
     IngestResult,
     RequestContext,
     SourceObjectAbsence,
+    SourceRevision,
 )
 from kip.ports.parser import ParserPort
 
@@ -79,10 +80,20 @@ class FilesystemSourcePort(Protocol):
         """Files still present on disk from the most recent `scan()` call
 
         that were excluded from ingestion by a config filter,
-        `max_file_bytes`, symlink policy, or the settle window. Deletion
+        `max_file_bytes`, symlink policy, cloud-only state, or the settle window. Deletion
         reconciliation must count these as seen so a present file is never
         tombstoned as deleted.
         """
+        ...
+
+    @property
+    def skipped_reason_counts(self) -> dict[str, int]:
+        """Counts by skip reason from the latest completed scan, without paths."""
+        ...
+
+    @property
+    def deferred_relative_prefixes(self) -> frozenset[str]:
+        """Unvisited directories whose descendants cannot be judged absent."""
         ...
 
 
@@ -129,6 +140,12 @@ class ContentAddressedStorePort(Protocol):
 
 
 class IngestionStore(Protocol):
+    def current_source_revision(
+        self, context: RequestContext, source_object_id: str
+    ) -> SourceRevision | None:
+        """Internal ingestion lookup, retaining ACL but not retrieval root filters."""
+        ...
+
     def upsert_acl_snapshot(
         self,
         context: RequestContext,

@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from unicodedata import normalize
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -57,6 +58,7 @@ from kip.domain.models import (
     StatusReport,
     VocabularyItem,
 )
+from kip.domain.source_access import FilesystemAccessPolicy
 from kip.errors import (
     AuthorizationError,
     ConflictError,
@@ -70,6 +72,10 @@ from kip.ontology import FALLBACK_EVIDENCE_REQUIRED_PREDICATES
 _REVIEW_RISK_ORDER_SQL = (
     "CASE review_risk WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END"
 )
+
+
+def _literal_like_pattern(value: str) -> str:
+    return "%" + value.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%"
 
 
 def _evidence_required(candidate: AssertionCandidate) -> bool:
@@ -165,10 +171,12 @@ class PostgresDatabase:
         pool_max_size: int = 10,
         hnsw_ef_search: int = 200,
         hnsw_max_scan_tuples: int = 100_000,
+        source_policy: FilesystemAccessPolicy | None = None,
     ) -> None:
         if hnsw_ef_search <= 0 or hnsw_max_scan_tuples <= 0:
             raise ValidationError("HNSW scan bounds must be positive")
         self.database_url = database_url
+        self.source_policy = source_policy
         self.statement_timeout_ms = statement_timeout_ms
         self.pool_max_size = pool_max_size
         self.hnsw_ef_search = hnsw_ef_search
@@ -212,9 +220,15 @@ class PostgresDatabase:
     def _connection(
         self,
         context: RequestContext | None = None,
+        *,
+        enforce_source_policy: bool = True,
     ) -> Generator[Connection[DictRow], None, None]:
         with self._connection_pool().connection() as connection:
             with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT set_config('kip.filesystem_sources', %s, true)",
+                    (_json(self.source_policy.payload()) if enforce_source_policy and self.source_policy is not None else "null",),
+                )
                 if context is not None:
                     cursor.execute(
                         "SELECT set_config('statement_timeout', %s, false),"
@@ -380,7 +394,7 @@ class PostgresDatabase:
         snapshot: AclSnapshot,
         classification: DataClassification,
     ) -> None:
-        with self._connection(context) as connection:
+        with self._connection(context, enforce_source_policy=False) as connection:
             self._ensure_workspace_and_principal(connection, context)
             with connection.cursor() as cursor:
                 self._write_acl_snapshot(cursor, context.workspace, snapshot)
@@ -462,7 +476,15 @@ class PostgresDatabase:
         cursor.execute(
             """
             UPDATE knowledge.assertions assertion
-            SET evidence_acl_snapshot_ids = (
+            SET acl_scopes = coalesce((
+                SELECT array_agg(DISTINCT scope ORDER BY scope)
+                FROM knowledge.assertion_evidence evidence
+                JOIN content.units unit ON unit.id=evidence.content_unit_id
+                CROSS JOIN LATERAL unnest(unit.acl_scopes) scope
+                WHERE evidence.workspace_id=assertion.workspace_id
+                  AND evidence.assertion_id=assertion.id
+            ), assertion.acl_scopes),
+            evidence_acl_snapshot_ids = (
                 SELECT coalesce(
                     array_agg(DISTINCT unit.acl_snapshot_id ORDER BY unit.acl_snapshot_id),
                     ARRAY[]::text[]
@@ -473,6 +495,13 @@ class PostgresDatabase:
                   AND evidence.assertion_id=assertion.id
             )
             WHERE assertion.workspace_id=%s
+              AND NOT EXISTS (
+                  SELECT 1 FROM knowledge.assertion_evidence evidence
+                  LEFT JOIN content.units unit ON unit.id=evidence.content_unit_id
+                  WHERE evidence.workspace_id=assertion.workspace_id
+                    AND evidence.assertion_id=assertion.id
+                    AND unit.id IS NULL
+              )
               AND EXISTS (
                   SELECT 1
                   FROM knowledge.assertion_evidence evidence
@@ -487,6 +516,30 @@ class PostgresDatabase:
             (workspace, source_object_id),
         )
 
+    def current_source_revision(
+        self, context: RequestContext, source_object_id: str
+    ) -> SourceRevision | None:
+        with self._connection(context, enforce_source_policy=False) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT r.* FROM source.objects o
+                JOIN source.revisions r ON r.id=o.current_revision_id
+                WHERE o.workspace_id=%s AND o.id=%s
+                  AND (cardinality(o.acl_scopes)=0 OR o.acl_scopes <@ %s::text[])
+                  AND kip.acl_snapshot_is_fresh(o.acl_snapshot_id)
+                """,
+                (context.workspace, source_object_id, context.acl_scopes),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return SourceRevision(
+            id=row["id"], object_id=row["object_id"], revision_key=row["revision_key"],
+            sha256=row["sha256"], size_bytes=row["size_bytes"],
+            source_modified_at=row["source_modified_at"], raw_object_uri=row["raw_object_uri"],
+            is_tombstone=row["is_tombstone"], metadata=row["metadata"] or {},
+        )
+
     def current_revision_by_stat(
         self,
         context: RequestContext,
@@ -495,7 +548,7 @@ class PostgresDatabase:
         size: int,
         mtime_ns: int,
     ) -> str | None:
-        with self._connection(context) as connection, connection.cursor() as cursor:
+        with self._connection(context, enforce_source_policy=False) as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT r.id
@@ -512,7 +565,7 @@ class PostgresDatabase:
         return str(row["id"]) if row else None
 
     def has_revision(self, context: RequestContext, source_object_id: str, sha256: str) -> bool:
-        with self._connection(context) as connection, connection.cursor() as cursor:
+        with self._connection(context, enforce_source_policy=False) as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
                 SELECT 1
@@ -531,7 +584,7 @@ class PostgresDatabase:
         seen_object_ids: AbstractSet[str],
     ) -> list[SourceObjectAbsence]:
         seen = sorted(seen_object_ids)
-        with self._connection(context) as connection:
+        with self._connection(context, enforce_source_policy=False) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
@@ -601,7 +654,7 @@ class PostgresDatabase:
         if any(unit.classification != packet.source_object.classification for unit in packet.units):
             raise ValidationError("every content unit must match the source data classification")
 
-        with self._connection(context) as connection:
+        with self._connection(context, enforce_source_policy=False) as connection:
             self._ensure_workspace_and_principal(connection, context)
             with connection.cursor() as cursor:
                 self._write_acl_snapshot(cursor, context.workspace, snapshot)
@@ -615,11 +668,12 @@ class PostgresDatabase:
                 )
                 if old_revision_id:
                     cursor.execute(
-                        "SELECT sha256 FROM source.revisions WHERE workspace_id=%s AND id=%s",
+                        "SELECT sha256, raw_object_uri FROM source.revisions WHERE workspace_id=%s AND id=%s",
                         (context.workspace, old_revision_id),
                     )
                     old_revision = cursor.fetchone()
-                    if old_revision and old_revision["sha256"] == packet.revision.sha256:
+                    if (old_revision and old_revision["sha256"] == packet.revision.sha256
+                            and old_revision["raw_object_uri"] == packet.revision.raw_object_uri):
                         cursor.execute(
                             """
                             UPDATE source.objects
@@ -981,7 +1035,7 @@ class PostgresDatabase:
         ):
             raise ValidationError("candidate units do not preserve source access controls")
 
-        with self._connection(context) as connection:
+        with self._connection(context, enforce_source_policy=False) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
@@ -1185,10 +1239,56 @@ class PostgresDatabase:
             warnings=list(packet.extraction.warnings),
         )
 
+    def has_identifier_match(self, context: RequestContext, request: SearchRequest) -> bool:
+        if not request.query:
+            return False
+        conditions = [
+            "l.workspace_id=%s",
+            "(cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])",
+            "kip.acl_snapshot_is_fresh(u.acl_snapshot_id)",
+            "kip.source_artifact_is_allowed(u.artifact_id)",
+            "(l.identifier_text ILIKE %s ESCAPE '!' OR l.identifier_text ILIKE %s ESCAPE '!')",
+        ]
+        params: list[Any] = [
+            context.workspace,
+            context.acl_scopes,
+            _literal_like_pattern(normalize("NFC", request.query)),
+            _literal_like_pattern(normalize("NFD", request.query)),
+        ]
+        for values, condition in (
+            (request.source_kinds, "l.source_kind = ANY(%s::text[])"),
+            (request.document_types, "d.document_type = ANY(%s::text[])"),
+            (request.project_ids, "coalesce(d.metadata->>'project_id','') = ANY(%s::text[])"),
+        ):
+            if values:
+                conditions.append(condition)
+                params.append(values)
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT EXISTS (
+                    SELECT 1 FROM search.lexical_units l
+                    JOIN content.units u ON u.id=l.unit_id
+                    JOIN content.artifacts a ON a.id=l.artifact_id
+                    JOIN source.revisions r ON r.id=a.revision_id
+                    JOIN source.objects o ON o.id=r.object_id AND o.current_revision_id=r.id
+                    LEFT JOIN content.logical_documents d ON d.id=l.document_id
+                    WHERE {" AND ".join(conditions)}
+                ) AS matched
+                """,
+                params,
+            )
+            row = cursor.fetchone()
+            return bool(row and row["matched"])
+
     def search(
         self, context: RequestContext, request: SearchRequest, lexemes: str
     ) -> list[SearchHit]:
         websearch_query = _websearch_or_query(lexemes)
+        identifier_patterns = [
+            _literal_like_pattern(normalize(form, request.query)) for form in ("NFC", "NFD")
+        ]
+        literal_pattern = _literal_like_pattern(request.query)
         inner_conditions = ["l.workspace_id=%s"]
         inner_condition_params: list[Any] = [context.workspace]
         if request.source_kinds:
@@ -1196,7 +1296,7 @@ class PostgresDatabase:
             inner_condition_params.append(request.source_kinds)
         outer_conditions = [
             "(cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])",
-            "kip.acl_snapshot_is_fresh(u.acl_snapshot_id)",
+            "(kip.acl_snapshot_is_fresh(u.acl_snapshot_id) AND kip.source_artifact_is_allowed(u.artifact_id))",
         ]
         outer_condition_params: list[Any] = [context.acl_scopes]
         if request.document_types:
@@ -1236,18 +1336,19 @@ class PostgresDatabase:
                     l.title, l.source_sha256, l.source_modified_at,
                     left(regexp_replace(l.body, '\\s+', ' ', 'g'), 500) AS snippet,
                     (
-                        CASE WHEN lower(l.identifier_text) = lower(%s) THEN 30 ELSE 0 END
-                      + CASE WHEN l.title ILIKE '%%' || %s || '%%' THEN 10 ELSE 0 END
-                      + CASE WHEN l.body ILIKE '%%' || %s || '%%' THEN 6 ELSE 0 END
+                        CASE WHEN l.identifier_text ILIKE %s ESCAPE '!' OR l.identifier_text ILIKE %s ESCAPE '!' THEN 30 ELSE 0 END
+                      + CASE WHEN l.title ILIKE %s ESCAPE '!' THEN 10 ELSE 0 END
+                      + CASE WHEN l.body ILIKE %s ESCAPE '!' THEN 6 ELSE 0 END
                       + CASE WHEN l.tsv @@ websearch_to_tsquery('simple', %s) THEN ts_rank_cd(l.tsv, websearch_to_tsquery('simple', %s)) * 10 ELSE 0 END
                       + similarity(l.title, %s) * 2
                     ) AS score
                 FROM search.lexical_units l
                 WHERE {" AND ".join(inner_conditions)}
                   AND (
-                        l.identifier_text ILIKE '%%' || %s || '%%'
-                     OR l.title ILIKE '%%' || %s || '%%'
-                     OR l.body ILIKE '%%' || %s || '%%'
+                        l.identifier_text ILIKE %s ESCAPE '!'
+                     OR l.identifier_text ILIKE %s ESCAPE '!'
+                     OR l.title ILIKE %s ESCAPE '!'
+                     OR l.body ILIKE %s ESCAPE '!'
                      OR l.tsv @@ websearch_to_tsquery('simple', %s)
                      OR l.title %% %s
                   )
@@ -1271,17 +1372,17 @@ class PostgresDatabase:
             ORDER BY q.score DESC, q.unit_id
         """
         score_params = [
-            request.query,
-            request.query,
-            request.query,
+            *identifier_patterns,
+            literal_pattern,
+            literal_pattern,
             websearch_query,
             websearch_query,
             request.query,
         ]
         or_params = [
-            request.query,
-            request.query,
-            request.query,
+            *identifier_patterns,
+            literal_pattern,
+            literal_pattern,
             websearch_query,
             request.query,
         ]
@@ -1340,7 +1441,7 @@ class PostgresDatabase:
                 LEFT JOIN content.logical_documents d ON d.id=u.document_id
                 WHERE u.workspace_id=%s
                   AND (cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])
-                  AND kip.acl_snapshot_is_fresh(u.acl_snapshot_id)
+                  AND (kip.acl_snapshot_is_fresh(u.acl_snapshot_id) AND kip.source_artifact_is_allowed(u.artifact_id))
                 ORDER BY u.id
                 """,
                 (context.workspace, context.acl_scopes),
@@ -1531,7 +1632,7 @@ class PostgresDatabase:
             "u.id=v.unit_id",
             "v.source_hash=r.sha256",
             "(cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])",
-            "kip.acl_snapshot_is_fresh(u.acl_snapshot_id)",
+            "(kip.acl_snapshot_is_fresh(u.acl_snapshot_id) AND kip.source_artifact_is_allowed(u.artifact_id))",
         ]
         eligibility_params: list[Any] = [context.acl_scopes]
         if request.source_kinds:
@@ -1695,7 +1796,7 @@ class PostgresDatabase:
                 CROSS JOIN LATERAL unnest(string_to_array(l.lexemes, ' ')) AS token
                 WHERE l.workspace_id=%s
                   AND (cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])
-                  AND kip.acl_snapshot_is_fresh(u.acl_snapshot_id)
+                  AND (kip.acl_snapshot_is_fresh(u.acl_snapshot_id) AND kip.source_artifact_is_allowed(u.artifact_id))
                   AND l.tsv @@ to_tsquery('simple', %s)
                   AND token <> ''
                   AND token LIKE %s || '%%'
@@ -1730,7 +1831,7 @@ class PostgresDatabase:
                     JOIN content.units u ON u.id=l.unit_id
                     WHERE l.workspace_id=%s
                       AND (cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])
-                      AND kip.acl_snapshot_is_fresh(u.acl_snapshot_id)
+                      AND (kip.acl_snapshot_is_fresh(u.acl_snapshot_id) AND kip.source_artifact_is_allowed(u.artifact_id))
                       AND l.tsv @@ to_tsquery('simple', %s)
                     """,
                     (context.workspace, context.acl_scopes, tsquery),
@@ -1752,7 +1853,7 @@ class PostgresDatabase:
                 LEFT JOIN search.lexical_units l ON l.unit_id=u.id
                 WHERE u.workspace_id=%s AND u.id = ANY(%s::text[])
                   AND (cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])
-                  AND kip.acl_snapshot_is_fresh(u.acl_snapshot_id)
+                  AND (kip.acl_snapshot_is_fresh(u.acl_snapshot_id) AND kip.source_artifact_is_allowed(u.artifact_id))
                 """,
                 (context.workspace, list(unit_ids), context.acl_scopes),
             )
@@ -1815,7 +1916,7 @@ class PostgresDatabase:
                 LEFT JOIN content.logical_documents d ON d.id=da.document_id
                 WHERE a.workspace_id=%s AND a.id=%s
                   AND (cardinality(o.acl_scopes)=0 OR o.acl_scopes <@ %s::text[])
-                  AND kip.acl_snapshot_is_fresh(o.acl_snapshot_id)
+                  AND (kip.acl_snapshot_is_fresh(o.acl_snapshot_id) AND kip.source_artifact_is_allowed(a.id))
                 """,
                 (context.workspace, artifact_id, context.acl_scopes),
             )
@@ -1901,7 +2002,7 @@ class PostgresDatabase:
                 JOIN source.objects o ON o.id=r.object_id AND o.current_revision_id=r.id
                 WHERE da.workspace_id=%s AND da.document_id=%s
                   AND (cardinality(o.acl_scopes)=0 OR o.acl_scopes <@ %s::text[])
-                  AND kip.acl_snapshot_is_fresh(o.acl_snapshot_id)
+                  AND (kip.acl_snapshot_is_fresh(o.acl_snapshot_id) AND kip.source_artifact_is_allowed(a.id))
                 ORDER BY da.is_primary DESC, a.file_name
                 """,
                 (context.workspace, document_id, context.acl_scopes),
@@ -1923,6 +2024,7 @@ class PostgresDatabase:
             "(a.valid_from IS NULL OR a.valid_from <= statement_timestamp())",
             "(a.valid_to IS NULL OR a.valid_to > statement_timestamp())",
             "(cardinality(a.acl_scopes)=0 OR a.acl_scopes <@ %s::text[])",
+            "kip.source_assertion_is_allowed(a.id)",
             "NOT EXISTS (SELECT 1 FROM unnest(a.evidence_acl_snapshot_ids) snapshot_id "
             "WHERE NOT kip.acl_snapshot_is_fresh(snapshot_id))",
         ]
@@ -1998,6 +2100,7 @@ class PostgresDatabase:
                   AND (a.valid_to IS NULL OR a.valid_to > statement_timestamp())
                   AND a.object_entity_id IS NOT NULL
                   AND (cardinality(a.acl_scopes)=0 OR a.acl_scopes <@ %s::text[])
+                  AND kip.source_assertion_is_allowed(a.id)
                   AND NOT EXISTS (
                       SELECT 1
                       FROM unnest(a.evidence_acl_snapshot_ids) snapshot_id
@@ -2374,7 +2477,7 @@ class PostgresDatabase:
                     WHERE workspace_id=%s
                       AND id = ANY(%s::text[])
                       AND (cardinality(acl_scopes)=0 OR acl_scopes <@ %s::text[])
-                      AND kip.acl_snapshot_is_fresh(acl_snapshot_id)
+                      AND (kip.acl_snapshot_is_fresh(acl_snapshot_id) AND kip.source_artifact_is_allowed(artifact_id))
                     """,
                     (context.workspace, evidence_ids, context.acl_scopes),
                 )
@@ -2426,7 +2529,7 @@ class PostgresDatabase:
                                     cardinality(unit.acl_scopes)=0
                                     OR unit.acl_scopes <@ %s::text[]
                                 )
-                                AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                                AND (kip.acl_snapshot_is_fresh(unit.acl_snapshot_id) AND kip.source_artifact_is_allowed(unit.artifact_id))
                           )
                       )
                     """,
@@ -2485,7 +2588,7 @@ class PostgresDatabase:
                                 cardinality(unit.acl_scopes)=0
                                 OR unit.acl_scopes <@ %s::text[]
                             )
-                            AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                            AND (kip.acl_snapshot_is_fresh(unit.acl_snapshot_id) AND kip.source_artifact_is_allowed(unit.artifact_id))
                       )
                   )
                 """,
@@ -2522,7 +2625,7 @@ class PostgresDatabase:
                                 cardinality(unit.acl_scopes)=0
                                 OR unit.acl_scopes <@ %s::text[]
                             )
-                            AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                            AND (kip.acl_snapshot_is_fresh(unit.acl_snapshot_id) AND kip.source_artifact_is_allowed(unit.artifact_id))
                       )
                   )
                 """,
@@ -2562,7 +2665,7 @@ class PostgresDatabase:
                                 cardinality(unit.acl_scopes)=0
                                 OR unit.acl_scopes <@ %s::text[]
                             )
-                            AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                            AND (kip.acl_snapshot_is_fresh(unit.acl_snapshot_id) AND kip.source_artifact_is_allowed(unit.artifact_id))
                       )
                   )
                 ORDER BY created_at, id
@@ -2606,7 +2709,7 @@ class PostgresDatabase:
                                     cardinality(unit.acl_scopes)=0
                                     OR unit.acl_scopes <@ %s::text[]
                                 )
-                                AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                                AND (kip.acl_snapshot_is_fresh(unit.acl_snapshot_id) AND kip.source_artifact_is_allowed(unit.artifact_id))
                           )
                       )
                     FOR UPDATE
@@ -2632,7 +2735,7 @@ class PostgresDatabase:
                     WHERE workspace_id=%s
                       AND id = ANY(%s::text[])
                       AND (cardinality(acl_scopes)=0 OR acl_scopes <@ %s::text[])
-                      AND kip.acl_snapshot_is_fresh(acl_snapshot_id)
+                      AND (kip.acl_snapshot_is_fresh(acl_snapshot_id) AND kip.source_artifact_is_allowed(artifact_id))
                     """,
                     (context.workspace, evidence_ids, context.acl_scopes),
                 )
@@ -2759,7 +2862,7 @@ class PostgresDatabase:
                                 cardinality(unit.acl_scopes)=0
                                 OR unit.acl_scopes <@ %s::text[]
                             )
-                            AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                            AND (kip.acl_snapshot_is_fresh(unit.acl_snapshot_id) AND kip.source_artifact_is_allowed(unit.artifact_id))
                       )
                   )
                 RETURNING *
@@ -2832,7 +2935,7 @@ class PostgresDatabase:
                                 cardinality(unit.acl_scopes)=0
                                 OR unit.acl_scopes <@ %s::text[]
                             )
-                            AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                            AND (kip.acl_snapshot_is_fresh(unit.acl_snapshot_id) AND kip.source_artifact_is_allowed(unit.artifact_id))
                       )
                   )
                 """,
@@ -2872,6 +2975,7 @@ class PostgresDatabase:
                   AND assertion.predicate=%s
                   AND assertion.status='active'
                   AND (cardinality(assertion.acl_scopes)=0 OR assertion.acl_scopes <@ %s::text[])
+                  AND kip.source_assertion_is_allowed(assertion.id)
                   AND NOT EXISTS (
                       SELECT 1
                       FROM unnest(assertion.evidence_acl_snapshot_ids) snapshot_id
@@ -2917,6 +3021,7 @@ class PostgresDatabase:
                       cardinality(assertion.acl_scopes)=0
                       OR assertion.acl_scopes <@ %s::text[]
                   )
+                  AND kip.source_assertion_is_allowed(assertion.id)
                   AND NOT EXISTS (
                       SELECT 1
                       FROM unnest(assertion.evidence_acl_snapshot_ids) snapshot_id
@@ -2962,7 +3067,7 @@ class PostgresDatabase:
                               cardinality(acl_scopes)=0
                               OR acl_scopes <@ %s::text[]
                           )
-                          AND kip.acl_snapshot_is_fresh(acl_snapshot_id)
+                          AND (kip.acl_snapshot_is_fresh(acl_snapshot_id) AND kip.source_artifact_is_allowed(artifact_id))
                         """,
                         (context.workspace, evidence_ids, context.acl_scopes),
                     )
@@ -3088,7 +3193,7 @@ class PostgresDatabase:
                           cardinality(unit.acl_scopes)=0
                           OR unit.acl_scopes <@ %s::text[]
                       )
-                      AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                      AND (kip.acl_snapshot_is_fresh(unit.acl_snapshot_id) AND kip.source_artifact_is_allowed(unit.artifact_id))
                 )
             )""",
         ]
@@ -3176,7 +3281,7 @@ class PostgresDatabase:
                                 cardinality(unit.acl_scopes)=0
                                 OR unit.acl_scopes <@ %s::text[]
                             )
-                            AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                            AND (kip.acl_snapshot_is_fresh(unit.acl_snapshot_id) AND kip.source_artifact_is_allowed(unit.artifact_id))
                       )
                   )
                 """,
@@ -3309,7 +3414,7 @@ class PostgresDatabase:
                                     cardinality(unit.acl_scopes)=0
                                     OR unit.acl_scopes <@ %s::text[]
                                 )
-                                AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                                AND (kip.acl_snapshot_is_fresh(unit.acl_snapshot_id) AND kip.source_artifact_is_allowed(unit.artifact_id))
                           )
                       )
                     FOR UPDATE
@@ -3352,7 +3457,7 @@ class PostgresDatabase:
                               cardinality(acl_scopes)=0
                               OR acl_scopes <@ %s::text[]
                           )
-                          AND kip.acl_snapshot_is_fresh(acl_snapshot_id)
+                          AND (kip.acl_snapshot_is_fresh(acl_snapshot_id) AND kip.source_artifact_is_allowed(artifact_id))
                         """,
                         (
                             context.workspace,
@@ -3497,7 +3602,7 @@ class PostgresDatabase:
                                 cardinality(unit.acl_scopes)=0
                                 OR unit.acl_scopes <@ %s::text[]
                             )
-                            AND kip.acl_snapshot_is_fresh(unit.acl_snapshot_id)
+                            AND (kip.acl_snapshot_is_fresh(unit.acl_snapshot_id) AND kip.source_artifact_is_allowed(unit.artifact_id))
                       )
                   )
                 RETURNING *
@@ -3534,6 +3639,7 @@ class PostgresDatabase:
                 WHERE a.workspace_id=%s
                   AND a.id=%s
                   AND (cardinality(a.acl_scopes)=0 OR a.acl_scopes <@ %s::text[])
+                  AND kip.source_assertion_is_allowed(a.id)
                   AND NOT EXISTS (
                       SELECT 1
                       FROM unnest(a.evidence_acl_snapshot_ids) snapshot_id

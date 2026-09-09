@@ -25,8 +25,10 @@ Run from the KIP repository with `./scripts/kip`. On a fresh clone, use
    and failed `runtime_readiness` items with their remediation.
 
 Setup is configuration-only. Follow the receipt's `next_steps` within the
-authorized setup: migrate, `./scripts/app-up.sh`, source sync, then search and
-exact-read smoke. `app-up.sh` loads the generated Compose override.
+authorized setup: `./scripts/app-up.sh` (database readiness and migration precede
+services), source sync, then search and exact-read smoke. `app-up.sh` selects
+the standalone generated Compose. All-cloud sources need user-selected local
+downloads; a local generation choice still needs a separately verified service.
 `sync_schedule` is declarative metadata; a scheduler must be installed separately.
 A missing evaluation dataset means installation-ready, not production-ready.
 

@@ -49,6 +49,7 @@ class PostgresSemanticProjectionStore:
                 WHERE u.workspace_id=%s
                   AND (cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])
                   AND kip.acl_snapshot_is_fresh(u.acl_snapshot_id)
+                  AND kip.source_artifact_is_allowed(u.artifact_id)
                   AND (v.unit_id IS NULL OR v.source_hash<>r.sha256)
                 ORDER BY u.id
                 """,
@@ -82,6 +83,7 @@ class PostgresSemanticProjectionStore:
                 WHERE u.workspace_id=%s
                   AND (cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])
                   AND kip.acl_snapshot_is_fresh(u.acl_snapshot_id)
+                  AND kip.source_artifact_is_allowed(u.artifact_id)
                 """,
                 (space_id, context.workspace, context.acl_scopes),
             )

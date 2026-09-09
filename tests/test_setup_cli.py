@@ -7,6 +7,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from kip.cli import app
+from tests.setup_support import prepare_setup_project
 
 
 def test_setup_cli_runs_before_runtime_configuration(
@@ -42,6 +43,7 @@ def test_setup_cli_answers_previews_plans_applies_and_verifies(
 ) -> None:
     project_root = tmp_path / "project"
     project_root.mkdir()
+    prepare_setup_project(project_root)
     source = tmp_path / "company-docs"
     source.mkdir()
     (source / "policy.txt").write_text("승인 정책", encoding="utf-8")
@@ -146,8 +148,8 @@ def test_setup_cli_answers_previews_plans_applies_and_verifies(
     assert "database_secret" in readiness_names
     assert "source_readable:company-docs" in readiness_names
     assert receipt["next_steps"][:2] == [
-        "./scripts/migrate.sh",
         "./scripts/app-up.sh",
+        "./scripts/kip sync run --source company-docs",
     ]
     assert any(
         "configuration" in limitation for limitation in receipt["limitations"]

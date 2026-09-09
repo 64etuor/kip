@@ -26,33 +26,35 @@ agent는 `kip-setup` Skill에 따라 매번 하나의 누락된 결정만 질문
 ./scripts/kip setup verify --plan .kip/setup-plan.json
 ```
 
-`setup apply`와 `verify`는 설정 파일만 생성한다. 실제로 서비스가 뜨고 문서가
+`setup apply`는 설정 파일을 생성하고 `verify`는 파일과 runtime 준비를 검증한다.
+실제로 서비스가 뜨고 문서가
 색인되려면 receipt의 `next_steps`를 순서대로 실행해야 한다.
 
 ```bash
-./scripts/migrate.sh
 ./scripts/app-up.sh
 ./scripts/kip sync run --source SOURCE
 ./scripts/kip search "스모크 테스트 질의" --limit 5
+./scripts/kip read UNIT_ID
 ```
 
 `./scripts/app-up.sh`는 `compose.generated.yaml`과
-`config/kip.generated.toml`이 있으면 base `compose.yaml` 위에 override를
-겹쳐 승인된 read-only source mount, CAS 경로, 생성 config를 컨테이너에
-적용한다. override가 없으면 안내 문구와 함께 기본 app profile로 동작한다.
+`config/kip.generated.toml`이 있으면 standalone generated Compose만 선택하여
+승인된 read-only source mount, CAS 경로, 생성 config를 적용한다. DB 준비와
+migration 후 서비스가 시작된다. 둘 다 없으면 안내와 함께 기본 app profile로
+동작하고 하나만 있으면 불완전한 설정으로 실패한다.
 `./scripts/app-up.sh --down`으로 종료한다.
 
 실제 credential 대신 `env:KIP_DATABASE_URL` 같은 secret reference만 답한다.
 런타임은 `env:`와 (모델 credential에 한해) `file:` reference만 해석하며,
 `keychain:`/`secret-manager:`는 CLI가 거부한다. `/`, 홈 디렉터리, 프로젝트
 루트 또는 그 상위 디렉터리는 source root로 거부된다. 생성된 config와 Compose
-override는 로컬 전용이며 Git에서 제외된다.
+파일은 로컬 전용이며 Git에서 제외된다. source 질문에는 폴더 절대경로만
+답할 수도 있다. preview의 ACL/분류와 local/cloud-only 건수를 확인한다.
+cloud-only 파일은 provider 앱에서 선택하여 다운로드한 뒤 수집한다.
 
 ## Local CLI profile
 
 ```bash
-cp .env.example .env
-cp config/kip.example.toml config/kip.toml
 ./scripts/bootstrap.sh
 ./scripts/dev-up.sh
 ./scripts/migrate.sh
@@ -107,9 +109,9 @@ For a real read-only OneDrive audit, use [`docs/AI_OPERATOR_RUNBOOK.md`](AI_OPER
 curl http://127.0.0.1:8080/readyz
 ```
 
-`app-up.sh`는 guided setup이 적용된 저장소에서는
-`docker compose -f compose.yaml -f compose.generated.yaml --profile app up -d --build`
-를, 그렇지 않으면 `docker compose --profile app up -d --build`를 실행한다.
+`app-up.sh`는 guided setup의 standalone Compose와 secret references를 함께
+해석한다. 직접 base Compose와 합치면 승인되지 않은 mount가 추가될 수 있으므로
+생성 배포는 wrapper로 실행한다.
 
 The API and CLI call the same service layer. App integrations should use REST/OpenAPI unless the calling system specifically supports MCP.
 

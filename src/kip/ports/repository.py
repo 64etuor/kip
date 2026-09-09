@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from kip.domain.source_access import FilesystemAccessPolicy
 from kip.ports.evidence import EvidenceStore
 from kip.ports.ingestion import IngestionStore
 from kip.ports.interactions import InteractionStore
@@ -13,6 +14,8 @@ from kip.ports.telemetry import QueryTraceStore
 
 
 class RepositoryPort(Protocol):
+    def configure_source_access(self, policy: FilesystemAccessPolicy) -> None: ...
+
     @property
     def name(self) -> str: ...
 

@@ -94,19 +94,24 @@ class FileIngestionWorkflow:
         ingest_context = self._ingest_context(context, acl_scopes)
         system_id = stable_id("srcsys", context.workspace, source_name)
         object_id = stable_id("srcobj", system_id, record.relative_path)
-        self._store.upsert_acl_snapshot(
-            ingest_context,
-            object_id,
-            acl_snapshot,
-            classification,
-        )
+        path = _safe_source_path(record.path, source_root)
+        current = self._store.current_source_revision(ingest_context, object_id)
+        same_path = current is None or current.raw_object_uri == path.as_uri()
+        # Never put the new root's authorization on bytes from the old root.
+        # The normal packet commit refreshes policy after a changed-root file
+        # has been parsed successfully in its new location.
+        if same_path:
+            self._store.upsert_acl_snapshot(
+                ingest_context, object_id, acl_snapshot, classification,
+            )
         # Fast path: if the stored current revision matches the file's
         # size/mtime, skip hashing (and therefore reading) the file entirely.
-        current_revision_id = self._store.current_revision_by_stat(
-            ingest_context,
-            object_id,
-            size=record.size,
-            mtime_ns=record.mtime_ns,
+        current_revision_id = (
+            current.id if current is not None and same_path
+            and not current.is_tombstone
+            and current.size_bytes == record.size
+            and current.metadata.get("mtime_ns") == record.mtime_ns
+            else None
         )
         if current_revision_id is not None:
             path = _safe_source_path(record.path, source_root)
@@ -123,16 +128,12 @@ class FileIngestionWorkflow:
                 unit_count=0,
             )
         identity = self._identity(
-            context,
+            ingest_context,
             source_name=source_name,
             source_root=source_root,
             record=record,
         )
-        if self._store.has_revision(
-            ingest_context,
-            identity.object_id,
-            record.sha256,
-        ):
+        if current is not None and same_path and not current.is_tombstone and current.sha256 == record.sha256:
             return IngestResult(
                 status="unchanged",
                 source_object_id=identity.object_id,
@@ -300,8 +301,8 @@ class FileIngestionWorkflow:
             }
         )
 
-    @staticmethod
     def _identity(
+        self,
         context: RequestContext,
         *,
         source_name: str,
@@ -312,6 +313,15 @@ class FileIngestionWorkflow:
         system_id = stable_id("srcsys", context.workspace, source_name)
         object_id = stable_id("srcobj", system_id, record.relative_path)
         revision_id = stable_id("rev", object_id, record.sha256)
+        current = self._store.current_source_revision(context, object_id)
+        if current is not None:
+            if current.raw_object_uri == path.as_uri() and current.sha256 == record.sha256 and not current.is_tombstone:
+                revision_id = current.id
+            else:
+                # Bind every changed revision to its URI, including a later
+                # content reversion after a root move. Reusing a historical
+                # hash-only ID could otherwise revive the old root's row.
+                revision_id = stable_id("rev", object_id, record.sha256 + "\x1f" + path.as_uri())
         stable_key = _logical_key(record.relative_path)
         document_id = stable_id("ldoc", context.workspace, stable_key)
         return _FileIdentity(
@@ -380,7 +390,11 @@ class FileIngestionWorkflow:
             revision=SourceRevision(
                 id=identity.revision_id,
                 object_id=identity.object_id,
-                revision_key=record.sha256,
+                revision_key=(
+                    record.sha256
+                    if identity.revision_id == stable_id("rev", identity.object_id, record.sha256)
+                    else record.sha256 + ":" + identity.revision_id
+                ),
                 sha256=record.sha256,
                 size_bytes=record.size,
                 source_modified_at=source_modified_at,

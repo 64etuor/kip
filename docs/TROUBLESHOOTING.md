@@ -78,11 +78,17 @@ PowerShell/cmd에서는 동작하지 않습니다. WSL2(Ubuntu)를 설치하고 
    내 권한 범위 밖의 자료는 존재 자체가 보이지 않습니다. 설정한
    `acl_scope`와 실행 시 사용하는 스코프가 같은지 확인하세요.
 
+5. **허용 폴더 설정이 바뀌었는가**
+   삭제·비활성화·root/분류/ACL 변경 후에는 이전 색인이 존재해도 숨겨질 수
+   있습니다. 실제 선택된 config와 서비스 재시작 여부를 확인하세요. 의도한
+   범위를 승인한 뒤 그 source만 명시적으로 sync합니다. 알려진 ID나 넓은
+   request ACL로 이 경계를 우회할 수 없습니다.
+
 ---
 
 ## 3. 특정 파일이 색인되지 않을 때
 
-`sync run` 결과의 `warnings`에 파일별 이유가 나옵니다. 자주 나오는 경우:
+`sync run` 결과의 `warnings`에는 오류와 원인별 skip 집계가 나옵니다. 자주 나오는 경우:
 
 | 메시지에 나오는 말 | 뜻과 해결 |
 |---|---|
@@ -93,7 +99,8 @@ PowerShell/cmd에서는 동작하지 않습니다. WSL2(Ubuntu)를 설치하고 
 | `parser process timed out` | 파일 하나가 `[parsers.isolation].wall_seconds`를 넘었습니다. 원본은 바뀌지 않고 이전 active extraction이 유지됩니다. 같은 파일을 읽기 전용으로 재현해 시간/RSS를 측정한 뒤에만 한도를 조정하세요. |
 | `parser process exceeded memory budget` | child와 descendants의 합산 RSS가 `memory_mib`를 넘었습니다. 동시 실행을 늘리지 말고 파일 크기·형식·peak RSS를 기록한 뒤 `OPERATIONS.md`의 headroom 규칙으로 조정하세요. |
 | `parser process response exceeded` / `invalid response` | 결과 파일이 `result_mib`를 넘었거나 child contract가 손상됐습니다. 한도를 무작정 풀지 말고 해당 parser/version과 unit 수를 격리 표본으로 재현하세요. |
-| `present but skipped from ingestion (filter, size, symlink, or settle policy)` | 파일이 아직 안정화 대기 중이거나 필터·용량·symlink 정책에 걸렸습니다. 원본과 이전 active extraction은 그대로 있고 삭제로 처리되지 않습니다. |
+| `cloud` / `placeholder` 집계 | OneDrive 등에서 파일 내용이 로컬에 없습니다. provider 앱에서 원하는 표본만 다운로드하고 preview를 다시 실행하세요. KIP은 placeholder를 다운로드하지 않고 이전 extraction도 삭제하지 않습니다. |
+| filter / size / symlink / settle 집계 | 안정화 대기 또는 수집 정책에 걸린 파일입니다. 이전 active extraction은 유지하고 삭제로 처리하지 않습니다. |
 | `filesystem scan incomplete` | 하위 디렉터리를 읽지 못해 삭제 조정을 중단했습니다. NAS mount와 디렉터리 권한을 복구한 뒤 다시 sync하세요. |
 | `partial` 상태 + 낮은 quality | 일부만 추출되었습니다. 원본 확인 후 필요하면 다시 저장해서 재수집하세요. |
 

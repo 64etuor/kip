@@ -148,12 +148,14 @@ class SearchEngine:
         mode: str | None = None,
     ) -> list[SearchHit]:
         # The pipeline is a fixed sequence of stages with one exit:
-        #   plan → analyze → build ranked pool → diversify + truncate.
+        #   plan → analyze → check content/identifiers → rank → diversify.
         # Each stage is a named method so a change in one cannot silently
         # reorder another; only the pool builder branches on mode.
         plan = self._resolve_mode(mode)
         query = self._analyze(context, request.query)
-        if self._should_abstain(context, query):
+        if self._should_abstain(context, query) and not self._store.has_identifier_match(
+            context, request
+        ):
             return []
         pool = self._ranked_pool(context, request, query, plan)
         return self._diversify(pool, request.limit)
@@ -173,10 +175,10 @@ class SearchEngine:
 
         Scope is deliberately narrow: abstain only when the query's ENTIRE
         vocabulary — every content token and every approved-alias
-        expansion — is absent from the reachable corpus. That is the only
-        lexical threshold that never abstains a legitimate query (any
-        single grounded term keeps retrieval alive), so it catches typos
-        and nonsense without touching paraphrases. Distinguishing partial
+        expansion — is absent from the reachable corpus. The caller also
+        checks literal identifiers: filenames need not occur in body
+        vocabulary. Any single grounded term keeps retrieval alive.
+        Distinguishing partial
         nonsense from a low-overlap paraphrase, or a real-word query with
         no factual answer, needs the calibrated semantic score — which
         plugs into this same gate once the vector space is active.

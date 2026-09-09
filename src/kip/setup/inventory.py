@@ -4,6 +4,7 @@ import os
 from fnmatch import fnmatch
 from pathlib import Path, PurePosixPath
 
+from kip.adapters.storage.cloud_files import is_cloud_placeholder
 from kip.errors import ValidationError
 from kip.setup.models import FilesystemSourceAnswer, SourceInventory
 
@@ -15,6 +16,8 @@ def inspect_source(
 ) -> SourceInventory:
     root = Path(source.root)
     file_count = 0
+    local_file_count = 0
+    cloud_placeholder_count = 0
     byte_count = 0
     extension_counts: dict[str, int] = {}
     excluded_count = 0
@@ -60,12 +63,16 @@ def inspect_source(
                 excluded_count += 1
                 continue
             try:
-                size = path.stat(follow_symlinks=False).st_size
+                file_stat = path.stat(follow_symlinks=False)
             except OSError:
                 unreadable_count += 1
                 continue
             file_count += 1
-            byte_count += size
+            byte_count += file_stat.st_size
+            if is_cloud_placeholder(file_stat):
+                cloud_placeholder_count += 1
+            else:
+                local_file_count += 1
             extension_counts[extension or "<none>"] = (
                 extension_counts.get(extension or "<none>", 0) + 1
             )
@@ -73,6 +80,8 @@ def inspect_source(
     return SourceInventory(
         root=str(root),
         file_count=file_count,
+        local_file_count=local_file_count,
+        cloud_placeholder_count=cloud_placeholder_count,
         byte_count=byte_count,
         extension_counts=dict(sorted(extension_counts.items())),
         excluded_count=excluded_count,

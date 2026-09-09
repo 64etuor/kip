@@ -96,13 +96,16 @@ def build_container(
 ) -> Container:
     selected = settings or Settings.load()
     selected_identity = _build_identity(selected)
+    sources = ConfiguredSourceCatalog(selected)
+    source_policy = sources.filesystem_access_policy()
     if repository is not None:
         selected_repository = repository
     elif selected.is_memory:
-        selected_repository = MemoryRepository()
+        selected_repository = MemoryRepository(source_policy=source_policy)
     else:
         selected_repository = PostgresRepository(
             selected.database_url,
+            source_policy=source_policy,
             statement_timeout_ms=selected.database_statement_timeout_ms,
             pool_max_size=selected.database_pool_max_size,
             hnsw_ef_search=int(selected.get("search.hnsw_ef_search", 200)),
@@ -111,7 +114,8 @@ def build_container(
             ),
         )
     parsers = ParserRegistry.from_settings(selected)
-    sources = ConfiguredSourceCatalog(selected)
+    # Injected repositories obey the same deployment boundary as built-ins.
+    selected_repository.configure_source_access(source_policy)
     analyzer = KoreanNgramAnalyzer(
         min_n=int(selected.get("search.korean_ngram_min", 2)),
         max_n=int(selected.get("search.korean_ngram_max", 4)),
@@ -200,7 +204,7 @@ def build_container(
             allow_remote_egress=allow_remote_egress,
         )
     selected.cas_path.mkdir(parents=True, exist_ok=True)
-    source_files = LocalSourceFileInspector()
+    source_files = LocalSourceFileInspector(source_policy=source_policy)
     telemetry_config = selected.get("telemetry", {}) or {}
     if not isinstance(telemetry_config, dict):
         raise ConfigurationError("telemetry must be a table")
@@ -240,6 +244,7 @@ def build_container(
         selected_repository.evidence,
         source_files,
         LocalWorkbookReader(),
+        source_policy=source_policy,
     )
     retrieval = RetrievalUseCases(
         selected,

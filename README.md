@@ -1,4 +1,4 @@
-# KIP 지식 패브릭 스타터킷 v3.4
+# KIP 지식 패브릭 스타터킷 v3.6
 
 KIP은 NAS 파일, HWP/HWPX, PDF, PPTX, XLSX, Slack, 이메일에 흩어진 회사
 지식을 색인하고 근거와 함께 검색하기 위한 에이전트 우선·증거 우선 기반입니다.
@@ -82,8 +82,8 @@ ontology profile, interaction-memory 동의, reviewer를 확정합니다. 이후
 크기, 확장자 분포, 제외 항목, symlink를 미리 보여주고 사용자가 plan fingerprint와
 read-only mount를 승인한 뒤 다음 파일을 원자적으로 생성·검증합니다.
 
-- `config/kip.generated.toml`: container 경로
-- `config/kip.host.generated.toml`: host/MCP 경로
+- `config/kip.generated.toml`: container 설정
+- `config/kip.host.generated.toml`: host/MCP 설정 (source 절대경로는 container와 동일)
 - `compose.generated.yaml`
 - 생성된 host config를 가리키는 `.mcp.json`
 
@@ -92,10 +92,17 @@ read-only mount를 승인한 뒤 다음 파일을 원자적으로 생성·검증
 허용합니다. `keychain:`과 `secret-manager:`는 거부합니다. 평가 dataset이 없으면
 설치는 가능하지만 production-promoted 상태가 아니라는 제한을 receipt에 남깁니다.
 
-`setup apply`와 `setup verify`는 설정만 생성합니다. 실제 배포는
-`./scripts/migrate.sh`, `./scripts/app-up.sh`, source sync, search smoke test까지
-실행해야 합니다. 전체 인수 절차는
+`setup apply`는 설정을 생성하고 `setup verify`는 파일과 runtime 준비 항목을
+검증합니다. 실제 배포는 `./scripts/app-up.sh`부터 실행한 뒤 source sync,
+search와 exact-read smoke까지 확인합니다. 승인한 Compose만 사용하며 DB 준비와
+migration 순서는 자동 처리합니다. 폴더 경로만 답해도 보수적 분류와 workspace
+ACL을 제안하고, preview가 local/cloud-only 파일을 구분합니다. 다운로드가 필요한
+파일은 OneDrive 앱에서 먼저 선택합니다. 전체 인수 절차는
 [`docs/STARTER_KIT_GUIDE.md`](docs/STARTER_KIT_GUIDE.md)를 따릅니다.
+
+검색 범위는 활성 source에 지정한 디렉터리 하위로 제한됩니다. 제거·비활성화·
+범위 변경 후 서비스가 설정을 다시 읽으면 이전 색인과 알려진 ID에도 새 경계가
+적용됩니다. 변경 범위를 다시 허용하려면 명시적인 sync가 필요합니다.
 
 ## 3. 로컬 개발 빠른 시작
 
@@ -122,13 +129,13 @@ Windows에서는 PowerShell/cmd가 아니라 WSL2 Ubuntu 안에서 실행해야 
 한 줄이라도 실패하면 [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)를
 확인하세요.
 
-Bootstrap은 고정된 Kordoc OCR runtime과 한국어 model cache를 설치·검증합니다.
+Bootstrap은 `uv.lock`의 고정된 의존성을 `uv sync --frozen`으로 설치하고,
+고정된 Kordoc OCR runtime과 한국어 model cache를 설치·검증합니다.
+uv가 없으면 별도 도구 환경에 0.8.22를 준비합니다. 새 `.env`에는 무작위
+credential을 생성하며 기존 `.env`와 config는 보존합니다.
 정상 색인 중에는 parser package나 model을 내려받지 않습니다.
 
 ```bash
-cp .env.example .env
-cp config/kip.example.toml config/kip.toml
-
 ./scripts/bootstrap.sh
 ./scripts/dev-up.sh
 ./scripts/migrate.sh

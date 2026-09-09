@@ -284,7 +284,7 @@ def test_hwp_reextraction_does_not_hash_other_configured_formats(
     assert hashed_suffixes == [".hwp"]
 
 
-def test_hwp_reextraction_preserves_the_canonical_source_access_snapshot(
+def test_hwp_reextraction_does_not_reauthorize_a_foreign_source_snapshot(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -321,8 +321,8 @@ def test_hwp_reextraction_preserves_the_canonical_source_access_snapshot(
     )
 
     active = next(iter(repository.state.packets_by_revision.values()))
-    assert summary.activated == 1
-    assert summary.failed == 0
+    assert summary.activated == 0
+    assert summary.failed == 1
     assert active.source_object.acl_snapshot == canonical_snapshot
     assert all(
         unit.acl_snapshot_id == canonical_snapshot.id for unit in active.units

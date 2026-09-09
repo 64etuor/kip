@@ -16,6 +16,23 @@ owner; they are not a sandbox against a concurrent filesystem attacker.
 - The local model sidecar binds only to loopback and disables Infinity and
   Hugging Face telemetry in the provided launcher.
 
+## Filesystem access boundary
+
+Configured enabled filesystem roots form a trusted deployment allowlist in
+addition to request ACLs. Current source name, snapshot, and descendant path
+are checked before retrieval ranking/limits and graph traversal, including
+previously indexed records. Removing or changing a root takes effect when the
+application reloads its configuration; retaining old database rows grants no
+access. Explicit sync is required to authorize records under changed policy.
+Exact evidence and workbook reads recheck live containment and symlink policy
+before opening bytes. Unavailable or cloud-only source bytes leave cached text
+explicitly stale with no current hash; a live workbook read fails without
+hydration. Source configuration is operator-controlled, never a search argument.
+
+These checks do not replace read-only mounts or OS permissions. Cloud detection
+uses OS-reported residency flags, and is not a remote OneDrive API or a sandbox
+against a concurrent filesystem attacker. See ADR-056.
+
 ## Spreadsheet parsing boundary
 
 - XLSX/XLSM deep reads open the source read-only, do not preserve VBA, disable
@@ -74,6 +91,13 @@ owner; they are not a sandbox against a concurrent filesystem attacker.
   and guided setup rejects `keychain:`/`secret-manager:` references at answer
   time.
 - Never commit `.env`, Slack tokens, IMAP passwords, API keys, or Neo4j credentials.
+- Fresh bootstrap generates distinct random database/API/admin credentials
+  into a private `.env`; existing deployments are not rotated. Setup honors
+  the configured secret variable names instead of substituting default keys.
+  Verification resolves references and rejects placeholder or identical
+  API/admin credentials. Generated runtime services run as the plan's non-root
+  installer UID/GID and supplementary groups; apply verifies host memberships.
+  A new host requires a regenerated, approved plan (ADR-057).
 - Do not place secrets in `.mcp.json`, `CLAUDE.md`, `AGENTS.md`, or Skill files.
 
 ## Starter archive boundary

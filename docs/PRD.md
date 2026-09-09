@@ -3,7 +3,7 @@ document_id: KIP-PRD-003
 title: KIP v3 Agent-First Knowledge Fabric 제품 요구사항 정의서
 version: 3.1.0
 status: accepted
-last_updated: 2026-08-17
+last_updated: 2026-09-10
 language: ko-KR
 audience:
   - product
@@ -421,6 +421,8 @@ Agent 흐름:
 - **FR-SRC-013 SHOULD**: Slack export ZIP을 초기 backfill에 사용할 수 있어야 한다.
 - **FR-SRC-014 SHOULD**: Apple Mail rule이 신규 메시지를 spool에 넣는 push 보조 경로를 제공해야 한다.
 - **FR-SRC-015 MAY**: IMAP 또는 Gmail/Microsoft provider API adapter를 추가할 수 있어야 한다.
+- **FR-SRC-016 MUST**: 활성 filesystem source의 지정 디렉터리 하위만 검색·근거 읽기·graph에 허용한다. 설정 제거·비활성화·범위 변경 후 서비스 재시작 시 기존 색인에도 현재 경계를 적용하고, 변경된 범위는 명시적 sync로 다시 확인한다 (ADR-056).
+- **FR-SRC-017 MUST**: cloud-only 파일은 metadata만 확인하여 다운로드 없이 보류하며, 보류를 삭제로 해석하지 않고 원인별 집계 진단을 제공한다.
 
 ### 9.3 Raw capture and source identity
 
@@ -499,7 +501,7 @@ Agent 흐름:
 
 ### 9.9 Lexical search
 
-- **FR-LEX-001 MUST**: exact identifier search를 제공해야 한다.
+- **FR-LEX-001 MUST**: exact identifier와 파일명 검색을 제공해야 한다. 본문 vocabulary에 파일명이 없다는 이유로 실제 허용된 파일명 일치를 검색 전에 거부하지 않는다.
 - **FR-LEX-002 MUST**: title, document number, project, organization, author, date, source type 필터를 제공해야 한다.
 - **FR-LEX-003 MUST**: 한국어 검색은 PostgreSQL 기본 FTS만 단독으로 의존하지 않아야 한다.
 - **FR-LEX-004 MUST**: 사전 토큰화된 lexeme index와 raw text fallback을 제공해야 한다.
@@ -607,6 +609,8 @@ Agent 흐름:
 - **FR-OPS-008 MUST**: structured status와 health report를 제공해야 한다.
 - **FR-OPS-009 SHOULD**: macOS launchd를 통한 예약 sync를 지원해야 한다.
 - **FR-OPS-010 SHOULD**: PostgreSQL major upgrade와 restore drill 절차를 문서화해야 한다.
+- **FR-OPS-011 MUST**: 승인된 setup plan의 source mount, workspace, 신원, secret reference와 non-root runtime owner가 실제 host/container 실행에 적용돼야 한다. 기본 설정 병합으로 승인 범위를 넓히지 않고, 시작 순서와 미충족 준비 항목을 receipt로 제공한다 (ADR-057).
+- **FR-OPS-012 MUST**: 같은 DB를 쓰는 guided host/container runtime은 동일한 canonical source root·URI·ACL snapshot을 사용해야 한다. source를 container의 다른 경로로 바꿔 기존 근거의 권한이 달라지게 하지 않는다.
 
 ---
 

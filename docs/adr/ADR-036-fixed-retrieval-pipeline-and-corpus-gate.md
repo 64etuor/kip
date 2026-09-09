@@ -26,8 +26,12 @@ threshold would incorrectly reject low-overlap paraphrases.
   request-limit stage.
 - The lexical abstention gate returns an empty result only when **every** whole
   content token and approved-alias expansion has zero document frequency in
-  the caller's ACL-filtered reachable corpus. One grounded term keeps retrieval
-  alive.
+  the caller's ACL-filtered reachable corpus, and no literal filename/identifier
+  matches within the current source policy and request filters. One grounded
+  term or reachable identifier keeps the normal ranked-pool path alive. The
+  2026-09-10 OneDrive correction covers filenames absent from body vocabulary,
+  Unicode NFC/NFD, and escaped literal wildcard characters without reindexing;
+  it does not add a second ranking or authorization path.
 - `verify.sh` always invokes a checked-in portable floor containing 100 positive
   search contracts and 20 ACL-negative cases. It also invokes the reviewed
   private-corpus floor for Recall@K, MRR, failed cases, and P95 when that corpus

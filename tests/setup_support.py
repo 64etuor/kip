@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 from kip.setup.models import (
@@ -10,6 +11,7 @@ from kip.setup.models import (
 
 
 def complete_setup_answers(tmp_path: Path) -> SetupAnswers:
+    prepare_setup_project(tmp_path / "project")
     source = tmp_path / "company-docs"
     source.mkdir(exist_ok=True)
     backup = tmp_path / "backup"
@@ -49,3 +51,8 @@ def complete_setup_answers(tmp_path: Path) -> SetupAnswers:
         interaction_memory_mode="explicit_consent",
         ontology_reviewers=["knowledge-owner@example.invalid"],
     )
+
+
+def prepare_setup_project(project_root: Path) -> None:
+    project_root.mkdir(exist_ok=True)
+    shutil.copy2(Path(__file__).resolve().parents[1] / "compose.yaml", project_root / "compose.yaml")

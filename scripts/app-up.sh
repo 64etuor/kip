@@ -11,26 +11,35 @@ Usage: app-up.sh [--down]
 
 Starts the KIP application profile (api, worker, migrate, postgres).
 When guided setup has been applied (compose.generated.yaml plus
-config/kip.generated.toml exist), the generated override is layered on top of
-compose.yaml so the approved source mounts, CAS path, and generated runtime
-configuration take effect. Otherwise the plain app profile is started with the
+config/kip.generated.toml exist), the standalone generated Compose project applies
+the approved source mounts, CAS path, and generated runtime
+configuration. Otherwise the plain app profile is started with the
 baked-in container configuration.
 
   --down    Stop the app profile started by this script.
 EOF
 }
 
-compose_args=(-f compose.yaml)
 if [[ -f compose.generated.yaml && -f config/kip.generated.toml ]]; then
-  compose_args+=(-f compose.generated.yaml)
   using_generated=1
+elif [[ -e compose.generated.yaml || -e config/kip.generated.toml ]]; then
+  echo "error: incomplete generated setup; regenerate and apply a setup plan." >&2
+  exit 1
 else
   using_generated=0
 fi
 
+run_compose() {
+  if [[ "$using_generated" == "1" ]]; then
+    "$(python_cmd)" "$SCRIPT_DIR/setup_compose.py" "$@"
+  else
+    docker compose -f compose.yaml --profile app "$@"
+  fi
+}
+
 case "${1:-}" in
   --down)
-    docker compose "${compose_args[@]}" --profile app down
+    run_compose down
     exit 0
     ;;
   -h|--help)
@@ -46,7 +55,7 @@ case "${1:-}" in
 esac
 
 if [[ "$using_generated" == "1" ]]; then
-  echo "Using generated setup override: compose.yaml + compose.generated.yaml"
+  echo "Using approved standalone setup: compose.generated.yaml"
 else
   cat >&2 <<'EOF'
 notice: no generated setup override found (compose.generated.yaml and
@@ -56,8 +65,8 @@ script to apply approved source mounts and configuration.
 EOF
 fi
 
-docker compose "${compose_args[@]}" --profile app up -d --build
-echo "App profile is starting. Check http://127.0.0.1:8080/healthz once healthy."
+run_compose up -d --build
+echo "App profile is starting. Check http://127.0.0.1:${KIP_API_PORT:-8080}/readyz once healthy."
 if [[ "$using_generated" == "1" ]]; then
   echo "Next: ./scripts/kip sync run --source SOURCE && ./scripts/kip search \"query\" --limit 5"
 fi

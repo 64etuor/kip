@@ -34,6 +34,11 @@ result: `exact_xlsx_read_required` needs a deep range read, and insufficient
 evidence does not authorize inventing a conclusion. State source locators and
 stale-source status; an approved graph edge still requires reading its evidence.
 
+Configured source roots also constrain existing indexed evidence. A removed or
+changed source can make old IDs unavailable after service reload; do not widen
+scope or sync merely to recover an answer. Cloud-only source bytes are not
+downloaded automatically, so cached text can be stale and live XLSX unavailable.
+
 Read [retrieval](references/retrieval.md) for weak results and
 [evidence](references/evidence.md) for source-specific locators.
 Use command `--help` or the connected tool schema for current arguments.

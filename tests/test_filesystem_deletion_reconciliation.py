@@ -160,7 +160,7 @@ def test_file_grown_past_size_cap_is_not_tombstoned(test_container):
         assert summary.absent == 0
         assert summary.tombstoned == 0
         assert any(
-            "삭제대상.txt" in warning and "skipped" in warning
+            "max_file_bytes=1" in warning and "skipped" in warning
             for warning in summary.warnings
         )
 

@@ -11,6 +11,7 @@ from kip.adapters.repository.memory.operations import MemoryOperationsStore
 from kip.adapters.repository.memory.retrieval import MemoryRetrievalStore
 from kip.adapters.repository.memory.state import MemoryState
 from kip.adapters.telemetry.memory import MemoryQueryTraceStore
+from kip.domain.source_access import FilesystemAccessPolicy
 from kip.ports.retrieval import RetrievalStore
 
 
@@ -22,8 +23,10 @@ class MemoryRepository:
         state: MemoryState | None = None,
         *,
         retrieval: RetrievalStore | None = None,
+        source_policy: FilesystemAccessPolicy | None = None,
     ) -> None:
         self.state = state or MemoryState()
+        self.state.source_policy = source_policy
         self.ingestion = MemoryIngestionStore(self.state)
         self.retrieval = retrieval or MemoryRetrievalStore(self.state)
         self.evidence = MemoryEvidenceStore(self.state)
@@ -32,6 +35,9 @@ class MemoryRepository:
         self.operations = MemoryOperationsStore(self.state)
         self.telemetry = MemoryQueryTraceStore(self.state)
         self.interactions = MemoryInteractionStore(self.state)
+
+    def configure_source_access(self, policy: FilesystemAccessPolicy) -> None:
+        self.state.source_policy = policy
 
 
 __all__ = ["MemoryRepository"]

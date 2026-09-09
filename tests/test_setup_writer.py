@@ -104,6 +104,7 @@ def test_generated_compose_mounts_generated_config_for_runtime(
                 "source": "./config/kip.generated.toml",
                 "target": "/app/config/kip.generated.toml",
                 "read_only": True,
+                "bind": {"create_host_path": False},
             }
         ]
 
@@ -127,7 +128,7 @@ def test_generated_host_config_uses_host_paths_for_mcp(tmp_path: Path) -> None:
     )
     assert host_config["api"]["host"] == "127.0.0.1"
     assert container_config["sources"]["filesystem"][0]["root"] == (
-        "/sources/company-docs"
+        answers.filesystem_sources[0].root
     )
     assert container_config["storage"]["cas_path"] == "/var/lib/kip/cas"
     assert host_config["setup"]["plan_fingerprint"] == plan.plan_fingerprint

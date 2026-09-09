@@ -5,7 +5,27 @@
 
 ## 자주 하는 작업 (Everyday tasks)
 
-**문서 폴더 하나 더 추가하기.** 설정 파일(`config/kip.toml`)에 블록을 하나
+Guided setup 배포는 `./scripts/app-up.sh`부터 실행한다. standalone generated
+Compose가 DB 준비와 migration을 순서대로 수행하며 승인된 source mount만
+연결한다. wrapper는 generated host config를 기본 선택하고, 명시적 config나
+exported override는 유지한다. 기본 `env:KIP_DATABASE_URL`은 bundled local DB와
+일치해야 하며 external DB는 별도 변수의 secret reference를 선택한다. 모든
+서비스와 host CLI가 같은 DB를 사용하는지 receipt/readiness로 확인한다.
+
+Guided source는 host의 canonical 절대경로 그대로 container에 mount한다.
+두 config의 source root가 같아야 공유 DB의 URI/ACL snapshot도 일치한다.
+이전 split-path plan은 재생성·apply 후 명시적으로 sync한다. runtime 보호
+경로, 중복 mount target, model credential/source 겹침은 plan에서 거부된다.
+`./scripts/curl-smoke.sh`는 승인한 config의 API port/key로 `/readyz`와
+capabilities를 확인한다. 임의 identity header를 넣지 않는다.
+
+**허용 폴더 변경하기.** setup으로 만든 배포는 source 질문을 다시 답하고 새
+plan을 승인·apply한다. 수동 배포는 선택된 config의 `sources.filesystem`을
+수정한다. API/worker/MCP를 재시작하여 정책을 로드하면 제거·비활성화·변경된
+root의 이전 색인도 차단된다. 남긴 범위는 명시적 sync로 다시 확인한다.
+색인 삭제나 자동 rebuild 없이 접근 경계를 바꾸는 절차다 (ADR-056).
+
+**문서 폴더 하나 더 추가하기.** 수동 배포의 선택된 설정 파일에 블록을 하나
 추가하고 그 소스만 수집하면 됩니다. 원본 폴더는 읽기 전용으로만 연결되며
 수정되지 않습니다.
 
@@ -43,6 +63,14 @@ proposed`가 비어 있으면 할 일이 없습니다. 관계 채굴을 켜지 �
 동작합니다.
 
 ## Daily
+
+`./scripts/bootstrap.sh` synchronizes the project environment from `uv.lock`
+with `uv sync --frozen` and the postgres, api, identity, extractors, mcp,
+telemetry, and dev extras. If uv is absent, it installs pinned uv 0.8.22 into
+`var/bootstrap-uv-0.8.22`, outside the project environment. Existing `.env` and
+config files are preserved; a fresh `.env` receives random credentials rather
+than sample placeholders. Bootstrap does not perform an unbounded dependency
+upgrade.
 
 For code or release validation, run `./scripts/verify.sh`. It preflights pytest,
 Ruff, mypy, and pip-audit and fails with a bootstrap remediation if any tool is

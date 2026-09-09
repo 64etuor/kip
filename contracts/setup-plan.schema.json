@@ -67,6 +67,11 @@
           "title": "Byte Count",
           "type": "integer"
         },
+        "cloud_placeholder_count": {
+          "default": 0,
+          "title": "Cloud Placeholder Count",
+          "type": "integer"
+        },
         "excluded_count": {
           "default": 0,
           "title": "Excluded Count",
@@ -82,6 +87,11 @@
         "file_count": {
           "default": 0,
           "title": "File Count",
+          "type": "integer"
+        },
+        "local_file_count": {
+          "default": 0,
+          "title": "Local File Count",
           "type": "integer"
         },
         "root": {
@@ -355,6 +365,47 @@
     "retention_days": {
       "title": "Retention Days",
       "type": "integer"
+    },
+    "runtime_gid": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Runtime Gid"
+    },
+    "runtime_supplementary_gids": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Runtime Supplementary Gids"
+    },
+    "runtime_uid": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Runtime Uid"
     },
     "schema_version": {
       "const": "kip.setup-plan.v1",

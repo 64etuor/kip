@@ -1,5 +1,43 @@
 # Changelog
 
+## 3.6.0 - 2026-09-10
+
+- Enforce the currently configured filesystem sources as a deployment access
+  boundary before retrieval ranking, limits, vocabulary, and graph traversal.
+  Removing, disabling, or narrowing a source blocks its old indexed evidence
+  after configuration reload without an implicit sync. Exact reads also check
+  the current root and symlink policy. Source-root moves cannot reuse an old
+  path's cached revision, and CLI workspace selection now precedes composition.
+- Defer OneDrive/cloud-only files before hashing or parsing; report aggregate
+  skip reasons instead of per-file warning floods. Directory symlink escapes
+  and cycles are pruned before descent, with conservative deletion deferral.
+  Special filesystem items such as FIFOs are skipped before hashing.
+- Make guided setup runnable across the host CLI and standalone generated
+  Compose deployment. Approved settings survive bootstrap defaults, all app
+  services share the selected database, and only approved source mounts are
+  present. Existing generated deployments must create, review, and apply a new
+  plan before using the new launcher.
+- Accept directory paths directly during source setup, show locally available
+  versus cloud-only document counts, validate secret readiness, and generate
+  random private credentials only for a new bootstrap environment. Runtime
+  ownership is recorded in the plan so private files stay readable by the
+  selected non-root container user. Setup now starts dependencies before sync.
+- Generated host and container source paths now use the same canonical absolute
+  path, so CLI and API/worker share source identity and can reopen each other's
+  ingested evidence. Protected runtime mount collisions are rejected. The REST
+  smoke wrapper uses the approved port, secret reference, and interpreter;
+  teardown can stop the stack even when credential files are unavailable.
+- Added real OneDrive and isolated setup acceptance probes alongside expanded
+  Memory/PostgreSQL/CLI/REST/MCP permission and handoff regression coverage.
+- Restore literal filename discovery when body vocabulary has no matching
+  terms, without re-indexing or weakening abstention for unknown queries.
+  Filename/identifier checks retain all access filters and support NFC/NFD
+  Korean names and literal wildcard characters.
+- Bootstrap now installs the frozen lock with all supported runtime/test
+  extras. A missing uv uses the CI-pinned version in a separate tool environment
+  rather than resolving newer runtime libraries. Missing configured database
+  secrets fail with a versioned CLI error instead of using transient storage.
+
 ## 3.5.1 - 2026-09-10
 
 - Reduced always-loaded agent instructions to task routing and operational

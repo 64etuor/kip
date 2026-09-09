@@ -21,7 +21,10 @@
 
 1. `./scripts/bootstrap.sh`를 실행한다. Python 3.12+가 없으면 여기서 명확히
    실패하므로 먼저 설치한다. bootstrap 전에는 `./scripts/kip`가 시스템
-   python으로 떨어져 어떤 setup 명령도 실행되지 않는다.
+   python으로 떨어져 어떤 setup 명령도 실행되지 않는다. 의존성은 `uv.lock`의
+   frozen sync로 설치한다. uv가 없으면 별도 `var/bootstrap-uv-0.8.22` 환경에
+   고정 버전을 준비한다. `.env`를 미리 example에서 복사할 필요는 없으며,
+   기존 `.env`와 config는 유지한다.
 2. AI agent에게 “KIP을 셋업해줘”라고 요청해 `kip-setup` Skill을 시작한다.
 3. `setup inspect`가 반환한 질문에 매번 하나씩 답한다. Agent가 먼저
    identity mode를 묻고, `proxy_jwt`이면 issuer/audience/JWKS/admin group을,
@@ -35,17 +38,22 @@
    활성화되어 있어야 한다. 이 선택은 후보 생성만 허용하며 승인되지 않은
    관계를 graph fact로 승격하지 않는다.
 4. `setup preview`의 source 이름, 분류, ACL scope, 파일 수, 용량, 확장자,
-   제외 건수와 symlink 건수를 확인한다.
+   제외 건수와 symlink 건수를 확인한다. 폴더 절대경로 하나 또는 JSON 경로
+   배열만 답해도 된다. 이 경우 workspace ACL과 보수적인 분류(개인 소유는
+   `personal`, 나머지는 `restricted`)가 기본으로 제안된다. local/cloud-only
+   건수를 확인하고, cloud-only만 있으면 원하는 파일을 provider 앱에서 먼저
+   다운로드한다. preview는 파일 내용을 열거나 다운로드하지 않는다.
 5. `setup plan`의 source scope, read-only mount, egress, ontology profile,
    relation-mining mode, interaction-memory consent, reviewer, warning과
    fingerprint를 승인한다.
 6. agent가 `setup apply`와 `setup verify`를 마치고 redacted receipt를
    제시하게 한다. receipt의 `runtime_readiness` 실패 항목과 `limitations`를
-   먼저 해결한다. apply/verify는 설정 파일만 생성하며 아직 아무것도 색인되지
+   먼저 해결한다. apply는 설정 파일 생성, verify는 파일과 runtime 준비 점검이며 아직 아무것도 색인되지
    않는다.
-7. receipt의 `next_steps`대로 `./scripts/migrate.sh`와 `./scripts/app-up.sh`를
-   실행한다. `app-up.sh`는 `compose.generated.yaml`을 base `compose.yaml` 위에
-   겹쳐 승인된 source mount와 생성 config를 적용한다. 필요하면
+7. receipt의 `next_steps`대로 `./scripts/app-up.sh`부터 실행한다. 선택된 DB의
+   준비와 migration 뒤 API/worker가 시작된다. `app-up.sh`는 standalone
+   `compose.generated.yaml`만 선택하여 승인된 source mount와 생성 config를
+   적용한다. 기본 Compose의 sample mount는 합쳐지지 않는다. 필요하면
    `./scripts/doctor.sh`로 환경을 점검한다.
 8. sample source로 `sync -> search -> context -> read -> xlsx-read`를 완료한다.
 9. 실제 source는 `sync run --dry-run`으로 다시 범위와 건수를 확인한다.
@@ -61,12 +69,35 @@ TOML, Compose, `.mcp.json`을 직접 편집하지 않는다. 셋업 state machin
 config를 선택하는 `.mcp.json`을 함께 쓴다. 기존 generated file은 apply 때
 `.previous`로 한 세대 보존되고, answer가 바뀐 stale plan은 쓰기 전에 거부된다.
 
+host와 container의 source root는 동일한 canonical 절대경로다. Compose도
+그 경로 그대로 read-only mount하여 같은 DB의 근거 URI와 ACL snapshot이
+일치한다. CAS/backup만 container 관리 경로로 매핑한다. runtime 보호 경로와
+충돌, source target 중복, model credential 파일과 source 겹침은 거부한다.
+과거에 source를 별도 container 경로로 매핑한 plan은 재생성·승인하고 명시적으로
+sync해야 한다. 기존 근거 경로를 자동으로 바꿔 권한을 복구하지 않는다.
+
+생성된 host config는 wrapper의 기본값이 되며, 명시적으로 선택한 환경변수나
+다른 config는 유지된다. 새 bootstrap만 무작위 DB/API/admin credential을
+private `.env`에 만들고 기존 secret은 교체하지 않는다. 사용자 지정 secret
+reference는 기본 키보다 우선한다. runtime readiness는 실제 reference 해석,
+서로 다른 API/admin 키와 cloud-only 여부를 확인한다. `local` 생성 모델은
+setup이 설치하지 않으므로 도달 가능한 서비스를 별도로 준비·검증해야 한다.
+컨테이너는 plan에 기록된 설치 사용자의 non-root UID/GID와 supplementary
+groups로 실행하며 apply 시 해당 host membership을 확인한다. 다른
+사용자/호스트로 옮기거나 과거 plan을 재사용할 때는 plan을 재생성·승인한다.
+
 `sync_schedule` 답변은 생성 config에 declarative 운영 메타데이터로만
 기록된다. 이 값이 자동으로 sync를 예약하지는 않는다. 주기 실행이 필요하면
 `scripts/install-launchd.sh`를 사용하며, launchd installer는 자체 interval
 설정을 따른다.
 
 복사 직후 성공 기준은 서버가 뜨는 것이 아니다. 허용된 principal로 검색한 근거를 exact read할 수 있고, 허용되지 않은 principal에게 동일 문서와 graph path가 보이지 않으며, 원본 해시가 변하지 않아야 한다.
+
+허용 저장소는 활성 `sources.filesystem`의 지정 폴더 하위다. 폴더를 제거,
+비활성화하거나 범위를 변경한 뒤 장기 실행 서비스를 재시작하면 기존 색인도
+새 경계로 차단된다. 남길 범위를 명시적으로 sync해야 다시 검색 가능하며,
+검색이나 setup verify가 자동 수집하지 않는다. 이 절차는 과거 데이터를
+삭제하는 작업과 별개다 (ADR-056).
 
 운영 API 호출은 임의의 workspace/principal/ACL header를 보내지 않는다.
 `proxy_jwt` 배포는 검증 가능한 Bearer JWT를, 단일 principal API-key 배포는

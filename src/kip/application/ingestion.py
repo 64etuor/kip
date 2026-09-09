@@ -92,6 +92,14 @@ class IngestionUseCases:
         summary = SyncSummary(source=source_name)
         system_id = stable_id("srcsys", context.workspace, source_name)
         seen_object_ids: set[str] = set()
+        failure_details_limit = 50
+
+        def record_failure(record: DiscoveredFile, exc: Exception) -> None:
+            summary.failed += 1
+            if summary.failed <= failure_details_limit:
+                detail = f"{record.relative_path}: {type(exc).__name__}: {exc}"
+                summary.warnings.append(detail[:1000])
+
         # If source.scan() raises (unavailable mount, walk failure), the
         # exception propagates before any reconciliation: a failed or partial
         # scan never marks absences and never tombstones.
@@ -116,10 +124,7 @@ class IngestionUseCases:
                     classification=source.classification,
                 )
             except (KipError, OSError) as exc:
-                summary.failed += 1
-                summary.warnings.append(
-                    f"{record.relative_path}: {type(exc).__name__}: {exc}"
-                )
+                record_failure(record, exc)
                 continue
             except Exception as exc:
                 # Defense-in-depth: a parser bug that raises something other
@@ -127,12 +132,14 @@ class IngestionUseCases:
                 # parser exception) must not abort the whole sync. Record it
                 # as a failed file, same shape as the branch above, and keep
                 # scanning the rest of the corpus.
-                summary.failed += 1
-                summary.warnings.append(
-                    f"{record.relative_path}: {type(exc).__name__}: {exc}"
-                )
+                record_failure(record, exc)
                 continue
             self._record_result(summary, result)
+        if summary.failed > failure_details_limit:
+            summary.warnings.append(
+                f"{summary.failed - failure_details_limit} additional file failures; "
+                f"details limited to the first {failure_details_limit} files"
+            )
         for skipped_relative_path in source.skipped_present_relative_paths:
             # Present on disk but not eligible for ingestion in this scan. It
             # must still count as "seen" for deletion reconciliation so its
@@ -141,12 +148,22 @@ class IngestionUseCases:
             seen_object_ids.add(
                 stable_id("srcobj", system_id, skipped_relative_path)
             )
-            summary.warnings.append(
-                f"{skipped_relative_path}: present but skipped from ingestion "
-                "(filter, size, symlink, or settle policy); prior revision, "
-                "if any, stays active"
+        if source.skipped_reason_counts:
+            reasons = ", ".join(
+                f"{reason}={count}"
+                for reason, count in sorted(source.skipped_reason_counts.items())
             )
-        if not dry_run:
+            summary.warnings.append(
+                f"present but skipped from ingestion: {reasons}; prior revisions, "
+                "if any, stay active"
+            )
+        if source.deferred_relative_prefixes:
+            summary.warnings.append(
+                f"scan deferred {len(source.deferred_relative_prefixes)} directories; "
+                "skipping deletion reconciliation because their descendants "
+                "could not be checked"
+            )
+        elif not dry_run:
             self._reconcile_filesystem_deletions(
                 context,
                 summary,

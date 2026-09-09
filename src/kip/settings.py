@@ -124,15 +124,16 @@ class Settings:
         elif os.environ.get("KIP_ENV", "development") not in {"test", "development"}:
             raise ConfigurationError(f"configuration file does not exist: {path}")
 
-        database_url = _environment_secret("KIP_DATABASE_URL")
+        env_name = str(_deep_get(raw, "database.url_env", "KIP_DATABASE_URL"))
+        database_url = _environment_secret(env_name)
+        environment = os.environ.get(
+            "KIP_ENV", str(_deep_get(raw, "app.environment", "development")),
+        )
         if not database_url:
-            env_name = _deep_get(raw, "database.url_env", "KIP_DATABASE_URL")
-            database_url = (
-                _environment_secret(str(env_name))
-                if str(env_name) != "KIP_DATABASE_URL"
-                else ""
-            )
-        if not database_url:
+            if env_name != "KIP_DATABASE_URL" or environment not in {"test", "development"}:
+                raise ConfigurationError(
+                    f"required database secret is not set: {env_name} (or {env_name}_FILE)"
+                )
             database_url = "memory://"
 
         cas_value = os.environ.get("KIP_CAS_PATH", _deep_get(raw, "storage.cas_path", "./var/cas"))
@@ -151,7 +152,7 @@ class Settings:
             project_root=root,
             config_path=path,
             raw=raw,
-            environment=os.environ.get("KIP_ENV", str(_deep_get(raw, "app.environment", "development"))),
+            environment=environment,
             workspace=os.environ.get("KIP_WORKSPACE", str(_deep_get(raw, "app.workspace", "default"))),
             database_url=database_url,
             database_statement_timeout_ms=_positive_integer(
@@ -171,18 +172,8 @@ class Settings:
             cas_path=cas_path,
             api_host=os.environ.get("KIP_API_HOST", str(_deep_get(raw, "api.host", "127.0.0.1"))),
             api_port=int(os.environ.get("KIP_API_PORT", _deep_get(raw, "api.port", 8080))),
-            api_key=_environment_secret("KIP_API_KEY")
-            or (
-                _environment_secret(api_key_env)
-                if api_key_env != "KIP_API_KEY"
-                else ""
-            ),
-            admin_key=_environment_secret("KIP_ADMIN_KEY")
-            or (
-                _environment_secret(admin_key_env)
-                if admin_key_env != "KIP_ADMIN_KEY"
-                else ""
-            ),
+            api_key=_environment_secret(api_key_env),
+            admin_key=_environment_secret(admin_key_env),
             identity_mode=os.environ.get(
                 "KIP_IDENTITY_MODE",
                 str(_deep_get(raw, "identity.mode", "api_key")),

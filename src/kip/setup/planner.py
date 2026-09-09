@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
+import os
+from pathlib import Path, PurePosixPath
 
 from kip.errors import ValidationError
 from kip.setup.inventory import inspect_source
@@ -38,6 +39,8 @@ def build_setup_plan(
     *,
     project_root: Path,
 ) -> SetupPlan:
+    if os.getuid() == 0 or os.getgid() == 0:
+        raise ValidationError("create and apply setup plans as a non-root user and group that own the CAS and backup directories; do not run setup with sudo")
     inspection = inspect_setup(answers, project_root=project_root)
     if not inspection.complete:
         missing = inspection.questions[0].id
@@ -82,7 +85,7 @@ def build_setup_plan(
         SourcePlan(
             name=source.name,
             host_root=source.root,
-            target_root=f"/sources/{source.name}",
+            target_root=source.root,
             classification=source.classification,
             acl_scope=source.acl_scope,
             include_extensions=source.include_extensions,
@@ -91,6 +94,17 @@ def build_setup_plan(
         )
         for source in answers.filesystem_sources
     ]
+    if len({source.target_root for source in sources}) != len(sources):
+        raise ValidationError("filesystem source directories must be unique")
+    if answers.model_secret_ref and answers.model_secret_ref.scheme == "file":
+        secret_path = PurePosixPath(answers.model_secret_ref.name)
+        if any(
+            PurePosixPath(source.target_root) == secret_path
+            or PurePosixPath(source.target_root) in secret_path.parents
+            or secret_path in PurePosixPath(source.target_root).parents
+            for source in sources
+        ):
+            raise ValidationError("source directories must not overlap a model credential file")
     mounts = [
         MountPlan(
             source=source.host_root,
@@ -117,6 +131,19 @@ def build_setup_plan(
         ]
     )
     warnings = list(inspection.risks)
+    for source in sources:
+        if source.inventory.cloud_placeholder_count:
+            warnings.append(
+                f"{source.name}: {source.inventory.cloud_placeholder_count} cloud-only files "
+                f"and {source.inventory.local_file_count} locally available files; "
+                "download chosen files in OneDrive (or the cloud provider) before syncing. "
+                "Setup and indexing do not download placeholders."
+            )
+    warnings.append(
+        "env:KIP_DATABASE_URL selects the bundled PostgreSQL service for Compose; "
+        "use a different environment reference for an external database. "
+        "Generated Compose is standalone and must not be layered on compose.yaml."
+    )
     if answers.evaluation_dataset == "none":
         warnings.append(
             "no private evaluation dataset is configured; production promotion is blocked"
@@ -159,6 +186,9 @@ def build_setup_plan(
             ".mcp.json",
         ],
         warnings=warnings,
+        runtime_uid=os.getuid(),
+        runtime_gid=os.getgid(),
+        runtime_supplementary_gids=sorted(set(os.getgroups()) - {os.getgid()}),
     )
     return plan.model_copy(
         update={"plan_fingerprint": plan.calculate_fingerprint()}
@@ -313,10 +343,13 @@ _QUESTIONS = {
     ),
     "filesystem_sources": SetupQuestion(
         id="filesystem_sources",
-        prompt="수집할 하위 폴더별 이름, 절대경로, 데이터 등급, ACL scope, 포함 확장자와 제외 glob을 알려주세요.",
-        answer_format="JSON array of source objects",
+        prompt="검색을 허용할 하위 폴더의 절대경로를 알려주세요. 여러 폴더는 경로의 JSON 배열로 입력할 수 있습니다.",
+        answer_format="absolute folder path, JSON array of paths, or JSON array of source objects",
         example='[{"name":"company-docs","root":"/mnt/nas/team","classification":"internal","acl_scope":"workspace:acme-rnd"}]',
         why=(
+            "경로만 입력하면 안정적인 폴더 이름과 현재 workspace의 ACL을 자동으로 정하고, "
+            "회사 자료는 restricted, 개인 배포는 personal 등급을 사용합니다. "
+            "preview와 plan에서 이 범위를 확인한 후 적용합니다. 세부 설정이 필요하면 기존 JSON 객체 형식을 사용하세요. "
             "각 항목의 뜻: name=폴더 별명(영문 소문자·하이픈), root=실제 "
             "절대경로, classification=민감도 등급(public 공개 가능 / internal "
             "사내 공유 / confidential 관련 부서만 / restricted 지정 소수만 / "

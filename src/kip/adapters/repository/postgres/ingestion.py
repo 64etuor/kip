@@ -11,12 +11,18 @@ from kip.domain.models import (
     IngestResult,
     RequestContext,
     SourceObjectAbsence,
+    SourceRevision,
 )
 
 
 @dataclass(frozen=True, slots=True)
 class PostgresIngestionStore:
     database: PostgresDatabase
+
+    def current_source_revision(
+        self, context: RequestContext, source_object_id: str
+    ) -> SourceRevision | None:
+        return self.database.current_source_revision(context, source_object_id)
 
     def upsert_acl_snapshot(
         self,

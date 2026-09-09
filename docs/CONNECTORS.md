@@ -6,14 +6,29 @@ A connector discovers immutable source revisions and emits canonical source even
 
 ## Filesystem/NAS
 
+Only regular files are eligible for byte reads. FIFOs and other special items
+are counted as `non_regular` skips and remain present for deletion accounting.
+
 - Mount read-only.
 - Use path relative to configured source root as the external ID.
+- Enabled `sources.filesystem` entries are the deployment's allowed roots,
+  not just scan hints. Retrieval requires the current source name, ACL snapshot,
+  and a stored descendant path; exact reads also check live path containment.
+  After removing, disabling, moving, or narrowing a source, reload services and
+  explicitly sync the retained scope before expecting its old index to return.
+  Request ACL scopes cannot broaden this boundary (ADR-056).
 - Wait for file size and mtime to settle before hashing.
+- Inspect cloud residency from filesystem metadata before hashing or parsing.
+  OneDrive/cloud-only placeholders are deferred without downloading them;
+  choose files in the provider client and make them available locally first.
+  Symlinks are skipped by default; an enabled in-root symlink policy still
+  rejects outside-root targets and directory cycles. Scan warnings aggregate
+  skip reasons instead of returning one warning per excluded file.
 - Do not treat an unavailable mount as mass deletion. A failed or aborted scan
   never contributes deletion evidence, and a scan that sees zero files skips
   deletion reconciliation entirely.
 - Treat a directory walk error as an incomplete scan. Files deferred by settle,
-  symlink, filter, or size policy remain present for deletion accounting even
+  symlink, cloud-residency, filter, or size policy remain present for deletion accounting even
   though they are not parsed in that scan.
 - Hash content for revision identity.
 - Deletion is reconciled per complete scan with a grace policy

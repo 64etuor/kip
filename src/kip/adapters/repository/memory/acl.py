@@ -13,6 +13,10 @@ def unit_is_visible(
     *,
     now: datetime | None = None,
 ) -> bool:
+    if state.source_policy is not None:
+        view = state.artifacts.get(unit.artifact_id)
+        if view is None or not state.source_policy.allows_artifact(view):
+            return False
     if unit.acl_scopes and not set(unit.acl_scopes).issubset(context.acl_scopes):
         return False
     if unit.acl_snapshot_id is None:

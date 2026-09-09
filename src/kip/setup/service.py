@@ -1,19 +1,24 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tomllib
 from pathlib import Path
 from typing import cast
+from urllib.parse import urlsplit
 
 import yaml
 from pydantic import TypeAdapter
 
 from kip.domain.json_types import JsonObject, JsonValue
-from kip.errors import ConflictError, ValidationError
+from kip.errors import ConfigurationError, ConflictError, ValidationError
+from kip.settings import Settings
+from kip.setup.config_payload import build_config_payload
 from kip.setup.inventory import inspect_source
 from kip.setup.models import (
     FilesystemSourceAnswer,
@@ -26,9 +31,9 @@ from kip.setup.models import (
     SetupReceipt,
     SourcePreview,
 )
-from kip.setup.paths import canonical_managed_path
+from kip.setup.paths import canonical_managed_path, canonical_source_root
 from kip.setup.planner import build_setup_plan, inspect_setup
-from kip.setup.writer import apply_setup_plan, atomic_write_json
+from kip.setup.writer import apply_setup_plan, atomic_write_json, build_compose_payload
 
 _JSON_OBJECTS = TypeAdapter(list[JsonObject])
 _STRINGS = TypeAdapter(list[str])
@@ -145,6 +150,8 @@ class SetupService:
                     "name": source.name,
                     "classification": source.classification,
                     "file_count": source.inventory.file_count,
+                    "local_file_count": source.inventory.local_file_count,
+                    "cloud_placeholder_count": source.inventory.cloud_placeholder_count,
                     "byte_count": source.inventory.byte_count,
                     "excluded_count": source.inventory.excluded_count,
                 }
@@ -161,10 +168,10 @@ class SetupService:
         )
         first_source = plan.sources[0].name if plan.sources else "SOURCE"
         next_steps = [
-            "./scripts/migrate.sh",
             "./scripts/app-up.sh",
             f"./scripts/kip sync run --source {first_source}",
             './scripts/kip search "smoke test query" --limit 5',
+            "./scripts/kip read UNIT_ID",
         ]
         return SetupReceipt(
             plan_fingerprint=plan.plan_fingerprint,
@@ -210,6 +217,26 @@ class SetupService:
         if docker_cli:
             checks.append(_docker_daemon_check(docker_cli))
         checks.append(_database_secret_check(plan))
+        if plan.identity_mode == "api_key":
+            for name, reference in (
+                ("identity_api_key_secret", plan.identity_api_key_secret_ref),
+                ("identity_admin_key_secret", plan.identity_admin_key_secret_ref),
+            ):
+                if reference is not None:
+                    checks.append(_secret_check(name, reference))
+            checks.append(_identity_key_separation_check(plan))
+        if plan.model_provider in {"openai", "anthropic"} and plan.model_secret_ref:
+            checks.append(_secret_check("model_secret", plan.model_secret_ref))
+        if plan.model_provider == "local":
+            checks.append(SetupCheck(
+                name="local_generation_service",
+                ok=False,
+                detail=(
+                    "local generation is not installed by setup; provide and verify a "
+                    "generation service reachable from the selected runtime before "
+                    "enabling model operations"
+                ),
+            ))
         for source in plan.sources:
             root = Path(source.host_root)
             readable = root.is_dir() and os.access(root, os.R_OK | os.X_OK)
@@ -225,6 +252,17 @@ class SetupService:
                     ),
                 )
             )
+            if source.inventory.cloud_placeholder_count:
+                checks.append(SetupCheck(
+                    name=f"source_local_files:{source.name}",
+                    ok=source.inventory.local_file_count > 0,
+                    detail=(
+                        f"plan preview found {source.inventory.local_file_count} local and "
+                        f"{source.inventory.cloud_placeholder_count} cloud-only files; "
+                        "download chosen files in OneDrive (or the cloud provider), then "
+                        "rerun setup preview before sync; indexing never downloads placeholders"
+                    ),
+                ))
         return checks
 
     def _parse_answer(
@@ -234,7 +272,35 @@ class SetupService:
         answers: SetupAnswers,
     ) -> JsonValue | SecretReference | list[FilesystemSourceAnswer]:
         if question_id == "filesystem_sources":
-            objects = _JSON_OBJECTS.validate_python(_load_json(value))
+            objects: list[JsonObject]
+            if value.lstrip().startswith("["):
+                parsed_sources = _load_json(value)
+            else:
+                parsed_sources = [value.strip()]
+            if isinstance(parsed_sources, list) and all(
+                isinstance(item, str) for item in parsed_sources
+            ):
+                objects = []
+                for item in parsed_sources:
+                    root = Path(str(item)).expanduser()
+                    if not root.is_absolute():
+                        raise ValidationError("source folders must be absolute paths")
+                    canonical = canonical_source_root(
+                        str(root), project_root=self.project_root,
+                    )
+                    slug = re.sub(r"[^a-z0-9]+", "-", canonical.name.lower())
+                    slug = slug.strip("-")[:45] or "folder"
+                    suffix = hashlib.sha256(str(canonical).encode()).hexdigest()[:10]
+                    objects.append({
+                        "name": f"{slug}-{suffix}",
+                        "root": str(canonical),
+                        "classification": (
+                            "personal" if answers.source_ownership == "personal" else "restricted"
+                        ),
+                        "acl_scope": f"workspace:{answers.workspace}",
+                    })
+            else:
+                objects = _JSON_OBJECTS.validate_python(parsed_sources)
             sources = [
                 FilesystemSourceAnswer.from_user_value(
                     item,
@@ -398,14 +464,16 @@ class SetupService:
             compose = compose_value if isinstance(compose_value, dict) else {}
             mcp_value = json.loads(mcp_path.read_text(encoding="utf-8"))
             fingerprint_ok = (
-                config.get("setup", {}).get("plan_fingerprint")
-                == plan.plan_fingerprint
-                and host_config.get("setup", {}).get("plan_fingerprint")
-                == plan.plan_fingerprint
+                config == build_config_payload(plan, container=True)
+                and host_config == build_config_payload(plan, container=False)
+                and compose.get("x-kip-setup") == {
+                    "mode": "standalone", "plan_fingerprint": plan.plan_fingerprint,
+                }
+                and compose == build_compose_payload(plan, project_root=self.project_root)
             )
             read_only_ok = _all_source_mounts_read_only(compose, plan)
             mcp_ok = _mcp_uses_generated_config(mcp_value, plan)
-        except (OSError, ValueError, TypeError, yaml.YAMLError):
+        except (OSError, ValueError, TypeError, ValidationError, yaml.YAMLError):
             fingerprint_ok = False
             read_only_ok = False
             mcp_ok = False
@@ -513,27 +581,50 @@ def _docker_daemon_check(docker_cli: str) -> SetupCheck:
 
 
 def _database_secret_check(plan: SetupPlan) -> SetupCheck:
-    reference = plan.database_secret_ref
-    if reference.scheme == "env":
-        resolvable = bool(
-            os.environ.get(reference.name)
-            or os.environ.get(f"{reference.name}_FILE")
+    return _secret_check("database_secret", plan.database_secret_ref, database=True)
+
+
+def _secret_check(
+    name: str, reference: SecretReference, *, database: bool = False,
+) -> SetupCheck:
+    try:
+        value = Settings.for_test().resolve_secret_reference(reference.display())
+        if any(marker in value for marker in ("change-me-before-use", "replace-with-")):
+            raise ConfigurationError("replace the example credential before starting the deployment")
+        if database:
+            parsed = urlsplit(value)
+            if parsed.scheme not in {"postgres", "postgresql"} or not parsed.hostname:
+                raise ConfigurationError("a PostgreSQL connection URL is required")
+        return SetupCheck(name=name, ok=True, detail="resolvable")
+    except (ConfigurationError, ValueError):
+        return SetupCheck(
+            name=name,
+            ok=False,
+            detail=(
+                f"set a valid non-placeholder {reference.display()} credential; "
+                "secret files must be readable, regular, and single-line"
+            ),
         )
-        detail = (
-            "resolvable"
-            if resolvable
-            else f"set {reference.name} (or {reference.name}_FILE) in the "
-            "environment or .env before starting the app profile"
+
+
+def _identity_key_separation_check(plan: SetupPlan) -> SetupCheck:
+    try:
+        resolver = Settings.for_test()
+        api_key = (
+            resolver.resolve_secret_reference(plan.identity_api_key_secret_ref.display())
+            if plan.identity_api_key_secret_ref else ""
         )
-    else:
-        resolvable = Path(reference.name).is_file()
-        detail = (
-            "resolvable"
-            if resolvable
-            else f"secret file {reference.name} is missing or unreadable"
+        admin_key = (
+            resolver.resolve_secret_reference(plan.identity_admin_key_secret_ref.display())
+            if plan.identity_admin_key_secret_ref else ""
         )
+        distinct = bool(api_key and admin_key and api_key != admin_key)
+    except ConfigurationError:
+        distinct = False
     return SetupCheck(
-        name="database_secret",
-        ok=resolvable,
-        detail=detail,
+        name="identity_key_separation",
+        ok=distinct,
+        detail=(
+            "distinct keys" if distinct else "set different nonempty API and admin credentials"
+        ),
     )

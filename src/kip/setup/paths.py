@@ -1,6 +1,21 @@
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+
+
+def validate_container_source_target(value: str) -> None:
+    """Protect container runtime paths without applying host symlink rules."""
+    target = PurePosixPath(value)
+    protected = (
+        "/app", "/opt", "/usr", "/etc", "/proc", "/sys", "/dev", "/run",
+        "/bin", "/sbin", "/lib", "/lib64", "/var/lib/kip", "/data",
+    )
+    if not target.is_absolute() or ".." in target.parts or target == PurePosixPath("/tmp"):
+        raise ValueError("source target must be a dedicated absolute directory outside container runtime paths")
+    for value in protected:
+        reserved = PurePosixPath(value)
+        if target == reserved or target in reserved.parents or reserved in target.parents:
+            raise ValueError(f"source target overlaps a protected container runtime path: {reserved}")
 
 
 def canonical_source_root(value: str, *, project_root: Path) -> Path:
@@ -18,6 +33,7 @@ def canonical_source_root(value: str, *, project_root: Path) -> Path:
         raise ValueError(f"source root is too broad: {root}")
     if not root.is_dir():
         raise ValueError(f"source root is not an existing directory: {root}")
+    validate_container_source_target(str(root))
     return root
 
 

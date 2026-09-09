@@ -8,12 +8,15 @@ from pathlib import Path
 
 import tomli_w
 import yaml
+from pydantic import TypeAdapter
 
 from kip.domain.json_types import JsonObject, JsonValue
 from kip.errors import ConflictError, ValidationError
 from kip.setup.config_payload import build_config_payload
 from kip.setup.models import SetupApplyReceipt, SetupPlan
-from kip.setup.paths import canonical_managed_path
+from kip.setup.paths import canonical_managed_path, validate_container_source_target
+
+_JSON_OBJECT: TypeAdapter[JsonObject] = TypeAdapter(JsonObject)
 
 
 def apply_setup_plan(
@@ -25,6 +28,22 @@ def apply_setup_plan(
         plan.verify_fingerprint()
     except ValidationError as exc:
         raise ConflictError("setup plan fingerprint is stale or invalid") from exc
+    if (
+        plan.runtime_uid is None or plan.runtime_gid is None
+        or plan.runtime_supplementary_gids is None
+    ):
+        raise ConflictError("setup plan predates explicit runtime ownership; regenerate and approve a new plan")
+    if (plan.runtime_uid, plan.runtime_gid) != (os.getuid(), os.getgid()):
+        raise ConflictError("apply setup as the non-root user and group recorded in the plan, or regenerate the plan")
+    if not set(plan.runtime_supplementary_gids).issubset(os.getgroups()):
+        raise ConflictError("the applying user no longer belongs to the plan's supplementary groups; restore membership or regenerate the plan")
+    for source in plan.sources:
+        if source.host_root != source.target_root:
+            raise ConflictError("setup plan uses different host and container source paths; regenerate the plan")
+        try:
+            validate_container_source_target(source.target_root)
+        except ValueError as exc:
+            raise ConflictError(str(exc)) from exc
 
     source_roots = [Path(source.host_root) for source in plan.sources]
     try:
@@ -41,10 +60,9 @@ def apply_setup_plan(
         )
     except ValueError as exc:
         raise ConflictError(str(exc)) from exc
+    files = _render_files(plan, project_root=project_root)
     cas_path.mkdir(parents=True, mode=0o700, exist_ok=True)
     backup_path.mkdir(parents=True, mode=0o700, exist_ok=True)
-
-    files = _render_files(plan)
     written: list[str] = []
     previous: list[str] = []
     for relative, content in files.items():
@@ -68,10 +86,10 @@ def atomic_write_json(path: Path, content: str) -> None:
     _atomic_write(path, content)
 
 
-def _render_files(plan: SetupPlan) -> dict[str, str]:
+def _render_files(plan: SetupPlan, *, project_root: Path) -> dict[str, str]:
     config = build_config_payload(plan, container=True)
     host_config = build_config_payload(plan, container=False)
-    compose = _compose_payload(plan)
+    compose = build_compose_payload(plan, project_root=project_root)
     mcp = _mcp_payload(plan)
     return {
         "config/kip.generated.toml": tomli_w.dumps(config),
@@ -91,17 +109,33 @@ def _render_files(plan: SetupPlan) -> dict[str, str]:
     }
 
 
-def _compose_payload(plan: SetupPlan) -> JsonObject:
+def build_compose_payload(plan: SetupPlan, *, project_root: Path) -> JsonObject:
+    try:
+        base = yaml.safe_load((project_root / "compose.yaml").read_text(encoding="utf-8"))
+        services = base["services"]
+        if not all(isinstance(services[name], dict) for name in ("api", "worker", "migrate", "postgres")):
+            raise ValueError("missing application services")
+    except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError) as exc:
+        raise ValidationError("setup requires the starter compose.yaml application template") from exc
     environment = {
         "KIP_CONFIG": "/app/config/kip.generated.toml",
         "KIP_ENV": "production",
         "KIP_WORKSPACE": plan.workspace,
         "KIP_CAS_PATH": "/var/lib/kip/cas",
+        "KIP_IDENTITY_MODE": plan.identity_mode,
+        "KIP_API_PRINCIPAL_ID": "bootstrap-operator",
+        "KIP_API_ACL_SCOPES": f"workspace:{plan.workspace}",
+        "KIP_JWT_ISSUER": plan.jwt_issuer or "",
+        "KIP_JWT_AUDIENCE": plan.jwt_audience or "",
+        "KIP_JWT_JWKS_URL": plan.jwt_jwks_url or "",
     }
-    if plan.database_secret_ref.scheme == "env":
-        environment[plan.database_secret_ref.name] = (
-            f"${{{plan.database_secret_ref.name}:?required}}"
+    managed_database = plan.database_secret_ref.name == "KIP_DATABASE_URL"
+    if managed_database:
+        environment["KIP_DATABASE_URL"] = (
+            "${KIP_CONTAINER_DATABASE_URL:?start the generated profile with ./scripts/app-up.sh}"
         )
+    else:
+        environment[plan.database_secret_ref.name] = f"${{{plan.database_secret_ref.name}:?required}}"
     if plan.model_secret_ref and plan.model_secret_ref.scheme == "env":
         environment[plan.model_secret_ref.name] = (
             f"${{{plan.model_secret_ref.name}:?required}}"
@@ -112,12 +146,18 @@ def _compose_payload(plan: SetupPlan) -> JsonObject:
     ):
         if secret_ref is not None and secret_ref.scheme == "env":
             environment[secret_ref.name] = f"${{{secret_ref.name}:?required}}"
-    return {
-        "services": {
-            "api": _compose_service(plan, environment),
-            "worker": _compose_service(plan, environment),
-        }
-    }
+    for name in ("api", "worker", "migrate"):
+        service = services[name]
+        service.pop("env_file", None)
+        service.update(_compose_service(plan, environment, service_name=name))
+        if not managed_database:
+            service.get("depends_on", {}).pop("postgres", None)
+    if not managed_database:
+        services.pop("postgres")
+    base["x-kip-setup"] = {"mode": "standalone", "plan_fingerprint": plan.plan_fingerprint}
+    # This is a complete Compose project, not an override: merging source
+    # mounts would retain the sample NAS mount outside the approved plan.
+    return _JSON_OBJECT.validate_python(base)
 
 
 def _mcp_payload(plan: SetupPlan) -> JsonObject:
@@ -138,6 +178,8 @@ def _mcp_payload(plan: SetupPlan) -> JsonObject:
 def _compose_service(
     plan: SetupPlan,
     environment: dict[str, str],
+    *,
+    service_name: str,
 ) -> JsonObject:
     volumes: list[JsonValue] = [
         {
@@ -145,6 +187,7 @@ def _compose_service(
             "source": "./config/kip.generated.toml",
             "target": "/app/config/kip.generated.toml",
             "read_only": True,
+            "bind": {"create_host_path": False},
         }
     ]
     volumes.extend(
@@ -153,12 +196,31 @@ def _compose_service(
             "source": mount.source,
             "target": mount.target,
             "read_only": mount.read_only,
+            "bind": {"create_host_path": False},
         }
         for mount in plan.mounts
+        if service_name != "migrate" or mount.purpose == "cas"
     )
+    if service_name != "migrate":
+        volumes.append({
+            "type": "bind", "source": "${KIP_ONTOLOGY_PATH:-./ontology}",
+            "target": "/app/ontology", "read_only": service_name != "api",
+            "bind": {"create_host_path": False},
+        })
+        if plan.model_secret_ref is not None and plan.model_secret_ref.scheme == "file":
+            volumes.append({
+                "type": "bind", "source": plan.model_secret_ref.name,
+                "target": plan.model_secret_ref.name, "read_only": True,
+                "bind": {"create_host_path": False},
+            })
+    runtime_environment = dict(environment)
+    if service_name == "api":
+        runtime_environment["KIP_API_HOST"] = "0.0.0.0"
     return {
-        "environment": dict(environment),
+        "environment": {key: value for key, value in runtime_environment.items()},
         "volumes": volumes,
+        "user": f"{plan.runtime_uid}:{plan.runtime_gid}",
+        "group_add": [str(group) for group in plan.runtime_supplementary_gids or []],
     }
 
 

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from kip.domain.json_types import JsonObject
 from kip.domain.models import ArtifactView, EvidenceRead, RequestContext, XlsxRangeRead
+from kip.domain.source_access import FilesystemAccessPolicy
 from kip.errors import ConflictError, NotFoundError, ValidationError
 from kip.ports.evidence import EvidenceStore, SourceFileInspectorPort, WorkbookReaderPort
 
@@ -14,10 +15,13 @@ class EvidenceUseCases:
         store: EvidenceStore,
         source_files: SourceFileInspectorPort,
         workbooks: WorkbookReaderPort,
+        *,
+        source_policy: FilesystemAccessPolicy | None = None,
     ) -> None:
         self._store = store
         self._source_files = source_files
         self._workbooks = workbooks
+        self._source_policy = source_policy
 
     def read_unit(
         self,
@@ -28,6 +32,7 @@ class EvidenceUseCases:
     ) -> EvidenceRead:
         unit = self._store.get_content_unit(context, unit_id)
         view = self._store.get_artifact(context, unit.artifact_id)
+        self._require_source_access(view)
         if not view.source_object or not view.revision:
             raise NotFoundError(f"source metadata missing for unit: {unit_id}")
         # verify_hash=False lets bulk reopen paths (context bundles, answer
@@ -72,6 +77,7 @@ class EvidenceUseCases:
         require_fresh: bool = True,
     ) -> XlsxRangeRead:
         view = self._store.get_artifact(context, artifact_id)
+        self._require_source_access(view)
         path_value = view.artifact.source_path
         if not path_value:
             raise ValidationError("artifact has no live source path")
@@ -103,7 +109,9 @@ class EvidenceUseCases:
         context: RequestContext,
         artifact_id: str,
     ) -> ArtifactView:
-        return self._store.get_artifact(context, artifact_id)
+        view = self._store.get_artifact(context, artifact_id)
+        self._require_source_access(view)
+        return view
 
     def get_document(
         self,
@@ -116,3 +124,15 @@ class EvidenceUseCases:
         if not source_path:
             return None
         return self._source_files.sha256(Path(source_path))
+
+    def _require_source_access(self, view: ArtifactView) -> None:
+        if self._source_policy is None:
+            return
+        if not self._source_policy.allows_artifact(view):
+            raise NotFoundError("artifact not found")
+        source = view.source_object
+        if source is not None and source.system_kind == "filesystem":
+            path = view.artifact.source_path
+            if path is None:
+                raise NotFoundError("artifact not found")
+            self._source_policy.require_path(Path(path), source_name=source.system_name)

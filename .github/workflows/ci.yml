@@ -347,6 +347,7 @@ jobs:
             dist/kip-starter-kit-${{ steps.release.outputs.version }}.zip
             dist/kip-starter-kit-${{ steps.release.outputs.version }}.zip.sha256
           if-no-files-found: error
+          retention-days: 90
 
       # A workflow artifact expires and needs a signed-in user who can find the
       # run. The starter kit is the primary way an adopter installs KIP, so it
@@ -389,4 +390,3 @@ jobs:
             "dist/release.tar.gz" \
             dist/wheels/*.whl \
             dist/release/artifacts/*.json
-          retention-days: 90

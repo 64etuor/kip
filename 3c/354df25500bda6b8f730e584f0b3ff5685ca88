@@ -1,0 +1,31 @@
+src/kip/__init__.py
+  s_d4f896a44f26db::t_80d8beae3de78b 3
+pyproject.toml
+  s_d4f896a44f26db::t_80d8beae3de78b 7
+contracts/openapi.yaml
+  s_d4f896a44f26db::t_80d8beae3de78b 6
+CHANGELOG.md
+  s_d4f896a44f26db::t_80d8beae3de78b 5-6
+VERSION
+  s_d4f896a44f26db::t_80d8beae3de78b 1
+contracts/openapi.json
+  s_d4f896a44f26db::t_80d8beae3de78b 1098
+uv.lock
+  s_d4f896a44f26db::t_c0b7db612db003 928
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "3c354df25500bda6b8f730e584f0b3ff5685ca88",
+  "prompts": {},
+  "sessions": {
+    "s_d4f896a44f26db": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4317375d-72cd-45a5-8145-ba75040e8bf7",
+        "model": "claude-opus-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

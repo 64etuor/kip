@@ -1,0 +1,40 @@
+CHANGELOG.md
+  s_d4f896a44f26db::t_b766f99244c730 5-16
+contracts/starter-archive-manifest.schema.json
+  s_d4f896a44f26db::t_b09771b9bd732c 10-21
+src/kip/starter_archive_cli.py
+  s_d4f896a44f26db::t_b09771b9bd732c 35,47
+docs/DATA_CONTRACTS.md
+  s_d4f896a44f26db::t_b766f99244c730 34-39
+docs/STARTER_KIT_GUIDE.md
+  s_d4f896a44f26db::t_b134eaba60f644 309-371
+AGENTS.md
+  s_d4f896a44f26db::t_fab44bd57ec39d 82,114-117
+src/kip/domain/starter_archive.py
+  s_d4f896a44f26db::t_487e63648781ca 16
+src/kip/starter_archive.py
+  s_d4f896a44f26db::t_487e63648781ca 40,71,145-178
+  s_d4f896a44f26db::t_b09771b9bd732c 15
+  s_d4f896a44f26db::t_46e750f683415b 179-180
+tests/test_starter_archive.py
+  s_d4f896a44f26db::t_eec5b3e5062d2f 232
+  s_d4f896a44f26db::t_51d516bfe30676 18,222-231,233-274
+docs/PRODUCTION_DESIGN_ALIGNMENT.md
+  s_d4f896a44f26db::t_53f838b02f50f4 50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "ad36a50d82e1bbe081dbea2853b8b7e50f0117a4",
+  "prompts": {},
+  "sessions": {
+    "s_d4f896a44f26db": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4317375d-72cd-45a5-8145-ba75040e8bf7",
+        "model": "claude-opus-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

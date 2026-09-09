@@ -4,6 +4,14 @@
 
 ## 3.5.0 - 2026-09-09
 
+- Upgraded the pinned `httpx2` transitive dependency of the MCP 2.x SDK from
+  2.10.0 to 2.12.0, clearing CVE-2026-84379, CVE-2026-84380, and
+  CVE-2026-84382 in the runtime lock. `httpcore2` moves to 2.12.0 with it.
+- `./scripts/verify.sh` now runs the same `pip-audit` over
+  `requirements/runtime.txt` that CI runs. The gate previously omitted it, so
+  a runtime lock carrying a known advisory could pass local verification and
+  fail only after a release tag was pushed.
+
 - Added `THIRD-PARTY-NOTICES.md` and a README license section. KIP is MIT, but
   the pinned runtime installs AGPL-3.0 PyMuPDF into the production image and the
   default PDF path calls it for table fallback, and psycopg is LGPL-3.0-only.

@@ -16,6 +16,7 @@ if command -v uv >/dev/null 2>&1; then
   uv run pytest
   uv run ruff check src tests scripts
   uv run mypy src/kip
+  uv run pip-audit --requirement requirements/runtime.txt --no-deps --disable-pip
 else
   "$PY" -m pytest
   if command -v ruff >/dev/null 2>&1; then
@@ -27,6 +28,11 @@ else
     mypy src/kip
   else
     printf 'WARNING: mypy not found — type check skipped; CI will enforce it\n' >&2
+  fi
+  if command -v pip-audit >/dev/null 2>&1; then
+    pip-audit --requirement requirements/runtime.txt --no-deps --disable-pip
+  else
+    printf 'WARNING: pip-audit not found — dependency audit skipped; CI will enforce it\n' >&2
   fi
 fi
 "$PY" scripts/portable_golden_gate.py

@@ -77,6 +77,17 @@ config를 선택하는 `.mcp.json`을 함께 쓴다. 기존 generated file은 ap
 
 ## 3. AI agent 변경 계약
 
+`AGENTS.md`의 작업별 경로에서 필요한 문서만 읽는다. Skill은 근거·권한·승인
+경계와 운영 주의점을 제공하며, 명령 인자는 `--help`와 MCP schema를 따른다.
+다른 프로젝트에 설치할 때는 `./scripts/install-agent-files.sh project DIR`을
+사용한다. 두 Skill 복사와 교체 중 처리 가능한 오류가 나면 이전 설치로
+복구하며, symlink 대상은 거부한다. `KIP_PROJECT_DIR`을 명시했다면 잘못된
+경로는 다른 KIP으로 대체되지 않고 오류가 된다.
+
+`./scripts/verify.sh`는 pytest·Ruff·mypy·pip-audit 중 하나라도 없으면 실패한다.
+`./scripts/bootstrap.sh`로 환경을 복구한 뒤 다시 실행한다. uv가 없어도
+프로젝트 Python에 설치된 모듈로 전체 검증하며, 검사 생략은 성공이 아니다.
+
 AI가 기능이나 라이브러리를 바꿀 때 다음 순서를 유지한다.
 
 1. 관련 계약, port, adapter와 기존 테스트를 읽는다.

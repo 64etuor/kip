@@ -1,6 +1,20 @@
 # Changelog
 
-## Unreleased
+## 3.5.1 - 2026-09-10
+
+- Reduced always-loaded agent instructions to task routing and operational
+  traps; command help, schemas, and canonical docs remain the detailed sources.
+  Retrieval skills now prefer connected MCP, keep consent and exact-evidence
+  boundaries, and load mining/interaction details only when needed. Corrected
+  stale discovery-release guidance and unsupported date-filter advice.
+- An invalid explicit `KIP_PROJECT_DIR` now fails instead of silently querying
+  another runtime. Skill installation stages both bundles before replacement
+  and restores the previous installation on handled copy, replacement, or
+  pointer-update failures; symlink bundles are rejected.
+- Full verification now requires pytest, Ruff, mypy, and pip-audit before
+  running checks. The pip-only path uses the project interpreter's modules;
+  the uv path uses `--frozen`. Missing tooling can no longer produce a passing
+  release gate.
 
 - The tagged release step is now idempotent. It previously always ran
   `gh release create`, so re-running a tag failed against the release a prior

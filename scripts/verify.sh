@@ -4,37 +4,34 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 PY="$(python_cmd)"
 cd "$PROJECT_ROOT"
+# Resolve the entire gate before running any checks. Missing tooling is a
+# failed verification, including on pip-bootstrapped hosts without uv.
+if command -v uv >/dev/null 2>&1; then
+  CHECK_RUNNER=(uv run --frozen python -m)
+else
+  CHECK_RUNNER=("$PY" -m)
+fi
+for module in pytest ruff mypy pip_audit; do
+  if ! "${CHECK_RUNNER[@]}" "$module" --version >/dev/null 2>&1; then
+    printf 'Verification unavailable: %s. Run ./scripts/bootstrap.sh and retry; no checks were skipped.\n' "$module" >&2
+    exit 1
+  fi
+done
 "$PY" -m compileall -q src tests scripts sdk
 while IFS= read -r script; do
   bash -n "$script"
 done < <(find scripts examples -type f -name '*.sh' -print | sort)
 "$PY" scripts/generate_contracts.py --check
 "$PY" scripts/verify_project.py
-# Prefer `uv run pytest`: it matches the import/PYTHONPATH semantics CI uses,
-# which have previously caught bugs that `python -m pytest` alone missed.
+# Retain the pytest entry point used by CI when uv is available.
 if command -v uv >/dev/null 2>&1; then
-  uv run pytest
-  uv run ruff check src tests scripts
-  uv run mypy src/kip
-  uv run pip-audit --requirement requirements/runtime.txt --no-deps --disable-pip
+  uv run --frozen pytest
 else
   "$PY" -m pytest
-  if command -v ruff >/dev/null 2>&1; then
-    ruff check src tests scripts
-  else
-    printf 'WARNING: ruff not found — lint skipped; CI will enforce it\n' >&2
-  fi
-  if command -v mypy >/dev/null 2>&1; then
-    mypy src/kip
-  else
-    printf 'WARNING: mypy not found — type check skipped; CI will enforce it\n' >&2
-  fi
-  if command -v pip-audit >/dev/null 2>&1; then
-    pip-audit --requirement requirements/runtime.txt --no-deps --disable-pip
-  else
-    printf 'WARNING: pip-audit not found — dependency audit skipped; CI will enforce it\n' >&2
-  fi
 fi
+"${CHECK_RUNNER[@]}" ruff check src tests scripts
+"${CHECK_RUNNER[@]}" mypy src/kip
+"${CHECK_RUNNER[@]}" pip_audit --requirement requirements/runtime.txt --no-deps --disable-pip
 "$PY" scripts/portable_golden_gate.py
 "$PY" scripts/golden_gate.py
 printf 'Verification passed.\n'

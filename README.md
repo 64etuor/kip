@@ -380,9 +380,11 @@ rerank하며 RapidFuzz 3.14.5를 fallback으로 사용합니다. 검토된 priva
 이는 retrieval 근거이지 answer 또는 ontology 품질 근거가 아닙니다. Lexical candidate
 set에 없는 문서는 reranking으로 복구할 수 없습니다.
 
-수정이나 배포 전에 `./scripts/verify.sh`를 실행하세요. Dependency PR과 parser/model
-upstream 알림은 candidate discovery일 뿐 자동 활성화가 아닙니다. 모든 변경은 shadow
-평가와 사람의 승격 승인을 거쳐야 합니다.
+수정이나 배포 전에 `./scripts/verify.sh`를 실행하세요. 필수 검사 도구가 없으면
+실패하므로 `./scripts/bootstrap.sh`로 환경을 복구한 뒤 다시 실행합니다.
+Dependency PR과 parser/model upstream 알림은 candidate discovery일 뿐 자동
+활성화가 아닙니다. Parser/model 교체는 shadow 평가와 승격 결정을 거칩니다.
+AI 지침은 `AGENTS.md`에서 작업별 문서를 찾아 필요한 부분만 읽도록 구성했습니다.
 
 ## 11. 재현 가능한 RAG scorecard
 

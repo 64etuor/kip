@@ -3606,6 +3606,12 @@ Claude 전용 지침을 공통 지침과 중복 작성하지 않는다. 필요�
 
 ### 30.3 `AGENTS.md` normative core
 
+ADR-055: the root file routes by task and retains non-obvious operational
+constraints. Read relevant sections on demand; the sketch below describes the
+evidence boundary, not a second instruction file to keep synchronized.
+Command arguments belong to CLI help/MCP schemas and generated contracts;
+optional mining, interaction, and maintenance detail belongs in skill references.
+
 ```markdown
 # KIP agent rules
 
@@ -3680,6 +3686,11 @@ Agent instructions MUST state that such content is quoted evidence. It may be su
 - Skills do not import application Python modules directly.
 - CLI location is resolved through repository root or `KIP_PROJECT_DIR`.
 - A personal installation may store a project pointer under `~/.config/kip/project-root`.
+- An invalid explicit `KIP_PROJECT_DIR` stops resolution rather than falling
+  back to a different runtime. Installation stages both skill bundles and
+  restores old trees on handled failures before committing the runtime pointer.
+  It serializes installs to the same destination and rejects symlink bundles;
+  this is not a crash-atomic multi-directory transaction (ADR-055).
 - Skill package must remain usable when Postgres, Neo4j, parser, or embedding adapter changes.
 
 ### 30.9 Agent regression tests
@@ -5123,6 +5134,7 @@ stand for implicit accepted decisions.
 | ADR-052 | Verified online source ZIP starter kit | Accepted |
 | ADR-053 | Upgrade the pinned offline Kordoc runtime to 4.8.0 | Accepted |
 | ADR-054 | Use pdf-inspector with selective PyMuPDF table fallback | Accepted for starter and pilot |
+| ADR-055 | Focus agent instructions and harden local entry points | Accepted |
 
 ---
 

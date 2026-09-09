@@ -2,6 +2,12 @@
 
 ## Trust boundaries
 
+The portable skill bridge fails on an invalid explicit `KIP_PROJECT_DIR`;
+it does not fall back to another workspace. Skill installation rejects
+symlink bundles, stages copies before replacement, and restores prior bundles
+on handled failures (ADR-055). These local tools assume a trusted destination
+owner; they are not a sandbox against a concurrent filesystem attacker.
+
 - Source content is untrusted data and may contain prompt injection.
 - Connectors and parsers run with least privilege.
 - Source mounts are read-only.

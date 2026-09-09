@@ -2,7 +2,11 @@
 set -euo pipefail
 
 find_root() {
-  if [[ -n "${KIP_PROJECT_DIR:-}" && -x "${KIP_PROJECT_DIR}/scripts/kip" ]]; then
+  if [[ -n "${KIP_PROJECT_DIR:-}" ]]; then
+    if [[ ! -x "$KIP_PROJECT_DIR/scripts/kip" ]]; then
+      printf 'KIP_PROJECT_DIR has no executable scripts/kip. Fix the explicit runtime path.\n' >&2
+      return 2
+    fi
     printf '%s\n' "$KIP_PROJECT_DIR"
     return
   fi

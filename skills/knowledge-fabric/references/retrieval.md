@@ -3,7 +3,8 @@
 ## Query order
 
 1. Exact document number, project number, email address, Slack ID, or canonical entity ID.
-2. Structured filters such as source kind, project, date, or document type.
+2. Supported filters such as source kind, project, or document type. Date-range
+   filtering is not in the current search contract; inspect dates in exact evidence.
 3. PostgreSQL lexical search.
 4. Vocabulary and verified alias expansion.
 5. Approved graph traversal.

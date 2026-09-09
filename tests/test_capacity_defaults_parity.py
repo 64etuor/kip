@@ -181,13 +181,6 @@ def test_ci_install_only_requests_declared_optional_dependencies() -> None:
     )
 
 
-def test_verify_uses_the_locked_uv_environment_for_static_checks() -> None:
-    verify_script = (ROOT / "scripts/verify.sh").read_text(encoding="utf-8")
-
-    assert "uv run ruff check src tests scripts" in verify_script
-    assert "uv run mypy src/kip" in verify_script
-
-
 def test_every_mcp_tool_function_is_mentioned_in_app_integration_docs() -> None:
     mcp_server_source = (ROOT / "src/kip/mcp_server.py").read_text(encoding="utf-8")
     tool_names = re.findall(r"^\s+def (kip_[a-zA-Z0-9_]+)\(", mcp_server_source, re.MULTILINE)

@@ -7,4 +7,6 @@
 - Slack: workspace, conversation, message timestamp, and optional thread root.
 - Mail: account, mailbox placement, Message-ID or UID, and MIME part when available.
 
-A locator is valid only while its source revision hash matches. When a source is stale, report the warning and request or run an explicit re-index before relying on it.
+A locator supports a current claim only while its source revision hash matches.
+When stale, report the warning and withhold current-state conclusions. Re-index
+only when the user has authorized maintenance; ordinary retrieval does not.

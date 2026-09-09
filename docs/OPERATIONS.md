@@ -44,6 +44,23 @@ proposed`가 비어 있으면 할 일이 없습니다. 관계 채굴을 켜지 �
 
 ## Daily
 
+For code or release validation, run `./scripts/verify.sh`. It preflights pytest,
+Ruff, mypy, and pip-audit and fails with a bootstrap remediation if any tool is
+missing. With uv it uses the frozen lock; without uv it runs modules from the
+project interpreter, including tools installed by `./scripts/bootstrap.sh`.
+Only a completed gate is verification evidence. Private golden-set skips remain
+explicit and do not prove private-corpus acceptance.
+
+Portable skill installation is `./scripts/install-agent-files.sh personal` or
+`./scripts/install-agent-files.sh project /path/to/project`. It replaces only
+the two bundled skills under `.claude/skills`, stages both before replacement,
+and rolls back handled failures. Other skill directories remain untouched.
+Symlink bundles are rejected. A machine interruption can leave
+`.claude/skills/.kip-install-*` containing previous bundles; preserve those
+until the installation is reconciled. The runtime pointer under
+`~/.config/kip/project-root` changes only after both replacements succeed.
+`KIP_PROJECT_DIR` overrides discovery and an invalid value is an error.
+
 ```bash
 ./scripts/doctor.sh
 ./scripts/kip status

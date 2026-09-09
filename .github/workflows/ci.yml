@@ -382,11 +382,27 @@ jobs:
 
           Full changes are in \`CHANGELOG.md\`.
           NOTES
-          gh release create "v$version" \
-            --title "KIP Knowledge Fabric $version" \
-            --notes-file "$notes" \
-            "dist/kip-starter-kit-$version.zip" \
-            "dist/kip-starter-kit-$version.zip.sha256" \
-            "dist/release.tar.gz" \
-            dist/wheels/*.whl \
-            dist/release/artifacts/*.json
+          assets=(
+            "dist/kip-starter-kit-$version.zip"
+            "dist/kip-starter-kit-$version.zip.sha256"
+            "dist/release.tar.gz"
+          )
+          for extra in dist/wheels/*.whl dist/release/artifacts/*.json; do
+            assets+=("$extra")
+          done
+          # Re-running a tag has to converge on one published release. A prior
+          # attempt can leave a release behind, and deleting the tag it points
+          # at demotes that release to a draft, so create would fail and the
+          # draft would stay invisible.
+          if gh release view "v$version" >/dev/null 2>&1; then
+            gh release edit "v$version" \
+              --title "KIP Knowledge Fabric $version" \
+              --notes-file "$notes" \
+              --draft=false
+            gh release upload "v$version" "${assets[@]}" --clobber
+          else
+            gh release create "v$version" \
+              --title "KIP Knowledge Fabric $version" \
+              --notes-file "$notes" \
+              "${assets[@]}"
+          fi

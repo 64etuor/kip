@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- The tagged release step is now idempotent. It previously always ran
+  `gh release create`, so re-running a tag failed against the release a prior
+  attempt had left behind — and deleting a tag demotes its release to a draft,
+  which then stays invisible. The step now edits, publishes, and re-uploads
+  with `--clobber` when a release for the tag exists, and creates one
+  otherwise.
+
 ## 3.5.0 - 2026-09-09
 
 - Tagged releases now publish a GitHub release carrying the starter kit ZIP

@@ -55,14 +55,14 @@ def test_kordoc_doctor_check_reports_ok_with_detected_version_when_resolvable(
 ) -> None:
     # Given an enabled Kordoc runtime whose version probe resolves and matches.
     command = tmp_path / "kordoc_ok.py"
-    command.write_text("print('4.7.3')", encoding="utf-8")
+    command.write_text("print('4.8.0')", encoding="utf-8")
     settings = _settings(
         tmp_path,
         kordoc={
             "enabled": True,
             "argv": [sys.executable, str(command)],
             "version_argv": [sys.executable, str(command)],
-            "expected_version": "4.7.3",
+            "expected_version": "4.8.0",
         },
     )
 
@@ -71,21 +71,21 @@ def test_kordoc_doctor_check_reports_ok_with_detected_version_when_resolvable(
 
     # Then it reports ok and surfaces the detected version.
     assert check["ok"] is True
-    assert check["details"] == {"enabled": True, "version": "4.7.3", "reason": None}
+    assert check["details"] == {"enabled": True, "version": "4.8.0", "reason": None}
 
 
 def test_kordoc_doctor_check_warns_with_actionable_reason_when_not_resolvable(
     tmp_path: Path,
 ) -> None:
     # Given Kordoc enabled but not resolvable on PATH (e.g. only installed under
-    # var/kordoc/node_modules/.bin/kordoc, never linked onto PATH).
+    # a project-local runtime directory, never linked onto PATH).
     settings = _settings(
         tmp_path,
         kordoc={
             "enabled": True,
             "argv": ["kordoc-not-on-path", "--format", "json", "--ocr"],
             "version_argv": ["kordoc-not-on-path", "--version"],
-            "expected_version": "4.7.3",
+            "expected_version": "4.8.0",
         },
     )
 
@@ -113,14 +113,14 @@ def test_kordoc_doctor_check_warns_on_version_mismatch(tmp_path: Path) -> None:
             "enabled": True,
             "argv": [sys.executable, str(command)],
             "version_argv": [sys.executable, str(command)],
-            "expected_version": "4.7.3",
+            "expected_version": "4.8.0",
         },
     )
 
     check = _kordoc_ocr_doctor_check(settings)
 
     assert check["ok"] is False
-    assert "expected 4.7.3" in check["details"]["reason"]
+    assert "expected 4.8.0" in check["details"]["reason"]
 
 
 def test_doctor_command_surfaces_kordoc_resolvability(
@@ -142,7 +142,7 @@ def test_doctor_command_surfaces_kordoc_resolvability(
                         "enabled": True,
                         "argv": ["kordoc-not-on-path", "--format", "json", "--ocr"],
                         "version_argv": ["kordoc-not-on-path", "--version"],
-                        "expected_version": "4.7.3",
+                        "expected_version": "4.8.0",
                     }
                 },
             },

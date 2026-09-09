@@ -81,12 +81,12 @@ def test_command_broker_preserves_kordoc_structured_blocks(tmp_path: Path) -> No
     ]
 
 
-def test_command_broker_marks_page_exact_only_when_metadata_says_so(
+def test_command_broker_maps_kordoc_layout_pages_to_exact_locators(
     tmp_path: Path,
 ) -> None:
-    # Given a payload whose document metadata explicitly claims exact pages.
+    # Given a Kordoc payload whose document metadata reports layout-backed pages.
     payload = {
-        "metadata": {"parserVersion": "4.7.3", "pageMode": "exact"},
+        "metadata": {"parserVersion": "4.8.0", "pageMode": "layout"},
         "blocks": [{"type": "paragraph", "text": "승인 완료", "pageNumber": 1}],
     }
     source = tmp_path / "fixture.hwp"
@@ -102,8 +102,7 @@ def test_command_broker_marks_page_exact_only_when_metadata_says_so(
         acl_scopes=["workspace:default"],
     )
 
-    # Then the locator records the exact page mode instead of the
-    # conservative section_approx default.
+    # Then the locator maps Kordoc's layout claim to KIP's exact page contract.
     assert units[0].locator.data["page"] == 1
     assert units[0].locator.data["page_mode"] == "exact"
 

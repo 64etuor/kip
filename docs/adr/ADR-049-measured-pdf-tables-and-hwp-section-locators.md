@@ -1,6 +1,6 @@
 # ADR-049: Measured PDF table extraction and HWP section locators
 
-- **Status:** Accepted
+- **Status:** Accepted; default PDF backend superseded by ADR-054
 - **Date:** 2026-08-16
 
 ## Context
@@ -105,6 +105,10 @@ kordoc as the *primary* HWP parser regressing retrieval from Recall@5/MRR
    existing hand-rolled HWP5 one.
 
 ## Consequences
+
+ADR-054 supersedes only this ADR's all-page PyMuPDF default. The measured
+PyMuPDF behavior remains the rollback baseline and its exact bordered-table
+path remains the selective fallback.
 
 - PDF tables become citable evidence units for the first time, at a
   measured, operator-tunable ingest cost; existing page evidence is

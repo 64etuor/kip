@@ -6,6 +6,7 @@ from pathlib import Path
 import anyio
 import pytest
 import yaml
+from mcp.types import CallToolResult, TextContent
 
 from kip.adapters.repository.memory import MemoryRepository
 from kip.container import build_container
@@ -469,7 +470,10 @@ def test_mcp_exposes_revocation_and_job_status_over_the_same_services(
 
     async def invoke(tool: str, arguments: dict[str, object]) -> object:
         result = await server.call_tool(tool, arguments)
-        envelope = json.loads(result[0][0].text)
+        assert isinstance(result, CallToolResult)
+        content = result.content[0]
+        assert isinstance(content, TextContent)
+        envelope = json.loads(content.text)
         assert envelope["schema_version"] == "kip.envelope.v1"
         assert envelope["ok"] is True
         return envelope["data"]

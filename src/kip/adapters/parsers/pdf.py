@@ -2,35 +2,31 @@ from __future__ import annotations
 
 import contextlib
 from collections.abc import Iterator
-from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
 from typing import Literal, Protocol, cast
 
+from kip.adapters.parsers.pdf_ocr import (
+    PdfOcrContext,
+    page_was_ocrd,
+    pdf_ocr_reason,
+    pdf_ocr_units,
+)
+from kip.adapters.parsers.pdf_tables import (
+    PdfTableContext,
+    PdfTablePage,
+    extract_pymupdf_table_units,
+)
 from kip.domain.json_types import JsonObject
 from kip.domain.models import ContentUnit, EvidenceLocator, ExtractionRun
 from kip.domain.text import normalize_text
 from kip.errors import DependencyUnavailableError, ParserError
 from kip.ids import new_id, sha256_bytes, stable_id
-from kip.ports.ocr import OcrDocument, OcrPort
+from kip.ports.ocr import OcrPort
 
 
-class _PdfTable(Protocol):
-    row_count: int
-    col_count: int
-    bbox: tuple[float, float, float, float]
-
-    def to_markdown(self, clean: bool) -> str: ...
-
-
-class _PdfTableFinder(Protocol):
-    tables: list[_PdfTable]
-
-
-class _PdfPage(Protocol):
+class _PdfPage(PdfTablePage, Protocol):
     def get_text(self, option: str) -> str: ...
-
-    def find_tables(self, strategy: str) -> _PdfTableFinder: ...
 
 
 class _PdfDocument(Protocol):
@@ -43,16 +39,6 @@ class _PdfDocument(Protocol):
 
 class _PymupdfModule(Protocol):
     def open(self, path: Path) -> _PdfDocument: ...
-
-
-@dataclass(frozen=True, slots=True)
-class _PdfOcrContext:
-    extraction_id: str
-    artifact_id: str
-    document_id: str
-    acl_scopes: tuple[str, ...]
-    ordinal_start: int
-    candidate_pages: frozenset[int]
 
 
 class PdfParser:
@@ -102,7 +88,7 @@ class PdfParser:
                 for index, page in enumerate(document):
                     text = page.get_text("text") or ""
                     normalized = normalize_text(text)
-                    reason = _ocr_reason(text)
+                    reason = pdf_ocr_reason(text)
                     if reason is not None:
                         page_number = index + 1
                         ocr_candidates[page_number] = reason
@@ -127,17 +113,20 @@ class PdfParser:
                         )
                     )
                     if self._tables_enabled:
-                        table_units, table_ordinal = _extract_pdf_tables(
+                        table_result = extract_pymupdf_table_units(
                             page,
-                            page_index=index,
-                            start_ordinal=table_ordinal,
-                            extraction_id=extraction_id,
-                            artifact_id=artifact_id,
-                            document_id=document_id,
-                            acl_scopes=acl_scopes,
-                            warnings=warnings,
+                            index,
+                            PdfTableContext(
+                                extraction_id=extraction_id,
+                                artifact_id=artifact_id,
+                                document_id=document_id,
+                                acl_scopes=tuple(acl_scopes),
+                                start_ordinal=table_ordinal,
+                            ),
                         )
-                        units.extend(table_units)
+                        units.extend(table_result.units)
+                        warnings.extend(table_result.warnings)
+                        table_ordinal = table_result.next_ordinal
             finally:
                 document.close()
         except pdf_error_types as exc:
@@ -170,9 +159,9 @@ class PdfParser:
             except ParserError as exc:
                 warnings.append(f"OCR_FAILED: {exc}")
             else:
-                ocr_units = _ocr_units(
+                ocr_units = pdf_ocr_units(
                     documents,
-                    _PdfOcrContext(
+                    PdfOcrContext(
                         extraction_id=extraction_id,
                         artifact_id=artifact_id,
                         document_id=document_id,
@@ -203,7 +192,7 @@ class PdfParser:
                 warnings = [
                     warning
                     for warning in warnings
-                    if not _page_was_ocrd(warning, covered_pages)
+                    if not page_was_ocrd(warning, covered_pages)
                 ]
                 warnings.extend(
                     f"OCR_WARNING: {warning}"
@@ -225,158 +214,3 @@ class PdfParser:
             metadata=metadata,
         )
         return extraction, units
-
-
-def _ocr_units(
-    documents: tuple[OcrDocument, ...],
-    context: _PdfOcrContext,
-) -> list[ContentUnit]:
-    units: list[ContentUnit] = []
-    for document in documents:
-        for block in document.blocks:
-            if block.page not in context.candidate_pages:
-                continue
-            if not block.text.strip():
-                continue
-            ordinal = context.ordinal_start + len(units)
-            normalized = normalize_text(block.text)
-            units.append(
-                ContentUnit(
-                    id=stable_id("unit", context.extraction_id, str(ordinal)),
-                    extraction_id=context.extraction_id,
-                    document_id=context.document_id,
-                    artifact_id=context.artifact_id,
-                    ordinal=ordinal,
-                    unit_type="pdf_ocr",
-                    title=f"{document.source_path.name} - page {block.page or 1} OCR",
-                    body=block.text,
-                    body_normalized=normalized,
-                    lexical_text=normalized,
-                    locator=EvidenceLocator(
-                        type="pdf_ocr",
-                        data={"page": block.page or 1, "bbox": block.bbox},
-                    ),
-                    acl_scopes=list(context.acl_scopes),
-                    metadata={"block_type": block.block_type, **block.metadata},
-                )
-            )
-    return units
-
-
-def _extract_pdf_tables(
-    page: _PdfPage,
-    *,
-    page_index: int,
-    start_ordinal: int,
-    extraction_id: str,
-    artifact_id: str,
-    document_id: str,
-    acl_scopes: list[str],
-    warnings: list[str],
-) -> tuple[list[ContentUnit], int]:
-    """Additively detect bordered tables on one page via PyMuPDF's own
-    ``find_tables(strategy="lines_strict")``.
-
-    Measured side-effect-free against ``page.get_text()`` (byte-identical
-    before/after on 100% of a synthetic + real corpus) so it never changes
-    ``pdf_page`` unit output. Table detection is best-effort: any failure
-    degrades to a ``TABLE_DETECTION_FAILED`` warning instead of failing the
-    page or the document, mirroring the existing ``OCR_FAILED:`` pattern.
-    """
-    page_number = page_index + 1
-    try:
-        finder = page.find_tables(strategy="lines_strict")
-        tables = list(finder.tables)
-    except Exception as exc:  # pragma: no cover - defensive, see docstring
-        warnings.append(f"TABLE_DETECTION_FAILED: page {page_number}: {exc}")
-        return [], start_ordinal
-
-    units: list[ContentUnit] = []
-    ordinal = start_ordinal
-    for table_index, table in enumerate(tables):
-        try:
-            row_count = int(table.row_count)
-            col_count = int(table.col_count)
-            # This filter is what suppresses the measured real-corpus false
-            # positives: decorative single-row callout/footer boxes that
-            # PyMuPDF's line-based strategy otherwise detects as 1xN "tables".
-            if row_count < 2 or col_count < 2:
-                continue
-            body = table.to_markdown(clean=True)
-            bbox = [float(value) for value in table.bbox]
-        except Exception as exc:  # pragma: no cover - defensive, see docstring
-            warnings.append(
-                f"TABLE_DETECTION_FAILED: page {page_number} table {table_index}: {exc}"
-            )
-            continue
-        normalized = normalize_text(body)
-        units.append(
-            ContentUnit(
-                id=stable_id("unit", extraction_id, f"{page_index}-table-{table_index}"),
-                extraction_id=extraction_id,
-                document_id=document_id,
-                artifact_id=artifact_id,
-                ordinal=ordinal,
-                unit_type="pdf_table",
-                title=f"table {table_index + 1} - page {page_number}",
-                body=body,
-                body_normalized=normalized,
-                lexical_text=normalized,
-                locator=EvidenceLocator(
-                    type="pdf_table",
-                    data={
-                        # PyMuPDF's find_tables never merges a table across a
-                        # page break, so end_page always equals page today;
-                        # the field is kept so a future cross-page merge can
-                        # populate it without a locator shape change.
-                        "page": page_number,
-                        "end_page": page_number,
-                        "table_index": table_index,
-                    },
-                ),
-                acl_scopes=acl_scopes,
-                metadata={
-                    "row_count": row_count,
-                    "col_count": col_count,
-                    "strategy": "lines_strict",
-                    "source": "pymupdf.find_tables",
-                    "bbox": bbox,
-                },
-            )
-        )
-        ordinal += 1
-    return units, ordinal
-
-
-def _page_was_ocrd(warning: str, covered_pages: set[int | None]) -> bool:
-    if not warning.startswith("page "):
-        return False
-    page_text = warning.removeprefix("page ").split(":", maxsplit=1)[0]
-    return page_text.isdigit() and int(page_text) in covered_pages
-
-
-def _ocr_reason(text: str) -> str | None:
-    characters = [character for character in text if character not in " \t\n\r"]
-    total = len(characters)
-    if total < 20:
-        return "low_text"
-    pua = sum(
-        "\ue000" <= character <= "\uf8ff"
-        or "\U000f0000" <= character <= "\U000ffffd"
-        or "\U00100000" <= character <= "\U0010fffd"
-        for character in characters
-    )
-    control = sum(
-        ord(character) < 0x20
-        or ord(character) == 0x7F
-        or 0x80 <= ord(character) <= 0x9F
-        for character in characters
-    )
-    replacement = characters.count("\ufffd")
-    if pua / total >= 0.2:
-        return "high_pua"
-    if control / total >= 0.05:
-        return "high_control"
-    if replacement / total >= 0.05:
-        return "high_replacement"
-    return None

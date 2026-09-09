@@ -3,8 +3,8 @@ from pathlib import Path
 import fitz
 import pytest
 
-from kip.adapters.parsers import pdf as pdf_module
 from kip.adapters.parsers.pdf import PdfParser
+from kip.adapters.parsers.pdf_ocr import pdf_ocr_reason
 from kip.errors import ParserError
 from kip.ports.ocr import OcrBlock, OcrDocument
 
@@ -107,7 +107,7 @@ def test_pdf_flags_private_use_glyphs_for_korean_ocr() -> None:
     broken_text = "\ue000\ue001\ue002\ue003\ue004" * 10
 
     # When page text quality is classified.
-    reason = pdf_module._ocr_reason(broken_text)
+    reason = pdf_ocr_reason(broken_text)
 
     # Then the page is routed to OCR despite exceeding the low-text threshold.
     assert reason == "high_pua"
@@ -411,7 +411,7 @@ def test_registry_wires_pdf_tables_enabled_from_settings(tmp_path: Path) -> None
     settings = Settings(
         project_root=tmp_path,
         config_path=tmp_path / "kip.toml",
-        raw={"parsers": {"pdf": {"tables_enabled": False}}},
+        raw={"parsers": {"pdf": {"backend": "pymupdf", "tables_enabled": False}}},
     )
     path = tmp_path / "fixture.pdf"
     path.write_bytes(b"%PDF-1.4\n%fake")

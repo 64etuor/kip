@@ -14,18 +14,20 @@ done < <(find scripts examples -type f -name '*.sh' -print | sort)
 # which have previously caught bugs that `python -m pytest` alone missed.
 if command -v uv >/dev/null 2>&1; then
   uv run pytest
+  uv run ruff check src tests scripts
+  uv run mypy src/kip
 else
   "$PY" -m pytest
-fi
-if command -v ruff >/dev/null 2>&1; then
-  ruff check src tests scripts
-else
-  printf 'WARNING: ruff not found — lint skipped; CI will enforce it\n' >&2
-fi
-if command -v mypy >/dev/null 2>&1; then
-  mypy src/kip
-else
-  printf 'WARNING: mypy not found — type check skipped; CI will enforce it\n' >&2
+  if command -v ruff >/dev/null 2>&1; then
+    ruff check src tests scripts
+  else
+    printf 'WARNING: ruff not found — lint skipped; CI will enforce it\n' >&2
+  fi
+  if command -v mypy >/dev/null 2>&1; then
+    mypy src/kip
+  else
+    printf 'WARNING: mypy not found — type check skipped; CI will enforce it\n' >&2
+  fi
 fi
 "$PY" scripts/portable_golden_gate.py
 "$PY" scripts/golden_gate.py

@@ -31,7 +31,7 @@ node_18_ready() {
 }
 
 kordoc_version_ready() {
-  [[ "$(kordoc --version 2>/dev/null)" == "4.7.3" ]]
+  [[ "$(kordoc --version 2>/dev/null)" == "4.8.0" ]]
 }
 
 kordoc_ppocr_ready() {
@@ -68,7 +68,7 @@ fi
 required "Node 18+ for Kordoc OCR" \
   "install Node.js 18+, then run ./scripts/bootstrap.sh" \
   node_18_ready
-required "Kordoc 4.7.3" \
+required "Kordoc 4.8.0" \
   "run ./scripts/bootstrap.sh to install the exact local Kordoc runtime" \
   kordoc_version_ready
 required "Kordoc PP-OCRv5 Korean models" \

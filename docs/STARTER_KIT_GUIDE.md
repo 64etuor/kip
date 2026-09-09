@@ -121,13 +121,23 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 - 활성화가 문서별 PostgreSQL transaction이고 이전 extraction과 unit을
   보존하는지, 동일 artifact에 active extraction이 하나뿐인지 검증한다.
 - 한글 PDF OCR 후보는 rendered page와 사람이 검토한 transcript로 CER/WER, 표 구조, locator fidelity를 별도 측정한다.
+- 새 PDF 기본값은 `backend = "pdf_inspector"`다. 기존 corpus는 공개 6문서
+  결과만으로 즉시 바꾸지 말고 shadow re-extraction에서 page/table/OCR 수,
+  exact locator, 실제 내부 질의, source hash를 비교한 뒤 활성화한다.
+  `backend = "pymupdf"`는 명시적 rollback 경로다.
 - PPTX는 text-only 성공으로 판정하지 않는다. merged table, cached chart
   data, image alt/hash, nested group, notes, hidden slide, comment/SmartArt,
   정확한 slide/shape locator와 partial warning을 실제 조직 표본에서 확인한다.
-- 새 reference install은 `./scripts/bootstrap.sh`에서 `kordoc@4.7.3`과
+- 새 reference install은 `./scripts/bootstrap.sh`에서 `kordoc@4.8.0`과
   PP-OCRv5 Korean cache를 설치·SHA 검증한다. `./scripts/doctor.sh`와
   `./scripts/kordoc models --status`로 준비 상태를 확인하며, production
   indexing은 offline launcher를 사용하고 `npx`를 parser argv로 사용하지 않는다.
+- 기존 설치를 4.8.0으로 올릴 때는 `./scripts/install-kordoc.sh`를 다시
+  실행하고 로컬 `config/kip.toml`의 `expected_version`도 `4.8.0`으로 바꾼 뒤
+  doctor와 read-only shadow sample을 통과시킨다.
+- Kordoc binary와 OCR model cache는 source ZIP에 넣지 않는다. 인터넷 연결
+  bootstrap이 격리된 `var/kordoc-4.8.0-r1`에 설치하며, high-severity 전이
+  의존성을 피하도록 `adm-zip` 0.6.0과 `sharp` 0.35.3을 강제한다.
 - OCR 운영 전 low-text PDF, 깨진 Korean font map, screenshot형 PPTX,
   중복 이미지, 대형 이미지, 실패/timeout 표본을 shadow extraction으로
   검증하고 원본 hash와 locator fidelity를 확인한다.
@@ -176,7 +186,11 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 저장소에는 두 계층의 알림이 있다.
 
 - Dependabot: Python, GitHub Actions, Docker 업데이트를 매주 `dependencies`와 `quality-candidate` PR로 제안한다.
-- `upstream-watch`: 매일 09:00 KST에 `parsers.ocr.kordoc.expected_version`과 pinned Hugging Face embedding/reranker revision을 upstream과 비교한다. 차이가 있으면 하나의 GitHub issue를 생성하거나 갱신하고, 다시 모두 일치하면 해당 issue를 닫는다. `./scripts/check-upstream-updates.sh`로 같은 읽기 전용 검사를 로컬에서 실행하거나 Actions의 `upstream-watch`를 수동 실행할 수도 있다.
+- `upstream-watch`: 매일 09:00 KST에 `pdf-inspector`와 Kordoc pin, pinned
+  Hugging Face embedding/reranker revision을 upstream과 비교한다. 차이가
+  있으면 하나의 GitHub issue를 생성하거나 갱신하고, 다시 모두 일치하면
+  해당 issue를 닫는다. `./scripts/check-upstream-updates.sh`로 같은 읽기 전용
+  검사를 로컬에서 실행하거나 Actions의 `upstream-watch`를 수동 실행할 수도 있다.
 
 알림은 설치 또는 활성화가 아니다. 업데이트마다 다음을 수행한다.
 
@@ -189,6 +203,12 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 4. `quality validate-manifest`, 동일 golden dataset 평가, `quality recommend`를 실행한다.
 5. `keep_disabled`이면 종료하고, `promote`도 사람의 별도 activation 승인을 받는다.
 6. 이전 pin, extraction, projection으로 돌아가는 rollback 절차를 audit에 남긴다.
+
+MCP major 업데이트는 unit test만으로 승격하지 않는다. 실제
+`./scripts/mcp.sh` stdio 프로세스를 client로 시작해 initialize, tool discovery,
+`kip_capabilities`, server version, `kip.envelope.v1`을 확인한다. MCP metadata를
+identity 또는 ACL 근거로 쓰지 않으며, Streamable HTTP를 추가할 때는 TLS,
+identity, origin, request-size, 배포 경계를 별도 설계한다.
 
 `upstream-watch`는 첫 알림 때 `dependencies`와 `quality-candidate` label을 생성한다. Dependabot PR에도 같은 label을 쓰려면 저장소를 처음 전달할 때 label을 미리 만들어 둔다. 조직 정책상 issue 쓰기 권한이나 외부 네트워크가 금지된 경우 scheduled workflow를 끄고 내부 dependency scanner로 같은 계약을 구현한다.
 
@@ -231,7 +251,36 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 
 비밀, 실제 사내 경로, private golden corpus, DB dump, CAS는 starter repository에 포함하지 않는다. 별도 승인된 안전한 채널과 환경별 bootstrap 절차로 전달한다.
 
-## 9. 검증된 배포 패키지 생성
+## 9. 온라인 소스 ZIP 생성과 인수
+
+인터넷 연결 환경에서 코드와 필수 운영 문서만 전달하려면 작업 디렉터리를
+그대로 압축하지 말고 allowlist 기반 소스 ZIP을 만든다.
+
+```bash
+./scripts/build-starter-kit.sh
+./scripts/verify-starter-kit.sh dist/kip-starter-kit-$(cat VERSION).zip
+```
+
+릴리스용 ZIP은 clean tree에서 만든다. 검토 중인 변경을 전달해야 할 때만
+`./scripts/build-starter-kit.sh --allow-dirty`를 사용하며, 그 상태는 내부
+manifest에 기록된다. ZIP에는 소스, `uv.lock`, 테스트, migration, ontology,
+contract, 예제, 자동화, canonical 운영 문서가 들어간다. 실제 config와 비밀,
+사내 절대 경로, private 평가 자료, DB/CAS/output, 내부 plan/report, `.git`,
+`.venv`, `*.egg-info`, 기존 배포 산출물은 포함하지 않는다.
+
+수신자는 `.zip.sha256`과 ZIP 내부 manifest/checksum을 먼저 검증하고, 하나의
+versioned root에 압축을 푼 뒤 다음을 실행한다.
+
+```bash
+./scripts/bootstrap.sh
+./scripts/doctor.sh
+./scripts/verify.sh
+```
+
+이 ZIP은 개발 인수물이다. 운영 image digest, SBOM, provenance, attestation을
+포함하는 다음 절의 검증된 배포 패키지를 대체하지 않는다.
+
+## 10. 검증된 배포 패키지 생성
 
 깨끗한 tree에서 실제 배포할 단일 image digest를 지정한 뒤 디렉터리와 압축
 아카이브를 모두 검증한다.

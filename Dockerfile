@@ -4,11 +4,22 @@ ARG PYTHON_IMAGE=python:3.12-slim@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb
 ARG NODE_IMAGE=node:22-trixie-slim@sha256:db8a96a63e5264607ada2d206758876ebbed6a12be2ada7517793cbfb0c2a29c
 
 FROM ${NODE_IMAGE} AS kordoc
-ARG KORDOC_VERSION=4.7.3
+ARG KORDOC_VERSION=4.8.0
+ARG KORDOC_ADM_ZIP_VERSION=0.6.0
+ARG KORDOC_SHARP_VERSION=0.35.3
 ENV KORDOC_MODEL_CACHE=/opt/kordoc-models
-RUN npm install --global --omit=dev "kordoc@${KORDOC_VERSION}" && \
-    test "$(kordoc --version)" = "$KORDOC_VERSION" && \
-    kordoc check-ocr-models
+WORKDIR /opt/kordoc-runtime
+RUN npm init --yes >/dev/null && \
+    npm pkg delete dependencies optionalDependencies devDependencies peerDependencies overrides && \
+    npm pkg set --json private=true && \
+    npm pkg set \
+      "name=kip-kordoc-runtime" \
+      "dependencies.kordoc=${KORDOC_VERSION}" \
+      "overrides.adm-zip=${KORDOC_ADM_ZIP_VERSION}" \
+      "overrides.sharp=${KORDOC_SHARP_VERSION}" && \
+    npm install --no-package-lock --omit=dev && \
+    test "$(node node_modules/kordoc/dist/cli.js --version)" = "$KORDOC_VERSION" && \
+    node node_modules/kordoc/dist/cli.js check-ocr-models
 
 FROM ${PYTHON_IMAGE} AS builder
 ARG BUILDKIT_SBOM_SCAN_STAGE=true
@@ -32,7 +43,7 @@ LABEL org.opencontainers.image.title="KIP Knowledge Fabric" \
       org.opencontainers.image.source="${SOURCE_URL}" \
       org.opencontainers.image.licenses="MIT"
 ENV PATH=/app/scripts:/opt/venv/bin:$PATH \
-    KIP_KORDOC_PACKAGE_DIR=/opt/kordoc \
+    KIP_KORDOC_PACKAGE_DIR=/opt/kordoc-runtime/node_modules/kordoc \
     KORDOC_MODEL_CACHE=/opt/kordoc-models \
     KORDOC_OFFLINE=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -43,7 +54,7 @@ RUN groupadd --system --gid 10001 kip && \
 WORKDIR /app
 COPY --from=builder /wheels /wheels
 COPY --from=kordoc /usr/local/bin/node /usr/local/bin/node
-COPY --from=kordoc /usr/local/lib/node_modules/kordoc /opt/kordoc
+COPY --from=kordoc /opt/kordoc-runtime/node_modules /opt/kordoc-runtime/node_modules
 COPY --from=kordoc /opt/kordoc-models /opt/kordoc-models
 RUN /opt/venv/bin/pip install --no-cache-dir --no-index /wheels/* && \
     rm -rf /wheels

@@ -11,6 +11,7 @@ from kip.adapters.parsers.hwp_broker import CommandParserConfig, HwpParserBroker
 from kip.adapters.parsers.hwp_native import HwpNativeParser, HwpParserChain
 from kip.adapters.parsers.isolation import IsolatedParserAdapter
 from kip.adapters.parsers.pdf import PdfParser
+from kip.adapters.parsers.pdf_inspector import PdfInspectorParser
 from kip.adapters.parsers.plain import PlainTextParser
 from kip.adapters.parsers.pptx import PptxParser
 from kip.adapters.parsers.pptx_ocr import PptxOcrLimits
@@ -89,10 +90,17 @@ def raw_parser_by_key(settings: Settings, parser_key: str) -> ParserPort:
 
 def _raw_parser_registrations(settings: Settings) -> list[tuple[str, ParserPort]]:
     ocr = _kordoc_ocr(settings)
-    pdf = PdfParser(
-        ocr=ocr,
-        tables_enabled=bool(settings.get("parsers.pdf.tables_enabled", True)),
-    )
+    pdf_backend = str(settings.get("parsers.pdf.backend", "pdf_inspector"))
+    match pdf_backend:
+        case "pdf_inspector":
+            pdf: ParserPort = PdfInspectorParser(ocr=ocr)
+        case "pymupdf":
+            pdf = PdfParser(
+                ocr=ocr,
+                tables_enabled=bool(settings.get("parsers.pdf.tables_enabled", True)),
+            )
+        case _:
+            raise ConfigurationError(f"unsupported PDF parser backend: {pdf_backend}")
     hwp_configs: list[CommandParserConfig] = []
     native_parser: HwpNativeParser | None = None
     for name in settings.get("parsers.hwp.order", ["kordoc", "unhwp"]):
@@ -160,10 +168,10 @@ def _kordoc_ocr(settings: Settings) -> KordocOcrAdapter | None:
         raise ConfigurationError(
             "Kordoc OCR requires an installed Kordoc binary, not npm or npx"
         )
-    expected_version = str(config.get("expected_version", "4.7.3"))
+    expected_version = str(config.get("expected_version", "4.8.0"))
     if expected_version != KordocOcrAdapter.version:
         raise ConfigurationError(
-            "Kordoc OCR adapter supports only pinned version 4.7.3"
+            "Kordoc OCR adapter supports only pinned version 4.8.0"
         )
     version_argv = tuple(str(item) for item in config.get("version_argv", []))
     if not version_argv:

@@ -163,7 +163,11 @@ def test_generated_configs_enable_pinned_korean_ocr(tmp_path: Path) -> None:
             "enabled": True,
             "argv": ["kordoc", "--format", "json", "--ocr", "--silent"],
             "version_argv": ["kordoc", "--version"],
-            "expected_version": "4.7.3",
+            "expected_version": "4.8.0",
+        }
+        assert config["parsers"]["pdf"] == {
+            "backend": "pdf_inspector",
+            "tables_enabled": True,
         }
         assert config["parsers"]["hwp"]["hwp-hwpx-parser"]["enabled"] is True
         assert config["parsers"]["isolation"] == {

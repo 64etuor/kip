@@ -525,7 +525,7 @@ def _kordoc_ocr_doctor_check(settings: Settings) -> dict[str, Any]:
         KordocOcrConfig(
             argv=tuple(str(item) for item in kordoc_config.get("argv", [])),
             version_argv=tuple(str(item) for item in kordoc_config.get("version_argv", [])),
-            expected_version=str(kordoc_config.get("expected_version", "4.7.3")),
+            expected_version=str(kordoc_config.get("expected_version", "4.8.0")),
             timeout_seconds=_KORDOC_DOCTOR_PROBE_TIMEOUT_SECONDS,
         )
     )

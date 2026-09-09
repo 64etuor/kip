@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from kip.adapters.ocr.kordoc import KordocOcrAdapter, KordocOcrConfig
-from kip.adapters.parsers.pdf import PdfParser
+from kip.adapters.parsers.pdf_inspector import PdfInspectorParser
 from kip.adapters.parsers.registry import ParserRegistry
 from kip.errors import ConfigurationError, ParserError
 from kip.settings import Settings
@@ -73,22 +73,22 @@ print(json.dumps({
 
 
 def test_kordoc_ocr_rejects_unexpected_runtime_version(tmp_path: Path) -> None:
-    # Given a configured Kordoc 4.7.3 adapter backed by a different executable version.
+    # Given a configured Kordoc 4.8.0 adapter backed by a different executable version.
     command = tmp_path / "wrong_version.py"
-    command.write_text("print('4.7.2')", encoding="utf-8")
+    command.write_text("print('4.7.3')", encoding="utf-8")
     image = tmp_path / "scan.png"
     image.write_bytes(b"fixture")
     adapter = KordocOcrAdapter(
         KordocOcrConfig(
             argv=(sys.executable, str(command)),
             version_argv=(sys.executable, str(command)),
-            expected_version="4.7.3",
+            expected_version="4.8.0",
             timeout_seconds=5,
         )
     )
 
     # When OCR begins.
-    with pytest.raises(ParserError, match=r"expected 4\.7\.3"):
+    with pytest.raises(ParserError, match=r"expected 4\.8\.0"):
         adapter.recognize((image,))
 
     # Then unreviewed model/runtime drift is rejected before document parsing.
@@ -180,7 +180,7 @@ def test_registry_enables_pinned_korean_ocr_from_settings(tmp_path: Path) -> Non
                         "enabled": True,
                         "argv": ["/opt/kordoc/bin/kordoc", "--format", "json", "--ocr"],
                         "version_argv": ["/opt/kordoc/bin/kordoc", "--version"],
-                        "expected_version": "4.7.3",
+                        "expected_version": "4.8.0",
                     }
                 }
             }
@@ -191,10 +191,12 @@ def test_registry_enables_pinned_korean_ocr_from_settings(tmp_path: Path) -> Non
     registry = ParserRegistry.from_settings(settings)
 
     # Then PDF and PPTX parsers share the pinned Korean OCR adapter.
-    pdf = next(parser for parser in registry.parsers if isinstance(parser, PdfParser))
+    pdf = next(
+        parser for parser in registry.parsers if isinstance(parser, PdfInspectorParser)
+    )
     assert pdf._ocr is not None
     assert pdf._ocr.name == "kordoc-ppocrv5-korean"
-    assert pdf._ocr.version == "4.7.3"
+    assert pdf._ocr.version == "4.8.0"
 
 
 def test_registry_rejects_enabled_ocr_without_version_check(tmp_path: Path) -> None:
@@ -208,7 +210,7 @@ def test_registry_rejects_enabled_ocr_without_version_check(tmp_path: Path) -> N
                     "kordoc": {
                         "enabled": True,
                         "argv": ["/opt/kordoc/bin/kordoc", "--format", "json", "--ocr"],
-                        "expected_version": "4.7.3",
+                        "expected_version": "4.8.0",
                     }
                 }
             }
@@ -232,9 +234,9 @@ def test_registry_rejects_runtime_package_download_command(tmp_path: Path) -> No
                 "ocr": {
                     "kordoc": {
                         "enabled": True,
-                        "argv": ["npx", "kordoc@4.7.3", "--format", "json", "--ocr"],
-                        "version_argv": ["npx", "kordoc@4.7.3", "--version"],
-                        "expected_version": "4.7.3",
+                        "argv": ["npx", "kordoc@4.8.0", "--format", "json", "--ocr"],
+                        "version_argv": ["npx", "kordoc@4.8.0", "--version"],
+                        "expected_version": "4.8.0",
                     }
                 }
             }

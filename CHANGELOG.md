@@ -2,6 +2,47 @@
 
 ## Unreleased
 
+## 3.4.0 - 2026-08-17
+
+- Added the local `pdf-inspector` 1.14.2 hybrid PDF backend and made it the
+  starter default, retaining explicit `pymupdf` rollback. Page Markdown and
+  per-page OCR reasons come from the bounded Rust engine; valid Markdown tables
+  become `pdf_table` units, while detected table pages without structured
+  Markdown use selective PyMuPDF `lines_strict` fallback. On six public PDFs,
+  raw parsing was 19.2x faster and isolated PostgreSQL sync 3.23x faster while
+  lexical Recall@10/MRR stayed 1.0000/0.9861 with zero ACL leaks (ADR-054).
+- Upgraded the pinned offline Kordoc runtime from 4.7.3 to 4.8.0 after a
+  compatibility gate over six public PDFs and two public HWPX files preserved
+  blocks, page counts, metadata, and warning codes. KIP continues to consume
+  the established block contract and ignores the additive per-page Markdown
+  projection. Corrected Kordoc `pageMode="layout"` to map to KIP's `exact`
+  evidence locator instead of being mislabeled `section_approx`. The online
+  installer and production image enforce patched `adm-zip` 0.6.0 and `sharp`
+  0.35.3 overrides in an isolated runtime after the published default graph
+  exposed high-severity advisories; the overridden graph audits clean
+  (ADR-053).
+- Added a deterministic, allowlisted online source starter ZIP with a versioned
+  manifest, per-file checksums, an external archive digest, path and expansion
+  defenses, private/secret-content scanning, build/verify CLI commands, and
+  standalone shell entry points. The ZIP carries only source, locked inputs,
+  tests, contracts, migrations, ontology, examples, automation, and canonical
+  operating documents; local state, internal plans, private evaluation data,
+  databases, CAS/output data, generated package metadata, and release binaries
+  are excluded (ADR-052).
+- Upgraded the optional MCP edge from the 1.x maintenance line to the stable
+  2.0 SDK. The adapter now uses `MCPServer`, reports the KIP package version
+  during initialization, negotiates the current protocol while retaining the
+  SDK's legacy-client support, and preserves `kip.envelope.v1` tool payloads.
+  Added an MCP 2 client discovery/tool-call contract test.
+- Refreshed the locked Python toolchain and runtime dependencies, including
+  mypy 2.3.1, PyMuPDF 1.28.2, Uvicorn 0.52.3, Ruff 0.16.3, and their transitive
+  locks; regenerated the production runtime requirements.
+- Fixed hosted CI after the Neo4j extra was removed: the workflow no longer
+  requests the nonexistent extra, and a structural test now rejects any CI
+  extra not declared by `pyproject.toml`. Refreshed SHA-pinned GitHub Actions
+  to their current releases. Local `verify.sh` now runs Ruff and mypy through
+  the locked uv environment instead of silently skipping installed tools that
+  are absent from the shell `PATH`.
 - Guided setup now asks explicitly whether ontology entity/relation mining
   should be enabled. The choice is fingerprinted in the versioned setup plan
   and written to `[models.relation_mining]` in both generated configs;
@@ -357,5 +398,8 @@
 - Added shallow XLSX index and exact workbook range reader.
 - Added ontology, assertion candidate, approved assertion, ACL, and graph query contracts.
 - Added optional Neo4j projection adapter boundary without making it canonical.
-- Added source-neutral `sync run`, stable top-level `xlsx-read`, projection management, canonical export, and assertion explanation commands.
-- Added REST connector events, generic durable sync enqueueing, job polling, assertion explanation, OpenAPI contracts, MCP tools, and a Python application client.
+- Added source-neutral `sync run`, stable top-level `xlsx-read`, projection
+  management, canonical export, and assertion explanation commands.
+- Added REST connector events, generic durable sync enqueueing, job polling,
+  assertion explanation, OpenAPI contracts, MCP tools, and a Python
+  application client.

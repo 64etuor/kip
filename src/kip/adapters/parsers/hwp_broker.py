@@ -134,7 +134,7 @@ class HwpParserBroker:
                 locator_data = {
                     # kordoc's structured-block JSON never emits a "section"
                     # or "sectionNumber" key (verified against the pinned
-                    # 4.7.3 output shape - only pageNumber appears), so
+                    # 4.7.3-4.8.0 output shape - only pageNumber appears), so
                     # reading either was dead code that always yielded None.
                     # Kept explicit as None (rather than removed) so this
                     # hwp_structure locator has the same shape as the native
@@ -151,7 +151,11 @@ class HwpParserBroker:
                     "page_mode": (
                         None
                         if page is None
-                        else ("exact" if metadata.get("pageMode") == "exact" else "section_approx")
+                        else (
+                            "exact"
+                            if metadata.get("pageMode") in {"exact", "layout"}
+                            else "section_approx"
+                        )
                     ),
                     "block": ordinal,
                     "bbox": block.get("bbox"),

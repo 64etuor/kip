@@ -131,6 +131,13 @@ PostgreSQL network is internal and the NAS bind is read-only. Validate the
 resolved Compose model before every rollout and reject a deployment if a
 secret, source path, or image digest is still an example value.
 
+The optional MCP edge is a stdio-only MCP 2.x server. After an MCP SDK major
+upgrade, start `./scripts/mcp.sh` through a real client and verify
+initialization, tool discovery, `kip_capabilities`, the reported KIP version,
+and the `kip.envelope.v1` result. Streamable HTTP transport is not enabled;
+adding it requires a separate identity, TLS, origin, request-size, and
+deployment design rather than exposing the stdio server on a port.
+
 `${KIP_NAS_PATH}` is required and is bind-mounted read-only into **both** the
 worker and the API service. The API opens the live source path for evidence
 freshness checks and `xlsx-read` range reads; without the bind every unit
@@ -140,6 +147,26 @@ healthchecks (the worker check proves PostgreSQL reachability with the
 worker's own credentials), and the API healthcheck targets `/readyz`, which
 performs a real database round-trip and answers 503 when PostgreSQL is
 unreachable. `/healthz` remains a process-liveness probe only.
+
+## Online source starter ZIP
+
+Use this path for a source handoff to an internet-connected developer or agent.
+It is deliberately smaller than the production release bundle and does not
+contain wheels, images, SBOM, provenance, deployment secrets, local state, or
+private evaluation data.
+
+```bash
+./scripts/build-starter-kit.sh
+./scripts/verify-starter-kit.sh dist/kip-starter-kit-$(cat VERSION).zip
+(cd dist && shasum -a 256 -c kip-starter-kit-$(cat ../VERSION).zip.sha256)
+```
+
+The builder refuses an existing output and a dirty source tree. Use
+`--allow-dirty` only for a named local candidate; the manifest records that
+state. A recipient verifies the external digest and ZIP before extraction,
+then runs `./scripts/bootstrap.sh` and `./scripts/verify.sh` inside the single
+versioned root. Do not substitute this source ZIP for the signed production
+bundle described below.
 
 ## Release artifacts
 
@@ -689,6 +716,28 @@ the launch/container network policy for egress denial. Disabling isolation is
 appropriate only for deterministic parser development and comparison, not a
 production sync. Search and `xlsx-read` never launch these workers.
 
+## PDF backend rollout and rollback
+
+New starter configs use:
+
+```toml
+[parsers.pdf]
+backend = "pdf_inspector"
+tables_enabled = true
+```
+
+`pdf-inspector` is installed by the extractor profile and must report version
+1.14.2. Before changing an existing corpus, run `parser reextract` as a shadow
+candidate and compare page/table counts, OCR reasons, exact locators, source
+hashes, and the same golden dataset. Activate only after the measured candidate
+passes. Roll back by setting `backend = "pymupdf"`, rerunning shadow extraction,
+and activating that candidate; do not edit active rows or stamp projections.
+
+The public acceptance measured six successful documents, 70 page units, 37
+table units, 13 OCR units on one garbled page, 4.82 s isolated sync versus
+15.58 s baseline, and identical lexical Recall@10/MRR of 1.0000/0.9861. This is
+a starter/pilot gate, not private-corpus table or OCR certification.
+
 ## PPTX parser validation
 
 Install the pinned extractor extra and include `.pptx` in the intended
@@ -712,7 +761,7 @@ reviewed runtime and pre-warms its Korean models:
 ./scripts/kordoc models --status
 ```
 
-The version must be exactly `4.7.3`; the `ppocr` group must report `allReady`
+The version must be exactly `4.8.0`; the `ppocr` group must report `allReady`
 and each detector, recognizer, and dictionary file must report `verified`.
 The reference configuration resolves the checked-in offline launcher:
 
@@ -724,7 +773,7 @@ timeout_seconds = 120
 enabled = true
 argv = ["kordoc", "--format", "json", "--ocr", "--silent"]
 version_argv = ["kordoc", "--version"]
-expected_version = "4.7.3"
+expected_version = "4.8.0"
 ```
 
 The launcher and production image set `KORDOC_OFFLINE=1` after the verified
@@ -733,9 +782,16 @@ binary, version drift, timeout, malformed JSON, or OCR failure makes the current
 extraction partial while retaining native PDF/PPTX units; it does not replace a
 previous active extraction.
 
+The installer downloads into the ignored versioned runtime
+`var/kordoc-4.8.0-r1` and the production image builds the same isolated npm
+root. Both override transitive `adm-zip` to 0.6.0 and `sharp` to 0.35.3; the
+resulting production dependency graph must report zero high-severity findings.
+Kordoc binaries and model caches are never part of the source starter ZIP.
+
 Existing deployments are not rewritten. To upgrade one, rerun
-`./scripts/install-kordoc.sh`, set `[parsers.ocr.kordoc].enabled = true` in its
-local `config/kip.toml`, and run `./scripts/doctor.sh` before a shadow sample.
+`./scripts/install-kordoc.sh`, set `[parsers.ocr.kordoc].enabled = true` and
+`expected_version = "4.8.0"` in its local `config/kip.toml`, and run
+`./scripts/doctor.sh` before a shadow sample.
 
 PPTX defaults accept at most 128 images, 20 MiB per image, 100 MiB total, and
 images at least 96x48 pixels. Adjust only after a read-only shadow sample. Check
@@ -771,6 +827,11 @@ source-derived RapidFuzz promotion; ADR-034 records why BM25 superseded it on
 the reviewed 19-case set.
 
 ## Dependency and model update watch
+
+The daily detector compares the exact `pdf-inspector` and Kordoc pins plus the
+embedding/reranker revisions with PyPI, npm, and Hugging Face metadata. An
+available version is only a candidate: rerun the matching PDF/parser shadow
+gate and preserve an exercised rollback before changing the pin.
 
 Dependabot proposes Python, GitHub Actions, and Docker updates weekly. The
 `upstream-watch` workflow runs daily at 09:00 KST and compares

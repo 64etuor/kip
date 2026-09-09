@@ -63,6 +63,11 @@ The default Compose profile is a local pilot profile. Before serving multiple us
   response cap against locally allocated real samples. Treat source read-only
   mounts and network denial as separate deployment gates.
 - Benchmark HWP adapters on real HWP/HWPX samples before selecting a default.
+- Before activating the `pdf_inspector` backend on an existing corpus, compare
+  it with `pymupdf` through shadow extraction on native text, mixed/scanned,
+  borderless/bordered/cross-page tables, broken encodings, and encrypted PDFs.
+  Require unchanged source hashes, exact page locators, no retrieval/ACL
+  regression, bounded RSS/output, and an exercised `pymupdf` rollback.
 - Keep previous extraction active until shadow output passes quality and contract tests.
 - Maintain 30-50 pilot golden questions, then at least 100 before broad rollout.
 - The current reviewed private retrieval set has 19 cases. It is below the
@@ -78,6 +83,10 @@ The default Compose profile is a local pilot profile. Before serving multiple us
 
 ## Operations
 
+- For an online source handoff, build and verify
+  `dist/kip-starter-kit-$(cat VERSION).zip`, retain its external SHA-256 file,
+  and confirm the recipient can bootstrap and run the verification suite after
+  extraction. Do not treat that source ZIP as signed deployment provenance.
 - Require the current commit to pass Python 3.12 and 3.13 CI, generated-contract
   and architecture checks, Ruff, mypy, runtime dependency audit, migrations,
   tests, and the 75% coverage floor.

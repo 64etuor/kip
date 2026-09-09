@@ -1,0 +1,64 @@
+{
+  "$defs": {
+    "StarterArchiveSource": {
+      "additionalProperties": false,
+      "properties": {
+        "git_commit": {
+          "title": "Git Commit",
+          "type": "string"
+        },
+        "tracked_changes": {
+          "title": "Tracked Changes",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "git_commit",
+        "tracked_changes"
+      ],
+      "title": "StarterArchiveSource",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "files": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Files",
+      "type": "object"
+    },
+    "root": {
+      "title": "Root",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "kip.starter-archive.v1",
+      "default": "kip.starter-archive.v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/StarterArchiveSource"
+    },
+    "version": {
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "version",
+    "created_at",
+    "root",
+    "files",
+    "source"
+  ],
+  "title": "StarterArchiveManifest",
+  "type": "object"
+}

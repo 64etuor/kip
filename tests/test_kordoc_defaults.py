@@ -3,16 +3,24 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import tomllib
 from pathlib import Path
 
 import pytest
 
-from kip.adapters.parsers.pdf import PdfParser
 from kip.adapters.parsers.pptx import PptxParser
 from kip.adapters.parsers.registry import ParserRegistry, raw_parser_by_key
 from kip.settings import Settings
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_extractor_profiles_pin_pdf_inspector() -> None:
+    with (ROOT / "pyproject.toml").open("rb") as handle:
+        project = tomllib.load(handle)["project"]
+
+    assert "pdf-inspector==1.14.2" in project["optional-dependencies"]["extractors"]
+    assert "pdf-inspector==1.14.2" in project["optional-dependencies"]["all"]
 
 
 @pytest.mark.parametrize(
@@ -33,9 +41,10 @@ def test_reference_configs_enable_pinned_kordoc_ocr_by_default(
 
     # Then Korean OCR is active and pinned for both image-bearing formats.
     assert kordoc["enabled"] is True
-    assert kordoc["expected_version"] == "4.7.3"
+    assert kordoc["expected_version"] == "4.8.0"
+    assert settings.get("parsers.pdf.backend") == "pdf_inspector"
     assert all(parser.__class__.__name__ == "IsolatedParserAdapter" for parser in registry.parsers)
-    assert isinstance(pdf, PdfParser)
+    assert pdf.__class__.__name__ == "PdfInspectorParser"
     assert isinstance(pptx, PptxParser)
     assert pdf._ocr is not None
     assert pptx._ocr is not None
@@ -106,7 +115,7 @@ def test_kordoc_installer_verifies_version_and_prewarms_models(tmp_path: Path) -
         """
 const fs = require("node:fs")
 if (process.argv.includes("--version")) {
-  console.log("4.7.3")
+  console.log("4.8.0")
 } else if (process.argv.includes("check-ocr-models")) {
   fs.mkdirSync(process.env.KORDOC_MODEL_CACHE, {recursive: true})
   fs.writeFileSync(process.env.KORDOC_MODEL_CACHE + "/ready", "true")
@@ -115,6 +124,16 @@ if (process.argv.includes("--version")) {
         encoding="utf-8",
     )
     model_cache = tmp_path / "models"
+    npm_log = tmp_path / "npm.log"
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    npm = fake_bin / "npm"
+    npm.write_text(
+        "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$KIP_NPM_LOG\"\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    npm.chmod(0o755)
 
     # When the default installer validates and prepares Kordoc.
     result = subprocess.run(
@@ -122,8 +141,10 @@ if (process.argv.includes("--version")) {
         cwd=ROOT,
         env={
             **os.environ,
+            "PATH": f"{fake_bin}:{os.environ['PATH']}",
             "KIP_KORDOC_INSTALL_ROOT": str(install_root),
             "KORDOC_MODEL_CACHE": str(model_cache),
+            "KIP_NPM_LOG": str(npm_log),
         },
         capture_output=True,
         text=True,
@@ -133,6 +154,9 @@ if (process.argv.includes("--version")) {
     # Then the verified package prewarms the selected model cache.
     assert result.returncode == 0, result.stderr
     assert (model_cache / "ready").read_text(encoding="utf-8") == "true"
+    npm_commands = npm_log.read_text(encoding="utf-8")
+    assert "overrides.adm-zip=0.6.0" in npm_commands
+    assert "overrides.sharp=0.35.3" in npm_commands
 
 
 def test_bootstrap_and_container_bake_the_same_pinned_kordoc_runtime() -> None:
@@ -142,13 +166,15 @@ def test_bootstrap_and_container_bake_the_same_pinned_kordoc_runtime() -> None:
 
     # When their Kordoc installation commands are inspected.
     bootstrap_installer = '"$SCRIPT_DIR/install-kordoc.sh"'
-    pinned_package = '"kordoc@${KORDOC_VERSION}"'
+    pinned_package = '"dependencies.kordoc=${KORDOC_VERSION}"'
 
-    # Then both default runtimes install 4.7.3 and prewarm Korean OCR models.
+    # Then both default runtimes install 4.8.0 and prewarm Korean OCR models.
     assert bootstrap_installer in bootstrap
-    assert "ARG KORDOC_VERSION=4.7.3" in dockerfile
+    assert "ARG KORDOC_VERSION=4.8.0" in dockerfile
+    assert "ARG KORDOC_ADM_ZIP_VERSION=0.6.0" in dockerfile
+    assert "ARG KORDOC_SHARP_VERSION=0.35.3" in dockerfile
     assert pinned_package in dockerfile
-    assert "kordoc check-ocr-models" in dockerfile
+    assert "node node_modules/kordoc/dist/cli.js check-ocr-models" in dockerfile
     assert "KORDOC_OFFLINE=1" in dockerfile
 
 
@@ -156,7 +182,7 @@ def test_doctor_requires_the_default_kordoc_runtime_and_korean_models() -> None:
     doctor = (ROOT / "scripts/doctor.sh").read_text(encoding="utf-8")
     required_checks = (
         'required "Node 18+ for Kordoc OCR"',
-        'required "Kordoc 4.7.3"',
+        'required "Kordoc 4.8.0"',
         'required "Kordoc PP-OCRv5 Korean models"',
     )
 

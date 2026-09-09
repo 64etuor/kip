@@ -52,7 +52,7 @@ def test_portable_production_gate_passes_the_real_application_pipeline() -> None
     assert portable_gate_failures(report) == []
 
 
-def test_required_private_gate_fails_closed_without_a_durable_corpus() -> None:
+def test_required_private_gate_fails_closed_without_required_evidence() -> None:
     # Given a protected-runner policy that requires private corpus evidence.
     environment = {
         **os.environ,
@@ -60,7 +60,7 @@ def test_required_private_gate_fails_closed_without_a_durable_corpus() -> None:
         "KIP_REQUIRE_PRIVATE_GOLDEN": "1",
     }
 
-    # When the private gate cannot reach a durable corpus.
+    # When the private files are absent or the configured repository is ephemeral.
     result = subprocess.run(
         [sys.executable, "scripts/golden_gate.py"],
         cwd=ROOT,
@@ -70,7 +70,14 @@ def test_required_private_gate_fails_closed_without_a_durable_corpus() -> None:
         check=False,
     )
 
-    # Then missing evidence blocks promotion instead of silently passing.
+    # Then the first missing requirement blocks promotion instead of passing.
     assert result.returncode == 1
     assert "FAILED" in result.stdout
-    assert "durable corpus" in result.stdout
+    private_dataset = ROOT / "evaluation/golden/private-onedrive-nl.yaml"
+    private_floor = ROOT / "evaluation/golden/private-onedrive-nl.floor.json"
+    expected_reason = (
+        "no durable corpus configured"
+        if private_dataset.exists() and private_floor.exists()
+        else "reviewed dataset or floor missing"
+    )
+    assert expected_reason in result.stdout

@@ -139,6 +139,10 @@ def build_config_payload(plan: SetupPlan, *, container: bool) -> JsonObject:
             "parser_timeout_seconds": 120,
             "minimum_quality_score": 0.70,
             "shadow_parse_critical_documents": True,
+            "pdf": {
+                "backend": "pdf_inspector",
+                "tables_enabled": True,
+            },
             "isolation": {
                 "enabled": True,
                 "wall_seconds": 180,
@@ -155,7 +159,7 @@ def build_config_payload(plan: SetupPlan, *, container: bool) -> JsonObject:
                     "enabled": True,
                     "argv": ["kordoc", "--format", "json", "--ocr", "--silent"],
                     "version_argv": ["kordoc", "--version"],
-                    "expected_version": "4.7.3",
+                    "expected_version": "4.8.0",
                 },
                 "pptx": {
                     "max_images": 128,

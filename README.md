@@ -1,113 +1,129 @@
-# KIP Knowledge Fabric Starter Kit v3.3
+# KIP 지식 패브릭 스타터킷 v3.4
 
-KIP is an agent-first, evidence-first foundation for indexing and retrieving company knowledge from NAS files, HWP/HWPX, PDF, PPTX, XLSX, Slack, and email. It supports two equal entry paths:
+KIP은 NAS 파일, HWP/HWPX, PDF, PPTX, XLSX, Slack, 이메일에 흩어진 회사
+지식을 색인하고 근거와 함께 검색하기 위한 에이전트 우선·증거 우선 기반입니다.
+두 진입 경로는 같은 애플리케이션 서비스를 사용합니다.
 
-- **Agent/terminal path:** stable CLI commands that emit versioned JSON.
-- **Application path:** REST/OpenAPI and optional MCP adapters backed by the same services.
+- **에이전트/터미널 경로:** 버전이 지정된 JSON을 출력하는 안정적인 CLI 명령
+- **애플리케이션 경로:** 동일한 서비스를 사용하는 REST/OpenAPI 및 선택형 MCP 어댑터
 
-The baseline runtime is PostgreSQL 18 with PostgreSQL-native lexical search. `pgvector` is installed by the reference image but semantic search remains disabled until an evaluation proves value. Neo4j is not canonical and is only a future read projection.
+기준 런타임은 PostgreSQL 18과 PostgreSQL 기본 lexical search입니다.
+`pgvector`는 기준 이미지에 설치되지만, 평가로 효용을 입증하기 전까지 semantic
+search는 비활성 상태입니다. Neo4j는 canonical store가 아니며 향후 선택형 read
+projection으로만 취급합니다.
 
-The approved target, current implementation, measured evidence, and remaining
-production gaps are separated in
-[`docs/PRODUCTION_DESIGN_ALIGNMENT.md`](docs/PRODUCTION_DESIGN_ALIGNMENT.md).
-Do not infer current readiness from PRD/TRD target language alone.
+승인된 목표, 현재 구현, 측정 근거, 남은 운영 격차는
+[`docs/PRODUCTION_DESIGN_ALIGNMENT.md`](docs/PRODUCTION_DESIGN_ALIGNMENT.md)에
+분리해 기록합니다. PRD/TRD의 목표 문구만 보고 현재 준비 상태를 추정하지 마세요.
 
-## 0. 처음 오셨나요? (Start here)
+## 검증된 소스 ZIP
 
-전문 용어 없이 요약하면, KIP은 **회사 문서를 모아 검색하고, 답변에 그 근거가
-된 원문 위치를 항상 함께 제시하는 시스템**입니다.
+인터넷 연결 환경에 소스와 필수 운영 문서만 전달하려면 작업 디렉터리를 직접
+압축하지 말고 결정적 스타터 ZIP을 만듭니다.
 
-- 용어가 어렵다면 → [`docs/GLOSSARY.md`](docs/GLOSSARY.md) (용어집, 한 줄 설명)
+```bash
+./scripts/build-starter-kit.sh
+./scripts/verify-starter-kit.sh dist/kip-starter-kit-$(cat VERSION).zip
+```
+
+ZIP은 하나의 버전 디렉터리 아래에 구현 코드, 잠긴 의존성, 테스트, migration,
+contract, ontology, 예제, 자동화, canonical 운영 문서를 담습니다. 로컬 설정,
+credential, DB, CAS/output, private 평가 자료, 내부 plan, 생성형 package metadata,
+릴리스 바이너리는 제외합니다. `STARTER-KIT-MANIFEST.json`, 내부 `SHA256SUMS`,
+외부 `.zip.sha256` 파일로 전달물을 독립적으로 검증할 수 있습니다. 정식 릴리스는
+clean tree에서 만들고, `--allow-dirty`는 이름이 명확한 로컬 candidate에만 씁니다.
+
+## 0. 처음 오셨나요?
+
+전문 용어 없이 요약하면 KIP은 **회사 문서를 모아 검색하고, 답변의 근거가 된
+원문 위치를 항상 함께 제시하는 시스템**입니다.
+
+- 용어가 어렵다면 → [`docs/GLOSSARY.md`](docs/GLOSSARY.md)
 - 설치부터 하고 싶다면 → [`docs/QUICKSTART.md`](docs/QUICKSTART.md)
 - 설치 후 매일 쓰는 법 → [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 
 가장 쉬운 설치 방법은 AI 에이전트에게 `KIP을 셋업해줘`라고 요청하는 것입니다.
-에이전트가 필요한 질문을 하나씩 물어보고 설정 파일을 대신 만들어 줍니다.
+에이전트가 필요한 질문을 하나씩 묻고 설정 파일을 생성합니다.
 
-**어떤 인터페이스를 쓰나요?** 셋 다 설치할 필요는 없습니다. 터미널에서 직접
-쓰면 CLI만으로 충분하고, 사내 다른 프로그램과 연동하려면 REST API를, Claude
-같은 AI 비서와 연결하려면 MCP를 쓰면 됩니다. 셋 다 내부 동작은 같습니다.
+세 인터페이스를 모두 설치할 필요는 없습니다. 터미널에서 직접 사용하면 CLI로
+충분하고, 사내 프로그램과 연동하려면 REST API를, Claude 같은 AI 비서와
+연결하려면 MCP를 사용합니다. 세 경로의 내부 동작과 권한 규칙은 같습니다.
 
-## 1. Repository guarantees
+## 1. 저장소가 보장하는 것
 
-- `AGENTS.md` and `CLAUDE.md` are at the project root.
-- `CLAUDE.md` imports `AGENTS.md` with `@AGENTS.md`.
-- NAS and connector sources are read-only.
-- Reference filesystem parsers run one document per bounded child process;
-  source permissions and network denial remain deployment controls.
-- HWP/HWPX uses the measured native `hwp-hwpx-parser` adapter first, with replaceable command and paired-PDF fallbacks.
-- XLSX uses shallow-all / deep-candidate retrieval.
-- PPTX preserves slide/shape structure, tables, chart caches, image metadata,
-  notes, comments, SmartArt text, and exact geometry without executing macros or
-  fetching external relationships.
-- CLI, REST, and MCP use the same application layer.
-- Search, graph, and embeddings are replaceable projections.
+- 프로젝트 루트에 `AGENTS.md`와 `CLAUDE.md`가 있습니다.
+- `CLAUDE.md`는 `@AGENTS.md`로 지침을 불러옵니다.
+- NAS와 connector 원본은 읽기 전용입니다.
+- 기준 filesystem parser는 문서마다 제한된 별도 child process에서 실행됩니다.
+  원본 권한과 network denial은 배포 계층에서 별도로 강제합니다.
+- HWP/HWPX는 측정된 `hwp-hwpx-parser`를 우선 사용하고, 교체 가능한 command와
+  paired-PDF fallback을 제공합니다.
+- PDF는 `pdf-inspector`를 기본으로 쓰며 선택적 PyMuPDF 표 fallback을 제공합니다.
+- XLSX는 shallow-all / deep-candidate 검색 전략을 사용합니다.
+- PPTX는 macro 실행이나 외부 relationship fetch 없이 slide/shape 구조, 표,
+  chart cache, image metadata, note, comment, SmartArt text, geometry를 보존합니다.
+- CLI, REST, MCP는 동일한 application layer를 사용합니다.
+- Search, graph, embedding은 다시 만들 수 있는 교체형 projection입니다.
 
-## 2. Agent-guided setup
+## 2. AI 에이전트 기반 설정
 
-On a new deployment, do not hand-edit configuration files by guesswork.
-Instead, give an AI agent a single instruction:
+새 배포에서 추측으로 설정 파일을 직접 편집하지 마세요. AI 에이전트에게 다음 한
+문장을 전달합니다.
 
 ```text
-KIP을 셋업해줘   (set up KIP)
+KIP을 셋업해줘
 ```
 
-Following `skills/kip-setup/SKILL.md`, the agent asks the questions returned by
-`kip setup inspect` strictly one at a time. It settles the organization
-workspace, identity verification, the absolute path of every folder to index
-with its extension/exclusion scope, classification, and ACL, the model egress
-policy, whether reviewed ontology relation mining is enabled, secret
-references, CAS/backup paths, the evaluation dataset, an empty starter or
-example ontology profile, explicit interaction-memory consent, and the
-ontology reviewers. It then previews file counts, sizes, extension
-distribution, exclusions, and symlinks, and only after the user approves the
-plan fingerprint and read-only mounts does it atomically generate and verify:
+에이전트는 `skills/kip-setup/SKILL.md`에 따라 `kip setup inspect`가 반환하는
+질문을 한 번에 하나씩 묻습니다. 조직 workspace, 신원 검증, 색인할 각 폴더의
+절대 경로와 확장자/제외 범위, classification, ACL, model egress, 검토형 ontology
+relation mining 사용 여부, secret reference, CAS/backup 경로, 평가 dataset,
+ontology profile, interaction-memory 동의, reviewer를 확정합니다. 이후 file count,
+크기, 확장자 분포, 제외 항목, symlink를 미리 보여주고 사용자가 plan fingerprint와
+read-only mount를 승인한 뒤 다음 파일을 원자적으로 생성·검증합니다.
 
-- `config/kip.generated.toml` (container paths, mounted by the compose override)
-- `config/kip.host.generated.toml` (host paths, used by the MCP adapter)
+- `config/kip.generated.toml`: container 경로
+- `config/kip.host.generated.toml`: host/MCP 경로
 - `compose.generated.yaml`
-- `.mcp.json` pointing at the generated host runtime configuration
+- 생성된 host config를 가리키는 `.mcp.json`
 
-Raw credentials never enter questions, state, plans, or generated files. Only
-`env:` references the runtime can resolve are recorded (`file:` is also allowed
-for the model credential); `keychain:`/`secret-manager:` are rejected. When no
-evaluation dataset exists, the receipt records that the install is usable but
-not production-promoted.
+질문, state, plan, 생성 파일에는 raw credential을 기록하지 않습니다. 런타임이
+해석할 수 있는 `env:` reference만 저장하고, model credential에 한해 `file:`도
+허용합니다. `keychain:`과 `secret-manager:`는 거부합니다. 평가 dataset이 없으면
+설치는 가능하지만 production-promoted 상태가 아니라는 제한을 receipt에 남깁니다.
 
-`setup apply`/`verify` only generate configuration. The deployment actually
-runs after `./scripts/migrate.sh`, `./scripts/app-up.sh` (which layers the
-generated compose override on the base file), `./scripts/kip sync run --source
-SOURCE`, and a search smoke test. The full acceptance procedure is in
-[`docs/STARTER_KIT_GUIDE.md`](docs/STARTER_KIT_GUIDE.md).
+`setup apply`와 `setup verify`는 설정만 생성합니다. 실제 배포는
+`./scripts/migrate.sh`, `./scripts/app-up.sh`, source sync, search smoke test까지
+실행해야 합니다. 전체 인수 절차는
+[`docs/STARTER_KIT_GUIDE.md`](docs/STARTER_KIT_GUIDE.md)를 따릅니다.
 
-## 3. Quick start - local development
+## 3. 로컬 개발 빠른 시작
 
-When adopting this kit in another organization or repository, follow
-[`docs/STARTER_KIT_GUIDE.md`](docs/STARTER_KIT_GUIDE.md) first. It bundles the
-per-environment decisions, the AI change contract, real-corpus acceptance
-tests, and the update-notification and promotion/rollback criteria into a
-single path.
+다른 조직이나 저장소에서 이 킷을 도입한다면 먼저
+[`docs/STARTER_KIT_GUIDE.md`](docs/STARTER_KIT_GUIDE.md)를 읽으세요. 환경별
+결정, AI 변경 계약, 실제 corpus 인수 테스트, update notification, 승격/rollback
+기준이 한 경로에 정리돼 있습니다.
 
-### 준비물 확인 (Prerequisites)
+### 준비물
 
-필요한 것: Python 3.12+, Node.js 18+, Docker(Compose 포함), 여유 디스크 공간
-**최소 10GB**(런타임 이미지 약 2GB + OCR 모델 약 0.8GB + Python 환경 약 1GB +
-데이터베이스). 시작 전에 아래를 그대로 붙여넣어 확인하세요.
+Python 3.12+, Node.js 18+, Docker Compose, 최소 10GB의 여유 디스크가
+필요합니다. 런타임 이미지 약 2GB, OCR 모델 약 0.8GB, Python 환경 약 1GB,
+데이터베이스 공간을 포함한 최소치입니다.
 
 ```bash
 python3 --version        # 3.12 이상
 node --version           # 18 이상
-docker compose version   # Docker Desktop이 설치되어 실행 중이어야 함
+docker compose version   # Docker Desktop 실행 상태
 df -h .                  # 여유 공간 10GB 이상
 ```
 
-**운영체제:** 이 저장소의 스크립트는 bash입니다. macOS와 Linux에서는 터미널에서
-바로 실행됩니다. **Windows에서는 PowerShell/cmd가 아니라 WSL2(Ubuntu) 안에서**
-실행하세요(관리자 PowerShell에서 `wsl --install` 후 재부팅). 한 줄이라도 실패하면
-[`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)를 보세요.
+스크립트는 bash를 사용합니다. macOS와 Linux에서는 바로 실행할 수 있고,
+Windows에서는 PowerShell/cmd가 아니라 WSL2 Ubuntu 안에서 실행해야 합니다.
+한 줄이라도 실패하면 [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)를
+확인하세요.
 
-Bootstrap installs the pinned Kordoc OCR runtime and verifies the Korean model
-cache; normal indexing never downloads parser packages or models at runtime.
+Bootstrap은 고정된 Kordoc OCR runtime과 한국어 model cache를 설치·검증합니다.
+정상 색인 중에는 parser package나 model을 내려받지 않습니다.
 
 ```bash
 cp .env.example .env
@@ -120,39 +136,38 @@ cp config/kip.example.toml config/kip.toml
 ./scripts/test.sh
 ```
 
-Index the bundled sample data:
+포함된 sample data를 색인합니다.
 
 ```bash
-./scripts/kip sync run \
-  --source sample
+./scripts/kip sync run --source sample
 
 ./scripts/kip search "참여율 변경 승인" --limit 10
 ./scripts/kip context "정산 증빙 제출기한" --limit 5
 ```
 
-### 잘 됐는지 확인하는 법 (Did it work?)
+### 정상 동작 확인
 
-성공이라면 `search` 결과 JSON에 `"ok": true`가 있고 `data.results` 배열에 항목이
-최소 1개 있습니다. 결과가 비어 있다면 순서대로 확인하세요.
+성공하면 `search` 결과 JSON에 `"ok": true`가 있고 `data.results` 배열에 항목이
+하나 이상 있습니다. 결과가 비어 있다면 다음 순서로 확인합니다.
 
 ```bash
-./scripts/kip status   # data.content_units 가 0보다 커야 합니다(0이면 아직 색인 전)
-./scripts/kip doctor   # ok:false 인 항목의 reason 이 다음에 할 일을 알려줍니다
+./scripts/kip status   # data.content_units가 0보다 커야 함
+./scripts/kip doctor   # ok:false 항목의 reason 확인
 ```
 
-`content_units`가 0이면 `./scripts/kip sync run --source sample`을 먼저
-실행했는지 확인하세요. 그래도 막히면
-[`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)를 보세요.
+`content_units`가 0이면 `./scripts/kip sync run --source sample`을 먼저 실행했는지
+확인하세요. 계속 막히면 [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)를
+참조하세요.
 
-## 4. Run as an application
+## 4. 애플리케이션으로 실행
 
-Start the API locally:
+로컬 API를 시작합니다.
 
 ```bash
 ./scripts/api.sh
 ```
 
-Then call it from another app:
+다른 애플리케이션에서 호출합니다.
 
 ```bash
 curl -sS http://127.0.0.1:8080/v1/search \
@@ -161,9 +176,11 @@ curl -sS http://127.0.0.1:8080/v1/search \
   -d '{"query":"협약 변경 승인","limit":5}'
 ```
 
-A Python client is included at `sdk/python/kip_client.py`. OpenAPI is generated from the FastAPI app and checked into `contracts/openapi.json` during release verification.
+Python client는 `sdk/python/kip_client.py`에 있습니다. OpenAPI는 FastAPI app에서
+생성되며 release 검증 시 `contracts/openapi.json`에 기록됩니다.
 
-External applications can also push normalized source changes through the connector endpoint:
+외부 애플리케이션은 connector endpoint로 정규화된 source 변경을 전달할 수도
+있습니다.
 
 ```bash
 curl -sS http://127.0.0.1:8080/v1/connectors/events \
@@ -173,71 +190,99 @@ curl -sS http://127.0.0.1:8080/v1/connectors/events \
   --data-binary @examples/connector/event.json
 ```
 
-At an internet boundary, arbitrary workspace, principal, and ACL headers are
-never trusted. API-key bootstrap uses the single principal pinned in
-configuration; multi-user deployments derive workspace and scopes from
-verified JWT claims.
+인터넷 경계에서는 임의의 workspace, principal, ACL header를 신뢰하지 않습니다.
+API-key bootstrap은 config에 고정된 단일 principal을 사용하고, 다중 사용자 배포는
+검증된 JWT claim에서 workspace와 scope를 가져옵니다. 애플리케이션은 PostgreSQL이나
+선택형 graph projection에 직접 연결하지 말고 CLI/REST/MCP와 동일한 application
+service layer를 사용해야 합니다.
 
-CLI, REST, MCP, and connector events all enter the same application service layer. Applications must not connect directly to PostgreSQL or an optional graph projection.
+## 5. Claude Code와 MCP
 
-## 5. Claude Code and MCP
-
-Claude Code loads root `CLAUDE.md`, which imports `AGENTS.md`. The project skill lives at:
+Claude Code는 루트 `CLAUDE.md`를 읽고, 이 파일은 `AGENTS.md`를 import합니다.
+프로젝트 skill은 다음 경로에 있습니다.
 
 ```text
 .claude/skills/knowledge-fabric/SKILL.md
 ```
 
-The root `.mcp.json` starts the optional stdio MCP adapter without embedding secrets in the file. Guided setup rewrites it atomically to select the host-path `config/kip.host.generated.toml` (the container-path `config/kip.generated.toml` is for the compose services) and preserves the previous file. `./scripts/bootstrap.sh` installs the MCP and identity runtimes. For a standalone package install, select the MCP extra explicitly:
+루트 `.mcp.json`은 secret을 넣지 않고 선택형 stdio MCP adapter를 시작합니다.
+AI 기반 setup은 이 파일을 원자적으로 갱신해 host 경로용
+`config/kip.host.generated.toml`을 선택하고 이전 파일을 보존합니다. Container 경로용
+`config/kip.generated.toml`과 혼동하지 마세요. 저장소 checkout에서는 MCP extra를
+명시적으로 선택할 수 있습니다.
 
 ```bash
-python -m pip install 'kip-knowledge-fabric[mcp]'
+uv sync --extra mcp
 ```
 
-MCP is optional; the CLI remains the lowest-dependency agent interface.
-Set `KIP_WORKSPACE`, `KIP_PRINCIPAL_ID`, and `KIP_ACL_SCOPES` in the environment used by the MCP client so MCP retrieval receives the same authorization context as CLI and REST calls. Set `KIP_ROLES=admin` only for a verified reviewer that must list or review ontology-discovery candidates.
+Adapter는 안정화된 MCP 2.x SDK를 사용하고 KIP package version을 보고하며, 현재
+protocol과 SDK가 지원하는 legacy client를 협상합니다. Tool 결과는 계속
+`kip.envelope.v1`이고 MCP metadata는 권한 계약이 아닙니다. 제공 adapter는 stdio
+전용이며 sampling, elicitation, roots, protocol logging을 사용하지 않습니다.
 
-## 6. Connect real sources
+MCP client 실행 환경에 `KIP_WORKSPACE`, `KIP_PRINCIPAL_ID`, `KIP_ACL_SCOPES`를
+설정해 CLI/REST와 동일한 authorization context를 사용하세요. 검증된 reviewer가
+ontology discovery를 검토할 때만 `KIP_ROLES=admin`을 설정합니다.
 
-Edit `config/kip.toml` and `.env`.
+## 6. 실제 source 연결
 
-For an AI-operated real-corpus run, read [`docs/AI_OPERATOR_RUNBOOK.md`](docs/AI_OPERATOR_RUNBOOK.md) after the root agent files and contract documents.
+`config/kip.toml`과 `.env`를 편집합니다. AI가 실제 corpus를 운영한다면 루트 agent
+지침과 contract 문서 다음으로
+[`docs/AI_OPERATOR_RUNBOOK.md`](docs/AI_OPERATOR_RUNBOOK.md)를 읽어야 합니다.
 
 ### NAS
 
-Mount NAS paths read-only. For Docker app mode, set `KIP_NAS_PATH` and Compose mounts it at `/sources/nas:ro`.
+NAS 경로는 읽기 전용으로 mount합니다. Docker app mode에서는 `KIP_NAS_PATH`를
+설정하며 Compose가 이를 `/sources/nas:ro`에 mount합니다.
 
 ### HWP/HWPX
 
-Reference parser order:
+기준 parser 순서는 다음과 같습니다.
 
-1. native `hwp-hwpx-parser` adapter with bounded evidence units;
-2. disabled-by-default, preinstalled `kordoc`/`unhwp` subprocess broker;
-3. paired PDF fallback;
-4. manual review when all parsers fail.
+1. 제한된 evidence unit을 만드는 native `hwp-hwpx-parser`
+2. 기본 비활성 상태의 사전 설치 `kordoc`/`unhwp` subprocess broker
+3. paired PDF fallback
+4. 모든 parser 실패 시 수동 검토
 
-Parser binaries are not hidden inside Core. Existing HWP/HWPX indexes can be
-evaluated and promoted without a full source sync:
+Parser binary는 Core에 숨겨 넣지 않습니다. 기존 HWP/HWPX index는 전체 source sync
+없이 평가하고 승격할 수 있습니다.
 
 ```bash
 ./scripts/kip parser reextract --source SOURCE_NAME
 ./scripts/kip parser reextract --source SOURCE_NAME --activate
 ```
 
-The first command is non-mutating shadow work. The second retains the previous
-extraction and swaps the active PostgreSQL/lexical state per document only
-after revision, hash, ACL, classification, and quality checks. See
-`docs/CONNECTORS.md`.
+첫 명령은 non-mutating shadow 작업입니다. 두 번째 명령은 revision, hash, ACL,
+classification, quality를 확인한 뒤 문서별로 이전 extraction을 보존하면서 active
+PostgreSQL/lexical state를 교체합니다. 자세한 내용은 `docs/CONNECTORS.md`를
+참조하세요.
+
+### PDF
+
+새 starter profile은 로컬 `pdf-inspector` 1.14.2로 구조화된 page Markdown,
+layout/table signal, page별 OCR routing을 만듭니다. 유효한 Markdown table은
+`pdf_table` evidence가 되고, 표가 감지됐지만 구조화 Markdown이 없으면 그
+page에만 PyMuPDF `lines_strict` fallback을 적용합니다. 기존 `pymupdf` backend는
+rollback 경로로 유지합니다.
+
+```toml
+[parsers.pdf]
+backend = "pdf_inspector" # 또는 "pymupdf"
+tables_enabled = true     # pymupdf rollback backend에서 사용
+```
+
+기존 PDF index는 operator가 shadow re-extraction을 실행하고 candidate를 명시적으로
+활성화하기 전까지 바뀌지 않습니다. 원본 파일은 항상 읽기 전용입니다.
 
 ### PPTX
 
-The pinned `extractors` extra installs `python-pptx`. Filesystem sources that
-include `.pptx` emit shape-level evidence with exact slide/shape locators;
-merged tables, chart caches, image hashes/alt text, groups, speaker notes,
-legacy comments, and SmartArt text remain structured. Embedded OLE, media
-transcription, modern threaded comments, and legacy `.ppt` are explicit
-limitations rather than silent text loss. The reference profiles enable local
-Korean OCR for scanned PDF candidates and PPTX pictures:
+고정된 `extractors` extra가 `python-pptx`를 설치합니다. `.pptx`를 포함한 source는
+정확한 slide/shape locator를 가진 shape-level evidence를 만들며 merged table,
+chart cache, image hash/alt text, group, speaker note, legacy comment, SmartArt text를
+구조화해 보존합니다. Embedded OLE, media transcription, modern threaded comment,
+legacy `.ppt`는 조용히 유실하지 않고 명시적 제한으로 기록합니다.
+
+기준 profile은 scanned PDF candidate와 PPTX image에 로컬 한국어 OCR을 사용합니다.
 
 ```bash
 ./scripts/install-kordoc.sh
@@ -245,108 +290,105 @@ Korean OCR for scanned PDF candidates and PPTX pictures:
 KORDOC_OFFLINE=1 ./scripts/kip sync run --source company-nas
 ```
 
-Bootstrap and the production image verify every PP-OCRv5 Korean file before
-indexing. KIP requires exact Kordoc 4.7.3, rejects runtime `npm`/`npx` commands,
-bounds PPTX image batches, and keeps native evidence when OCR fails. Recognition
-output is candidate evidence; review low-confidence warnings before making
-material claims. Existing deployments keep their current `config/kip.toml`;
-rerun bootstrap and opt in explicitly when upgrading an older configuration.
+Bootstrap과 production image는 색인 전에 모든 PP-OCRv5 Korean 파일을 검증합니다.
+KIP은 Kordoc 4.8.0만 허용하고 runtime `npm`/`npx` 명령을 거부하며 PPTX image
+batch를 제한합니다. OCR 실패 시에도 native evidence는 유지됩니다. 인식 결과는
+candidate evidence이므로 중요한 주장 전에 low-confidence warning을 검토하세요.
+기존 배포는 현재 `config/kip.toml`을 유지하므로 bootstrap을 다시 실행한 뒤
+의도적으로 opt-in해야 합니다.
 
 ### Slack
 
-Set `KIP_SLACK_BOT_TOKEN` and configure allowed conversation IDs. The connector uses Slack APIs as a source sync mechanism; local search does not depend on Slack search.
+`KIP_SLACK_BOT_TOKEN`과 허용 conversation ID를 설정합니다. Connector는 Slack
+API를 source sync에만 사용하며 로컬 search는 Slack search에 의존하지 않습니다.
 
 ### Apple Mail
 
-The macOS host adapter uses JXA through `osascript`. It requires explicit Mail Automation permission and account/mailbox allowlists. It does not read Mail's private database directly.
+macOS host adapter는 `osascript`를 통한 JXA를 사용합니다. 명시적인 Mail
+Automation 권한과 account/mailbox allowlist가 필요하며 Mail의 private DB를 직접
+읽지 않습니다.
 
 ### IMAP
 
-Use an app password or organization-approved credential. The connector uses UID cursors and stores RFC Message-ID as the stable message identity where available.
+App password 또는 조직이 승인한 credential을 사용합니다. Connector는 UID
+cursor를 사용하고 가능한 경우 RFC Message-ID를 안정적인 message identity로
+저장합니다.
 
-## 7. Ontology curation loop
+## 7. Ontology 검토 루프
 
-Model, parser, and relation-miner outputs are candidates until a human approves
-them; nothing is silently promoted to a fact. The agent-mediated loop is:
+Model, parser, relation-miner 출력은 사람이 승인하기 전까지 candidate입니다.
+어떤 결과도 사실로 조용히 승격하지 않습니다.
 
 ```bash
-./scripts/kip ontology mine --unit-id UNIT_ID    # propose candidates from indexed evidence
-./scripts/kip jobs list                          # mining job status, per-proposal skip reasons
-./scripts/kip review list                        # triaged listing: risk desc, confidence desc,
-                                                 # display names, Korean labels, evidence quotes
-./scripts/kip review approve CANDIDATE_ID        # --supersede-contradicted to resolve conflicts
-./scripts/kip review revoke ASSERTION_ID --note "reason"   # undo an approval
+./scripts/kip ontology mine --unit-id UNIT_ID
+./scripts/kip jobs list
+./scripts/kip review list
+./scripts/kip review approve CANDIDATE_ID
+./scripts/kip review revoke ASSERTION_ID --note "reason"
 ```
 
-Relation candidates can only reference already-approved entities, so mining is
-two-pass: mine, approve entity candidates, mine again, approve relations
-(approving entities changes the mining digest, so the re-run is real). Approved
-entities expand search aliases; approved assertions feed `kip answer`/`kip
-context` with exact evidence and are dropped automatically when their source
-changes. The same operations are exposed over REST and MCP
-(`kip_jobs`, `kip_ontology_assertion_revoke`). See `docs/ONTOLOGY_GUIDE.md`.
+Relation candidate는 승인된 entity만 참조하므로 mine → entity 승인 → 다시 mine →
+relation 승인 순서로 진행합니다. Entity 승인은 mining digest를 바꾸므로 두 번째
+실행은 실제 재평가입니다. 승인된 entity는 search alias를 확장하고, 승인 assertion은
+exact evidence와 함께 `kip answer`/`kip context`에 들어갑니다. Source가 바뀌면
+자동으로 제외됩니다. 동일 기능은 REST와 MCP에도 제공됩니다. 자세한 내용은
+`docs/ONTOLOGY_GUIDE.md`를 참조하세요.
 
-## 8. Operations
+## 8. 운영
 
-- `GET /readyz` performs a real database round-trip (the production compose
-  healthcheck targets it); `/healthz` stays liveness-only.
-- `./scripts/ops-report.sh` checks failed jobs, queue age, last successful
-  sync, disk free, backup age, and API health in one command (`--json`,
-  `KIP_OPS_WEBHOOK` for failure notifications).
-- `./scripts/backup.sh --retain N` produces sealed, checksum-verified backups
-  with retention pruning; `./scripts/install-launchd.sh` schedules daily
-  backups, periodic sync, optional ops reports, and generates a newsyslog
-  rotation policy on macOS (`--dry-run` to preview).
-- Files deleted from a filesystem source are tombstoned only after they stay
-  absent for `[sync] deletion_grace_scans` consecutive complete scans
-  (default 2); failed or empty scans never trigger deletion, and reappearing
-  files re-index automatically. Directory walk errors fail the scan, while
-  settle/filter/size/symlink-policy deferrals remain present and cannot become
-  false tombstones.
+- `GET /readyz`는 실제 DB round-trip을 수행하고 production compose healthcheck가
+  이를 사용합니다. `/healthz`는 liveness 전용입니다.
+- `./scripts/ops-report.sh`는 failed job, queue age, 마지막 성공 sync, disk free,
+  backup age, API health를 확인합니다. `--json`과 실패 알림용
+  `KIP_OPS_WEBHOOK`을 지원합니다.
+- `./scripts/backup.sh --retain N`은 seal과 checksum이 있는 backup을 만들고
+  retention을 적용합니다. `./scripts/install-launchd.sh`는 macOS에서 daily backup,
+  periodic sync, 선택형 ops report, newsyslog rotation policy를 설정합니다.
+- Filesystem source에서 삭제된 파일은 `[sync] deletion_grace_scans`번의 연속된
+  complete scan에서 계속 없을 때만 tombstone됩니다. 기본값은 2입니다. Failed/empty
+  scan은 삭제 근거가 아니며 다시 나타난 파일은 자동 재색인됩니다. Directory walk
+  오류는 scan을 실패시키고 settle/filter/size/symlink-policy 보류 파일은 present로
+  유지합니다.
 
-Details are in `docs/OPERATIONS.md` and `docs/AI_OPERATOR_RUNBOOK.md`.
+세부 절차는 `docs/OPERATIONS.md`와 `docs/AI_OPERATOR_RUNBOOK.md`에 있습니다.
 
-## 9. Deployment profiles
+## 9. 배포 profile
 
-| Profile | Contents |
+| Profile | 구성 |
 |---|---|
-| Minimal | PostgreSQL, filesystem source, lexical search, CLI |
-| Standard | Minimal + API, worker, HWP broker, Slack/Mail optional connectors |
-| Expanded | Standard + explicitly activated semantic retrieval, relation miner, optional Neo4j projection; review remains headless CLI/API |
+| 최소 | PostgreSQL, filesystem source, lexical search, CLI |
+| 표준 | 최소 profile + API, worker, HWP broker, 선택형 Slack/Mail connector |
+| 확장 | 표준 + opt-in semantic/관계 추출/Neo4j. 검토는 CLI/API로 제공 |
 
-## 10. Important limitations of this starter
+## 10. 현재 제한 사항
 
-This is an implementation-ready starter, not a claim that every production
-adapter is complete. The filesystem, text, PDF, XLSX shallow/deep path, memory
-repository, CLI/API contracts, PostgreSQL migrations, and pgvector shadow path
-are concrete; the local semantic path has been validated on the documented
-Apple Silicon pilot but remains shadow-only for the private corpus. Slack,
-Apple Mail, IMAP, and Neo4j remain environment-specific reference adapters;
-the stdio MCP adapter is implemented and uses the shared application services.
-The supported PostgreSQL reference profile includes pgvector and the 1024d HNSW
-index even while semantic search is disabled; installation is not activation.
-Existing unchanged HWP and HWPX revisions use the explicit
-shadow/activate re-extraction workflow when parser versions change; no generic
-all-format forced re-index command is exposed.
+이 저장소는 구현 가능한 starter이지 모든 production adapter가 완성됐다는 주장이
+아닙니다. Filesystem, text, PDF, XLSX shallow/deep, memory repository, CLI/API
+contract, PostgreSQL migration, pgvector shadow path는 구현돼 있습니다. 로컬 semantic
+path는 문서화된 Apple Silicon pilot에서 검증됐지만 private corpus에서는 계속
+shadow-only입니다. Slack, Apple Mail, IMAP, Neo4j는 환경별 reference adapter입니다.
+stdio MCP adapter는 동일 application service를 사용하도록 구현돼 있습니다.
 
-The starter lexical path locally reranks up to 40 ACL-filtered candidates with
-candidate-local BM25; RapidFuzz 3.14.5 is the fallback. On the reviewed 19-case
-private set, the final BM25 configuration reached Recall@10/MRR
-`0.789/0.646` versus RapidFuzz `0.737/0.576`. This is retrieval evidence, not
-reviewed answer or ontology quality evidence; reranking cannot recover a
-document absent from the lexical candidate set.
+지원하는 PostgreSQL profile은 semantic search가 꺼져 있어도 pgvector와 1024d HNSW
+index를 포함합니다. 설치는 활성화가 아닙니다. 변경되지 않은 HWP/HWPX revision은
+parser version이 바뀔 때 명시적 shadow/activate re-extraction을 사용합니다. 모든
+format을 강제로 다시 색인하는 일반 명령은 제공하지 않습니다.
 
-Run `./scripts/verify.sh` before modifying or deploying the project.
+Starter lexical path는 ACL-filtered candidate 최대 40개를 candidate-local BM25로
+rerank하며 RapidFuzz 3.14.5를 fallback으로 사용합니다. 검토된 private 19-case에서
+최종 BM25는 Recall@10/MRR `0.789/0.646`, RapidFuzz는 `0.737/0.576`이었습니다.
+이는 retrieval 근거이지 answer 또는 ontology 품질 근거가 아닙니다. Lexical candidate
+set에 없는 문서는 reranking으로 복구할 수 없습니다.
 
-Dependency PRs and parser/model upstream notifications are candidate-discovery
-features. No update activates automatically; every one must pass shadow
-evaluation and human promotion approval.
+수정이나 배포 전에 `./scripts/verify.sh`를 실행하세요. Dependency PR과 parser/model
+upstream 알림은 candidate discovery일 뿐 자동 활성화가 아닙니다. 모든 변경은 shadow
+평가와 사람의 승격 승인을 거쳐야 합니다.
 
-## 11. Reproducible RAG scorecard
+## 11. 재현 가능한 RAG scorecard
 
-KIP includes a licensed Korean public pilot, an isolated local model sidecar,
-pgvector shadow spaces, lexical/vector/hybrid/reranked evaluation, and
-timestamped JSON/Markdown reports.
+KIP에는 라이선스가 명확한 한국어 공개 pilot, 격리된 로컬 model sidecar,
+pgvector shadow space, lexical/vector/hybrid/reranked 평가, timestamped JSON/Markdown
+report가 포함돼 있습니다.
 
 ```bash
 make fetch-corpus
@@ -356,7 +398,7 @@ make fetch-corpus
 ./scripts/semantic-server.sh run
 ```
 
-Then, from another terminal:
+다른 터미널에서 실행합니다.
 
 ```bash
 ./scripts/kip projection rebuild --name semantic
@@ -364,17 +406,17 @@ Then, from another terminal:
 make evaluate
 ```
 
-The current public result keeps semantic search disabled: corrected lexical
-retrieval reached Recall@10 and MRR 1.000 with zero ACL leaks, while the
-semantic variants did not improve quality. The historical reviewed private
-`c4000` result is different: vector-only Recall@10/MRR reached `0.947/0.822` versus lexical
-`0.789/0.646`, with HNSW P95 `133.75 ms` and zero ACL leaks. Stale-warning
-coverage is absent, and the current 12,000-character `c12000` identity has not
-been rebuilt/evaluated, so semantic search remains disabled under the
-fail-closed gate.
-Exact results, latency, fingerprints, target gaps,
-and improvement history are in `docs/PRODUCTION_DESIGN_ALIGNMENT.md`,
-`docs/RAG_EVALUATION.md` and `evaluation/reports/`.
+현재 공개 결과에서는 semantic search를 비활성 상태로 유지합니다. 수정된 lexical
+retrieval은 ACL 누출 없이 Recall@10과 MRR 1.000을 기록했으며 semantic variant는
+품질을 개선하지 못했습니다. 역사적으로 검토된 private `c4000` 결과는 다릅니다.
+Vector-only Recall@10/MRR은 `0.947/0.822`, lexical은 `0.789/0.646`, HNSW P95는
+`133.75 ms`, ACL 누출은 0이었습니다. 현재 12,000-character `c12000` identity는
+아직 rebuild/evaluate되지 않았고 stale-warning coverage도 없으므로 fail-closed
+gate에 따라 semantic search는 비활성 상태입니다.
 
-The loaded-corpus parser, retrieval, semantic, graph, and ontology audit is in
-[`docs/RAG_QUALITY_AUDIT_2026-08-06.md`](docs/RAG_QUALITY_AUDIT_2026-08-06.md).
+정확한 결과, latency, fingerprint, target gap, 개선 이력은
+`docs/PRODUCTION_DESIGN_ALIGNMENT.md`, `docs/RAG_EVALUATION.md`,
+`evaluation/reports/`에 있습니다. 전체 corpus의 parser, retrieval, semantic,
+graph, ontology audit는
+[`docs/RAG_QUALITY_AUDIT_2026-08-06.md`](docs/RAG_QUALITY_AUDIT_2026-08-06.md)에
+기록돼 있습니다.

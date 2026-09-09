@@ -21,7 +21,7 @@ _JSON_OBJECT: Final[TypeAdapter[JsonObject]] = TypeAdapter(JsonObject)
 class KordocOcrConfig:
     argv: tuple[str, ...]
     version_argv: tuple[str, ...] = ()
-    expected_version: str = "4.7.3"
+    expected_version: str = "4.8.0"
     timeout_seconds: int = 120
 
 
@@ -79,7 +79,7 @@ def probe_kordoc_version(config: KordocOcrConfig) -> KordocVersionProbe:
 
 class KordocOcrAdapter:
     name = "kordoc-ppocrv5-korean"
-    version = "4.7.3"
+    version = "4.8.0"
 
     def __init__(self, config: KordocOcrConfig) -> None:
         self._config = config

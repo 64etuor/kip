@@ -1,6 +1,6 @@
 # ADR-042: Korean OCR enriches candidate pages and presentation images
 
-- **Status:** Accepted
+- **Status:** Accepted; runtime version pin superseded by ADR-053
 - **Date:** 2026-08-14
 
 ## Context

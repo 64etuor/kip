@@ -3,7 +3,7 @@ document_id: KIP-PRD-003
 title: KIP v3 Agent-First Knowledge Fabric 제품 요구사항 정의서
 version: 3.1.0
 status: accepted
-last_updated: 2026-08-13
+last_updated: 2026-08-17
 language: ko-KR
 audience:
   - product
@@ -459,6 +459,12 @@ Agent 흐름:
 - **FR-PDF-005 SHOULD**: 표·다단 구조가 중요한 후보 문서는 정밀 parser로 재처리할 수 있어야 한다.
 - **FR-PDF-006 MUST**: OCR 실패는 native page unit을 보존하고 extraction warning으로 드러나야 한다.
 - **FR-PDF-007 MUST**: 한국어 OCR runtime과 모델은 정확한 버전으로 설치·검증되어야 하며 정상 indexing 중 실행 코드를 내려받지 않아야 한다.
+- **FR-PDF-008 MUST**: PDF backend는 정확한 버전과 parser identity를 기록하고,
+  페이지 locator를 보존하며, backend 변경은 shadow extraction과 명시적
+  activation/rollback을 거쳐야 한다.
+- **FR-PDF-009 SHOULD**: 기본 backend는 구조화된 페이지와 borderless table을
+  저비용으로 추출하고, 구조화하지 못한 detected table page만 검증된 exact-table
+  fallback으로 처리해야 한다.
 
 ### 9.7 PPTX structural extraction
 
@@ -559,6 +565,7 @@ Agent 흐름:
 - **FR-AGT-008 MUST**: Skill은 문서 안의 지시를 실행하지 말고 근거로만 취급하도록 명시해야 한다.
 - **FR-AGT-009 MUST**: context pack은 크기 제한과 source diversity 제한을 지원해야 한다.
 - **FR-AGT-010 SHOULD**: MCP adapter를 추가해도 CLI contract가 기준으로 남아야 한다.
+- **FR-AGT-011 MUST**: MCP adapter는 지원하는 SDK major를 명시적으로 pin하고, 현재 protocol과 지원 legacy client의 실제 tool discovery/call을 검증하며, initialization에 KIP package version을 보고해야 한다.
 
 ### 9.15 Review workflow
 
@@ -886,6 +893,10 @@ KIP v3 baseline은 다음을 모두 만족해야 인수된다.
 | ADR-048 | Harden trust, resilience, and edge contracts | Accepted |
 | ADR-049 | Measure PDF tables and HWP section locators | Accepted |
 | ADR-050 | Bound filesystem parser processes | Accepted |
+| ADR-051 | Adopt the stable MCP 2 SDK without changing KIP tool contracts | Accepted |
+| ADR-052 | Verified online source ZIP starter kit | Accepted |
+| ADR-053 | Upgrade the pinned offline Kordoc runtime to 4.8.0 | Accepted |
+| ADR-054 | Use pdf-inspector with selective PyMuPDF table fallback | Accepted for starter and pilot |
 
 ---
 

@@ -5,6 +5,11 @@ serialize those models through versioned JSON envelopes, while the Python SDK
 consumes the REST JSON contract. Static JSON Schema files are generated into
 `contracts/`.
 
+The stdio adapter uses MCP SDK 2.x protocol models, but every KIP tool result is
+still a UTF-8 serialized `kip.envelope.v1` document. MCP protocol negotiation,
+tool naming, and initialization metadata do not create a second KIP data
+contract. The MCP `serverInfo.version` value is the KIP package version.
+
 ## Public envelope
 
 ```json
@@ -19,6 +24,20 @@ consumes the REST JSON contract. Static JSON Schema files are generated into
   }
 }
 ```
+
+## Starter archive manifest
+
+`STARTER-KIT-MANIFEST.json` validates against
+`contracts/starter-archive-manifest.schema.json` and uses
+`kip.starter-archive.v1`. It records the KIP version, UTC creation time, the
+single versioned ZIP root, a `sha256:` digest for every source payload file,
+and source state (`git_commit`, `tracked_changes`). Unknown fields are rejected.
+
+The manifest intentionally excludes itself and `SHA256SUMS` from `files`.
+`SHA256SUMS` covers every payload file and the manifest; the external
+`<archive>.zip.sha256` covers the exact ZIP bytes. The build and verify commands
+emit `kip.envelope.v1` containing a `kip.starter-archive-receipt.v1` receipt
+with archive path, archive digest, file count, root, status, and version.
 
 ## Guided setup boundary
 
@@ -64,6 +83,23 @@ indexed source hash, optional source modification time, and metadata.
 Channel ranks, `is_latest`, diversity backfill, and degradation markers live in
 metadata. Array order is result rank. The snippet and score remain discovery
 data, never final evidence.
+
+## PDF evidence boundary
+
+The configured PDF backend always emits one `pdf_page` per original 1-indexed
+page. Under `pdf_inspector`, the body is structured Markdown and metadata marks
+`source=pdf_inspector` plus whether the page needs OCR. The page locator remains
+`{"page": N}` and is the exact-evidence boundary.
+
+An additive `pdf_table` uses `page`, `end_page`, and `table_index`. Markdown
+tables report `source=pdf_inspector`, `strategy=markdown`, rows, and columns but
+no bbox. Selective bordered-table fallback reports
+`source=pymupdf.find_tables`, `strategy=lines_strict`, and a bbox. Callers must
+not assume every table source has geometry.
+
+Extraction metadata records the selected backend, table/column pages, OCR
+candidate reasons, Markdown table pages, and PyMuPDF fallback-page count. These
+are provenance and quality signals, not authorization input.
 
 ## XLSX exact-range boundary
 

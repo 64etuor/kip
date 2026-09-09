@@ -182,12 +182,10 @@ cpu_threads = 4
 nice = 5
 
 [parsers.pdf]
-# Additive pdf_table evidence units via PyMuPDF find_tables(lines_strict).
-# Measured cost: PDF parsing rises from ~3.4 ms/page (text only) to
-# ~57 ms/page with table detection on in the raw parser path (see ADR-049),
-# before the fixed one-document isolation startup cost. Existing pdf_page text
-# output is unaffected either way; turn off only to shed the extra per-page
-# cost on table-light corpora.
+backend = "pdf_inspector"
+# pdf_inspector emits page Markdown and Markdown tables; table pages without a
+# valid Markdown table use selective PyMuPDF lines_strict fallback (ADR-054).
+# tables_enabled applies when backend = "pymupdf" is selected for rollback.
 tables_enabled = true
 
 [parsers.ocr]
@@ -197,7 +195,7 @@ timeout_seconds = 120
 enabled = true
 argv = ["kordoc", "--format", "json", "--ocr", "--silent"]
 version_argv = ["kordoc", "--version"]
-expected_version = "4.7.3"
+expected_version = "4.8.0"
 
 [parsers.ocr.pptx]
 max_images = 128

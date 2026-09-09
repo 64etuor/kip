@@ -6,6 +6,7 @@ import os
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Literal
 
+from kip import __version__
 from kip.container import build_container
 from kip.domain.interactions import (
     ClarificationAnswer,
@@ -32,7 +33,7 @@ from kip.errors import DependencyUnavailableError, KipError, error_code
 from kip.ids import new_id
 
 if TYPE_CHECKING:
-    from mcp.server.fastmcp import FastMCP
+    from mcp.server.mcpserver import MCPServer
 
 
 def _json(value: Any) -> str:
@@ -43,15 +44,15 @@ def _json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, default=str)
 
 
-def create_server() -> FastMCP:
+def create_server() -> MCPServer:
     try:
-        from mcp.server.fastmcp import FastMCP
+        from mcp.server.mcpserver import MCPServer
     except ImportError as exc:
-        raise DependencyUnavailableError("Install the MCP extra: pip install '.[mcp]'") from exc
+        raise DependencyUnavailableError("Install the MCP extra: uv sync --extra mcp") from exc
 
     container = build_container()
     application = container.application
-    mcp = FastMCP("KIP Knowledge Fabric")
+    mcp = MCPServer("KIP Knowledge Fabric", version=__version__)
 
     def context() -> RequestContext:
         workspace = os.environ.get("KIP_WORKSPACE") or container.settings.workspace

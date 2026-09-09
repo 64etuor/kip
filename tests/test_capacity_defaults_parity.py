@@ -11,11 +11,13 @@ from __future__ import annotations
 
 import inspect
 import re
+import shlex
 import tomllib
 from pathlib import Path
 from typing import Never
 
 import typer.main
+import yaml
 
 from kip.cli import app as cli_app
 from kip.domain.json_types import JsonObject
@@ -39,7 +41,7 @@ def _click_command_default(command_name: str, option_name: str) -> int:
 
 
 def _mcp_tool_default(tool_name: str, parameter_name: str) -> int:
-    from mcp.server.fastmcp import FastMCP
+    from mcp.server.mcpserver import MCPServer
 
     from kip import mcp_server
 
@@ -49,7 +51,7 @@ def _mcp_tool_default(tool_name: str, parameter_name: str) -> int:
         server = mcp_server.create_server()
     finally:
         mcp_server.build_container = original_build_container
-    assert isinstance(server, FastMCP)
+    assert isinstance(server, MCPServer)
     tool = server._tool_manager._tools[tool_name]
     signature = inspect.signature(tool.fn)
     default = signature.parameters[parameter_name].default
@@ -152,6 +154,38 @@ def test_postgres_image_digest_matches_between_production_compose_and_ci() -> No
     assert compose_match is not None, "no pgvector image found in compose.production.yaml"
     assert ci_match is not None, "no pgvector image found in .github/workflows/ci.yml"
     assert compose_match.group(0) == ci_match.group(0)
+
+
+def test_ci_install_only_requests_declared_optional_dependencies() -> None:
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    workflow = yaml.load(
+        (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"),
+        Loader=yaml.BaseLoader,
+    )
+    install_step = next(
+        step
+        for step in workflow["jobs"]["quality"]["steps"]
+        if step.get("name") == "Install locked test environment"
+    )
+    command_parts = shlex.split(install_step["run"])
+    requested_extras = {
+        command_parts[index + 1]
+        for index, part in enumerate(command_parts[:-1])
+        if part == "--extra"
+    }
+    declared_extras = set(pyproject["project"]["optional-dependencies"])
+
+    assert requested_extras <= declared_extras, (
+        f"CI requests undefined optional dependencies: "
+        f"{sorted(requested_extras - declared_extras)}"
+    )
+
+
+def test_verify_uses_the_locked_uv_environment_for_static_checks() -> None:
+    verify_script = (ROOT / "scripts/verify.sh").read_text(encoding="utf-8")
+
+    assert "uv run ruff check src tests scripts" in verify_script
+    assert "uv run mypy src/kip" in verify_script
 
 
 def test_every_mcp_tool_function_is_mentioned_in_app_integration_docs() -> None:

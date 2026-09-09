@@ -70,6 +70,21 @@
 - Never commit `.env`, Slack tokens, IMAP passwords, API keys, or Neo4j credentials.
 - Do not place secrets in `.mcp.json`, `CLAUDE.md`, `AGENTS.md`, or Skill files.
 
+## Starter archive boundary
+
+- The online source ZIP is built from an explicit allowlist. Local config,
+  `.env`, credentials, private evaluation data, databases, CAS/output data,
+  internal plans, build output, caches, and repository metadata are excluded.
+- Build and verification scan small UTF-8 files for private absolute paths,
+  known credential shapes, private keys, and non-example PostgreSQL passwords.
+- Verification rejects absolute or parent-traversing paths, duplicate entries,
+  symlinks, encrypted entries, multiple roots, oversized entries, excessive
+  uncompressed size, unallowlisted payload paths, and incomplete or mismatched
+  manifest/checksum coverage before extraction.
+- A ZIP digest proves byte identity, not publisher identity. Production
+  distribution still requires the signed release provenance and immutable
+  image digest described in Operations.
+
 ## Telemetry boundary
 
 - Query traces use a closed schema with no raw query, body, snippet, answer,
@@ -167,11 +182,21 @@
   denial in the outer launch/container policy.
 - PPTX parsing reads OOXML locally, never executes VBA or fetches external
   relationships, and records rather than expands embedded OLE/package objects.
-- Default PDF/PPTX OCR accepts only an installed Kordoc 4.7.3 binary with an
+- The default PDF backend is the local MIT-licensed `pdf-inspector` 1.14.2
+  native extension. It performs no model or network calls and is loaded only
+  inside the adapter. The pin includes bounds for Form XObject expansion, CMap
+  ranges, decoded content streams, detector lookback, and rectangle clustering.
+  Parser-worker CPU/RSS/wall/output limits remain the outer denial-of-service
+  boundary. A native failure becomes a typed failed shadow extraction; it does
+  not silently switch parsers or replace the active extraction.
+- Default PDF/PPTX OCR accepts only an installed Kordoc 4.8.0 binary with an
   exact version probe. Bootstrap or the image-build stage is the only package
   and model download boundary; runtime `npm`/`npx` execution is rejected,
   production preloads SHA-256-verified PP-OCRv5 Korean files, and indexing sets
   `KORDOC_OFFLINE=1`.
+- The isolated Kordoc install root overrides `adm-zip` to 0.6.0 and `sharp` to
+  0.35.3 so npm also replaces vulnerable nested copies. The source ZIP carries
+  only this installer policy, never the downloaded binary or model cache.
 - PPTX OCR writes selected image bytes only to a private temporary directory,
   removes it after the batch, deduplicates by SHA-256, and enforces image count,
   per-image bytes, total bytes, and minimum dimensions. OCR failure never
@@ -212,6 +237,12 @@ principals too; grant reviewers the admin role explicitly. Graph traversal
 requires the admin role to request unapproved (`approved_only=false`)
 results. The MCP adapter returns the same `kip.envelope.v1` result shape as
 CLI and REST, including a typed error `code` on failure.
+
+MCP initialization metadata, negotiated protocol version, and session state
+are not identity sources. The stdio process environment remains the only MCP
+authorization context. The shipped adapter does not request sampling,
+elicitation, roots, or protocol logging, so the SDK 2 upgrade introduces no
+client-directed model or filesystem egress path.
 
 JWTs must include the configured principal, workspace, groups, ACL snapshot ID,
 snapshot version, capture time, and expiry claims. The identity provider owns

@@ -101,6 +101,11 @@ Interaction endpoints run under the authenticated caller's principal scope.
 The stdio MCP adapter (`src/kip/mcp_server.py`) exposes these tools, each a
 pure delegation to the same application services as CLI and REST:
 
+It runs on the stable MCP 2.x SDK, reports the KIP package version during
+initialization, and supports the current protocol plus SDK-negotiated legacy
+clients. Tool payloads remain `kip.envelope.v1`; protocol metadata and client
+capabilities never grant a principal, workspace, scope, or role.
+
 - Read/answer: `kip_capabilities`, `kip_status`, `kip_search`,
   `kip_vocabulary`, `kip_context`, `kip_answer`, `kip_read`, `kip_xlsx_read`,
   `kip_explain_assertion`

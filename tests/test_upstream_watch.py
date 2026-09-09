@@ -10,17 +10,16 @@ ROOT = Path(__file__).resolve().parents[1]
 WATCH_SCRIPT = ROOT / "scripts/check-upstream-updates.sh"
 
 
-def test_upstream_watch_reports_new_kordoc_from_ocr_pin(tmp_path: Path) -> None:
-    # Given the OCR adapter pin and newer upstream Kordoc metadata.
+def test_upstream_watch_reports_new_pdf_inspector_release(tmp_path: Path) -> None:
+    # Given a reviewed pdf-inspector pin and newer PyPI metadata.
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        '[project.optional-dependencies]\nextractors = ["pdf-inspector==1.14.2"]\n',
+        encoding="utf-8",
+    )
     config = tmp_path / "kip.toml"
     config.write_text(
-        """
-[parsers.hwp.kordoc]
-argv = ["kordoc", "{input}"]
-
-[parsers.ocr.kordoc]
-expected_version = "4.7.3"
-""".strip(),
+        '[parsers.ocr.kordoc]\nexpected_version = "4.8.0"\n',
         encoding="utf-8",
     )
     environment_file = tmp_path / ".env"
@@ -36,6 +35,64 @@ set -euo pipefail
 url="${@: -1}"
 case "$url" in
   */kordoc/latest) printf '{"version":"4.8.0"}\\n' ;;
+  */pdf-inspector/json) printf '{"info":{"version":"1.15.0"}}\\n' ;;
+  */Qwen/Qwen3-Embedding-0.6B) printf '{"sha":"embedding-current"}\\n' ;;
+  */BAAI/bge-reranker-v2-m3) printf '{"sha":"reranker-current"}\\n' ;;
+  *) exit 64 ;;
+esac
+""",
+        encoding="utf-8",
+    )
+    fake_curl.chmod(0o755)
+
+    # When the reusable update detector checks package sources.
+    result = subprocess.run(
+        [str(WATCH_SCRIPT)],
+        cwd=ROOT,
+        env={
+            **os.environ,
+            "KIP_UPSTREAM_CONFIG": str(config),
+            "KIP_UPSTREAM_ENV_FILE": str(environment_file),
+            "KIP_UPSTREAM_PYPROJECT": str(pyproject),
+            "KIP_UPSTREAM_CURL": str(fake_curl),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    # Then the new parser release is reported independently.
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "- `pdf-inspector`: `1.14.2` -> `1.15.0`\n"
+
+
+def test_upstream_watch_reports_new_kordoc_from_ocr_pin(tmp_path: Path) -> None:
+    # Given the OCR adapter pin and newer upstream Kordoc metadata.
+    config = tmp_path / "kip.toml"
+    config.write_text(
+        """
+[parsers.hwp.kordoc]
+argv = ["kordoc", "{input}"]
+
+[parsers.ocr.kordoc]
+expected_version = "4.8.0"
+""".strip(),
+        encoding="utf-8",
+    )
+    environment_file = tmp_path / ".env"
+    environment_file.write_text(
+        "KIP_EMBEDDING_REVISION=embedding-current\n"
+        "KIP_RERANKER_REVISION=reranker-current\n",
+        encoding="utf-8",
+    )
+    fake_curl = tmp_path / "curl"
+    fake_curl.write_text(
+        """#!/usr/bin/env bash
+set -euo pipefail
+url="${@: -1}"
+case "$url" in
+  */kordoc/latest) printf '{"version":"4.9.0"}\\n' ;;
+  */pdf-inspector/json) printf '{"info":{"version":"1.14.2"}}\\n' ;;
   */Qwen/Qwen3-Embedding-0.6B) printf '{"sha":"embedding-current"}\\n' ;;
   */BAAI/bge-reranker-v2-m3) printf '{"sha":"reranker-current"}\\n' ;;
   *) exit 64 ;;
@@ -62,14 +119,14 @@ esac
 
     # Then it reports the reviewed OCR pin, not an unrelated command literal.
     assert result.returncode == 0, result.stderr
-    assert result.stdout == "- `kordoc`: `4.7.3` -> `4.8.0`\n"
+    assert result.stdout == "- `kordoc`: `4.8.0` -> `4.9.0`\n"
 
 
 def test_upstream_watch_is_quiet_when_all_pins_match(tmp_path: Path) -> None:
     # Given local parser and model pins that match their upstream metadata.
     config = tmp_path / "kip.toml"
     config.write_text(
-        '[parsers.ocr.kordoc]\nexpected_version = "4.7.3"\n',
+        '[parsers.ocr.kordoc]\nexpected_version = "4.8.0"\n',
         encoding="utf-8",
     )
     environment_file = tmp_path / ".env"
@@ -84,7 +141,8 @@ def test_upstream_watch_is_quiet_when_all_pins_match(tmp_path: Path) -> None:
 set -euo pipefail
 url="${@: -1}"
 case "$url" in
-  */kordoc/latest) printf '{"version":"4.7.3"}\\n' ;;
+  */kordoc/latest) printf '{"version":"4.8.0"}\\n' ;;
+  */pdf-inspector/json) printf '{"info":{"version":"1.14.2"}}\\n' ;;
   */Qwen/Qwen3-Embedding-0.6B) printf '{"sha":"embedding-current"}\\n' ;;
   */BAAI/bge-reranker-v2-m3) printf '{"sha":"reranker-current"}\\n' ;;
   *) exit 64 ;;

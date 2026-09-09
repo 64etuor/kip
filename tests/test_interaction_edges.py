@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from mcp.types import CallToolResult, TextContent
 from typer.testing import CliRunner
 
 from kip.adapters.repository.memory import MemoryRepository
@@ -201,7 +202,10 @@ def test_mcp_exposes_the_same_clarification_service(tmp_path: Path, monkeypatch)
     tools, result = asyncio.run(invoke())
 
     assert "kip_clarify" in tools
-    envelope = json.loads(result[0][0].text)
+    assert isinstance(result, CallToolResult)
+    content = result.content[0]
+    assert isinstance(content, TextContent)
+    envelope = json.loads(content.text)
     assert envelope["schema_version"] == "kip.envelope.v1"
     assert envelope["ok"] is True
     assert envelope["data"]["schema_version"] == "kip.clarification.v1"
@@ -229,7 +233,10 @@ def test_mcp_ontology_discovery_propose_threads_the_optional_parent_field(
 
     result = asyncio.run(invoke())
 
-    envelope = json.loads(result[0][0].text)
+    assert isinstance(result, CallToolResult)
+    content = result.content[0]
+    assert isinstance(content, TextContent)
+    envelope = json.loads(content.text)
     assert envelope["schema_version"] == "kip.envelope.v1"
     assert envelope["ok"] is True
     payload = envelope["data"]

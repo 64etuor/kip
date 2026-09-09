@@ -9,6 +9,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import anyio
+from mcp.types import CallToolResult, TextContent
 from typer.testing import CliRunner
 
 from kip.adapters.repository.memory import MemoryRepository
@@ -164,9 +165,12 @@ def test_mcp_search_accepts_the_complete_search_request(
                 "include_candidate_assertions": True,
             },
         )
-        return result[0][0].text
+        assert isinstance(result, CallToolResult)
+        content = result.content[0]
+        assert isinstance(content, TextContent)
+        return content.text
 
-    # When the complete request is sent through FastMCP.
+    # When the complete request is sent through the MCP server.
     envelope = json.loads(anyio.run(invoke))
 
     # Then it is accepted and returned inside the same envelope contract

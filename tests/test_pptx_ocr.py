@@ -112,7 +112,7 @@ def test_pptx_ocr_is_searchable_through_normal_sync(
 import json
 import sys
 if "--version" in sys.argv:
-    print("4.7.3")
+    print("4.8.0")
 else:
     for value in sys.argv[1:]:
         if value.endswith((".png", ".jpg", ".jpeg", ".webp")):
@@ -144,7 +144,7 @@ else:
                 "--silent",
             ],
             "version_argv": [sys.executable, str(command), "--version"],
-            "expected_version": "4.7.3",
+            "expected_version": "4.8.0",
         },
     }
     source_path = settings.project_root / "source" / "이미지현황.pptx"

@@ -12,7 +12,7 @@ def test_registry_starts_when_optional_extractors_are_not_installed(
     script = """
 import builtins
 
-blocked = {"PIL", "fitz", "hwp_hwpx_parser", "openpyxl", "pptx"}
+blocked = {"PIL", "fitz", "hwp_hwpx_parser", "openpyxl", "pdf_inspector", "pptx"}
 original_import = builtins.__import__
 
 def blocked_import(name, globals=None, locals=None, fromlist=(), level=0):
@@ -31,7 +31,7 @@ assert {
     "csv-table",
     "xlsx-shallow",
     "python-pptx",
-    "pymupdf",
+    "pdf-inspector",
 } <= capabilities.keys()
 """
     environment = {

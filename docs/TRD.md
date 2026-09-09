@@ -3,7 +3,7 @@ document_id: KIP-TRD-003
 title: KIP v3 Agent-First Knowledge Fabric 기술 요구사항 및 설계서
 version: 3.1.0
 status: accepted
-last_updated: 2026-08-13
+last_updated: 2026-08-17
 language: ko-KR
 audience:
   - backend-engineering
@@ -1957,10 +1957,18 @@ HWP parser 구조와 paired PDF 페이지를 매핑할 수 있으면 dual locato
 
 ### 19.1 Fast path
 
-- text object extraction
+- default `pdf-inspector==1.14.2` local Rust extraction to per-page Markdown
 - page boundary preservation
-- font/layout metadata optional
+- table/multi-column detection and per-page OCR reasons
+- valid Markdown tables promoted to `pdf_table`; detected table pages without
+  Markdown tables use PyMuPDF `lines_strict` fallback for that page only
 - low-cost header/footer detection
+
+`[parsers.pdf].backend` is `pdf_inspector` for new starter profiles and accepts
+`pymupdf` as the explicit rollback. The six-public-PDF gate measured 19.2x raw
+parser and 3.23x isolated sync speedup with unchanged lexical Recall@10/MRR
+(1.0000/0.9861) and zero ACL leaks (ADR-054). Existing extractions change only
+through shadow re-extraction and activation.
 
 ### 19.2 OCR trigger
 
@@ -1974,7 +1982,7 @@ HWP parser 구조와 paired PDF 페이지를 매핑할 수 있으면 dual locato
 ### 19.3 Korean OCR candidate enrichment
 
 OCR은 원본을 수정하거나 native unit을 대체하지 않는다. 활성화된 경우
-`PdfParser`가 후보가 하나 이상인 원본 PDF를 Kordoc 4.7.3 PP-OCRv5 Korean
+선택된 PDF parser가 후보가 하나 이상인 원본 PDF를 Kordoc 4.8.0 PP-OCRv5 Korean
 adapter에 한 번 전달한다. 후보 page의 non-empty text/table block만
 `pdf_ocr` unit으로 추가하며 page와 pixel bbox를 보존한다. Kordoc의 image
 reference block은 lexical evidence가 아니므로 제외한다.
@@ -1982,15 +1990,17 @@ reference block은 lexical evidence가 아니므로 제외한다.
 ```text
 Original PDF artifact (read-only)
   └─ immutable composite ExtractionRun
-       ├─ pdf_page units (PyMuPDF)
+       ├─ pdf_page units (pdf-inspector Markdown or PyMuPDF rollback)
+       ├─ pdf_table units (Markdown or selective exact fallback)
        └─ pdf_ocr units (Kordoc PP-OCRv5 Korean)
 ```
 
-`parser_name=pymupdf+kordoc-ppocrv5-korean`이 provenance를 기록한다. OCR
+`parser_name=pdf-inspector+kordoc-ppocrv5-korean` 또는 rollback backend 이름이
+provenance를 기록한다. OCR
 failure와 low-confidence warning은 native page를 지우지 않고 extraction을
-`partial`로 만든다. Reference bootstrap과 production image는 Kordoc 4.7.3과
+`partial`로 만든다. Reference bootstrap과 production image는 Kordoc 4.8.0과
 SHA-256 검증된 PP-OCRv5 Korean cache를 설치하고, runtime registry는 executable과 별도
-`--version` probe가 모두 정확히 4.7.3인지 확인하며 `npm`/`npx` 실행을
+`--version` probe가 모두 정확히 4.8.0인지 확인하며 `npm`/`npx` 실행을
 거부한다. Production은 사전 검증된 model cache와 `KORDOC_OFFLINE=1`을
 사용한다. 기존 설치의 사용자 `config/kip.toml`은 자동 변경하지 않는다.
 
@@ -3701,6 +3711,14 @@ REST. It derives its `RequestContext` from environment configuration
 any service call; tool arguments cannot choose workspace, principal, or ACL
 scopes.
 
+The adapter is pinned to the stable MCP 2.x SDK and uses `MCPServer` with the
+KIP package version as `serverInfo.version`. It negotiates protocol
+`2026-07-28` with SDK-supported legacy clients while keeping every tool result
+inside `kip.envelope.v1`. It is stdio-only and does not depend on sampling,
+elicitation, roots, protocol logging, or another server-initiated backchannel.
+Any future Streamable HTTP exposure requires a separate identity, TLS, origin,
+request-size, and deployment decision.
+
 ```text
 MCP tool family                             Application use case
 kip_search / kip_context / kip_answer    -> shared retrieval and answering
@@ -5093,6 +5111,18 @@ stand for implicit accepted decisions.
 | ADR-040 | Make guided setup end in a runnable deployment | Accepted |
 | ADR-041 | Structured PPTX extraction preserves presentation evidence | Accepted |
 | ADR-042 | Korean OCR enriches candidate pages and presentation images | Accepted |
+| ADR-043 | Reject ontology core shadowing and unknown source parents | Accepted |
+| ADR-044 | Materialize discovery approvals as additive ontology releases | Accepted |
+| ADR-045 | Grow golden datasets through sampled human audit | Accepted |
+| ADR-046 | Consolidate adapter seams for tool swappability | Accepted |
+| ADR-047 | Measured auto-approval for low-risk mined relations | Accepted |
+| ADR-048 | Harden trust, resilience, and edge contracts | Accepted |
+| ADR-049 | Measure PDF tables and HWP section locators | Accepted |
+| ADR-050 | Bound filesystem parser processes | Accepted |
+| ADR-051 | Adopt the stable MCP 2 SDK without changing KIP tool contracts | Accepted |
+| ADR-052 | Verified online source ZIP starter kit | Accepted |
+| ADR-053 | Upgrade the pinned offline Kordoc runtime to 4.8.0 | Accepted |
+| ADR-054 | Use pdf-inspector with selective PyMuPDF table fallback | Accepted for starter and pilot |
 
 ---
 

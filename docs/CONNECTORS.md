@@ -104,9 +104,20 @@ The base wheel can start its CLI without the extractor extra; Pillow is loaded
 only when PPTX OCR must transcode a non-PNG/JPEG/WebP image. Actual PPTX parsing
 and production indexing still require the pinned `extractors` extra.
 
+## Local PDF backends
+
+New profiles select `pdf_inspector`, a pinned local Rust extension that emits
+per-page Markdown, layout/table signals, and OCR reasons without network calls.
+Valid Markdown tables become additive table units. A detected table page whose
+Markdown has no valid table block runs the existing PyMuPDF `lines_strict`
+fallback for that page only. Set `backend = "pymupdf"` to roll back; do not
+silently mix backends after a parse failure. Existing indexed PDFs require
+shadow re-extraction before activation because page bodies change from plain
+text to Markdown.
+
 ## Local Korean OCR adapter
 
-PDF and PPTX parsers share the default Kordoc 4.7.3 adapter in new reference
+PDF and PPTX parsers share the default Kordoc 4.8.0 adapter in new reference
 installations. Bootstrap installs the exact runtime and model cache:
 
 ```bash
@@ -115,7 +126,7 @@ installations. Bootstrap installs the exact runtime and model cache:
 ```
 
 The launcher sets `KORDOC_OFFLINE=1` for indexing. The registry requires
-`argv`, `version_argv`, and `expected_version = "4.7.3"`, and rejects `npm` or
+`argv`, `version_argv`, and `expected_version = "4.8.0"`, and rejects `npm` or
 `npx` as the runtime command. PDF OCR runs only when native text quality crosses
 a candidate signal. PPTX OCR batches eligible pictures, deduplicates identical
 bytes, and applies count and byte budgets from `[parsers.ocr.pptx]`. Both paths

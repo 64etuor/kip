@@ -1,0 +1,340 @@
+src/kip/adapters/repository/memory/evidence.py
+  s_0e5d25024bfaed::t_a20d2429106730 46-47
+  s_0e5d25024bfaed::t_fbfc3f9e35d335 65-75,77-79
+  s_0e5d25024bfaed::t_8fe8ea03e34724 9,64
+tests/test_setup_handoff.py
+  s_0e5d25024bfaed::t_48a873918b08b4 275-319,321-323,325-328,362-380
+  s_0e5d25024bfaed::t_e51cdfd40856cd 1-4,6-9,11-12,14,20-21,23-30,36-111,117-126,129-130,132,142-167
+  s_0e5d25024bfaed::t_9e4a87d9158297 15-18,469-521,531-541
+  s_0e5d25024bfaed::t_323cc23da77c68 112
+  s_0e5d25024bfaed::t_4169036a4d0dc6 131,137,139-141
+  s_0e5d25024bfaed::t_ad55c49f7c6937 414-468
+  s_0e5d25024bfaed::t_b198ba8d6f4e8b 113-114,116,330-345,347-350,352-361
+  s_0e5d25024bfaed::t_9dc0b7f3d0cac0 127,168-181,227-274
+  s_0e5d25024bfaed::t_0f7279a5d9357f 128,182-214
+  s_0e5d25024bfaed::t_ecccafb45ff89b 133-136,138
+  s_0e5d25024bfaed::t_b13ad6721a8552 13,215-226
+  s_0e5d25024bfaed::t_7e08341a92a73a 5,10,31-35,115,320,324,329,346,351
+  s_0e5d25024bfaed::t_0280749846c4b0 381-413
+  s_0e5d25024bfaed::t_a1485ab96b1ffc 19,22,522-530
+pyproject.toml
+  s_0e5d25024bfaed::t_ea1fba4b303f9e 7
+.claude/skills/knowledge-fabric/SKILL.md
+  s_0e5d25024bfaed::t_a86802c3de3f0c 37-41
+src/kip/container.py
+  s_0e5d25024bfaed::t_288954c206a4b0 117-118
+  s_0e5d25024bfaed::t_c2d7b2d2bc5336 99-100,104,108,207,247
+src/kip/adapters/repository/memory/acl.py
+  s_0e5d25024bfaed::t_a20d2429106730 16-19
+src/kip/setup/models.py
+  s_0e5d25024bfaed::t_d9209b65395fd0 310,320-321
+  s_0e5d25024bfaed::t_d06d56e23ab9cd 231-232,326-329
+  s_0e5d25024bfaed::t_76ca745f1bbef3 308-309,316-319
+tests/test_filesystem_cloud_scan.py
+  s_0e5d25024bfaed::t_9908dd0f72485a 182-184,186-187,189-198
+  s_0e5d25024bfaed::t_67dee87b1b77f1 1-77
+  s_0e5d25024bfaed::t_6941a64023e745 204-213
+  s_0e5d25024bfaed::t_c4eba03a3bc6f8 78-181
+  s_0e5d25024bfaed::t_baf88c16d3fe42 185,188,199-203
+tests/test_bootstrap_locked.py
+  s_0e5d25024bfaed::t_3fd9e58787e93d 1-91
+tests/test_setup_cli.py
+  s_0e5d25024bfaed::t_323cc23da77c68 152
+  s_0e5d25024bfaed::t_6ba32a2e57c7ac 10,46
+tests/test_filesystem_access_policy.py
+  s_0e5d25024bfaed::t_8fe8ea03e34724 12,14-22,24
+  s_0e5d25024bfaed::t_61f69e3f86c122 366-367,400,402-403,417,426-427,431-440
+  s_0e5d25024bfaed::t_b67b80efda43b2 150-194
+  s_0e5d25024bfaed::t_28b588bb415ed8 1-4,7-10,23,73-74,77,81-86,90-97,99-112,115-126,128-129,132-137,139,141-146,148-149
+  s_0e5d25024bfaed::t_cc1233aba4ea1b 13,195-253
+  s_0e5d25024bfaed::t_fbfc3f9e35d335 147
+  s_0e5d25024bfaed::t_6b6102ec3db448 364-365,368-399,401,404-416,418-425,428-430,441-460
+  s_0e5d25024bfaed::t_e063195cec5f3b 254-314
+  s_0e5d25024bfaed::t_51e6d1ca6d7707 75-76,78-80,87-89,98,113-114,127,130-131,138,140
+  s_0e5d25024bfaed::t_eef91e8b11d4b3 5-6,11,25-72
+  s_0e5d25024bfaed::t_a7dc970f170c7b 315-363
+src/kip/application/ingestion.py
+  s_0e5d25024bfaed::t_eede896ddfea3b 151-160,162-164,166
+  s_0e5d25024bfaed::t_ca9bed2d75fbf3 95-102,127,135,138-142
+tests/integration/test_postgres_repository.py
+  s_0e5d25024bfaed::t_788895ad870d0b 1057-1066
+src/kip/setup/inventory.py
+  s_0e5d25024bfaed::t_d06d56e23ab9cd 7,19-20,66,71-75,83-84
+scripts/curl-smoke.sh
+  s_0e5d25024bfaed::t_380ca0f8236cd4 10
+  s_0e5d25024bfaed::t_aa2f4a43fb3c00 3-9,11-14
+tests/test_cli_runtime_boundaries.py
+  s_0e5d25024bfaed::t_1684c9b7d5e1f9 1-7,13-35
+docs/AI_OPERATOR_RUNBOOK.md
+  s_0e5d25024bfaed::t_4a2818e0ebfdc8 16-37,45,68-69
+  s_0e5d25024bfaed::t_d189c0f3cb7a74 38-44
+tests/test_parser_reextraction.py
+  s_0e5d25024bfaed::t_81d0b0851df265 287,324-325
+src/kip/settings.py
+  s_0e5d25024bfaed::t_d9209b65395fd0 129-131,133-136,155
+  s_0e5d25024bfaed::t_7015d168638b10 127-128,175-176
+tests/test_setup_planner.py
+  s_0e5d25024bfaed::t_ecccafb45ff89b 162
+src/kip/adapters/repository/memory/__init__.py
+  s_0e5d25024bfaed::t_a20d2429106730 14,26,29
+  s_0e5d25024bfaed::t_288954c206a4b0 39-41
+src/kip/ports/repository.py
+  s_0e5d25024bfaed::t_288954c206a4b0 17-18
+  s_0e5d25024bfaed::t_8fe8ea03e34724 5
+docs/CONNECTORS.md
+  s_0e5d25024bfaed::t_51fa3cf5501567 9-11
+  s_0e5d25024bfaed::t_158ec025367a75 14-19,21-26,31
+docs/PRODUCTION_DESIGN_ALIGNMENT.md
+  s_0e5d25024bfaed::t_4a2818e0ebfdc8 38-40,46-49
+  s_0e5d25024bfaed::t_73d140e0fe6fb1 56
+  s_0e5d25024bfaed::t_d189c0f3cb7a74 41-45
+  s_0e5d25024bfaed::t_d73c6f5d9a6086 4,30-36
+  s_0e5d25024bfaed::t_00406962280865 37
+docs/DATA_CONTRACTS.md
+  s_0e5d25024bfaed::t_8d365937cc0847 61-65,69-74
+  s_0e5d25024bfaed::t_158ec025367a75 82-89,257
+  s_0e5d25024bfaed::t_d189c0f3cb7a74 75
+  s_0e5d25024bfaed::t_f74b6387181287 66-68
+  s_0e5d25024bfaed::t_88922f31c556db 76-79
+.claude/skills/kip-setup/references/questions.md
+  s_0e5d25024bfaed::t_a86802c3de3f0c 7-13
+.claude/skills/kip-setup/SKILL.md
+  s_0e5d25024bfaed::t_a86802c3de3f0c 28-31
+contracts/openapi.yaml
+  s_0e5d25024bfaed::t_8590a17d7155fe 6
+src/kip/adapters/repository/memory/lexical.py
+  s_0e5d25024bfaed::t_d0c158fee2c5f9 3,5,31-32,36-70,93,189,198-204
+  s_0e5d25024bfaed::t_e42ca5bda43a66 205-206
+src/kip/adapters/repository/memory/ingestion.py
+  s_0e5d25024bfaed::t_7710ea3a75c6c5 15,24-34,174-175
+  s_0e5d25024bfaed::t_fda73de5541d6e 48,52,58-69,180,185
+src/kip/setup/writer.py
+  s_0e5d25024bfaed::t_be50f183ae1837 190,199,208
+  s_0e5d25024bfaed::t_b428e0e578c607 202
+  s_0e5d25024bfaed::t_d9209b65395fd0 31-34,38-39,223
+  s_0e5d25024bfaed::t_a80de307cd9b13 11,160,181-182,204-207,209-218
+  s_0e5d25024bfaed::t_76ca745f1bbef3 35-37,222
+  s_0e5d25024bfaed::t_d01dd6f4756d42 92,112
+  s_0e5d25024bfaed::t_14e4870a7974e5 63,89,113-119,125-130,132-134,137-138,149-156,158-159
+  s_0e5d25024bfaed::t_ecccafb45ff89b 17,40-46
+  s_0e5d25024bfaed::t_27d6e0dd02f2e8 157
+  s_0e5d25024bfaed::t_af12c50de9bbec 19,220
+  s_0e5d25024bfaed::t_b198ba8d6f4e8b 135
+  s_0e5d25024bfaed::t_01921f8cddd686 18
+src/kip/adapters/connectors/registry.py
+  s_0e5d25024bfaed::t_c2d7b2d2bc5336 20,111-125
+  s_0e5d25024bfaed::t_62e5144cc863aa 98-105
+  s_0e5d25024bfaed::t_0c1fea5db48d81 126
+tests/setup_support.py
+  s_0e5d25024bfaed::t_6ba32a2e57c7ac 3,14,54-58
+scripts/setup_compose.py
+  s_0e5d25024bfaed::t_3ca34a0f5962bf 53-54,56-64,71
+  s_0e5d25024bfaed::t_6659ef2216dfeb 29-46
+  s_0e5d25024bfaed::t_ef6ebb8120a8e6 49-51,55
+  s_0e5d25024bfaed::t_b198ba8d6f4e8b 10,65-70
+  s_0e5d25024bfaed::t_27d6e0dd02f2e8 1-9,11-28,47-48,52,72-87
+docs/IMPLEMENTATION_STATUS.md
+  s_0e5d25024bfaed::t_4a2818e0ebfdc8 7-10,13-31
+  s_0e5d25024bfaed::t_83f17d2bb90cf0 11-12
+  s_0e5d25024bfaed::t_e568ceaef4255c 57
+  s_0e5d25024bfaed::t_d189c0f3cb7a74 36-43
+  s_0e5d25024bfaed::t_d73c6f5d9a6086 45-56,58-62
+  s_0e5d25024bfaed::t_f2c9c6c84bc7e8 32-35,44
+  s_0e5d25024bfaed::t_73d140e0fe6fb1 108
+src/kip/__init__.py
+  s_0e5d25024bfaed::t_ea1fba4b303f9e 3
+src/kip/adapters/repository/postgres/database.py
+  s_0e5d25024bfaed::t_f953ca663bbd6a 14,77-80,1242-1283,1288-1291,1339-1341,1348-1351,1375-1377,1383-1385
+  s_0e5d25024bfaed::t_96b143505863de 174,179,223-224,228-231
+  s_0e5d25024bfaed::t_fda73de5541d6e 479-487,498-504
+  s_0e5d25024bfaed::t_34a656088f138d 397,551,568,587,657,1038,1299,1444,1635,1799,1834,1856,1919,2005,2027,2103,2480,2532,2591,2628,2668,2712,2738,2865,2938,2978,3024,3070,3196,3284,3417,3460,3605,3642
+  s_0e5d25024bfaed::t_8fe8ea03e34724 61
+  s_0e5d25024bfaed::t_7710ea3a75c6c5 519-542,671,675-676
+src/kip/adapters/repository/postgres/semantic_projection.py
+  s_0e5d25024bfaed::t_5eb0642fa4df67 52,86
+docs/APP_INTEGRATION.md
+  s_0e5d25024bfaed::t_c10d83c4415912 20-26
+migrations/0025_assertion_current_evidence_access.sql
+  s_0e5d25024bfaed::t_fda73de5541d6e 1-22
+VERSION
+  s_0e5d25024bfaed::t_ea1fba4b303f9e 1
+src/kip/ports/ingestion.py
+  s_0e5d25024bfaed::t_cf1c9b95e3bddb 83
+  s_0e5d25024bfaed::t_7710ea3a75c6c5 17,143-148
+  s_0e5d25024bfaed::t_eede896ddfea3b 89-98
+tests/test_setup_verify.py
+  s_0e5d25024bfaed::t_6ba32a2e57c7ac 22,151
+  s_0e5d25024bfaed::t_323cc23da77c68 55
+tests/test_setup_writer.py
+  s_0e5d25024bfaed::t_ecccafb45ff89b 131
+  s_0e5d25024bfaed::t_be50f183ae1837 107
+src/kip/setup/service.py
+  s_0e5d25024bfaed::t_d01dd6f4756d42 36,472
+  s_0e5d25024bfaed::t_244e47e6cc377e 13,19-21,174,220,230,467-471,584-586,590-599
+  s_0e5d25024bfaed::t_aa4e7e24cdc95d 3,6,276-279,283-287,293-294,300-303
+  s_0e5d25024bfaed::t_38cb12b813573c 221-229,231-239,280-282,288-292,295-299,587-589,600-606,608-615,617-619,621-623,625-629
+  s_0e5d25024bfaed::t_2a665f3300596e 34,275
+  s_0e5d25024bfaed::t_2c433ac4bbfced 476
+  s_0e5d25024bfaed::t_d06d56e23ab9cd 153-154,255-265
+tests/test_curl_smoke.py
+  s_0e5d25024bfaed::t_d71f7de242e983 1-26,30-57,59-75
+  s_0e5d25024bfaed::t_9e4adc592d289c 27-29,58
+src/kip/setup/planner.py
+  s_0e5d25024bfaed::t_d9209b65395fd0 191
+  s_0e5d25024bfaed::t_76ca745f1bbef3 3,42-43,189-190
+  s_0e5d25024bfaed::t_aa4e7e24cdc95d 346-347,350-352
+  s_0e5d25024bfaed::t_d06d56e23ab9cd 134-141
+  s_0e5d25024bfaed::t_244e47e6cc377e 142-146
+  s_0e5d25024bfaed::t_ecccafb45ff89b 4,88,97-107
+tests/test_filename_discovery.py
+  s_0e5d25024bfaed::t_63ebb3eb1e2109 1-6,8-92
+  s_0e5d25024bfaed::t_4f9c7248ae01c8 7
+docs/adr/ADR-040-runnable-guided-setup-path.md
+  s_0e5d25024bfaed::t_6e2ef859c3216d 6-11
+src/kip/adapters/repository/postgres/ingestion.py
+  s_0e5d25024bfaed::t_7710ea3a75c6c5 14,22-25
+  s_0e5d25024bfaed::t_638bd6c2bd967d 26
+contracts/setup-plan.schema.json
+  s_0e5d25024bfaed::t_8590a17d7155fe 70-74,92-96,369-409
+docs/TROUBLESHOOTING.md
+  s_0e5d25024bfaed::t_c10d83c4415912 81-86,91,102-103
+src/kip/application/evidence.py
+  s_0e5d25024bfaed::t_c2d7b2d2bc5336 7,18-19,24,35,80,112-114,127-138
+docs/OPERATIONS.md
+  s_0e5d25024bfaed::t_c10d83c4415912 8-14,22-28
+  s_0e5d25024bfaed::t_f2c9c6c84bc7e8 67-74
+  s_0e5d25024bfaed::t_88922f31c556db 15-21
+.claude/skills/knowledge-fabric/references/synchronization.md
+  s_0e5d25024bfaed::t_a86802c3de3f0c 10-15
+src/kip/application/ingestion_files.py
+  s_0e5d25024bfaed::t_6f739461637ebb 393-397
+  s_0e5d25024bfaed::t_fda73de5541d6e 318,320-324
+  s_0e5d25024bfaed::t_5eb0642fa4df67 97-106,109-114,131,136,305,316-317,319
+src/kip/adapters/repository/memory/retrieval.py
+  s_0e5d25024bfaed::t_d0c158fee2c5f9 44-46
+skills/knowledge-fabric/SKILL.md
+  s_0e5d25024bfaed::t_c61d3985a65079 37-41
+src/kip/adapters/repository/postgres/retrieval.py
+  s_0e5d25024bfaed::t_d0c158fee2c5f9 44-46
+docs/adr/ADR-056-current-filesystem-source-access.md
+  s_0e5d25024bfaed::t_c10d83c4415912 1-19,24-33,40-51
+  s_0e5d25024bfaed::t_83f17d2bb90cf0 20-23,34-39
+docs/PRD.md
+  s_0e5d25024bfaed::t_e568ceaef4255c 6
+  s_0e5d25024bfaed::t_88922f31c556db 613
+  s_0e5d25024bfaed::t_f2c9c6c84bc7e8 504
+  s_0e5d25024bfaed::t_158ec025367a75 424-425
+  s_0e5d25024bfaed::t_73d140e0fe6fb1 612
+src/kip/adapters/storage/local.py
+  s_0e5d25024bfaed::t_c2d7b2d2bc5336 12-13,46-52,54,57-58,62,69-70
+scripts/app-up.sh
+  s_0e5d25024bfaed::t_9d91a0cbf82da2 69
+  s_0e5d25024bfaed::t_27d6e0dd02f2e8 25-27,32-39,42,58,68
+  s_0e5d25024bfaed::t_cc9cf1daabeac0 14-16
+docs/QUICKSTART.md
+  s_0e5d25024bfaed::t_c61d3985a65079 37,41-44,51-53,112-114
+  s_0e5d25024bfaed::t_687682f56e56a8 29-30
+docs/SECURITY.md
+  s_0e5d25024bfaed::t_f74b6387181287 100
+  s_0e5d25024bfaed::t_8d365937cc0847 28-30
+  s_0e5d25024bfaed::t_158ec025367a75 19-27,31-35,94-98
+  s_0e5d25024bfaed::t_687682f56e56a8 99
+docs/STARTER_KIT_GUIDE.md
+  s_0e5d25024bfaed::t_f74b6387181287 85-86
+  s_0e5d25024bfaed::t_f2c9c6c84bc7e8 24-27
+  s_0e5d25024bfaed::t_687682f56e56a8 51
+  s_0e5d25024bfaed::t_88922f31c556db 72-78
+  s_0e5d25024bfaed::t_c61d3985a65079 41-45,53-56,79-84,87-88,96-100
+  s_0e5d25024bfaed::t_2d98d8b8cce305 101
+skills/kip-setup/SKILL.md
+  s_0e5d25024bfaed::t_c61d3985a65079 28-31
+README.md
+  s_0e5d25024bfaed::t_f2c9c6c84bc7e8 132-135
+  s_0e5d25024bfaed::t_8ec5b6ab09b70f 1
+  s_0e5d25024bfaed::t_88922f31c556db 85-86
+  s_0e5d25024bfaed::t_c61d3985a65079 95-100,103-105
+  s_0e5d25024bfaed::t_bdfe458071cdc4 106
+src/kip/cli.py
+  s_0e5d25024bfaed::t_16e430ea0d1315 6
+  s_0e5d25024bfaed::t_8ec5b6ab09b70f 167-177,238-243
+src/kip/adapters/connectors/filesystem.py
+  s_0e5d25024bfaed::t_0e8dce27930f74 52-55,72
+  s_0e5d25024bfaed::t_6ad72b70de1c8a 77-78
+  s_0e5d25024bfaed::t_eede896ddfea3b 87-91
+  s_0e5d25024bfaed::t_8d71eca22bdf7e 7,11,44-45,69-70,73-76,84-86,92-109,114,117,120,129-131,133,140,151,164-165
+  s_0e5d25024bfaed::t_70310dab744f28 5,126-128
+docs/adr/ADR-036-fixed-retrieval-pipeline-and-corpus-gate.md
+  s_0e5d25024bfaed::t_f2c9c6c84bc7e8 29-34
+docs/TRD.md
+  s_0e5d25024bfaed::t_8d365937cc0847 442-448,452,1557,1560,1567-1569,1573-1575
+  s_0e5d25024bfaed::t_83f17d2bb90cf0 1570-1572
+  s_0e5d25024bfaed::t_f2c9c6c84bc7e8 2400-2405
+  s_0e5d25024bfaed::t_73d140e0fe6fb1 5173-5174
+  s_0e5d25024bfaed::t_e568ceaef4255c 6
+  s_0e5d25024bfaed::t_f74b6387181287 449-451
+  s_0e5d25024bfaed::t_88922f31c556db 453-460
+  s_0e5d25024bfaed::t_5b1d811486ae43 1576
+src/kip/adapters/repository/postgres/__init__.py
+  s_0e5d25024bfaed::t_96b143505863de 14,28,36
+  s_0e5d25024bfaed::t_288954c206a4b0 47-49
+scripts/common.sh
+  s_0e5d25024bfaed::t_7015d168638b10 17-28,33-39,44,47-51
+src/kip/domain/source_access.py
+  s_0e5d25024bfaed::t_62067b021e5622 1-83
+src/kip/ports/retrieval.py
+  s_0e5d25024bfaed::t_d0c158fee2c5f9 21-26
+src/kip/adapters/storage/cloud_files.py
+  s_0e5d25024bfaed::t_ca01d397cfc6e1 1-17
+docs/adr/ADR-057-guided-setup-runtime-handoff.md
+  s_0e5d25024bfaed::t_f74b6387181287 35-36,38-43
+  s_0e5d25024bfaed::t_88922f31c556db 23-30,59-62
+  s_0e5d25024bfaed::t_c10d83c4415912 1-22,31-34,37,44-58
+CHANGELOG.md
+  s_0e5d25024bfaed::t_ea1fba4b303f9e 3-13,15-24,30-31,40
+  s_0e5d25024bfaed::t_d73c6f5d9a6086 25-29
+  s_0e5d25024bfaed::t_48bf98e34e8c5f 32-39
+  s_0e5d25024bfaed::t_51fa3cf5501567 14
+skills/kip-setup/references/questions.md
+  s_0e5d25024bfaed::t_c61d3985a65079 7-13
+scripts/bootstrap.sh
+  s_0e5d25024bfaed::t_7015d168638b10 9,55
+  s_0e5d25024bfaed::t_61e1a83282b0ea 36-50
+skills/knowledge-fabric/references/synchronization.md
+  s_0e5d25024bfaed::t_73d140e0fe6fb1 10-15
+src/kip/setup/paths.py
+  s_0e5d25024bfaed::t_ecccafb45ff89b 3-18,36
+src/kip/adapters/repository/memory/state.py
+  s_0e5d25024bfaed::t_a20d2429106730 25,31
+tests/test_filesystem_deletion_reconciliation.py
+  s_0e5d25024bfaed::t_ca9bed2d75fbf3 163
+src/kip/application/search_engine.py
+  s_0e5d25024bfaed::t_d0c158fee2c5f9 156-158
+  s_0e5d25024bfaed::t_4a33473fe7c20c 151,178-181
+contracts/openapi.json
+  s_0e5d25024bfaed::t_8590a17d7155fe 1098
+scripts/bootstrap_env.py
+  s_0e5d25024bfaed::t_7015d168638b10 1-7,9-23,26,37-42
+  s_0e5d25024bfaed::t_4f7183cd26fb85 8,24-25,27-36
+migrations/0024_filesystem_access_scope.sql
+  s_0e5d25024bfaed::t_779d28dae13dc4 78
+  s_0e5d25024bfaed::t_fe5cb0309b918e 1-75,77,79-83
+  s_0e5d25024bfaed::t_64dff7b50b56d5 76
+uv.lock
+  s_0e5d25024bfaed::t_0ac3556d30407c 928
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "1b04bad685762fe3002d9c4ec6a75f267df9fb94",
+  "prompts": {},
+  "sessions": {
+    "s_0e5d25024bfaed": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a086c4-a430-7101-a45d-9c050ba0f956",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

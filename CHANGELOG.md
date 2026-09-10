@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.8.1 - 2026-09-11
+
+- Include GNU tar's gzip dependency in the cold-runtime test environment and
+  check it before a Linux bootstrap download. The first 3.8.0 release attempt
+  was correctly blocked by that Linux CI failure; 3.8.1 includes the correction.
+
 ## 3.8.0 - 2026-09-11
 
 - Bootstrap without a preinstalled Python: prepare checksum-pinned uv and a

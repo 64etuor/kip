@@ -262,3 +262,21 @@ def test_desktop_installer_uses_hardware_architecture_without_accepting_license(
     assert downloaded == ["darwin-arm64"]
     assert not any("--accept-license" in arg for command in commands for arg in command)
     assert any(command[0] == "hdiutil" and command[1] == "detach" for command in commands)
+
+
+def test_linux_without_gzip_stops_before_any_download(tmp_path):
+    project = tmp_path / "project"
+    (project / "scripts").mkdir(parents=True)
+    for name in ("prerequisites.sh", "runtime-path.sh"):
+        shutil.copy2(ROOT / "scripts" / name, project / "scripts" / name)
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    for name in ("bash", "sh", "dirname"):
+        (tools / name).symlink_to(shutil.which(name))
+    (tools / "uname").write_text('#!/bin/sh\ncase "$1" in -s) echo Linux;; -m) echo x86_64;; esac\n')
+    (tools / "uname").chmod(0o755)
+    environment = {key: value for key, value in os.environ.items() if not key.startswith("KIP_")}
+    environment["PATH"] = str(tools)
+    result = subprocess.run([str(tools / "bash"), str(project / "scripts/prerequisites.sh"), "--without-docker"], cwd=project, env=environment, capture_output=True, text=True)
+    assert result.returncode == 1 and "gzip is required" in result.stderr
+    assert not (project / "var").exists()

@@ -58,6 +58,10 @@ if [[ -z "$selected" ]]; then
     Linux/x86_64) target=linux-x64 ;;
     *) printf 'Automatic runtime preparation supports macOS and glibc Linux on arm64/x86_64. Windows: use WSL2.\n' >&2; exit 1 ;;
   esac
+  if [[ "$target" == linux-* ]] && ! command -v gzip >/dev/null 2>&1; then
+    printf 'gzip is required by GNU tar for the first runtime download. Install gzip and rerun bootstrap.\n' >&2
+    exit 1
+  fi
   if ! record="$(awk -v target="$target" '$1=="uv" && $2==target {print; n++} END {if(n!=1) exit 1}' "$PROJECT_ROOT/requirements/bootstrap.tsv")"; then
     printf 'Expected exactly one uv asset for this platform in requirements/bootstrap.tsv.\n' >&2; exit 1
   fi

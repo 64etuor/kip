@@ -43,5 +43,5 @@ no-Python checks, frozen dependency installation and Docker action boundaries.
 CI executes a real download/bootstrap with host Python/Node/uv hidden from PATH.
 Native privileged Docker installation is not claimed to be verified on every
 supported OS by those simulated tests. Minimal Linux still needs a HTTPS
-transfer tool, CA certificates, tar and a SHA-256 utility for the first download.
+transfer tool, CA certificates, tar/gzip and a SHA-256 utility for the first download.
 Managed runtimes are deployment-owned state and are never shipped in source ZIPs.

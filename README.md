@@ -122,7 +122,7 @@ Python·Node를 먼저 설치할 필요 없이 아래 명령부터 실행할 수
 Python 3.13과 Node 22를 준비합니다. 시스템 Python·Node와 셸 프로필은
 수정하지 않습니다. 다운로드 연결과 최소 10GB의 여유 공간이 필요합니다.
 Python이 전혀 없는 환경의 첫 다운로드에는 curl 또는 wget, tar와 SHA-256
-도구가 필요합니다(macOS 기본 제공; 최소 Linux 이미지에서는 별도 준비).
+도구가 필요합니다(macOS 기본 제공; Linux의 GNU tar에는 gzip도 필요).
 
 ```bash
 ./scripts/bootstrap.sh --check   # 설치하지 않고 준비 상태 확인

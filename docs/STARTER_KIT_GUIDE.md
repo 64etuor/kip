@@ -27,7 +27,7 @@
    암호와 Desktop 약관/첫 실행 선택은 사용자 화면에서 처리한 뒤 같은 명령을
    재실행한다. 외부 DB용 CLI/MCP는 `--without-docker`를 사용할 수 있다.
    Python을 준비하기 전에도 실행되는 경로이므로 먼저 Python을 수동 설치할
-   필요는 없다. 최소 Linux에는 curl/wget, CA 인증서, tar, SHA-256 도구가
+   필요는 없다. 최소 Linux에는 curl/wget, CA 인증서, tar/gzip, SHA-256 도구가
    있어야 한다. 의존성은 `uv.lock` frozen sync로 설치한다. 기존 `.env`,
    config, 호환되는 `.venv`, Docker context와 셸 프로필은 보존한다.
 2. AI agent에게 “KIP을 셋업해줘”라고 요청해 `kip-setup` Skill을 시작한다.

@@ -4,7 +4,7 @@ This is the current readiness inventory, not the target architecture. The
 target-to-current matrix and ordered gap register live in
 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`.
 
-## 2026-09-11 prerequisite bootstrap (3.8.0)
+## 2026-09-11 prerequisite bootstrap (3.8.1)
 
 Bootstrap can prepare Python and Node/npm locally before loading dotenv; the
 missing-Python chicken-and-egg failure is removed. Read-only checks, explicit
@@ -18,7 +18,12 @@ action-boundary tests, not by removing/reinstalling the user's working Docker.
 Windows/WSL Desktop integration, OS authentication, license choices and Linux
 daemon permissions can still require user action. See ADR-061 and the starter
 guide; those boundaries are not reported as completed installation.
-The final local full gate passed 1,112 tests, lint/types, Python dependency
+The first Linux CI cold smoke was blocked because its restricted PATH omitted
+GNU tar's gzip helper. 3.8.1 corrects that fixture and checks gzip before Linux
+downloads. An Ubuntu 24.04 arm64 container with no Python/Node installed then
+completed the real runtime bootstrap and repeat readiness check. The failed
+3.8.0 tag was not rewritten and did not publish a release.
+The final local full gate passed 1,113 tests, lint/types, Python dependency
 auditing and the npm high-severity gate; the four documented moderate adm-zip
 propagation findings remain. The portable retrieval/ACL set retained 120/120
 cases, recall@k/MRR=1.0 and unauthorized=0. The private corpus floor was not

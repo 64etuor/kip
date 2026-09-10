@@ -12,7 +12,7 @@ done
 cp "$PROJECT_ROOT/requirements/bootstrap.tsv" "$work/project/requirements/"
 # Only transfer/extraction utilities are visible. Python, Node and uv must be
 # bootstrapped for real; host installations and shell profiles stay untouched.
-for name in bash sh dirname uname awk mkdir mktemp curl wget sha256sum shasum tar mv cat ln rm chmod ldd install_name_tool; do
+for name in bash sh dirname uname awk mkdir mktemp curl wget sha256sum shasum tar gzip mv cat ln rm chmod ldd install_name_tool; do
   binary="$(command -v "$name" || true)"
   if [[ -n "$binary" ]]; then ln -s "$binary" "$work/tools/$name"; fi
 done

@@ -610,6 +610,11 @@ Agent 흐름:
 
 ### 9.17 Operations and portability
 
+새 설치는 Python·Node가 없더라도 bootstrap에서 프로젝트 전용 런타임을
+준비할 수 있어야 한다. 시스템 Docker 설치와 OS 인증·약관 선택은 별도로
+구분하며, CLI 존재만으로 엔진 준비를 선언하지 않는다. 기존 프로그램,
+환경 설정과 Docker context를 보존하고 읽기 전용 점검을 제공한다 (ADR-061).
+
 - **FR-OPS-001 MUST**: 증분 sync와 full rebuild를 분리해야 한다.
 - **FR-OPS-002 MUST**: 동시 sync 중복 실행을 막아야 한다.
 - **FR-OPS-003 MUST**: 실패한 job은 재시도 가능하고 idempotent해야 한다.

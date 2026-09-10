@@ -17,14 +17,19 @@
 
 결정되지 않은 소스나 원격 모델은 비활성 상태로 둔다. 샘플 설정의 자격 증명과 경로를 그대로 운영에 사용하지 않는다.
 
-## 2. 복제 후 60분 인수 경로
+## 2. 복제 후 설치·검증 순서
 
-1. `./scripts/bootstrap.sh`를 실행한다. Python 3.12+가 없으면 여기서 명확히
-   실패하므로 먼저 설치한다. bootstrap 전에는 `./scripts/kip`가 시스템
-   python으로 떨어져 어떤 setup 명령도 실행되지 않는다. 의존성은 `uv.lock`의
-   frozen sync로 설치한다. uv가 없으면 별도 `var/bootstrap-uv-0.8.22` 환경에
-   고정 버전을 준비한다. `.env`를 미리 example에서 복사할 필요는 없으며,
-   기존 `.env`와 config는 유지한다.
+1. `./scripts/bootstrap.sh`를 실행한다. Python·Node가 없으면 checksum 검증된
+   설치 도구로 프로젝트 전용 `var/runtime`에 준비한 뒤 `.env`를 읽는다.
+   호환되는 기존 프로그램은 재사용한다. `--check`는 설치 없는 점검이며,
+   `--install-docker`는 시스템 Docker 설치를 명시적으로 허용한다.
+   비대화형 환경에서는 필요한 사용자 조작을 안내하고 멈춘다. OS 관리자
+   암호와 Desktop 약관/첫 실행 선택은 사용자 화면에서 처리한 뒤 같은 명령을
+   재실행한다. 외부 DB용 CLI/MCP는 `--without-docker`를 사용할 수 있다.
+   Python을 준비하기 전에도 실행되는 경로이므로 먼저 Python을 수동 설치할
+   필요는 없다. 최소 Linux에는 curl/wget, CA 인증서, tar, SHA-256 도구가
+   있어야 한다. 의존성은 `uv.lock` frozen sync로 설치한다. 기존 `.env`,
+   config, 호환되는 `.venv`, Docker context와 셸 프로필은 보존한다.
 2. AI agent에게 “KIP을 셋업해줘”라고 요청해 `kip-setup` Skill을 시작한다.
 3. `setup inspect`가 반환한 질문에 매번 하나씩 답한다. Agent가 먼저
    identity mode를 묻고, `proxy_jwt`이면 issuer/audience/JWKS/admin group을,

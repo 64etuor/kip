@@ -40,6 +40,7 @@ Read the relevant section, not every document at startup.
   the config and project interpreter. Bare Python/pytest/Compose or inline
   `KIP_CONFIG`/`PYTHONPATH` substitutions are not equivalent. `make lint`,
   `make typecheck`, `make coverage`, and `make audit` are supported exceptions.
+  Bootstrap prepares prerequisites before loading `common.sh`; preserve that order.
 
 ## Changes and completion
 

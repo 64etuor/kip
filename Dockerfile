@@ -36,6 +36,7 @@ LABEL org.opencontainers.image.title="KIP Knowledge Fabric" \
       org.opencontainers.image.source="${SOURCE_URL}" \
       org.opencontainers.image.licenses="MIT"
 ENV PATH=/app/scripts:/opt/venv/bin:$PATH \
+    KIP_USE_MANAGED_RUNTIMES=0 \
     KIP_KORDOC_PACKAGE_DIR=/opt/kordoc-runtime/node_modules/kordoc \
     KORDOC_MODEL_CACHE=/opt/kordoc-models \
     KORDOC_OFFLINE=1 \

@@ -53,7 +53,7 @@ raise SystemExit(0 if ready and verified else 1)
 }
 
 required "Python 3.12+" \
-  "install Python 3.12+ (for example: brew install python@3.12), then run ./scripts/bootstrap.sh to create .venv" \
+  "run ./scripts/bootstrap.sh to prepare Python and create the project environment" \
   "$(python_cmd)" -c 'import sys; raise SystemExit(sys.version_info < (3,12))'
 required "root AGENTS.md" \
   "restore AGENTS.md from git (git checkout -- AGENTS.md)" \
@@ -69,7 +69,7 @@ if command -v docker >/dev/null 2>&1; then
   optional "PostgreSQL container" docker compose exec -T postgres pg_isready -U "${POSTGRES_USER:-kip_owner}" -d "${POSTGRES_DB:-kip}"
 fi
 required "Node 20.9+ for Kordoc OCR" \
-  "install Node.js 20.9+, then run ./scripts/bootstrap.sh" \
+  "run ./scripts/bootstrap.sh to prepare a compatible project-local Node/npm runtime" \
   node_20_9_ready
 required "Kordoc $(kordoc_expected_version 2>/dev/null || printf 'pinned version')" \
   "run ./scripts/bootstrap.sh to install the exact local Kordoc runtime" \

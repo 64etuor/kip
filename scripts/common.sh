@@ -5,11 +5,17 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PROJECT_ROOT
 export KIP_PROJECT_ROOT="${KIP_PROJECT_ROOT:-$PROJECT_ROOT}"
 export PATH="$PROJECT_ROOT/scripts:$PATH"
+if [[ -f "$PROJECT_ROOT/scripts/runtime-path.sh" ]]; then
+  source "$PROJECT_ROOT/scripts/runtime-path.sh"
+fi
 
 if [[ -f "$PROJECT_ROOT/.env" && "${KIP_SKIP_DOTENV:-0}" != "1" ]]; then
   KIP_DOTENV_PYTHON="$PROJECT_ROOT/.venv/bin/python"
   if [[ ! -x "$KIP_DOTENV_PYTHON" ]]; then
-    KIP_DOTENV_PYTHON="$(command -v python3 || command -v python)"
+    if ! KIP_DOTENV_PYTHON="$(command -v python3 || command -v python)"; then
+      printf 'Python is not ready. Run ./scripts/bootstrap.sh before other KIP commands.\n' >&2
+      return 69 2>/dev/null || exit 69
+    fi
   fi
   if ! KIP_DOTENV_RECORDS="$($KIP_DOTENV_PYTHON "$PROJECT_ROOT/scripts/load_dotenv.py" "$PROJECT_ROOT/.env")"; then
     return 1 2>/dev/null || exit 1

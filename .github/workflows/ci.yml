@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  UV_VERSION: "0.8.22"
+  UV_VERSION: "0.12.12"
   UV_NO_PROGRESS: "1"
 
 jobs:
@@ -75,6 +75,10 @@ jobs:
           --extra mcp
           --extra telemetry
           --extra dev
+
+      - name: Cold prerequisite bootstrap without host Python or Node on PATH
+        if: matrix.python-version == '3.12'
+        run: ./scripts/smoke-prerequisites.sh
 
       - name: Check generated contracts, boundaries, lint, and types
         run: |

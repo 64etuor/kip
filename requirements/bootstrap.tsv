@@ -1,0 +1,14 @@
+# component platform version url sha256
+uv	darwin-arm64	0.12.12	https://github.com/astral-sh/uv/releases/download/0.12.12/uv-aarch64-apple-darwin.tar.gz	46740540b63fdee9a6cb2e19baf3f1f475b850c440a33e63455087a6871263f1
+uv	darwin-x64	0.12.12	https://github.com/astral-sh/uv/releases/download/0.12.12/uv-x86_64-apple-darwin.tar.gz	0dc8cd6c961582b0d140b5398f96b23502885277fb3464241456a2435e460dfa
+uv	linux-arm64	0.12.12	https://github.com/astral-sh/uv/releases/download/0.12.12/uv-aarch64-unknown-linux-gnu.tar.gz	fe08db50cc1b56cd1da7801065ed1103d27ed3f9571cd122386cfc7faf1b8df5
+uv	linux-x64	0.12.12	https://github.com/astral-sh/uv/releases/download/0.12.12/uv-x86_64-unknown-linux-gnu.tar.gz	ab9b309d4586403f024e100abaceb396616e178a553e2500c36087d180f09509
+python	any	3.13.15	managed-by-uv	managed-by-uv
+node	darwin-arm64	22.23.2	https://nodejs.org/dist/v22.23.2/node-v22.23.2-darwin-arm64.tar.gz	61130f394c1630d211dd50aecc4353d379480f36d3ac913cd85dbba1aed585c6
+node	darwin-x64	22.23.2	https://nodejs.org/dist/v22.23.2/node-v22.23.2-darwin-x64.tar.gz	58e99022c2ff89395576cc7fd4d98cea24bb68081475d5f88b801ee8729fb026
+node	linux-arm64	22.23.2	https://nodejs.org/dist/v22.23.2/node-v22.23.2-linux-arm64.tar.gz	013b59cfd2819703a6f4a14ab891fc46fc2a4e3f5bcd92de3fb4929b43e35b30
+node	linux-x64	22.23.2	https://nodejs.org/dist/v22.23.2/node-v22.23.2-linux-x64.tar.gz	b294a556e639d64338823920e5866c21c02741742d2e1529ee1a225c1ec9252a
+docker	darwin-arm64	4.90.0	https://desktop.docker.com/mac/main/arm64/238679/Docker.dmg	c131ee28ef56248d4abee2268c05235b19216b015ddf632727cef1b95a6f995c
+docker	darwin-x64	4.90.0	https://desktop.docker.com/mac/main/amd64/238679/Docker.dmg	d5c1143655cd2a4cbd674e5a1337762fa34699d541e93c53bde034048f1c74c8
+docker-key	ubuntu	current	https://download.docker.com/linux/ubuntu/gpg	1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570
+docker-key	debian	current	https://download.docker.com/linux/debian/gpg	1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570

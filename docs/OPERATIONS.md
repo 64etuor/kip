@@ -17,6 +17,14 @@ the limit as appropriate; ordinary retrieval still never starts a sync.
 
 ## 자주 하는 작업 (Everyday tasks)
 
+설치 전에는 `./scripts/bootstrap.sh --check`로 준비 상태를 확인한다.
+기본 bootstrap은 없는 Python/Node를 프로젝트 안에 준비하며
+`--install-docker`는 시스템 Docker 설치를 허용한다. OS 암호·Desktop
+약관과 첫 실행 선택은 사용자가 처리해야 한다. 완료되지 않은 경우 같은
+명령을 재실행할 수 있으며 기존 Docker context/그룹 권한은 바꾸지 않는다.
+외부 DB만 쓰는 CLI/MCP 설치는 `--without-docker`를 지정한다. 다운로드는
+pin과 checksum을 확인하며 실제 엔진 접근까지 성공해야 Docker ready다.
+
 CLI/MCP만 쓰는 배포는 `./scripts/app-up.sh --database-only`부터 실행한다.
 generated 배포에서는 승인된 `postgres` 서비스만 기동해 준비를 기다린 뒤
 `config/kip.host.generated.toml`의 plan fingerprint와 database secret ref가

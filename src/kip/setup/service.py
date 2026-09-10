@@ -201,16 +201,17 @@ class SetupService:
                 ),
             )
         )
-        docker_cli = shutil.which("docker")
+        docker_required = plan.database_secret_ref.name == "KIP_DATABASE_URL"
+        docker_cli = shutil.which("docker") if docker_required else None
         checks.append(
             SetupCheck(
                 name="docker_cli",
-                ok=docker_cli is not None,
+                ok=not docker_required or docker_cli is not None,
                 detail=(
-                    docker_cli
+                    "not required for external-database CLI/MCP; the optional API/worker profile still needs Docker"
+                    if not docker_required else docker_cli
                     if docker_cli
-                    else "docker CLI not found; install Docker to run "
-                    "./scripts/app-up.sh"
+                    else "docker CLI not found; run ./scripts/bootstrap.sh --install-docker"
                 ),
             )
         )

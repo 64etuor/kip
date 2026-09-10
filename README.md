@@ -117,15 +117,15 @@ ACL을 제안하고, preview가 local/cloud-only 파일을 구분합니다. 다�
 
 ### 준비물
 
-Python 3.12+, Node.js 20.9+, Docker Compose, 최소 10GB의 여유 디스크가
-필요합니다. 런타임 이미지 약 2GB, OCR 모델 약 0.8GB, Python 환경 약 1GB,
-데이터베이스 공간을 포함한 최소치입니다.
+Python·Node를 먼저 설치할 필요 없이 아래 명령부터 실행할 수 있습니다.
+호환되는 기존 프로그램은 재사용하고, 없으면 프로젝트의 `var/runtime`에
+Python 3.13과 Node 22를 준비합니다. 시스템 Python·Node와 셸 프로필은
+수정하지 않습니다. 다운로드 연결과 최소 10GB의 여유 공간이 필요합니다.
+Python이 전혀 없는 환경의 첫 다운로드에는 curl 또는 wget, tar와 SHA-256
+도구가 필요합니다(macOS 기본 제공; 최소 Linux 이미지에서는 별도 준비).
 
 ```bash
-python3 --version        # 3.12 이상
-node --version           # 20.9 이상
-docker compose version   # Docker Desktop 실행 상태
-df -h .                  # 여유 공간 10GB 이상
+./scripts/bootstrap.sh --check   # 설치하지 않고 준비 상태 확인
 ```
 
 스크립트는 bash를 사용합니다. macOS와 Linux에서는 바로 실행할 수 있고,
@@ -133,18 +133,27 @@ Windows에서는 PowerShell/cmd가 아니라 WSL2 Ubuntu 안에서 실행해야 
 한 줄이라도 실패하면 [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)를
 확인하세요.
 
+Docker가 없으면 터미널에서 설치 여부를 묻습니다. 에이전트 등 비대화형
+실행에서는 `./scripts/bootstrap.sh --install-docker`로 시스템 Docker 설치를
+명시적으로 허용할 수 있습니다. macOS는 검증된 Docker Desktop 설치기를,
+Ubuntu/Debian은 Docker 공식 서명 저장소를 사용합니다. 관리자 암호와
+Desktop 약관·초기 설정은 사용자가 OS 화면/터미널에서 처리합니다.
+Windows에서는 WSL2와 Docker Desktop의 WSL 연동을 사용합니다.
+외부 DB만 사용하는 CLI/MCP 설치는 `--without-docker`를 지정할 수 있습니다.
+
 Bootstrap은 `uv.lock`의 고정된 의존성을 `uv sync --frozen`으로 설치하고,
 고정된 Kordoc OCR runtime과 한국어 model cache를 설치·검증합니다.
 OCR npm 의존성도 lock 파일로 고정하며 설치 후처리를 실행하지 않습니다.
 알려진 high 이상 취약점이나 감사 실패가 있으면 설치를 중단합니다.
-uv가 없으면 별도 도구 환경에 0.8.22를 준비합니다. 새 `.env`에는 무작위
+설치 도구와 바이너리 pin은 `requirements/bootstrap.tsv`에 있습니다.
+Python 3.12+, Node 20.9+/npm 9+, Compose 2.20+를 검사하며 엔진 연결도
+확인합니다. 새 `.env`에는 무작위
 credential을 생성하며 기존 `.env`와 config는 보존합니다.
 정상 색인 중에는 parser package나 model을 내려받지 않습니다.
 
 ```bash
 ./scripts/bootstrap.sh
-./scripts/dev-up.sh
-./scripts/migrate.sh
+./scripts/app-up.sh --database-only
 ./scripts/doctor.sh
 ./scripts/test.sh
 ```

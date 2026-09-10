@@ -6,8 +6,17 @@ description: Install or configure a KIP deployment through its guided setup stat
 # KIP Guided Setup
 
 Run from the KIP repository with `./scripts/kip`. On a fresh clone, use
-`./scripts/bootstrap.sh` first; it requires Python 3.12+ and supports
-`KIP_PYTHON=/path/to/python3.12`. Resume interrupted setup from inspect.
+`./scripts/bootstrap.sh` first; it prepares Python 3.12+ and Node/npm locally
+when missing, without changing system runtimes or shell profiles. Use
+`--check` for read-only prerequisite status. System Docker installation uses
+`--install-docker`; explain that action and obtain authorization if the request
+has not already provided it. Native administrator authentication and Desktop
+license/first-run choices belong to the user's terminal/UI, never chat secrets.
+An action-required exit is not a successful setup: explain the next step and
+rerun after it is completed. Use `--without-docker` only for an external-DB
+CLI/MCP installation. Explicit `KIP_PYTHON` remains authoritative; a broken or
+old existing `.venv` is preserved for the user to move aside. Resume interrupted
+configuration from inspect.
 
 1. Run `./scripts/kip setup inspect`. If incomplete, ask exactly one question:
    the returned `data.questions` item, with its reason and answer format.

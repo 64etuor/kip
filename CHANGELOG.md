@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.8.0 - 2026-09-11
+
+- Bootstrap without a preinstalled Python: prepare checksum-pinned uv and a
+  project-local managed Python when needed, then load dotenv and create the
+  virtual environment. Reuse compatible existing Python/Node installations;
+  download a verified local Node/npm bundle when missing or too old.
+- Add read-only prerequisite checks, explicit Docker installation assistance,
+  bounded engine readiness checks and an external-database path without Docker.
+  Preserve existing environments, Docker contexts, shell profiles and container
+  packages. Native administrator/license steps remain visible user actions.
+- Share managed runtime discovery across wrappers and exercise a real cold
+  Python/Node bootstrap in CI. Guided external-database readiness no longer
+  incorrectly requires Docker for the CLI/MCP path.
+
 ## 3.7.1 - 2026-09-10
 
 - Bind named-file answers to the caller's allowed indexed filenames before

@@ -21,16 +21,16 @@ test:
 	./scripts/test.sh
 
 coverage:
-	uv run pytest --cov --cov-report=term --cov-report=xml
+	./scripts/uv.sh run pytest --cov --cov-report=term --cov-report=xml
 
 lint:
-	uv run ruff check src tests scripts
+	./scripts/uv.sh run ruff check src tests scripts
 
 typecheck:
-	uv run mypy src/kip
+	./scripts/uv.sh run mypy src/kip
 
 audit:
-	uv run pip-audit --requirement requirements/runtime.txt --no-deps --disable-pip
+	./scripts/uv.sh run pip-audit --requirement requirements/runtime.txt --no-deps --disable-pip
 	./scripts/audit-kordoc.sh
 
 verify:

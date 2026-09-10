@@ -12,7 +12,9 @@ agent는 `kip-setup` Skill에 따라 매번 하나의 누락된 결정만 질문
 수집 범위를 미리 계산한 뒤 승인된 plan만 원자적으로 적용한다.
 
 새로 복제한 저장소에서는 `./scripts/kip`가 `.venv`를 요구하므로 먼저
-`./scripts/bootstrap.sh`를 실행한다(Python 3.12+ 필요).
+`./scripts/bootstrap.sh`를 실행한다. 필요한 Python·Node는 프로젝트 안에
+준비한다. Docker 시스템 설치를 허용하려면 `--install-docker`, 외부 DB만
+사용하면 `--without-docker`를 붙인다. `--check`는 읽기 전용 준비 점검이다.
 
 ```bash
 ./scripts/bootstrap.sh

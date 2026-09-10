@@ -245,6 +245,15 @@ against a concurrent filesystem attacker. See ADR-056.
 
 ## Dependency safety
 
+Bootstrap prerequisite assets are version/checksum-pinned in
+`requirements/bootstrap.tsv`; verification precedes execution, and the Python
+stage uses bounded downloads and safe tar extraction. Managed host runtimes
+live under `var/runtime`; production images disable that writable PATH entry
+with `KIP_USE_MANAGED_RUNTIMES=0` and use their baked binaries. System Docker
+installation requires authorization, never silently removes conflicting
+container packages, accepts licenses, changes contexts or grants Docker group
+membership. Administrator credentials are entered only in the native terminal/UI.
+
 - The 2026-09-10 cold-install audit of 3.6.1 found sharp
   [GHSA-rgj7-g3m4-5g8c](https://github.com/advisories/GHSA-rgj7-g3m4-5g8c)
   (high; fixed in 0.35.4) and adm-zip

@@ -27,6 +27,13 @@ and synchronized updates to the affected canonical documents.
 
 ## Current alignment
 
+3.8.0 adds prerequisite preparation before Python-dependent setup, with pinned
+project-local runtimes, explicit system Docker installation, readiness checks
+and external-DB Docker exemption. A real macOS cold runtime/full bootstrap was
+exercised; Linux cold runtime smoke is included in CI. Native privileged Docker
+installation on every OS is not established by simulated installer tests,
+and first-run/permission/WSL choices remain explicit user actions (ADR-061).
+
 3.7.1 corrects named-source binding before retrieval limits and live freshness
 filtering, including quoted filenames and exclusions. Typed refusals preserve
 the requested scope when evidence cannot be used. This is covered on both

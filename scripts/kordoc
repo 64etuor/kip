@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+if [[ -f "$SCRIPT_DIR/runtime-path.sh" ]]; then source "$SCRIPT_DIR/runtime-path.sh"; fi
 source "$SCRIPT_DIR/kordoc-runtime.sh"
 
 if ! command -v node >/dev/null 2>&1; then

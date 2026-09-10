@@ -3,7 +3,13 @@
 막혔을 때 여기서 증상을 찾아 순서대로 따라 하세요. 용어가 낯설면
 [`GLOSSARY.md`](GLOSSARY.md)를 먼저 보세요.
 
-**어떤 명령이든 실패하면 가장 먼저 이 두 개를 실행하세요.**
+**설치 전이나 Python·Node·Docker 문제라면 먼저 실행하세요.**
+
+```bash
+./scripts/bootstrap.sh --check
+```
+
+설치가 끝난 뒤 자료 조회 문제라면 다음 두 개를 실행하세요.
 
 ```bash
 ./scripts/kip doctor    # 설정·저장소·폴더·OCR 상태를 점검하고 해야 할 일을 알려줍니다
@@ -17,12 +23,14 @@
 ## 1. 설치가 안 될 때
 
 ### `./scripts/bootstrap.sh`가 Python 버전 오류로 멈춤
-Python 3.12 이상이 필요합니다.
+새 환경에서는 `./scripts/bootstrap.sh`가 Python 3.12+를 준비합니다.
+기존 `.venv`가 손상됐거나 구버전이면 덮어쓰지 않습니다. 기존 환경을
+다른 이름으로 보관한 뒤 재실행하세요. 명시한 `KIP_PYTHON`이 잘못됐으면
+그 경로를 먼저 수정해야 하며 자동으로 다른 인터프리터를 고르지 않습니다.
 
 ```bash
-python3 --version
-# 3.12 미만이면 새로 설치한 뒤
-rm -rf .venv && ./scripts/bootstrap.sh
+mv .venv ".venv.backup.$(date +%s)"   # 기존 환경이 있을 때만
+./scripts/bootstrap.sh
 ```
 
 ### `Kordoc OCR requires Node.js 20.9+` (bootstrap 또는 doctor 실패)
@@ -30,10 +38,23 @@ Kordoc OCR 런타임은 Node.js 20.9 이상을 요구합니다. `doctor.sh`의
 `Node 20.9+ for Kordoc OCR` 항목도 같은 이유로 실패합니다.
 
 ```bash
-node --version
-# 20.9 미만이면 Node.js를 올린 뒤
-./scripts/install-kordoc.sh
+./scripts/bootstrap.sh
 ```
+
+### 설치기가 `Action required`로 멈춤
+Docker가 없으면 `./scripts/bootstrap.sh --install-docker`로 설치를 허용할 수
+있습니다. 관리자 인증은 대화형 터미널에서 진행하세요. Docker Desktop 창의
+약관·첫 실행 설정이 끝나지 않았거나 Docker Engine 권한이 없으면 준비 완료로
+처리하지 않습니다. Linux의 Docker 그룹 권한은 root와 동등한 접근을 주므로
+관리자와 결정하며, 새 로그인 세션이 필요할 수 있습니다. 기존 원격 context는
+바꾸지 않으므로 해당 엔진의 연결을 복구한 뒤 같은 명령을 다시 실행하세요.
+WSL2는 Windows Docker Desktop 설치와 해당 배포판의 WSL integration을
+완료해야 합니다. 외부 DB만 쓰는 경우에만 `--without-docker`로 건너뜁니다.
+
+### 다운로드 checksum 오류 또는 `var/runtime` 충돌
+검증에 실패한 다운로드는 실행하지 않습니다. 네트워크/배포 pin을 확인하고
+다시 실행하세요. 기존의 불완전한 버전 디렉터리나 symlink가 충돌하면 먼저
+내용을 보관·확인해야 하며, 설치기는 임의로 삭제하거나 외부 경로에 쓰지 않습니다.
 
 ### `Kordoc lock validation failed` 또는 npm audit 실패
 `./scripts/audit-kordoc.sh`가 실패한 것입니다. 앞의 메시지는

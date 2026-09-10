@@ -432,6 +432,14 @@ file 크기를 읽기 전에 검사하고 stderr는 tail만 bounded diagnostic�
 
 ## 8. Configuration
 
+Bootstrap은 Python이 필요한 `common.sh`/dotenv 처리 전에 순수 Bash
+prerequisite 단계를 실행한다. checksum-pinned uv가 필요한 Python을
+프로젝트 안에 준비한 뒤 stdlib-only 준비기가 Node/npm과 Docker 상태를
+점검한다. `requirements/bootstrap.tsv`의 URL·digest·version을 공유하며,
+컨테이너는 `KIP_USE_MANAGED_RUNTIMES=0`으로 writable `var/runtime/bin`을
+실행 경로에 넣지 않는다. 외부 DB용 CLI/MCP는 Docker가 필수가 아니다
+(ADR-061).
+
 ### 8.1 Precedence
 
 ```text
@@ -3606,6 +3614,8 @@ deadline contract; adding one requires cancellation and adapter propagation
 tests rather than documentation alone.
 
 ### 29.19 Guided setup relation mining decision
+
+
 
 `setup inspect` asks exactly one `relation_mining_mode` question after the
 generation provider and any provider-specific egress questions. The accepted

@@ -28,6 +28,21 @@ from tests.setup_support import complete_setup_answers
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_external_database_readiness_does_not_probe_docker(tmp_path, monkeypatch):
+    project = _project(tmp_path)
+    answers = complete_setup_answers(tmp_path).model_copy(update={
+        "database_secret_ref": SecretReference.parse("env:EXTERNAL_DATABASE_URL"),
+    })
+    plan = build_setup_plan(answers, project_root=project)
+    monkeypatch.setenv("EXTERNAL_DATABASE_URL", "postgresql://external.example.test/kip")
+    monkeypatch.setattr("kip.setup.service.shutil.which", lambda name: pytest.fail("external DB does not need Docker discovery"))
+    service = SetupService(project_root=project, state_path=project / ".kip/setup.json")
+    checks = {check.name: check for check in service._runtime_readiness(plan)}
+    assert checks["docker_cli"].ok
+    assert "not required" in checks["docker_cli"].detail
+    assert "docker_daemon" not in checks
+
+
 def _database_url(host: str, password: str) -> str:
     credentials = "kip_owner:" + quote(password, safe="")
     return urlunsplit(("postgresql", credentials + "@" + host, "/kip", "", ""))

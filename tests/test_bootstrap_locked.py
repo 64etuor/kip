@@ -23,6 +23,7 @@ def test_bootstrap_installs_declared_extras_from_frozen_lock(
     (scripts / "common.sh").write_text(
         'PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"\n'
         'export PROJECT_ROOT\n'
+        'export PATH="$PROJECT_ROOT/var/runtime/bin:$PATH"\n'
         'python_cmd() { printf "%s\\n" "$PROJECT_ROOT/.venv/bin/python"; }\n'
     )
     (scripts / "install-kordoc.sh").write_text("#!/bin/bash\nexit 0\n")
@@ -39,17 +40,19 @@ def test_bootstrap_installs_declared_extras_from_frozen_lock(
     uv_stub = tmp_path / "uv-stub"
     uv_stub.write_text(f"#!{sys.executable}\nPROGRAM='uv'\n" + record)
     uv_stub.chmod(0o755)
+    (scripts / "prerequisites.sh").write_text(
+        '#!/bin/bash\nset -eu\n'
+        'root="$(cd "$(dirname "$0")/.." && pwd)"\n'
+        'if ! command -v uv >/dev/null; then\n'
+        '  mkdir -p "$root/var/runtime/bin"\n'
+        '  cp "$BOOTSTRAP_UV_STUB" "$root/var/runtime/bin/uv"\n'
+        'fi\n'
+    )
+    (scripts / "prerequisites.sh").chmod(0o755)
     python = project / ".venv/bin/python"
     python.parent.mkdir(parents=True)
     python.write_text(
         f"#!{sys.executable}\nPROGRAM='python'\n" + record
-        + "import shutil\n"
-        "if sys.argv[1:3]==['-m','venv']:\n"
-        "    target=Path(sys.argv[3])/'bin'\n"
-        "    target.mkdir(parents=True)\n"
-        "    shutil.copy2(__file__,target/'python')\n"
-        "elif sys.argv[1:4]==['-m','pip','install'] and 'uv==0.8.22' in sys.argv:\n"
-        "    shutil.copy2(os.environ['BOOTSTRAP_UV_STUB'],Path(__file__).with_name('uv'))\n"
     )
     python.chmod(0o755)
     (python.parent / "activate").write_text('export PATH="$PROJECT_ROOT/.venv/bin:$PATH"\n')
@@ -79,12 +82,9 @@ def test_bootstrap_installs_declared_extras_from_frozen_lock(
             if argument == "--extra"
         } == {"postgres", "api", "identity", "extractors", "mcp", "telemetry", "dev"}
     installs = [call["args"] for call in calls if call["args"][:3] == ["-m", "pip", "install"]]
-    if existing_uv:
-        assert installs == []
-    else:
-        assert len(installs) == 1
-        assert "uv==0.8.22" in installs[0]
-        tool = project / "var/bootstrap-uv-0.8.22/bin/uv"
+    assert installs == []
+    if not existing_uv:
+        tool = project / "var/runtime/bin/uv"
         assert tool.is_file()
         assert not tool.is_relative_to(project / ".venv")
     assert (project / ".env").read_text() == "existing private environment\n"

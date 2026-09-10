@@ -4,6 +4,27 @@ This is the current readiness inventory, not the target architecture. The
 target-to-current matrix and ordered gap register live in
 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`.
 
+## 2026-09-11 prerequisite bootstrap (3.8.0)
+
+Bootstrap can prepare Python and Node/npm locally before loading dotenv; the
+missing-Python chicken-and-egg failure is removed. Read-only checks, explicit
+Docker installation assistance, bounded readiness and a Docker-free external
+database path are available. Compatible existing programs, virtual environments,
+profiles and Docker contexts are preserved. A real macOS arm64 cold probe with
+Python/Node/uv hidden from PATH installed Python 3.13.15 and Node 22.23.2; a
+separate fresh source-kit bootstrap completed the locked environment and OCR
+model checks. Docker native privileged installers are covered by simulated
+action-boundary tests, not by removing/reinstalling the user's working Docker.
+Windows/WSL Desktop integration, OS authentication, license choices and Linux
+daemon permissions can still require user action. See ADR-061 and the starter
+guide; those boundaries are not reported as completed installation.
+The final local full gate passed 1,112 tests, lint/types, Python dependency
+auditing and the npm high-severity gate; the four documented moderate adm-zip
+propagation findings remain. The portable retrieval/ACL set retained 120/120
+cases, recall@k/MRR=1.0 and unauthorized=0. The private corpus floor was not
+applicable to this workspace. Local receipts and cold-install logs are under
+the ignored `var/audits/prereq-380/` directory.
+
 ## 2026-09-10 named-source answer corrections (3.7.1)
 
 The three reproduced 3.7.0 defects are covered by regression checks: named

@@ -1,0 +1,31 @@
+docs/IMPLEMENTATION_STATUS.md
+  s_0e5d25024bfaed::t_627b8e81468e41 9-19
+docs/SECURITY.md
+  s_0e5d25024bfaed::t_4fdef7ea62c367 234-235,244-253
+docs/STARTER_KIT_GUIDE.md
+  s_0e5d25024bfaed::t_927900f5ba4eb8 58-62,184-187
+docs/PRODUCTION_DESIGN_ALIGNMENT.md
+  s_0e5d25024bfaed::t_627b8e81468e41 30-38
+docs/OPERATIONS.md
+  s_0e5d25024bfaed::t_4fdef7ea62c367 842-850
+CHANGELOG.md
+  s_0e5d25024bfaed::t_927900f5ba4eb8 3-8
+docs/AGENT_QUALITY.md
+  s_0e5d25024bfaed::t_627b8e81468e41 42-108
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "969b88d12e12c48f68826d2fab43ba612509fa40",
+  "prompts": {},
+  "sessions": {
+    "s_0e5d25024bfaed": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a086c4-a430-7101-a45d-9c050ba0f956",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

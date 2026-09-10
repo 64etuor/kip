@@ -1,0 +1,121 @@
+CHANGELOG.md
+  s_0e5d25024bfaed::t_4b195f9c33189b 3-14
+docs/adr/ADR-060-bind-answer-file-scope-before-retrieval.md
+  s_0e5d25024bfaed::t_4b195f9c33189b 1-32,36-50
+  s_0e5d25024bfaed::t_6309d2bbfddb59 33-35
+docs/OPERATIONS.md
+  s_0e5d25024bfaed::t_6309d2bbfddb59 3-14
+src/kip/adapters/repository/memory/retrieval.py
+  s_0e5d25024bfaed::t_3955ad49510522 50-52
+src/kip/__init__.py
+  s_0e5d25024bfaed::t_4b195f9c33189b 3
+docs/PRD.md
+  s_0e5d25024bfaed::t_af959cf2873950 521-525
+src/kip/application/search_engine.py
+  s_0e5d25024bfaed::t_643cf42af1e6b3 9
+  s_0e5d25024bfaed::t_3955ad49510522 174-175
+src/kip/adapters/repository/memory/lexical.py
+  s_0e5d25024bfaed::t_643cf42af1e6b3 9
+  s_0e5d25024bfaed::t_3955ad49510522 48,83-91,101-103
+  s_0e5d25024bfaed::t_9dc1d932c0b5d1 104
+src/kip/application/search.py
+  s_0e5d25024bfaed::t_3955ad49510522 154-156
+src/kip/ports/retrieval.py
+  s_0e5d25024bfaed::t_3955ad49510522 21-24
+docs/AGENT_QUALITY.md
+  s_0e5d25024bfaed::t_151643de3b11eb 3-14
+  s_0e5d25024bfaed::t_23cb365f5273d0 15-22
+docs/DATA_CONTRACTS.md
+  s_0e5d25024bfaed::t_6309d2bbfddb59 352-355
+  s_0e5d25024bfaed::t_af959cf2873950 345-351
+docs/APP_INTEGRATION.md
+  s_0e5d25024bfaed::t_af959cf2873950 3-9
+tests/test_mcp_envelope_contract.py
+  s_0e5d25024bfaed::t_11e865cdcb19af 22-41,43-59
+  s_0e5d25024bfaed::t_2488acf595aeac 42
+src/kip/adapters/repository/memory/semantic.py
+  s_0e5d25024bfaed::t_8e576c44777c90 145-146
+  s_0e5d25024bfaed::t_643cf42af1e6b3 9
+  s_0e5d25024bfaed::t_520b85bb7b66da 147-148
+tests/test_answer_source_scope.py
+  s_0e5d25024bfaed::t_fc08cf27ecc88f 157-173
+  s_0e5d25024bfaed::t_c8b6cb55c051d9 143-148,153-156
+  s_0e5d25024bfaed::t_3f8058d1d1c411 12,61,95-142
+  s_0e5d25024bfaed::t_ffedc95e165272 58,174-189
+  s_0e5d25024bfaed::t_c758a4168c67bb 6,53
+  s_0e5d25024bfaed::t_87725fa0fdce63 13-44
+  s_0e5d25024bfaed::t_4fb8449fb7aecd 149-152
+  s_0e5d25024bfaed::t_a77b61619ef08d 3-5
+  s_0e5d25024bfaed::t_6c8df81927e629 7-11
+  s_0e5d25024bfaed::t_3c88e8b098098b 45-47,50-52
+  s_0e5d25024bfaed::t_2012e3bbce4f43 54-57
+  s_0e5d25024bfaed::t_d39cb209bf056d 59-60
+  s_0e5d25024bfaed::t_c40a092fc64502 62-64,92-94
+  s_0e5d25024bfaed::t_c0e4b5b51ca33f 1-2,48-49,65-91
+src/kip/application/answering.py
+  s_0e5d25024bfaed::t_c8b6cb55c051d9 130-134
+  s_0e5d25024bfaed::t_ffedc95e165272 20,187-191,193,195-197
+  s_0e5d25024bfaed::t_82a85fc2fe88dd 8,17,23,37,135-161,168-169,171,200,215-216
+  s_0e5d25024bfaed::t_643cf42af1e6b3 18-19,21-22
+  s_0e5d25024bfaed::t_fc08cf27ecc88f 167,170
+docs/IMPLEMENTATION_STATUS.md
+  s_0e5d25024bfaed::t_af959cf2873950 7-17,21,57-58
+  s_0e5d25024bfaed::t_23cb365f5273d0 18-20
+docs/TRD.md
+  s_0e5d25024bfaed::t_af959cf2873950 2408-2415
+src/kip/adapters/repository/postgres/retrieval.py
+  s_0e5d25024bfaed::t_3955ad49510522 50-52
+VERSION
+  s_0e5d25024bfaed::t_4b195f9c33189b 1
+pyproject.toml
+  s_0e5d25024bfaed::t_4b195f9c33189b 7
+tests/test_file_references.py
+  s_0e5d25024bfaed::t_0ba2148b96a8f0 5-9,41-42
+  s_0e5d25024bfaed::t_3445cd15938936 45-55
+  s_0e5d25024bfaed::t_3f8058d1d1c411 1-4,10-40,43-44
+src/kip/domain/file_references.py
+  s_0e5d25024bfaed::t_0ba2148b96a8f0 18-19
+  s_0e5d25024bfaed::t_3445cd15938936 24-26,54
+  s_0e5d25024bfaed::t_8e3adcdf1883ff 48-49
+  s_0e5d25024bfaed::t_ac4fb5ff94d4cd 1-17,20,23,27-47,50-53,55-98
+  s_0e5d25024bfaed::t_643cf42af1e6b3 21-22
+docs/PRODUCTION_DESIGN_ALIGNMENT.md
+  s_0e5d25024bfaed::t_af959cf2873950 30-35
+src/kip/adapters/repository/postgres/database.py
+  s_0e5d25024bfaed::t_c8b6cb55c051d9 1314
+  s_0e5d25024bfaed::t_fbd2666508e00b 82
+  s_0e5d25024bfaed::t_3955ad49510522 1267-1272,1274-1295,1364-1365,1423,1709-1710
+  s_0e5d25024bfaed::t_8e576c44777c90 23
+  s_0e5d25024bfaed::t_483443e4892088 85-91,93,95-97
+  s_0e5d25024bfaed::t_8d93992fb77455 79-81,83-84,92,94,1273,1315
+  s_0e5d25024bfaed::t_d450f1b0333d7a 98
+docs/SECURITY.md
+  s_0e5d25024bfaed::t_151643de3b11eb 287-291
+  s_0e5d25024bfaed::t_d3b88c933e7849 292
+src/kip/application/answer_adequacy.py
+  s_0e5d25024bfaed::t_8e576c44777c90 10,114-115
+  s_0e5d25024bfaed::t_82a85fc2fe88dd 176,184,189-190,196-197
+  s_0e5d25024bfaed::t_c758a4168c67bb 113,127,361
+contracts/openapi.json
+  s_0e5d25024bfaed::t_d6536855ddd0fc 1098
+contracts/openapi.yaml
+  s_0e5d25024bfaed::t_cb90f6e8169906 6
+uv.lock
+  s_0e5d25024bfaed::t_7cf05b5d635631 928
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "c1a4995e11b1ded92eaa7a7a60d9de0188a2c0a1",
+  "prompts": {},
+  "sessions": {
+    "s_0e5d25024bfaed": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a086c4-a430-7101-a45d-9c050ba0f956",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

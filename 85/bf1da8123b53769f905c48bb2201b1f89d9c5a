@@ -1,0 +1,248 @@
+contracts/evidence-read.schema.json
+  s_0e5d25024bfaed::t_710be40cb11ab6 174-183
+VERSION
+  s_0e5d25024bfaed::t_e5fdb6b1893b6f 1
+.claude/skills/kip-setup/SKILL.md
+  s_16a999dee6ecf2::t_ae9598d32c2f67 28-32
+Makefile
+  s_0e5d25024bfaed::t_0263db13eb2753 34
+docs/OPERATIONS.md
+  s_16a999dee6ecf2::t_255a9539739447 8-22,851-871
+  s_16a999dee6ecf2::t_e12a59d1896fe6 97-101
+src/kip/application/search_engine.py
+  s_0e5d25024bfaed::t_b2487964adb893 11,47-62,234,237
+README.md
+  s_0e5d25024bfaed::t_e5fdb6b1893b6f 120,126,138-139
+scripts/audit-kordoc.sh
+  s_0e5d25024bfaed::t_0263db13eb2753 1-44
+src/kip/application/answering.py
+  s_16a999dee6ecf2::t_bc2333123d3613 149-154
+  s_0e5d25024bfaed::t_1ed709cdf35812 161-164
+  s_16a999dee6ecf2::t_ae4dcc66fd0433 155-160
+  s_16a999dee6ecf2::t_d6b8400d1f6f37 8-12
+tests/test_mcp_envelope_contract.py
+  s_0e5d25024bfaed::t_7c6fd45d43c371 22-45
+scripts/verify.sh
+  s_0e5d25024bfaed::t_0263db13eb2753 20
+pyproject.toml
+  s_0e5d25024bfaed::t_e5fdb6b1893b6f 7
+tests/integration/test_golden_gate_applicability.py
+  s_16a999dee6ecf2::t_e12a59d1896fe6 1-49
+src/kip/domain/models.py
+  s_0e5d25024bfaed::t_7c6fd45d43c371 268
+  s_0e5d25024bfaed::t_b2487964adb893 200-205,243-246,664
+.claude/skills/knowledge-fabric/SKILL.md
+  s_16a999dee6ecf2::t_ae9598d32c2f67 22-30
+scripts/kordoc-runtime.sh
+  s_16a999dee6ecf2::t_a38a10d21dd8da 1-19
+src/kip/application/answer_adequacy.py
+  s_16a999dee6ecf2::t_117ba90a203ce7 165-166,189-193,195,198,202,206-207,226-227,232-233,405,437,527,529
+  s_16a999dee6ecf2::t_ae4dcc66fd0433 167,169-170,175-176,200-201,203,221-222,224-225,228-231
+  s_16a999dee6ecf2::t_eba6da0f5f53c4 234-241,418
+  s_16a999dee6ecf2::t_ce1b0f389b34b1 409-412,414-417,467
+  s_16a999dee6ecf2::t_1a3bd143401e5e 32-48
+  s_16a999dee6ecf2::t_517c533e7244a3 49-55,442-443
+  s_16a999dee6ecf2::t_81c98713d74acd 56-69
+  s_16a999dee6ecf2::t_9073064059626a 151
+  s_0e5d25024bfaed::t_1ed709cdf35812 6,138,406
+  s_16a999dee6ecf2::t_71b967c6cefa33 123,126,129-137
+  s_16a999dee6ecf2::t_677f64a5a812a0 148,152-155,168,171,187-188,407,419-421,424-431,433,438-440,444-463,469
+  s_16a999dee6ecf2::t_55823bb31a8460 156-164,172-174,185,441
+  s_0e5d25024bfaed::t_b2487964adb893 5,7,139-147,149-150,434-436
+  s_16a999dee6ecf2::t_bc2333123d3613 177-184,186,194,196-197,199,204-205,208-220,223,408,413,422-423,432,477,489,500,518
+tests/test_app_up.py
+  s_16a999dee6ecf2::t_6998b2fef09030 56-57
+  s_0e5d25024bfaed::t_ef494de01f0355 176
+  s_0e5d25024bfaed::t_6ec06b2dcac616 5,39-40
+  s_0e5d25024bfaed::t_73758decc53c34 81
+  s_0e5d25024bfaed::t_064e7d5e5a5081 1-4,6-35,37-38,41-55,58-80,82-95,143-175,177-184
+  s_0e5d25024bfaed::t_063c544631f33d 98-123
+  s_0e5d25024bfaed::t_b1635d73d7aa2b 36,96-97,124-142
+src/kip/adapters/repository/memory/retrieval.py
+  s_0e5d25024bfaed::t_1ed709cdf35812 47-49
+src/kip/ports/retrieval.py
+  s_0e5d25024bfaed::t_1ed709cdf35812 21-24
+docs/TROUBLESHOOTING.md
+  s_16a999dee6ecf2::t_330c9c04175ce3 28-46,55-59
+  s_16a999dee6ecf2::t_f612932dcf3ba9 61-73
+  s_16a999dee6ecf2::t_2781b152539ef9 60
+docs/APP_INTEGRATION.md
+  s_16a999dee6ecf2::t_af3f00246adc11 20-27
+requirements/kordoc/package.json
+  s_0e5d25024bfaed::t_a5d1e1e0880b82 1-15
+scripts/golden_gate.py
+  s_16a999dee6ecf2::t_bae40f803bc912 20,56-71
+docs/QUICKSTART.md
+  s_16a999dee6ecf2::t_ecbbbdca7e25df 34,40-52,119-121
+tests/test_agent_runtime_scripts.py
+  s_16a999dee6ecf2::t_90f02131ab7ede 77-82
+  s_16a999dee6ecf2::t_1a3bd143401e5e 98
+tests/integration/test_postgres_discovery_snippets.py
+  s_0e5d25024bfaed::t_6a541163202913 1-115
+tests/test_kordoc_audit.py
+  s_0e5d25024bfaed::t_6d645473c1fb06 1-99,102-104,108-115
+  s_0e5d25024bfaed::t_5651e6d81e0bff 100-101,105-107,116-119,121-139
+  s_16a999dee6ecf2::t_a38a10d21dd8da 120,140-183
+contracts/answer-response.schema.json
+  s_0e5d25024bfaed::t_710be40cb11ab6 37-46
+tests/test_setup_verify.py
+  s_16a999dee6ecf2::t_6998b2fef09030 52
+Dockerfile
+  s_0e5d25024bfaed::t_0263db13eb2753 14
+  s_0e5d25024bfaed::t_e3a51bac748be8 9-13
+docs/STARTER_KIT_GUIDE.md
+  s_16a999dee6ecf2::t_65c61365e53dbb 53-57,186-192
+src/kip/application/citations.py
+  s_0e5d25024bfaed::t_7c6fd45d43c371 27
+src/kip/setup/service.py
+  s_0e5d25024bfaed::t_e8b471412035fb 166-167,171
+contracts/openapi.json
+  s_0e5d25024bfaed::t_710be40cb11ab6 1098
+scripts/kordoc
+  s_16a999dee6ecf2::t_a38a10d21dd8da 6-12,17
+.github/workflows/ci.yml
+  s_0e5d25024bfaed::t_0263db13eb2753 97-100
+docs/SECURITY.md
+  s_16a999dee6ecf2::t_eba0f310c2c77d 233-240,252-269
+tests/test_answer_adequacy.py
+  s_16a999dee6ecf2::t_447e1d7126639f 440,442
+  s_16a999dee6ecf2::t_d6b8400d1f6f37 385-439,441,443-451
+  s_16a999dee6ecf2::t_eba6da0f5f53c4 483-502
+  s_16a999dee6ecf2::t_fe652dd871aa51 340-384
+  s_16a999dee6ecf2::t_55823bb31a8460 452-482
+contracts/assertion-explanation.schema.json
+  s_0e5d25024bfaed::t_710be40cb11ab6 546-555
+src/kip/domain/snippets.py
+  s_16a999dee6ecf2::t_677f64a5a812a0 27-28,33-35,39
+  s_0e5d25024bfaed::t_6ea3efd92d5bd4 1-26,29-32,36,43,52-58
+  s_0e5d25024bfaed::t_b9337570ca0e82 37-38,40-42,44-51
+src/kip/__init__.py
+  s_0e5d25024bfaed::t_e5fdb6b1893b6f 3
+contracts/openapi.yaml
+  s_0e5d25024bfaed::t_710be40cb11ab6 6
+docs/DATA_CONTRACTS.md
+  s_16a999dee6ecf2::t_bc2333123d3613 150-152
+  s_16a999dee6ecf2::t_37ebbd839ac27f 142-149,153-164,332-339,344
+  s_16a999dee6ecf2::t_b04812d5dfc9e2 340-343
+tests/test_setup_cli.py
+  s_16a999dee6ecf2::t_6998b2fef09030 151
+src/kip/adapters/repository/postgres/retrieval.py
+  s_0e5d25024bfaed::t_1ed709cdf35812 47-49
+src/kip/application/evidence.py
+  s_0e5d25024bfaed::t_b2487964adb893 49,58
+tests/test_kordoc_defaults.py
+  s_0e5d25024bfaed::t_e4c488416af510 157-165,175,179-182,184,192
+  s_0e5d25024bfaed::t_e3a51bac748be8 183
+  s_16a999dee6ecf2::t_585e2bd1c04581 193
+src/kip/adapters/repository/postgres/database.py
+  s_0e5d25024bfaed::t_6ea3efd92d5bd4 61,1335,1374,1388,1428,1693,1748
+  s_16a999dee6ecf2::t_bc2333123d3613 1837-1840,1842,1844
+  s_0e5d25024bfaed::t_1ed709cdf35812 1244-1246,1249-1253,1255,1262-1271,1283,1285,1292-1293,1298
+  s_16a999dee6ecf2::t_c02bf2cbc9721c 1247-1248,1284
+  s_16a999dee6ecf2::t_55823bb31a8460 1841,1845
+  s_16a999dee6ecf2::t_6c74ba08fbbc25 1846-1847,1849-1854,1860-1867
+scripts/doctor.sh
+  s_16a999dee6ecf2::t_a38a10d21dd8da 5,35-37,74
+  s_0e5d25024bfaed::t_0263db13eb2753 30-31,71-73
+tests/test_discovery_snippets.py
+  s_0e5d25024bfaed::t_b9337570ca0e82 67-84
+  s_16a999dee6ecf2::t_10443101050015 85-109
+  s_0e5d25024bfaed::t_53e1661ce5baae 1-66
+contracts/context-bundle.schema.json
+  s_0e5d25024bfaed::t_710be40cb11ab6 10-15,42-51,100-106,147-153
+contracts/search-hit.schema.json
+  s_0e5d25024bfaed::t_710be40cb11ab6 42-48,90-96
+docs/IMPLEMENTATION_STATUS.md
+  s_16a999dee6ecf2::t_2a58e82bd76420 43-58
+  s_16a999dee6ecf2::t_a7c93ccddd2cc1 59-66
+  s_16a999dee6ecf2::t_8412662c326cfb 7-37,67-95,105-107
+  s_16a999dee6ecf2::t_946a2c246acba7 39-42
+  s_16a999dee6ecf2::t_f44554a2aa526f 38
+src/kip/application/search.py
+  s_0e5d25024bfaed::t_1ed709cdf35812 151-153
+  s_0e5d25024bfaed::t_b2487964adb893 197-198
+tests/test_retrieval_quality_regressions.py
+  s_0e5d25024bfaed::t_7c6fd45d43c371 45-50,161-162,165-172,174-179,237-251
+  s_16a999dee6ecf2::t_ce1b0f389b34b1 89-90,92-94,97
+  s_0e5d25024bfaed::t_b1a3e7eece3c83 39
+  s_16a999dee6ecf2::t_9d81832f971cd8 115-129
+  s_0e5d25024bfaed::t_26834949294554 1-38,40-44,252-295
+  s_16a999dee6ecf2::t_10443101050015 62-88,91,95-96,98-114
+  s_16a999dee6ecf2::t_117ba90a203ce7 51-61,147-160
+  s_0e5d25024bfaed::t_2ade248aa857d9 163-164,173
+  s_16a999dee6ecf2::t_1a3bd143401e5e 180-195
+  s_16a999dee6ecf2::t_6998b2fef09030 220-236
+  s_16a999dee6ecf2::t_71b967c6cefa33 196-219
+  s_16a999dee6ecf2::t_d6b8400d1f6f37 130-146
+docs/PRODUCTION_DESIGN_ALIGNMENT.md
+  s_16a999dee6ecf2::t_d1d81d2107ba8e 35-45,79,82,90
+tests/test_setup_handoff.py
+  s_0e5d25024bfaed::t_e8b471412035fb 153
+src/kip/mcp_server.py
+  s_0e5d25024bfaed::t_b2487964adb893 190-195,219-223
+tests/integration/test_filename_answer_scope.py
+  s_16a999dee6ecf2::t_3fccface899e6f 63-64
+  s_0e5d25024bfaed::t_5187eadbe21883 1-62
+scripts/setup_compose.py
+  s_0e5d25024bfaed::t_e8b471412035fb 21-24,52,80-91,103-104,108-118
+  s_16a999dee6ecf2::t_677f64a5a812a0 92-93
+  s_0e5d25024bfaed::t_b1635d73d7aa2b 94-102,105-107
+CHANGELOG.md
+  s_16a999dee6ecf2::t_f612932dcf3ba9 37-40
+  s_16a999dee6ecf2::t_b47f424675b7a7 41-45
+  s_16a999dee6ecf2::t_bcc66b67be78fd 18-28,33-36
+  s_0e5d25024bfaed::t_e5fdb6b1893b6f 3,5-17
+  s_16a999dee6ecf2::t_44d5d4366bceed 29-32
+scripts/app-up.sh
+  s_0e5d25024bfaed::t_063c544631f33d 54
+  s_0e5d25024bfaed::t_e8b471412035fb 10,19-20,24-28,47-53,55-58
+docs/adr/ADR-059-discovery-evidence-and-reproducible-startup.md
+  s_16a999dee6ecf2::t_6998b2fef09030 25-26
+  s_16a999dee6ecf2::t_946a2c246acba7 30
+  s_16a999dee6ecf2::t_9073064059626a 27-29
+  s_16a999dee6ecf2::t_44d5d4366bceed 31-34
+  s_0e5d25024bfaed::t_e5fdb6b1893b6f 1-24,35-55
+src/kip/adapters/repository/memory/semantic.py
+  s_0e5d25024bfaed::t_6ea3efd92d5bd4 7,19,232
+scripts/install-kordoc.sh
+  s_0e5d25024bfaed::t_0263db13eb2753 5,7,10,14-15,20,24-27,29,32-34
+  s_16a999dee6ecf2::t_a38a10d21dd8da 6,19,21-23
+skills/kip-setup/SKILL.md
+  s_16a999dee6ecf2::t_3b385f487147e1 28-32
+skills/knowledge-fabric/SKILL.md
+  s_16a999dee6ecf2::t_3b385f487147e1 22-28
+  s_16a999dee6ecf2::t_ae9598d32c2f67 29-30
+src/kip/adapters/repository/memory/lexical.py
+  s_0e5d25024bfaed::t_6ea3efd92d5bd4 18,56,236,251
+  s_16a999dee6ecf2::t_677f64a5a812a0 73,76
+  s_0e5d25024bfaed::t_1ed709cdf35812 69,79-81
+  s_16a999dee6ecf2::t_c02bf2cbc9721c 70-72,74-75,77-78
+requirements/kordoc/package-lock.json
+  s_0e5d25024bfaed::t_8b6fc3b75afcda 1-2911
+uv.lock
+  s_0e5d25024bfaed::t_a8e22e0f1954ce 928
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "85bf1da8123b53769f905c48bb2201b1f89d9c5a",
+  "prompts": {},
+  "sessions": {
+    "s_0e5d25024bfaed": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a086c4-a430-7101-a45d-9c050ba0f956",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_16a999dee6ecf2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b9abc8ac-2c56-4e22-a7c7-3deb16f779f3",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

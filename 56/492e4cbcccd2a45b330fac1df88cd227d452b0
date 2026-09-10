@@ -1,0 +1,128 @@
+tests/test_answer_adequacy.py
+  s_0e5d25024bfaed::t_1b83eb14e9cef1 329-339
+  s_0e5d25024bfaed::t_5bba4395d4602e 3-4,264-299
+  s_0e5d25024bfaed::t_f0d3ccdfef5ad1 300-318
+  s_0e5d25024bfaed::t_9e5e51bc484299 319-328
+tests/test_starter_archive.py
+  s_0e5d25024bfaed::t_7fdd71d7ce6473 219
+tests/test_mcp_envelope_contract.py
+  s_0e5d25024bfaed::t_2e71295fa5ad84 69-90
+  s_0e5d25024bfaed::t_5bba4395d4602e 15,22-66
+  s_0e5d25024bfaed::t_f917acbefe7124 67-68
+scripts/verify_project.py
+  s_0e5d25024bfaed::t_591354dd35c17d 10,12,32-35
+docs/TRD.md
+  s_0e5d25024bfaed::t_7fdd71d7ce6473 3743-3745,4609-4610
+  s_0e5d25024bfaed::t_86815403143457 3172-3173
+  s_0e5d25024bfaed::t_5e3a679e8893b4 3739-3742,5186
+  s_0e5d25024bfaed::t_f96eecb7a80a3f 3143-3144,3159-3162
+  s_55ebd15a5b6dde::t_61cf6537be1be5 3163
+tests/test_api.py
+  s_0e5d25024bfaed::t_f96eecb7a80a3f 138-146
+docs/adr/ADR-045-judge-proposed-golden-dataset-growth.md
+  s_0e5d25024bfaed::t_1b824048a273df 66,86
+CHANGELOG.md
+  s_0e5d25024bfaed::t_026178fc39dbd6 3-20
+docs/DATA_CONTRACTS.md
+  s_0e5d25024bfaed::t_5e3a679e8893b4 13-29,32-35
+  s_0e5d25024bfaed::t_1611b9fad8d32a 30-31
+pyproject.toml
+  s_0e5d25024bfaed::t_026178fc39dbd6 7
+tests/test_generated_answers.py
+  s_0e5d25024bfaed::t_9e5e51bc484299 335-358
+src/kip/documentation.py
+  s_0e5d25024bfaed::t_591354dd35c17d 1-42
+tests/test_documentation_distribution.py
+  s_0e5d25024bfaed::t_591354dd35c17d 1-27
+tests/test_release_bundle.py
+  s_0e5d25024bfaed::t_591354dd35c17d 78-79
+  s_0e5d25024bfaed::t_4976fdc54602ef 13-14,80-83
+docs/RAG_EVALUATION.md
+  s_0e5d25024bfaed::t_7fdd71d7ce6473 18,20
+docs/PRODUCTION_DESIGN_ALIGNMENT.md
+  s_0e5d25024bfaed::t_5e3a679e8893b4 30-35
+  s_0e5d25024bfaed::t_19ed2800f83100 6
+docs/APP_INTEGRATION.md
+  s_0e5d25024bfaed::t_5e3a679e8893b4 108-114
+VERSION
+  s_0e5d25024bfaed::t_026178fc39dbd6 1
+src/kip/__init__.py
+  s_0e5d25024bfaed::t_026178fc39dbd6 3
+docs/IMPLEMENTATION_STATUS.md
+  s_0e5d25024bfaed::t_86815403143457 16-19
+  s_0e5d25024bfaed::t_5e3a679e8893b4 7-15,20
+docs/OPERATIONS.md
+  s_0e5d25024bfaed::t_5e3a679e8893b4 67-72
+src/kip/starter_archive_policy.py
+  s_0e5d25024bfaed::t_026178fc39dbd6 56
+docs/PRD.md
+  s_0e5d25024bfaed::t_5e3a679e8893b4 204-209
+scripts/release_artifacts.py
+  s_0e5d25024bfaed::t_591354dd35c17d 22,187-191
+  s_0e5d25024bfaed::t_3c3df1d04b67b9 21
+docs/SECURITY.md
+  s_0e5d25024bfaed::t_5e3a679e8893b4 5-10
+skills/knowledge-fabric/SKILL.md
+  s_0e5d25024bfaed::t_f0d3ccdfef5ad1 37-41
+docs/adr/ADR-047-measured-auto-approve-policy.md
+  s_0e5d25024bfaed::t_21b3b30d0a2256 90
+docs/plans/README.md
+  s_0e5d25024bfaed::t_7fdd71d7ce6473 1-13
+docs/AGENT_QUALITY.md
+  s_0e5d25024bfaed::t_c8d6a24b6b6ddc 11-13
+  s_0e5d25024bfaed::t_026178fc39dbd6 1-10,14-53
+docs/adr/ADR-058-agent-evidence-and-tool-contracts.md
+  s_0e5d25024bfaed::t_026178fc39dbd6 1-32
+src/kip/application/answer_adequacy.py
+  s_0e5d25024bfaed::t_1611b9fad8d32a 176,210
+  s_0e5d25024bfaed::t_81ab1c5ddba845 353-362
+  s_0e5d25024bfaed::t_690bb176108d2f 165-175,177-209,211-234,260-264,300-306
+docs/adr/ADR-005-local-first-hybrid-retrieval.md
+  s_0e5d25024bfaed::t_7fdd71d7ce6473 54
+  s_0e5d25024bfaed::t_9ff9628d16b79e 53
+src/kip/mcp_server.py
+  s_0e5d25024bfaed::t_cded5223e1c23c 67,74
+  s_0e5d25024bfaed::t_63ab6b3f4c5502 166,173,179,202,227,257,263,269,280,296,302,308,314,329,352,366,400,415,430,447,459,465,480,507,528,534,551,559,580,628,643
+  s_0e5d25024bfaed::t_2e71295fa5ad84 5,39-40,140-146
+  s_0e5d25024bfaed::t_f0d3ccdfef5ad1 81-83,272-277
+  s_0e5d25024bfaed::t_026178fc39dbd6 14
+  s_0e5d25024bfaed::t_c8d6a24b6b6ddc 239,241
+  s_0e5d25024bfaed::t_c170fb0f7f3282 8-11,36,53-66,70,76-80,84-90,127-133,161,163,182-183,205-207,230-232,240,242-244,286,298,311,338,355,406,421,471,543,604,650-655
+src/kip/application/answering.py
+  s_0e5d25024bfaed::t_81ab1c5ddba845 163-165,169,193,215
+README.md
+  s_0e5d25024bfaed::t_7fdd71d7ce6473 434
+  s_0e5d25024bfaed::t_5e3a679e8893b4 19-22
+.claude/skills/knowledge-fabric/SKILL.md
+  s_0e5d25024bfaed::t_ca037e943976cf 37-41
+contracts/openapi.json
+  s_0e5d25024bfaed::t_2b4f30f37bccd7 1098
+contracts/openapi.yaml
+  s_0e5d25024bfaed::t_d5814b2f48fc9f 6
+uv.lock
+  s_0e5d25024bfaed::t_72c29484c892f0 928
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "56492e4cbcccd2a45b330fac1df88cd227d452b0",
+  "prompts": {},
+  "sessions": {
+    "s_0e5d25024bfaed": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a086c4-a430-7101-a45d-9c050ba0f956",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_55ebd15a5b6dde": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a089e7-dfcd-7711-8c1b-611754a713ea",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

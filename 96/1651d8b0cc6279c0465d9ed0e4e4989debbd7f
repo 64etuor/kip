@@ -1,0 +1,148 @@
+scripts/verify-starter-kit.sh
+  s_0e5d25024bfaed::t_421d8d21792597 6
+scripts/runtime-path.sh
+  s_0e5d25024bfaed::t_18109d8aa36758 6-9
+  s_0e5d25024bfaed::t_0524a66b87a926 1-4,10-18
+  s_0e5d25024bfaed::t_b466913afc1531 5
+scripts/common.sh
+  s_0e5d25024bfaed::t_38eacaf5b67996 8-10,15-18
+docs/IMPLEMENTATION_STATUS.md
+  s_0e5d25024bfaed::t_3155974f86df1b 7-20,27
+  s_0e5d25024bfaed::t_db8ca0fb2e7170 21-26
+CHANGELOG.md
+  s_0e5d25024bfaed::t_66141ccfc192e2 3-16
+tests/test_prerequisites.py
+  s_0e5d25024bfaed::t_e120a047c5fcdf 193-212
+  s_0e5d25024bfaed::t_26d800695be2ad 223-228
+  s_0e5d25024bfaed::t_fd0591772fa461 248-264
+  s_0e5d25024bfaed::t_421d8d21792597 158-163
+  s_0e5d25024bfaed::t_18109d8aa36758 213-222
+  s_0e5d25024bfaed::t_66141ccfc192e2 185-192
+  s_0e5d25024bfaed::t_05e4521d7f8697 229-232,236-247
+  s_0e5d25024bfaed::t_b466913afc1531 233-235
+  s_0e5d25024bfaed::t_ab819c312367ee 1-102,104-113,115-157,164-184
+  s_0e5d25024bfaed::t_f96e3098de4da3 103,114
+VERSION
+  s_0e5d25024bfaed::t_66141ccfc192e2 1
+docs/SECURITY.md
+  s_0e5d25024bfaed::t_3155974f86df1b 248-256
+scripts/bootstrap.sh
+  s_0e5d25024bfaed::t_3e39c57fe3a0dd 4-9,17,21,23,26,28-32,39-41
+  s_0e5d25024bfaed::t_311659621abead 34
+  s_0e5d25024bfaed::t_49a70615aac32a 16
+scripts/uv.sh
+  s_0e5d25024bfaed::t_b466913afc1531 1-9
+skills/kip-setup/SKILL.md
+  s_0e5d25024bfaed::t_88383e3b9dbb2c 9-19
+src/kip/__init__.py
+  s_0e5d25024bfaed::t_66141ccfc192e2 3
+tests/test_bootstrap_locked.py
+  s_0e5d25024bfaed::t_8cf7a6f4e6df2d 26,43-51,85-87
+scripts/kordoc
+  s_0e5d25024bfaed::t_38eacaf5b67996 6
+scripts/verify-release.sh
+  s_0e5d25024bfaed::t_421d8d21792597 10
+requirements/bootstrap.tsv
+  s_0e5d25024bfaed::t_0524a66b87a926 1
+  s_0e5d25024bfaed::t_13c91b158c1a39 2-14
+Dockerfile
+  s_0e5d25024bfaed::t_18109d8aa36758 39
+docs/adr/ADR-061-bootstrap-before-python.md
+  s_0e5d25024bfaed::t_356bce64d2bbd5 1-47
+scripts/smoke-prerequisites.sh
+  s_0e5d25024bfaed::t_421d8d21792597 1-14,16-28
+  s_0e5d25024bfaed::t_311659621abead 15
+scripts/doctor.sh
+  s_0e5d25024bfaed::t_e4ff0f7f6b25a7 56,72
+docs/PRD.md
+  s_0e5d25024bfaed::t_1b1263a2de5408 613-616
+  s_904e43c01a3618::t_d4713a1fc6c677 617
+docs/TROUBLESHOOTING.md
+  s_0e5d25024bfaed::t_88383e3b9dbb2c 6-12,26-29,32-33,41,44-57
+  s_0e5d25024bfaed::t_3eaa209e3fe05d 58
+docs/OPERATIONS.md
+  s_0e5d25024bfaed::t_3155974f86df1b 20-27
+pyproject.toml
+  s_0e5d25024bfaed::t_66141ccfc192e2 7
+scripts/prerequisites.py
+  s_0e5d25024bfaed::t_311659621abead 162-163,219-221,242-244,252
+  s_0e5d25024bfaed::t_38eacaf5b67996 176,229-232,241,258,262-263,300-301,303
+  s_0e5d25024bfaed::t_fd0591772fa461 186-188,192
+  s_0e5d25024bfaed::t_35f0f2070ccc38 245-251,254,319
+  s_0e5d25024bfaed::t_356bce64d2bbd5 80,184-185
+  s_0e5d25024bfaed::t_e120a047c5fcdf 90-91,96-98
+  s_0e5d25024bfaed::t_f8b8082891a38f 1-38,55-68,75-79,81-89,92-95,99-109,112-126,128-129,132-134,136-153,155-161,164-175,177-183,189-191,193-218,222-228,233-240,253,255-257,259-261,264-299,302,304-318,320-325
+  s_0e5d25024bfaed::t_66141ccfc192e2 39-43,50-54
+  s_0e5d25024bfaed::t_4beebeb57b1b06 44-49
+  s_0e5d25024bfaed::t_26d800695be2ad 69-74,135,154
+  s_0e5d25024bfaed::t_49a70615aac32a 110-111,127,130-131
+README.md
+  s_0e5d25024bfaed::t_356bce64d2bbd5 156
+  s_0e5d25024bfaed::t_88383e3b9dbb2c 120-125,128,136-143,148-150
+docs/QUICKSTART.md
+  s_0e5d25024bfaed::t_88383e3b9dbb2c 15-17
+AGENTS.md
+  s_0e5d25024bfaed::t_3155974f86df1b 43
+docs/STARTER_KIT_GUIDE.md
+  s_0e5d25024bfaed::t_88383e3b9dbb2c 20,22-32
+tests/test_setup_handoff.py
+  s_0e5d25024bfaed::t_1b1263a2de5408 32
+  s_0e5d25024bfaed::t_3155974f86df1b 31,33-45
+.github/workflows/ci.yml
+  s_0e5d25024bfaed::t_38eacaf5b67996 18
+  s_0e5d25024bfaed::t_421d8d21792597 79-82
+docs/PRODUCTION_DESIGN_ALIGNMENT.md
+  s_0e5d25024bfaed::t_3155974f86df1b 30-36
+scripts/release-bundle.sh
+  s_0e5d25024bfaed::t_421d8d21792597 6
+docs/TRD.md
+  s_0e5d25024bfaed::t_98b00b03f79897 435-442,3618
+  s_0e5d25024bfaed::t_3155974f86df1b 3619
+Makefile
+  s_0e5d25024bfaed::t_b466913afc1531 24,27,30,33
+scripts/build-starter-kit.sh
+  s_0e5d25024bfaed::t_421d8d21792597 6
+src/kip/setup/service.py
+  s_0e5d25024bfaed::t_e4ff0f7f6b25a7 204-205,209,211-212,214
+scripts/prerequisites.sh
+  s_0e5d25024bfaed::t_49a70615aac32a 8-9,13-14,21-23,36,69-71,74-75,103,111
+  s_0e5d25024bfaed::t_e120a047c5fcdf 80
+  s_0e5d25024bfaed::t_fd0591772fa461 27
+  s_0e5d25024bfaed::t_26d800695be2ad 97-98
+  s_0e5d25024bfaed::t_311659621abead 25-26,28,107
+  s_0e5d25024bfaed::t_0524a66b87a926 1-7,10-12,15-20,24,29-35,37-60,68,72-73,76-79,81-96,99-102,104-106,108-110,112
+  s_0e5d25024bfaed::t_66141ccfc192e2 61-64
+  s_0e5d25024bfaed::t_4beebeb57b1b06 65-67
+.claude/skills/kip-setup/SKILL.md
+  s_0e5d25024bfaed::t_4c93714a9bc068 9-19
+contracts/openapi.json
+  s_0e5d25024bfaed::t_96c7419b4ed453 1098
+contracts/openapi.yaml
+  s_0e5d25024bfaed::t_a49ba3fc59f577 6
+uv.lock
+  s_0e5d25024bfaed::t_fea539a99e7961 928
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "961651d8b0cc6279c0465d9ed0e4e4989debbd7f",
+  "prompts": {},
+  "sessions": {
+    "s_0e5d25024bfaed": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a086c4-a430-7101-a45d-9c050ba0f956",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_904e43c01a3618": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a08b6b-d218-7441-9325-719e88416d66",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

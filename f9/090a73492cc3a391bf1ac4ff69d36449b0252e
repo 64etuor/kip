@@ -1,0 +1,46 @@
+pyproject.toml
+  s_0e5d25024bfaed::t_6450318108e599 7
+scripts/prerequisites.sh
+  s_0e5d25024bfaed::t_80ced9482f21b8 61-64
+tests/test_prerequisites.py
+  s_0e5d25024bfaed::t_6450318108e599 265-282
+src/kip/__init__.py
+  s_0e5d25024bfaed::t_6450318108e599 3
+docs/IMPLEMENTATION_STATUS.md
+  s_0e5d25024bfaed::t_ed86282fd7cc99 7,21-25
+  s_0e5d25024bfaed::t_1657710365f8b7 26
+README.md
+  s_0e5d25024bfaed::t_1b2a3e6155a934 125
+scripts/smoke-prerequisites.sh
+  s_0e5d25024bfaed::t_1b2a3e6155a934 15
+contracts/openapi.json
+  s_0e5d25024bfaed::t_7acc628520e85e 1098
+VERSION
+  s_0e5d25024bfaed::t_6450318108e599 1
+docs/STARTER_KIT_GUIDE.md
+  s_0e5d25024bfaed::t_ed86282fd7cc99 30
+contracts/openapi.yaml
+  s_0e5d25024bfaed::t_7acc628520e85e 6
+CHANGELOG.md
+  s_0e5d25024bfaed::t_6450318108e599 3-8
+docs/adr/ADR-061-bootstrap-before-python.md
+  s_0e5d25024bfaed::t_ed86282fd7cc99 46
+uv.lock
+  s_0e5d25024bfaed::t_afa75cb04ec654 928
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "f9090a73492cc3a391bf1ac4ff69d36449b0252e",
+  "prompts": {},
+  "sessions": {
+    "s_0e5d25024bfaed": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a086c4-a430-7101-a45d-9c050ba0f956",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

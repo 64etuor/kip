@@ -5,11 +5,7 @@ import re
 from datetime import UTC, datetime
 from time import perf_counter
 
-from kip.application.answer_adequacy import (
-    excluded_filename,
-    prepare_answer_evidence,
-    referenced_filename,
-)
+from kip.application.answer_adequacy import prepare_answer_evidence
 from kip.application.answers import assemble_extractive_answer
 from kip.application.citations import assemble_generated_answer
 from kip.application.egress import EgressPolicyUseCases
@@ -18,6 +14,13 @@ from kip.application.ontology_context import OntologyContextUseCases
 from kip.application.search import RetrievalUseCases
 from kip.application.telemetry import TelemetryUseCases
 from kip.domain.egress import EgressDecision
+from kip.domain.file_references import (
+    FilenameSearchRequest,
+    file_references,
+    filename_key,
+    has_unresolved_file_reference,
+    without_references,
+)
 from kip.domain.generation import (
     GenerationEvidence,
     GenerationRelation,
@@ -31,6 +34,7 @@ from kip.domain.models import (
     EvidenceRead,
     OntologyAnswerContext,
     RequestContext,
+    SearchRequest,
 )
 from kip.domain.telemetry import (
     QueryFilterSummary,
@@ -123,13 +127,48 @@ class AnsweringUseCases:
         context: RequestContext,
         request: AnswerRequest,
     ) -> AnswerResponse:
-        hits = self._retrieval.search(context, request)
+        candidates = (
+            self._retrieval.filename_candidates(context, request)
+            if "." in request.query or len(request.query.split()) == 1 else []
+        )
+        references = file_references(request.query, candidates)
+        if has_unresolved_file_reference(request.query, references):
+            return AnswerResponse(
+                query=request.query, refused=True, refusal_reason="no_admissible_evidence",
+                answer="지정한 파일의 접근 가능한 근거를 찾지 못했습니다. 파일명과 허용된 검색 범위를 확인해 주세요.",
+            )
+        included = sorted({ref.name for ref in references if not ref.excluded})
+        excluded = sorted({ref.name for ref in references if ref.excluded})
+        if any(
+            self._retrieval.has_ambiguous_filename(context, request.model_copy(update={"query": name}))
+            for name in included
+        ):
+            return AnswerResponse(
+                query=request.query, refused=True, refusal_reason="clarification_required",
+                answer="같은 이름의 문서가 여러 개입니다. 검색 결과의 원본 위치를 확인하고 대상 문서를 지정해 주세요.",
+            )
+        search_request: SearchRequest = request
+        gate_request = request
+        if references:
+            remainder = without_references(request.query, references, excluded_only=True)
+            gate_request = request.model_copy(update={"query": remainder})
+            search_request = FilenameSearchRequest(
+                **{key: getattr(request, key) for key in SearchRequest.model_fields},
+                included_filenames=included, excluded_filenames=excluded,
+            )
+            if excluded and remainder.strip():
+                search_request = search_request.model_copy(update={"query": remainder})
+        hits = self._retrieval.search(context, search_request)
         ontology_bundle = self._ontology_context.build(
             context,
             request.query,
             include_candidates=request.include_candidate_assertions,
         )
-        fresh: list[EvidenceRead] = list(ontology_bundle.evidence)
+        scoped_ids = {hit.unit_id for hit in hits}
+        fresh: list[EvidenceRead] = [
+            item for item in ontology_bundle.evidence
+            if not references or item.unit.id in scoped_ids
+        ]
         seen_ids = {item.unit.id for item in fresh}
         had_stale_evidence = False
         for hit in hits:
@@ -145,25 +184,20 @@ class AnsweringUseCases:
                 continue
             fresh.append(item)
             seen_ids.add(item.unit.id)
-        had_stale_evidence = had_stale_evidence or ontology_bundle.had_stale_evidence
-        named_files = {
-            name
-            for item in fresh
-            if (name := referenced_filename(request.query, item))
-            and excluded_filename(request.query, item) is None
+        had_stale_evidence = had_stale_evidence or (not references and ontology_bundle.had_stale_evidence)
+        fresh_ids = {item.unit.id for item in fresh}
+        fresh_names = {
+            filename_key(str(hit.metadata.get("file_name", "")))
+            for hit in hits if hit.unit_id in fresh_ids
         }
-        # Ambiguity is decided across the ACL-visible corpus, not the limited
-        # hits: a same-named file with other content may not be in `fresh`.
-        if any(
-            self._retrieval.has_ambiguous_filename(context, request.model_copy(update={"query": name}))
-            for name in sorted(named_files)
-        ):
+        if {filename_key(name) for name in included} - fresh_names:
             return AnswerResponse(
-                query=request.query, refused=True, refusal_reason="clarification_required",
-                answer="같은 이름의 문서가 여러 개입니다. 검색 결과의 원본 위치를 확인하고 대상 문서를 지정해 주세요.",
+                query=request.query, refused=True,
+                refusal_reason="no_fresh_evidence" if had_stale_evidence else "no_admissible_evidence",
+                answer="요청한 파일 모두의 최신 근거를 확보하지 못했습니다. 대상 파일을 좁히거나 결과 수를 늘려 다시 확인해 주세요.",
             )
         prepared = prepare_answer_evidence(
-            request,
+            gate_request,
             fresh,
             had_stale_evidence=had_stale_evidence,
             ontology_evidence_ids=set(
@@ -178,8 +212,8 @@ class AnsweringUseCases:
                 ontology_bundle.context,
                 {item.unit_id for item in prepared.refusal.citations},
             ):
-                return prepared.refusal
-            return prepared.refusal.model_copy(update={"ontology_context": ontology_bundle.context})
+                return prepared.refusal.model_copy(update={"query": request.query})
+            return prepared.refusal.model_copy(update={"query": request.query, "ontology_context": ontology_bundle.context})
         ontology_context = ontology_bundle.context
         if not _context_is_cited(ontology_context, {item.unit.id for item in prepared.evidence}):
             ontology_context = None

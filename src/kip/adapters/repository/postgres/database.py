@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from psycopg.rows import DictRow
 
 from kip.domain.egress import DataClassification
+from kip.domain.file_references import FilenameSearchRequest, filename_key
 from kip.domain.identity import AclSnapshot
 from kip.domain.knowledge import (
     AUTO_APPROVE_POLICY_PRINCIPAL,
@@ -74,6 +75,26 @@ _REVIEW_RISK_ORDER_SQL = (
     "CASE review_risk WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END"
 )
 
+
+def _filename_key_sql(value: str) -> str:
+    # The default libc collation treats casefold as lower(). Use PostgreSQL's
+    # Unicode provider to match Python's filename_key, including sharp-s.
+    return f"casefold(normalize({value}, NFC) COLLATE pg_catalog.pg_unicode_fast)"
+
+
+def _filename_scope_sql(
+    request: FilenameSearchRequest, conditions: list[str], params: list[Any], *, artifact_alias: str | None,
+) -> None:
+    for names, exclude in ((request.included_filenames, False), (request.excluded_filenames, True)):
+        if not names:
+            continue
+        if artifact_alias is None:
+            predicate = f"EXISTS (SELECT 1 FROM content.artifacts filename_artifact WHERE filename_artifact.id=l.artifact_id AND {_filename_key_sql('filename_artifact.file_name')} = ANY(%s::text[]))"
+        else:
+            predicate = f"{_filename_key_sql(f'{artifact_alias}.file_name')} = ANY(%s::text[])"
+        predicate = f"(l.source_kind='filesystem' AND {predicate})"
+        conditions.append(f"NOT {predicate}" if exclude else predicate)
+        params.append([filename_key(name) for name in names])
 
 def _literal_like_pattern(value: str) -> str:
     return "%" + value.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%"
@@ -1243,6 +1264,35 @@ class PostgresDatabase:
     def has_identifier_match(self, context: RequestContext, request: SearchRequest) -> bool:
         return self._identifier_document_count(context, request, exact_filename=False) > 0
 
+    def filename_candidates(self, context: RequestContext, request: SearchRequest) -> list[str]:
+        conditions = [
+            "l.workspace_id=%s", "l.source_kind='filesystem'",
+            "(cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])",
+            "kip.acl_snapshot_is_fresh(u.acl_snapshot_id)",
+            "kip.source_artifact_is_allowed(u.artifact_id)",
+            f"strpos({_filename_key_sql('%s')},{_filename_key_sql('a.file_name')}) > 0",
+        ]
+        params: list[Any] = [context.workspace, context.acl_scopes, request.query]
+        for values, condition in (
+            (request.source_kinds, "l.source_kind = ANY(%s::text[])"),
+            (request.document_types, "d.document_type = ANY(%s::text[])"),
+            (request.project_ids, "coalesce(d.metadata->>'project_id','') = ANY(%s::text[])"),
+        ):
+            if values:
+                conditions.append(condition)
+                params.append(values)
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(f"""
+                SELECT DISTINCT a.file_name FROM search.lexical_units l
+                JOIN content.units u ON u.id=l.unit_id
+                JOIN content.artifacts a ON a.id=l.artifact_id
+                JOIN source.revisions r ON r.id=a.revision_id
+                JOIN source.objects o ON o.id=r.object_id AND o.current_revision_id=r.id
+                LEFT JOIN content.logical_documents d ON d.id=l.document_id
+                WHERE {" AND ".join(conditions)}
+            """, params)
+            return sorted(row["file_name"] for row in cursor.fetchall())
+
     def has_ambiguous_filename(self, context: RequestContext, request: SearchRequest) -> bool:
         # Counts distinct allowed file contents with this exact name before
         # limit; identical copies in several roots are not ambiguous.
@@ -1261,7 +1311,8 @@ class PostgresDatabase:
         ]
         params: list[Any] = [context.workspace, context.acl_scopes]
         if exact_filename:
-            conditions.append("lower(normalize(a.file_name, NFC)) = lower(normalize(%s, NFC))")
+            conditions.append("l.source_kind='filesystem'")
+            conditions.append(f"{_filename_key_sql('a.file_name')} = {_filename_key_sql('%s')}")
             params.append(request.query.strip())
         else:
             conditions.append("(l.identifier_text ILIKE %s ESCAPE '!' OR l.identifier_text ILIKE %s ESCAPE '!')")
@@ -1310,6 +1361,8 @@ class PostgresDatabase:
         if request.source_kinds:
             inner_conditions.append("l.source_kind = ANY(%s::text[])")
             inner_condition_params.append(request.source_kinds)
+        if isinstance(request, FilenameSearchRequest):
+            _filename_scope_sql(request, inner_conditions, inner_condition_params, artifact_alias=None)
         outer_conditions = [
             "(cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])",
             "(kip.acl_snapshot_is_fresh(u.acl_snapshot_id) AND kip.source_artifact_is_allowed(u.artifact_id))",
@@ -1367,6 +1420,7 @@ class PostgresDatabase:
                      OR l.body ILIKE %s ESCAPE '!'
                      OR l.tsv @@ websearch_to_tsquery('simple', %s)
                      OR l.title %% %s
+                     {"OR true" if isinstance(request, FilenameSearchRequest) and request.included_filenames else ""}
                   )
             )
             SELECT
@@ -1652,6 +1706,8 @@ class PostgresDatabase:
             "(kip.acl_snapshot_is_fresh(u.acl_snapshot_id) AND kip.source_artifact_is_allowed(u.artifact_id))",
         ]
         eligibility_params: list[Any] = [context.acl_scopes]
+        if isinstance(request, FilenameSearchRequest):
+            _filename_scope_sql(request, eligibility_conditions, eligibility_params, artifact_alias="a")
         if request.source_kinds:
             eligibility_conditions.append("l.source_kind = ANY(%s::text[])")
             eligibility_params.append(request.source_kinds)

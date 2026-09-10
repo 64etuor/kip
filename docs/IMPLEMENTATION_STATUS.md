@@ -4,6 +4,21 @@ This is the current readiness inventory, not the target architecture. The
 target-to-current matrix and ordered gap register live in
 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`.
 
+## 2026-09-10 named-source answer corrections (3.7.1)
+
+The three reproduced 3.7.0 defects are covered by regression checks: named
+files retain their scope when ranked below the requested limit or stale;
+quoted/backticked names select the same source; and 언제인가/누구인가/무엇인가
+no longer become required evidence keywords. The source binding now precedes
+retrieval, with inclusion/exclusion on both lexical and vector candidates and
+approved ontology evidence. Unknown or inaccessible document references refuse
+without revealing out-of-scope existence. Memory/PostgreSQL checks also cover
+removed roots, limit=1 exclusion, Unicode casefold ambiguity and edge parity.
+See ADR-060 and [agent quality evidence](AGENT_QUALITY.md) for the measured scope.
+The final local full gate passed 1,090 tests and retained the 120-case portable
+retrieval/ACL results. The unrelated workspace did not run the reviewed private
+corpus floor; no broad answer-quality or semantic activation claim is implied.
+
 ## 2026-09-10 discovery evidence, retrieval and startup fixes
 
 Search hits now state their own status: `evidence_role` is always `discovery`
@@ -39,7 +54,8 @@ factual question scopes evidence to that document; the rest of the question
 must still be present in it or the answer refuses with `answer_not_present`;
 a bare name with punctuation or a display verb returns the document, several
 named files are a comparison rather than a duplicate, `말고`/`제외` excludes the
-named file, and approved ontology evidence is retained through scoping.
+named file. As of 3.7.1, approved ontology evidence must respect the explicit
+file scope as well (ADR-060).
 Shallow XLSX evidence still returns `exact_xlsx_read_required`. Interrogative
 endings (언제야, 언제까지야, 누구야, 무엇인지, ...) are no longer subject
 keywords and unit titles count toward relevance, so `제출기한은 언제야?` over a

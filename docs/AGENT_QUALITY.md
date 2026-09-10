@@ -1,5 +1,25 @@
 # Agent quality evidence
 
+## 3.7.1 source-binding regression checks
+
+The review of 3.7.0 reproduced three service defects: a named document could
+lose its scope after ranking or stale filtering; quotes/backticks prevented
+recognition; and interrogative endings caused false refusals. New targeted
+checks preserve the named-file boundary across both Memory and PostgreSQL,
+including limit=1, stale/unknown/inaccessible sources, exclusions, vector
+nearest-neighbor limits, Unicode names, and CLI/REST/MCP envelope parity.
+This is application/protocol verification over synthetic documents, not a new
+external-agent answer benchmark. Earlier free-form agent shortcomings remain
+separate evidence; these fixes do not establish universal agent compliance.
+
+The final local `./scripts/verify.sh` passed 1,090 tests, lint/type checks,
+Python dependency auditing and the locked npm high-severity gate (four moderate
+package findings remain from the documented adm-zip advisory). The 120-case
+portable retrieval/ACL gate retained recall@k=1.0, MRR=1.0 and unauthorized=0.
+The reviewed private-corpus floor was skipped because that corpus was not
+indexed in this workspace. Reproduction and final gate logs are retained in
+the ignored `var/audits/scope-fix-371/` directory.
+
 ## Scope: 2026-09-10
 
 This is a bounded working-code evaluation for 3.6.1, not a general agent or RAG

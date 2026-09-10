@@ -151,6 +151,9 @@ class RetrievalUseCases:
     def has_ambiguous_filename(self, context: RequestContext, request: SearchRequest) -> bool:
         return self._store.has_ambiguous_filename(context, request)
 
+    def filename_candidates(self, context: RequestContext, request: SearchRequest) -> list[str]:
+        return self._store.filename_candidates(context, request)
+
     def context_bundle(
         self,
         context: RequestContext,

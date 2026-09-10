@@ -6,6 +6,7 @@ from unicodedata import normalize
 
 from kip.adapters.repository.memory.acl import unit_is_visible
 from kip.adapters.repository.memory.state import MemoryState
+from kip.domain.file_references import FilenameSearchRequest, filename_key
 from kip.domain.models import (
     ArtifactView,
     ContentUnit,
@@ -44,7 +45,7 @@ class MemoryLexicalStore:
                 normalize("NFC", view.artifact.file_name).lower(),
                 unique_terms,
             )
-            if score > 0:
+            if score > 0 or (isinstance(request, FilenameSearchRequest) and request.included_filenames):
                 scored.append((score, unit, view))
 
         scored.sort(key=lambda item: (-item[0], item[1].id))
@@ -79,6 +80,15 @@ class MemoryLexicalStore:
                     return True
         return False
 
+    def filename_candidates(self, context: RequestContext, request: SearchRequest) -> list[str]:
+        query = filename_key(request.query)
+        return sorted({
+            view.artifact.file_name
+            for _, view in self._visible_units(context, request)
+            if view.source_object and view.source_object.system_kind == "filesystem"
+            and filename_key(view.artifact.file_name) in query
+        })
+
     def _visible_units(
         self, context: RequestContext, request: SearchRequest
     ) -> Iterator[tuple[ContentUnit, ArtifactView]]:
@@ -87,6 +97,10 @@ class MemoryLexicalStore:
                 continue
             view = self.state.artifacts.get(unit.artifact_id)
             if not view or not view.source_object or not view.revision:
+                continue
+            if isinstance(request, FilenameSearchRequest) and not request.allows(
+                view.artifact.file_name, view.source_object.system_kind,
+            ):
                 continue
             packet = self.state.packets_by_revision.get(view.revision.id)
             if not packet or packet.workspace_id != context.workspace:

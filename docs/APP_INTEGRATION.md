@@ -1,5 +1,12 @@
 # Application Integration
 
+Named-file `answer` requests resolve scope before ranking or freshness checks.
+Use balanced quotes for names with spaces, for example
+`"사업 보고서.pdf" 제출기한은 언제인가?`. Unknown/inaccessible or stale named
+evidence returns a typed refusal instead of borrowing another file's answer.
+Inclusion/exclusion also applies to ontology evidence. No new public request
+fields are required; CLI, REST and MCP share this behavior (ADR-060).
+
 ## Preferred integration order
 
 1. REST/OpenAPI for web and backend applications.

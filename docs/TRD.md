@@ -2405,6 +2405,14 @@ literal로 escape한다. 기존 색인을 다시 만들 필요는 없다 (ADR-03
 
 ### 22.5 Search query normalization
 
+파일을 명시한 답변은 먼저 현재 ACL·source root·요청 filter 안의 파일명을
+resolve한다. 공통 filename parser의 포함/제외 결과를 내부
+`FilenameSearchRequest`에 담아 lexical/vector 후보의 LIMIT 전에 적용한다.
+이후 live read에서 stale/unavailable이 확인돼도 범위를 해제하지 않는다.
+PostgreSQL의 filename 비교는 NFC와 `pg_catalog.pg_unicode_fast` casefold를
+사용해 Python casefold와 맞춘다. public request/envelope에는 내부 필드를
+추가하지 않는다 (ADR-060).
+
 1. Unicode NFKC
 2. whitespace collapse
 3. path and punctuation normalization

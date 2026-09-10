@@ -6,6 +6,7 @@ from enum import StrEnum, unique
 
 from kip.application.retrieval import apply_rerank, reciprocal_rank_fusion
 from kip.application.semantic import SemanticProjectionUseCases
+from kip.domain.file_references import FilenameSearchRequest
 from kip.domain.knowledge import normalize_entity_name
 from kip.domain.models import RequestContext, SearchHit, SearchRequest
 from kip.domain.text import normalize_text
@@ -170,7 +171,8 @@ class SearchEngine:
         # reorder another; only the pool builder branches on mode.
         plan = self._resolve_mode(mode)
         query = self._analyze(context, request.query)
-        if self._should_abstain(context, query) and not self._store.has_identifier_match(
+        explicitly_scoped = isinstance(request, FilenameSearchRequest) and bool(request.included_filenames)
+        if not explicitly_scoped and self._should_abstain(context, query) and not self._store.has_identifier_match(
             context, request
         ):
             return []

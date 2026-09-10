@@ -19,6 +19,44 @@ from kip import __version__
 from kip.mcp_server import create_server
 
 
+def test_answer_filename_binding_is_identical_across_edges(test_container, monkeypatch):
+    from fastapi.testclient import TestClient
+    from mcp.client import Client
+    from typer.testing import CliRunner
+
+    from kip.api import create_app
+    from kip.cli import app
+
+    source = test_container.settings.project_root / "source"
+    (source / "대상.txt").write_text("승인되지 않은 검토 초안이다.")
+    (source / "다른문서.txt").write_text("최종 승인일은 2026년 9월 3일이다. 최종 승인일에 승인했다.")
+    context = test_container.application.operations.request_context()
+    test_container.application.ingestion.sync_filesystem(context, "fixture")
+    query = '"대상.txt" 최종 승인일은 언제인가?'
+    monkeypatch.setattr("kip.cli.build_container", lambda settings, load_models=True: test_container)
+    monkeypatch.setenv("KIP_WORKSPACE", "default")
+    monkeypatch.setenv("KIP_ACL_SCOPES", "workspace:default")
+    cli = CliRunner().invoke(app, ["answer", query, "--limit", "1"])
+    assert cli.exit_code == 0, cli.output
+    with TestClient(create_app(test_container)) as client:
+        rest = client.post("/v1/answer", json={"query": query, "limit": 1}, headers={"X-KIP-API-Key": "test-key"})
+        assert rest.status_code == 200
+
+    async def invoke():
+        async with Client(create_server(test_container)) as client:
+            result = await client.call_tool("kip_answer", {"query": query, "limit": 1})
+            return json.loads(result.content[0].text)
+
+    envelopes = [json.loads(cli.output), rest.json(), anyio.run(invoke)]
+    for envelope in envelopes:
+        assert envelope["schema_version"] == "kip.envelope.v1"
+        assert envelope["ok"]
+        assert envelope["data"]["refused"]
+        assert envelope["data"]["refusal_reason"] == "answer_not_present"
+        assert envelope["data"]["citations"] == []
+        assert envelope["data"]["query"] == query
+
+
 def test_mcp_discovery_and_read_distinguish_freshness(test_container):
     from mcp.client import Client
 

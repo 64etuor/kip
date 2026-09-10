@@ -342,6 +342,17 @@ document without relaxing adequacy: the remaining question must be present in
 it, otherwise the answer refuses with `answer_not_present`, and the same
 ambiguity rule applies. A shallow XLSX extract still returns
 `exact_xlsx_read_required`.
+Filename binding is resolved before ranking, result limits and live freshness
+checks (ADR-060). Balanced straight/curly quotes and backticks use the same
+parser as inclusion, exclusion and ambiguity. Missing or inaccessible named
+evidence returns `no_admissible_evidence`; changed named evidence may return
+`no_fresh_evidence`. Neither condition permits an answer from other files.
+Explicit inclusion/exclusion also constrains approved ontology evidence.
+The internal filename criteria are not new public `SearchRequest` fields.
+Every positively named file must contribute usable fresh evidence; a tight
+limit or one stale named file cannot silently turn a multi-file request into
+an answer about only the remaining file. Ontology evidence in a file-scoped
+answer must be among the eligible retrieved units as well.
 Extractive fallback is visible through `retrieval_mode` and `warnings`; it is
 the primary local behavior when structured generation is disabled. When
 generation is enabled, a generator failure falls back only when

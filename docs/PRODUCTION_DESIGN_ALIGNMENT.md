@@ -27,6 +27,12 @@ and synchronized updates to the affected canonical documents.
 
 ## Current alignment
 
+3.7.1 corrects named-source binding before retrieval limits and live freshness
+filtering, including quoted filenames and exclusions. Typed refusals preserve
+the requested scope when evidence cannot be used. This is covered on both
+Memory/PostgreSQL and the shared CLI/REST/MCP answer path; it does not establish
+general natural-language or private-corpus answer quality (ADR-060).
+
 The independent dispatched 3.6.1 follow-up in [agent quality](AGENT_QUALITY.md)
 establishes core MCP task success without forced skill context, but not full
 evidence discipline: two of five responses added claims without exact reads.

@@ -1,5 +1,17 @@
 # Operations
 
+For a named-document answer, use a literal quoted filename, for example:
+
+```bash
+./scripts/kip answer '"보고서.pdf" 제출기한은 언제인가?' --limit 5
+```
+
+As of 3.7.1, that file scope is fixed before ranking and live source checks.
+Unknown/inaccessible or stale evidence returns a typed refusal; another file
+is not substituted. If several files are named, all must yield usable evidence
+within the requested limit. Inspect the source and narrow the request or raise
+the limit as appropriate; ordinary retrieval still never starts a sync.
+
 > 용어가 낯설면 [`GLOSSARY.md`](GLOSSARY.md), 문제가 생기면
 > [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)를 보세요.
 

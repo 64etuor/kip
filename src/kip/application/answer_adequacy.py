@@ -7,6 +7,7 @@ from unicodedata import normalize
 from urllib.parse import unquote, urlsplit
 
 from kip.application.citations import citation_from_evidence
+from kip.domain.file_references import file_references, without_references
 from kip.domain.models import (
     AnswerRefusalReason,
     AnswerRequest,
@@ -109,7 +110,9 @@ def _bigrams(text: str) -> set[str]:
 
 def _keywords(text: str) -> set[str]:
     keywords: set[str] = set()
-    for raw in _WORD_RE.findall(text.casefold()):
+    for raw in _WORD_RE.findall(normalize("NFC", text).casefold()):
+        if raw in _QUESTION_WORDS or re.fullmatch(r"(?:언제|누구|무엇|어디|얼마)(?:인가|입니까|인지|야|인가요)", raw):
+            continue
         word = raw
         for suffix in _PARTICLE_SUFFIXES:
             if word.endswith(suffix) and len(word) - len(suffix) >= 2:
@@ -121,6 +124,7 @@ def _keywords(text: str) -> set[str]:
 
 
 def _is_relevant(query: str, text: str) -> bool:
+    text = normalize("NFC", text)
     keywords = _keywords(query)
     if keywords:
         matches = sum(keyword in text.casefold() for keyword in keywords)
@@ -148,44 +152,6 @@ def is_exact_file_reference(query: str, evidence: EvidenceRead) -> bool:
     return bool(filename) and normalize("NFC", query.strip()).casefold() == normalize("NFC", filename).casefold()
 
 
-_REFERENCE_PUNCTUATION = "?!.,:;)(\"'\u201c\u201d\u2018\u2019"
-_REFERENCE_PARTICLES = (
-    "에서는", "으로는", "에게는", "에서", "으로", "에게", "까지", "부터", "이랑",
-    "의", "은", "는", "이", "가", "을", "를", "에", "로", "와", "과", "도", "랑",
-)
-# A question that sets a named document aside asks about the others. Each
-# entry is a regex fragment; 제외 must close the clause ("제외하고", "제외,
-# 다른 ...") because "제외 대상" is a heading inside the document, not scope.
-_EXCLUSION_MARKERS = (
-    "말고", "빼고", "외에", "이외", "아닌",
-    r"제외(?:하고서|하고|하면|하며|하여|한|시키고)",
-    r"제외(?=\s*(?:다른|나머지|기타|[,·]|$))",
-)
-_EXCLUSION_STARTS = ("말고", "빼고", "외에", "이외", "아닌", "제외")
-
-
-def _file_reference_pattern(filename: str) -> re.Pattern[str]:
-    """Match the whole basename at a token boundary, allowing one known particle."""
-    escaped = re.escape(normalize("NFC", filename).casefold())
-    boundary = re.escape(_REFERENCE_PUNCTUATION)
-    particles = "|".join(re.escape(particle) for particle in _REFERENCE_PARTICLES)
-    # "A.txt말고" is ordinary spacing; an attached exclusion word still ends the name.
-    markers = "|".join(re.escape(marker) for marker in _EXCLUSION_STARTS)
-    return re.compile(rf"(?<!\S){escaped}(?:{particles})?(?=$|\s|[{boundary}]|{markers})")
-
-
-def _file_exclusion_pattern(filename: str) -> re.Pattern[str]:
-    """Match the basename immediately followed by an exclusion marker.
-
-    Only "A.txt 말고", "A.txt를 제외하고", "A.txt 외에" set the file aside. A
-    marker elsewhere in the question ("정규직이 아닌 인력") is content.
-    """
-    escaped = re.escape(normalize("NFC", filename).casefold())
-    particles = "|".join(re.escape(particle) for particle in _REFERENCE_PARTICLES)
-    markers = "|".join(_EXCLUSION_MARKERS)
-    return re.compile(rf"(?<!\S){escaped}(?:{particles})?\s*(?:{markers})")
-
-
 def _evidence_filename(evidence: EvidenceRead) -> str | None:
     source = urlsplit(evidence.source_uri)
     if source.scheme != "file" or not evidence.unit.body.strip():
@@ -207,12 +173,7 @@ def referenced_filename(query: str, evidence: EvidenceRead) -> str | None:
     filename = _evidence_filename(evidence)
     if filename is None:
         return None
-    lowered = normalize("NFC", query).casefold()
-    if lowered.strip() == _name_key(filename):
-        return filename
-    if not PurePosixPath(filename).suffix:
-        return None
-    return filename if _file_reference_pattern(filename).search(lowered) else None
+    return filename if file_references(query, [filename]) else None
 
 
 def excluded_filename(query: str, evidence: EvidenceRead) -> str | None:
@@ -220,25 +181,20 @@ def excluded_filename(query: str, evidence: EvidenceRead) -> str | None:
     filename = referenced_filename(query, evidence)
     if filename is None:
         return None
-    return filename if _file_exclusion_pattern(filename).search(normalize("NFC", query).casefold()) else None
+    return filename if any(ref.excluded for ref in file_references(query, [filename])) else None
 
 
 
 def _without_file_references(query: str, evidence: list[EvidenceRead]) -> str:
-    remainder = normalize("NFC", query).casefold()
-    for filename in {name for item in evidence if (name := _evidence_filename(item))}:
-        remainder = _file_reference_pattern(filename).sub(" ", remainder)
-    return " ".join(remainder.split())
+    filenames = [name for item in evidence if (name := _evidence_filename(item))]
+    return without_references(query, file_references(query, filenames))
 
 
 def _without_exclusions(query: str, excluded: list[EvidenceRead]) -> str:
     # Remove the name together with its marker ("A.txt를 제외한"); a leftover
     # inflected marker would otherwise become a required subject keyword.
-    remainder = normalize("NFC", query).casefold()
-    for filename in {name for item in excluded if (name := _evidence_filename(item))}:
-        remainder = _file_exclusion_pattern(filename).sub(" ", remainder)
-        remainder = _file_reference_pattern(filename).sub(" ", remainder)
-    return " ".join(remainder.split())
+    filenames = [name for item in excluded if (name := _evidence_filename(item))]
+    return without_references(query, file_references(query, filenames), excluded_only=True)
 
 
 def _decision_subject_score(query: str, body: str) -> int:
@@ -402,7 +358,7 @@ def prepare_answer_evidence(
     apply_lexical_gate: bool = True,
 ) -> AnswerPreparation:
     ontology_ids = ontology_evidence_ids or set()
-    gate_request = request
+    gate_request = request.model_copy(update={"query": normalize("NFC", request.query)})
     reference_ids = {item.unit.id for item in evidence if is_exact_file_reference(request.query, item)}
     mentioned: dict[str, str] = {}
     if not reference_ids:

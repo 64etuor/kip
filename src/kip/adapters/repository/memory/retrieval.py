@@ -47,6 +47,9 @@ class MemoryRetrievalStore:
     def has_ambiguous_filename(self, context: RequestContext, request: SearchRequest) -> bool:
         return self.lexical.has_ambiguous_filename(context, request)
 
+    def filename_candidates(self, context: RequestContext, request: SearchRequest) -> list[str]:
+        return self.lexical.filename_candidates(context, request)
+
     def list_embeddable_units(
         self,
         context: RequestContext,

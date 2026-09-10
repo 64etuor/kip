@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from kip.adapters.repository.memory.acl import unit_is_visible
 from kip.adapters.repository.memory.lexical import revision_is_latest
 from kip.adapters.repository.memory.state import MemoryState
+from kip.domain.file_references import FilenameSearchRequest
 from kip.domain.json_types import JsonObject
 from kip.domain.models import (
     ArtifactView,
@@ -139,6 +140,10 @@ class MemorySemanticStore:
             if (
                 request.source_kinds
                 and view.source_object.system_kind not in request.source_kinds
+            ):
+                continue
+            if isinstance(request, FilenameSearchRequest) and not request.allows(
+                view.artifact.file_name, view.source_object.system_kind,
             ):
                 continue
             document_type = view.document.document_type if view.document else None

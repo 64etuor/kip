@@ -284,6 +284,12 @@ against a concurrent filesystem attacker. See ADR-056.
 
 ## App access
 
+Answer source selection is an additional constraint, never a grant. The
+filename resolver sees only ACL/current-root/request-filtered indexed names;
+scoped lexical/vector retrieval retains those same checks. Unavailable named
+evidence does not fall back to another document, and approved ontology evidence
+cannot bypass the caller's explicit file inclusion/exclusion (ADR-060).
+
 The built-in API key mechanism is a single configured principal for bootstrap,
 local operation, and controlled service-to-service use. It does not accept
 caller-selected identity or scopes. Multi-user production deployments use

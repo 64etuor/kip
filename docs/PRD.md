@@ -518,6 +518,11 @@ Agent 흐름:
 - **FR-LEX-009 MUST**: 검색 projection은 canonical content에서 재구축할 수 있어야 한다.
 - **FR-LEX-010 SHOULD**: lexical backend를 PGroonga, Tantivy, OpenSearch 등으로 교체할 수 있어야 한다.
 
+파일을 지정한 `answer` 요청은 해당 파일의 허용된 근거에 범위를 고정한다.
+순위·결과 수 제한·원본 변경 때문에 지정 파일의 근거를 확보하지 못해도
+다른 파일의 사실로 대체하지 않는다. 따옴표·백틱·제외 표현은 같은 파일명
+해석 규칙을 사용하며, 명시한 범위는 온톨로지 근거에도 적용한다 (ADR-060).
+
 ### 9.10 Semantic search and pgvector
 
 - **FR-VEC-001 MUST**: embedding은 canonical fact가 아니라 projection으로 취급해야 한다.

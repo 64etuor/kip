@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.7.1 - 2026-09-10
+
+- Bind named-file answers to the caller's allowed indexed filenames before
+  ranking, result limits and live freshness checks. Missing, inaccessible or
+  stale named evidence no longer falls back to another file's facts. Apply
+  inclusion/exclusion to both lexical and vector candidates and ontology evidence.
+- Share filename parsing across scope, ambiguity and answer preparation,
+  including balanced quotes/backticks, particles, exclusions and overlapping
+  names. Keep Unicode caseless matching consistent across repository backends.
+- Normalize interrogative words before stripping noun particles, so
+  언제인가/누구인가/무엇인가 do not cause false evidence refusals.
+
 ## 3.7.0 - 2026-09-10
 
 - Add a database-only startup path for CLI/MCP users: wait for the approved

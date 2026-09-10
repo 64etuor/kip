@@ -231,7 +231,8 @@ against a concurrent filesystem attacker. See ADR-056.
   production preloads SHA-256-verified PP-OCRv5 Korean files, and indexing sets
   `KORDOC_OFFLINE=1`.
 - The isolated Kordoc install root overrides `adm-zip` to 0.6.0 and `sharp` to
-  0.35.3 so npm also replaces vulnerable nested copies. The source ZIP carries
+  0.35.3, including nested copies. These pins have newly observed advisories
+  in the 2026-09-10 audit below. The source ZIP carries
   only this installer policy, never the downloaded binary or model cache.
 - PPTX OCR writes selected image bytes only to a private temporary directory,
   removes it after the batch, deduplicates by SHA-256, and enforces image count,
@@ -240,6 +241,16 @@ against a concurrent filesystem attacker. See ADR-056.
 
 ## Dependency safety
 
+- The 2026-09-10 cold-install audit of 3.6.1 found sharp
+  [GHSA-rgj7-g3m4-5g8c](https://github.com/advisories/GHSA-rgj7-g3m4-5g8c)
+  (high; fixed in 0.35.4) and adm-zip
+  [GHSA-vwc7-r8mq-g2x9](https://github.com/advisories/GHSA-vwc7-r8mq-g2x9)
+  (moderate; no patched release at audit time). Five npm package findings
+  represent propagation of these two advisories. The adm-zip extraction path
+  is in ONNX installation, outside parser isolation; it was not exercised by
+  the default macOS arm64 install. No exploit or compromise was demonstrated.
+  The current Python audit gate does not cover this npm graph. These findings
+  remain open in 3.6.1; see [evaluation scope](AGENT_QUALITY.md).
 - The production image installs only hash-locked `requirements/runtime.txt`.
   A contract test requires every core project dependency to appear in that
   lock, preventing a wheel-only dependency from being absent at runtime.

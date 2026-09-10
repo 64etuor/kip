@@ -27,6 +27,15 @@ and synchronized updates to the affected canonical documents.
 
 ## Current alignment
 
+The independent dispatched 3.6.1 follow-up in [agent quality](AGENT_QUALITY.md)
+establishes core MCP task success without forced skill context, but not full
+evidence discipline: two of five responses added claims without exact reads.
+OneDrive scope checks passed on a two-file sample. Cold installation reached
+host MCP retrieval using an isolated database, while full app startup stalled
+on Dockerfile frontend resolution. Kordoc npm advisories are outside the
+currently passing Python dependency gate. These remain acceptance gaps in the
+tested release, separate from previously completed setup/runtime probes.
+
 The follow-up 2026-09-10 [native agent exercise](AGENT_QUALITY.md) covers seven
 synthetic requests, not broad production answer quality. MCP descriptions,
 mutation hints and error envelopes are now tested; table completeness is

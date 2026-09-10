@@ -839,6 +839,15 @@ root. Both override transitive `adm-zip` to 0.6.0 and `sharp` to 0.35.3; the
 resulting production dependency graph must report zero high-severity findings.
 Kordoc binaries and model caches are never part of the source starter ZIP.
 
+The 2026-09-10 dispatched cold-install audit found that the 3.6.1 pins no longer
+meet this high-severity requirement: sharp 0.35.3 has a high advisory, propagated
+to three npm package entries, and adm-zip has a separate moderate finding.
+`verify.sh` currently audits Python requirements only, so its success does not
+establish this npm requirement. The isolated sharp 0.35.4 candidate passed a
+macOS image/OCR smoke but was not installed into the release; the moderate
+installation-path finding remains. See [dependency safety](SECURITY.md#dependency-safety)
+and [agent quality evidence](AGENT_QUALITY.md) before making readiness claims.
+
 Existing deployments are not rewritten. To upgrade one, rerun
 `./scripts/install-kordoc.sh`, set `[parsers.ocr.kordoc].enabled = true` and
 `expected_version = "4.8.0"` in its local `config/kip.toml`, and run

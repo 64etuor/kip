@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Record independent agent/OneDrive/cold-install outcomes and open evidence,
+  startup, and npm dependency limitations. Correct the setup guide to test the
+  approved source from its receipt rather than assuming a sample source exists.
+
 ## 3.6.1 - 2026-09-10
 
 - Describe every MCP tool's purpose and mutation effects, advertise canonical

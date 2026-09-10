@@ -6,6 +6,17 @@ target-to-current matrix and ordered gap register live in
 
 ## 2026-09-10 agent and distribution audit
 
+An independent dispatched follow-up of published 3.6.1 found correct core
+results in five fresh MCP sessions without a supplied skill/system prompt,
+but two answers added claims without exact reads and four repeated irrelevant
+embedded-instruction commentary. OneDrive exact reads and scope denials passed
+for two sampled files; a direct answer request refused. A new starter kit
+reached generated-config MCP retrieval after isolated database startup, while
+full app startup stalled at Dockerfile frontend resolution. Bootstrap exposed
+sharp/adm-zip npm advisories outside the Python audit gate. These are open
+quality/security limitations, not a full pass; see the detailed
+[dispatched evaluation](AGENT_QUALITY.md#independent-dispatched-follow-up-2026-09-10).
+
 Seven controlled native-MCP agent requests were reviewed for tool choice,
 exact reads, calculations, missing/stale evidence, and embedded instructions;
 see [agent quality](AGENT_QUALITY.md) for outcomes and limits. MCP discovery and

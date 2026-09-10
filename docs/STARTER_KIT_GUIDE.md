@@ -55,8 +55,11 @@
    `compose.generated.yaml`만 선택하여 승인된 source mount와 생성 config를
    적용한다. 기본 Compose의 sample mount는 합쳐지지 않는다. 필요하면
    `./scripts/doctor.sh`로 환경을 점검한다.
-8. sample source로 `sync -> search -> context -> read -> xlsx-read`를 완료한다.
-9. 실제 source는 `sync run --dry-run`으로 다시 범위와 건수를 확인한다.
+8. receipt의 `next_steps`에 나온 승인된 source 이름으로 먼저
+   `sync run --source SOURCE --dry-run`을 실행해 범위와 건수를 확인한다.
+   사용자 폴더만 설정했다면 `sample` source가 있다고 가정하지 않는다.
+9. 같은 source로 `sync -> search -> context -> read`를 완료한다.
+   엑셀 파일이 포함된 경우 해당 원본의 `xlsx-read`까지 확인한다.
 10. 기존 HWP/HWPX index가 있으면 `parser reextract --source SOURCE`로 shadow
     결과를 검토하고, 별도 승인 후에만 `--activate`를 실행한다.
 11. `docs/AI_OPERATOR_RUNBOOK.md`의 real-corpus cycle을 수행하고 결과를 새 audit 문서로 보존한다.
@@ -178,8 +181,10 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
   실행하고 로컬 `config/kip.toml`의 `expected_version`도 `4.8.0`으로 바꾼 뒤
   doctor와 read-only shadow sample을 통과시킨다.
 - Kordoc binary와 OCR model cache는 source ZIP에 넣지 않는다. 인터넷 연결
-  bootstrap이 격리된 `var/kordoc-4.8.0-r1`에 설치하며, high-severity 전이
-  의존성을 피하도록 `adm-zip` 0.6.0과 `sharp` 0.35.3을 강제한다.
+  bootstrap이 격리된 `var/kordoc-4.8.0-r1`에 설치하며 `adm-zip` 0.6.0과
+  `sharp` 0.35.3을 강제한다. 2026-09-10 신규 설치 감사에서 이 버전에 대한
+  advisory가 확인됐다. 현재 Python 검증 통과만으로 npm 의존성 안전성을
+  판단하지 말고 [알려진 의존성 문제](SECURITY.md#dependency-safety)를 확인한다.
 - OCR 운영 전 low-text PDF, 깨진 Korean font map, screenshot형 PPTX,
   중복 이미지, 대형 이미지, 실패/timeout 표본을 shadow extraction으로
   검증하고 원본 hash와 locator fidelity를 확인한다.

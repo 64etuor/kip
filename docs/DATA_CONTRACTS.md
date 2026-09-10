@@ -10,6 +10,29 @@ still a UTF-8 serialized `kip.envelope.v1` document. MCP protocol negotiation,
 tool naming, and initialization metadata do not create a second KIP data
 contract. The MCP `serverInfo.version` value is the KIP package version.
 
+Completed MCP handlers return this envelope for domain validation failures as
+well as success. Tool schemas advertise canonical bounds; malformed protocol
+argument shapes rejected before a handler remain SDK errors. Unexpected handler
+failures return `internal_error` without internal details. Mutation hints do
+not replace authorization, and discovery approval describes its YAML writes.
+
+## Answer evidence completeness
+
+Shallow `xlsx_sheet` units are discovery metadata, not final-answer evidence,
+regardless of question language. When no other admissible evidence remains,
+`exact_xlsx_read_required` carries discovery citations with workbook/sheet
+locators for a subsequent exact range read. A refusal's citations are not
+claims that the missing values were read.
+
+Partial CSV units qualify only with full contiguous, nonoverlapping row
+coverage from the same artifact/extraction/hash and sufficient `max_chars` to
+include the complete table. Otherwise `csv_full_table_required` identifies the
+missing completeness/budget boundary. Missing legacy completeness metadata is
+not assumed to mean a complete table. Checks run again after evidence filtering;
+excluded table units cannot leave unsupported ontology context. Complete
+non-table evidence can still answer a query that also matched a workbook.
+See ADR-058.
+
 ## Public envelope
 
 ```json

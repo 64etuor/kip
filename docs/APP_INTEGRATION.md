@@ -105,6 +105,13 @@ Interaction endpoints run under the authenticated caller's principal scope.
 
 ## MCP tool surface
 
+Each tool declares its purpose and read/mutation hints. Domain validation
+failures retain `kip.envelope.v1`; schemas advertise canonical numeric bounds,
+and unexpected handler failures return a generic `internal_error`. Hints are
+guidance, not permissions. `kip_answer` can refuse with workbook/sheet citations
+so a client can call `kip_xlsx_read`. Native-client observations and connection
+limits are recorded in [agent quality](AGENT_QUALITY.md).
+
 The stdio MCP adapter (`src/kip/mcp_server.py`) exposes these tools, each a
 pure delegation to the same application services as CLI and REST:
 

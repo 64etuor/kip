@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from kip.application.answer_adequacy import prepare_answer_evidence
 from kip.application.answers import assemble_answer
 from kip.domain.models import (
@@ -259,3 +261,79 @@ def test_answer_does_not_require_full_csv_read_for_a_single_chunk_file() -> None
     # Then the CSV-specific refusal does not trigger.
     assert prepared.refusal is None
     assert [item.unit.id for item in prepared.evidence] == ["csv-total"]
+
+
+@pytest.mark.parametrize("query", ["What is the total budget?", "인원은 몇 명?", "예산을 더하면?", "비용을 알려주세요"])
+def test_shallow_workbook_is_not_answer_evidence_in_any_language(query: str) -> None:
+    item = _evidence("sheet", "예산 인원 비용 budget headcount", document_id="budget")
+    item.unit.locator = EvidenceLocator(type="xlsx_sheet", data={"sheet": "Budget"})
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query=query), [item], had_stale_evidence=False, apply_lexical_gate=False,
+    )
+    assert not prepared.evidence
+    assert prepared.refusal is not None
+    assert prepared.refusal.refusal_reason == "exact_xlsx_read_required"
+    assert prepared.refusal.citations[0].locator.data["sheet"] == "Budget"
+
+
+def test_complete_evidence_is_not_blocked_by_shallow_workbook_discovery() -> None:
+    sheet = _evidence("sheet", "budget", document_id="budget")
+    sheet.unit.locator = EvidenceLocator(type="xlsx_sheet", data={"sheet": "Budget"})
+    document = _evidence("policy", "The approved budget is 450000 won.", document_id="policy")
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query="What is the approved budget?"), [sheet, document],
+        had_stale_evidence=False, apply_lexical_gate=False,
+    )
+    assert prepared.refusal is None
+    assert [item.unit.id for item in prepared.evidence] == ["policy"]
+
+
+def test_partial_csv_requires_complete_coverage_independent_of_query_language() -> None:
+    item = _csv_evidence("part", "Budget,450000", document_id="budget", csv_partial_table=True)
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query="What is the total budget?"), [item],
+        had_stale_evidence=False, apply_lexical_gate=False,
+    )
+    assert not prepared.evidence
+    assert prepared.refusal is not None
+    assert prepared.refusal.refusal_reason == "csv_full_table_required"
+
+
+@pytest.mark.parametrize("second_start,second_end,allowed", [(4, 5, True), (5, 5, False), (3, 5, False)])
+def test_csv_answer_requires_contiguous_nonoverlapping_rows(second_start, second_end, allowed):
+    first = _csv_evidence("first", "Budget\n10\n20", document_id="budget", csv_partial_table=True)
+    second = _csv_evidence("second", "Budget\n30\n40", document_id="budget", csv_partial_table=True)
+    for item in (first, second):
+        item.unit.artifact_id = "shared-artifact"
+        item.unit.extraction_id = "shared-extraction"
+        item.indexed_source_sha256 = "a" * 64
+        item.current_source_sha256 = "a" * 64
+        item.unit.metadata["csv_total_row_count"] = 4
+    second.unit.locator.data = {"start_row": second_start, "end_row": second_end}
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query="What is the budget?"), [first, second],
+        had_stale_evidence=False, apply_lexical_gate=False,
+    )
+    assert bool(prepared.evidence) is allowed
+    assert (prepared.refusal is None) is allowed
+
+
+def test_complete_csv_must_fit_the_answer_context_budget():
+    item = _csv_evidence("complete", "Budget,100\n" * 150, document_id="budget", csv_partial_table=False)
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query="What is the total budget?", max_chars=1000), [item],
+        had_stale_evidence=False, apply_lexical_gate=False,
+    )
+    assert prepared.refusal is not None
+    assert prepared.refusal.refusal_reason == "csv_full_table_required"
+
+
+def test_missing_csv_completeness_metadata_is_not_treated_as_a_complete_table():
+    item = _csv_evidence("legacy", "Budget,100", document_id="budget", csv_partial_table=True)
+    item.unit.metadata = {}
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query="What is the total budget?"), [item],
+        had_stale_evidence=False, apply_lexical_gate=False,
+    )
+    assert prepared.refusal is not None
+    assert prepared.refusal.refusal_reason == "csv_full_table_required"

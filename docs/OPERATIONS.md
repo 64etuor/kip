@@ -64,6 +64,12 @@ proposed`가 비어 있으면 할 일이 없습니다. 관계 채굴을 켜지 �
 
 ## Daily
 
+`verify.sh` checks local Markdown links against the online starter's document
+payload. Both source and production bundles include canonical documents and
+ADRs; historical designs/audits remain in Git history through pinned links.
+Live model-behavior checks are recorded in `docs/AGENT_QUALITY.md` and are not
+part of the deterministic CI gate.
+
 `./scripts/bootstrap.sh` synchronizes the project environment from `uv.lock`
 with `uv sync --frozen` and the postgres, api, identity, extractors, mcp,
 telemetry, and dev extras. If uv is absent, it installs pinned uv 0.8.22 into

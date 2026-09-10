@@ -12,10 +12,80 @@ from __future__ import annotations
 import json
 
 import anyio
+import pytest
 from mcp.types import CallToolResult, TextContent
 
 from kip import __version__
 from kip.mcp_server import create_server
+
+
+@pytest.mark.parametrize("name,arguments", [
+    ("kip_search", {"query": "audit", "limit": 0}),
+    ("kip_context", {"query": "audit", "max_chars": 1}),
+    ("kip_answer", {"query": "   "}),
+    ("kip_clarify", {"reason": "other", "prompt": "Choose", "choices_json": "{"}),
+    ("kip_remember_preference", {"key": "language", "values": ["ko"], "confirmed": False}),
+])
+def test_mcp_invalid_domain_input_returns_versioned_error(test_container, monkeypatch, name, arguments):
+    from mcp.client import Client
+
+    monkeypatch.setattr("kip.mcp_server.build_container", lambda: test_container)
+    server = create_server()
+
+    async def invoke():
+        async with Client(server) as client:
+            return await client.call_tool(name, arguments)
+
+    result = anyio.run(invoke)
+    assert result.is_error is False
+    payload = json.loads(result.content[0].text)
+    assert payload["schema_version"] == "kip.envelope.v1"
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "validation_error"
+    assert "input_value" not in payload["error"]["message"]
+
+
+def test_mcp_discovery_describes_bounds_and_mutation_effects(test_container, monkeypatch):
+    from mcp.client import Client
+
+    monkeypatch.setattr("kip.mcp_server.build_container", lambda: test_container)
+    server = create_server()
+
+    async def discover():
+        async with Client(server) as client:
+            return (await client.list_tools()).tools
+
+    tools = {tool.name: tool for tool in anyio.run(discover)}
+    assert all(tool.description for tool in tools.values())
+    assert all(tool.annotations is not None for tool in tools.values())
+    assert tools["kip_search"].input_schema["properties"]["limit"]["minimum"] == 1
+    assert tools["kip_search"].input_schema["properties"]["limit"]["maximum"] == 100
+    assert tools["kip_read"].annotations.read_only_hint is True
+    assert tools["kip_ontology_discovery_review"].annotations.read_only_hint is False
+    assert "release" in tools["kip_ontology_discovery_review"].description
+    assert "restart" in tools["kip_ontology_discovery_review"].description
+
+
+def test_mcp_unexpected_error_is_enveloped_without_internal_details(test_container, monkeypatch):
+    from mcp.client import Client
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("internal-sensitive-detail")
+
+    monkeypatch.setattr("kip.mcp_server.build_container", lambda: test_container)
+    monkeypatch.setattr(test_container.application.evidence, "read_unit", fail)
+    server = create_server()
+
+    async def invoke():
+        async with Client(server) as client:
+            return await client.call_tool("kip_read", {"unit_id": "unknown"})
+
+    result = anyio.run(invoke)
+    assert result.is_error is False
+    payload = json.loads(result.content[0].text)
+    assert payload["error"]["code"] == "internal_error"
+    assert payload["schema_version"] == "kip.envelope.v1"
+    assert "internal-sensitive-detail" not in json.dumps(payload)
 
 
 def test_mcp_v2_client_discovers_and_calls_server_in_process(test_container, monkeypatch) -> None:

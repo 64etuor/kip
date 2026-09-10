@@ -53,6 +53,7 @@ DOCUMENT_FILES: Final = tuple(
     f"docs/{name}"
     for name in (
         "AI_OPERATOR_RUNBOOK.md",
+        "AGENT_QUALITY.md",
         "APP_INTEGRATION.md",
         "CONNECTORS.md",
         "DATA_CONTRACTS.md",

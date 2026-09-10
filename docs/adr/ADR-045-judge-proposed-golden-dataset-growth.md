@@ -63,7 +63,7 @@ canonical truth or auto-promote anything.
   `stale_warning_rate`, activate if the gate passes.
 - Rejected samples give per-batch judge precision data — the input the
   future calibrated-review-tier work (see
-  `docs/plans/2026-08-14-llm-capability-scaling.md`) needs.
+  [historical design](https://github.com/64etuor/kip/blob/1b04bad685762fe3002d9c4ec6a75f267df9fb94/docs/plans/2026-08-14-llm-capability-scaling.md)) needs.
 - Known limitation (accepted trust model): the review file's decision list
   has no self-integrity protection beyond the draft fingerprint binding.
   An actor with local filesystem write access could hand-edit recorded
@@ -83,4 +83,4 @@ canonical truth or auto-promote anything.
 - `src/kip/evaluation/drafts.py`
 - `evaluation/golden/drafts/README.md`, `example-draft.yaml`
 - `docs/RAG_EVALUATION.md` (judge section)
-- `docs/plans/2026-08-14-llm-capability-scaling.md`
+- [historical design](https://github.com/64etuor/kip/blob/1b04bad685762fe3002d9c4ec6a75f267df9fb94/docs/plans/2026-08-14-llm-capability-scaling.md)

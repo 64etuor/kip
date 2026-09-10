@@ -1,5 +1,23 @@
 # Changelog
 
+## 3.6.1 - 2026-09-10
+
+- Describe every MCP tool's purpose and mutation effects, advertise canonical
+  request bounds, and preserve the versioned envelope for domain validation
+  and unexpected handler failures. Discovery approval now accurately describes
+  its immediate YAML release and restart implications.
+- Treat shallow workbook units as discovery, independent of question language.
+  Refusals include exact-read locators; complete evidence can still answer when
+  a shallow workbook also matched. Partial CSV evidence requires contiguous
+  full-row coverage that fits the context budget. Excluded evidence cannot
+  leave an uncitable ontology context in the answer.
+- Clarify missing currency and formula-cache semantics; record seven native
+  MCP agent cases covering Korean/English questions, workbook calculation,
+  changed decisions, missing/stale evidence, and embedded hostile instructions.
+- Remove 12 superseded implementation checklists and align both distribution
+  formats on the canonical document allowlist. Historical links point to pinned
+  Git history. Verification checks Markdown links against the shipped payload.
+
 ## 3.6.0 - 2026-09-10
 
 - Enforce the currently configured filesystem sources as a deployment access

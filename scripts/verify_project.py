@@ -7,7 +7,9 @@ import sys
 from pathlib import Path
 
 from kip.architecture_rules import application_adapter_imports
+from kip.documentation import documentation_link_errors
 from kip.ontology import validate_ontology
+from kip.starter_archive_policy import selected_source_files
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -27,6 +29,10 @@ def require(condition: bool, message: str, errors: list[str]) -> None:
 
 def main() -> int:
     errors: list[str] = []
+    errors.extend(documentation_link_errors({
+        path.relative_to(ROOT).as_posix(): path.read_bytes()
+        for path in selected_source_files(ROOT)
+    }))
     require((ROOT / "AGENTS.md").is_file(), "AGENTS.md must exist at project root", errors)
     require((ROOT / "CLAUDE.md").is_file(), "CLAUDE.md must exist at project root", errors)
     if (ROOT / "CLAUDE.md").exists():

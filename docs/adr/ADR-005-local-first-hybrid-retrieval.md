@@ -50,6 +50,6 @@ latency win does not waive the remaining gate or activate a space.
 
 ## References
 
-- `docs/plans/2026-07-30-rag-quality-stack-design.md`
-- `docs/plans/2026-07-30-rag-quality-stack-implementation.md`
+- [historical design](https://github.com/64etuor/kip/blob/1b04bad685762fe3002d9c4ec6a75f267df9fb94/docs/plans/2026-07-30-rag-quality-stack-design.md)
+- `docs/RAG_EVALUATION.md` (current execution and measurement contract)
 - `docs/TRD.md` sections 36.9 through 36.11

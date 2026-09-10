@@ -4,6 +4,20 @@ This is the current readiness inventory, not the target architecture. The
 target-to-current matrix and ordered gap register live in
 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`.
 
+## 2026-09-10 agent and distribution audit
+
+Seven controlled native-MCP agent requests were reviewed for tool choice,
+exact reads, calculations, missing/stale evidence, and embedded instructions;
+see [agent quality](AGENT_QUALITY.md) for outcomes and limits. MCP discovery and
+error contracts were hardened, and table completeness now governs answer
+admissibility independently of question language (ADR-058). Twelve superseded
+implementation checklists were removed. Both distributions now use the same
+canonical document allowlist, and verification checks recipient-visible links.
+The final local gate passed 951 tests, lint/types, dependency auditing, and the
+120-case portable retrieval/ACL gate. The default workspace still had no corpus
+for the separate historical private golden floor; this is not private-corpus
+answer-quality evidence.
+
 ## 2026-09-10 source scope and setup handoff
 
 Enabled filesystem roots now authorize existing indexed evidence before

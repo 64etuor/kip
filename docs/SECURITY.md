@@ -2,6 +2,12 @@
 
 ## Trust boundaries
 
+MCP mutation hints describe behavior but never grant authority. Unexpected
+handler failures return generic `internal_error` without input or exception
+details. Shallow workbook data and incomplete CSV fragments are excluded from
+final-answer evidence regardless of question language; exact-read refusal
+citations remain discovery locators, not verified numeric claims (ADR-058).
+
 The portable skill bridge fails on an invalid explicit `KIP_PROJECT_DIR`;
 it does not fall back to another workspace. Skill installation rejects
 symlink bundles, stages copies before replacement, and restores prior bundles

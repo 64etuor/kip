@@ -160,10 +160,13 @@ class AnsweringUseCases:
             ):
                 return prepared.refusal
             return prepared.refusal.model_copy(update={"ontology_context": ontology_bundle.context})
+        ontology_context = ontology_bundle.context
+        if not _context_is_cited(ontology_context, {item.unit.id for item in prepared.evidence}):
+            ontology_context = None
         extractive = assemble_extractive_answer(
             request,
             prepared.evidence,
-            ontology_bundle.context,
+            ontology_context,
         )
         if not self._enabled:
             return extractive
@@ -187,7 +190,7 @@ class AnsweringUseCases:
         generation_request = self._generation_request(
             request,
             prepared.evidence,
-            ontology_bundle.context,
+            ontology_context,
         )
         try:
             result = self._generator.generate(generation_request)
@@ -209,7 +212,7 @@ class AnsweringUseCases:
                 prepared.evidence,
                 result,
                 decision,
-                ontology_bundle.context,
+                ontology_context,
             )
         except DependencyUnavailableError:
             if self._fallback_on_error:

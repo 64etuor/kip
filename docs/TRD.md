@@ -3140,7 +3140,8 @@ I. Context pack with evidence metadata
 
 ### 28.7 Answer policy
 
-Agent Skill이 다음을 강제한다.
+Agent Skill은 다음 행동을 안내하고, 서버는 각 도구 경로에서 해당 근거·권한
+계약을 검증한다. 외부 모델이 지침을 따르는지는 실제 호출 기록으로 별도 확인한다.
 
 - material claim마다 evidence locator
 - official conclusion과 discussion context 구분
@@ -3155,6 +3156,11 @@ Agent Skill이 다음을 강제한다.
 - refusal은 검색 실패와 분리된 versioned `AnswerResponse` outcome이며, discovery
   hit가 존재해도 unsupported answer success로 승격하지 않음
 
+ADR-058: 얕은 XLSX는 검색용이며 최종 답변 근거에서 제외한다. CSV 조각은 같은
+artifact/extraction/hash의 전체 행을 연속·중복 없이 포함하고 문맥 한도 안에
+들어갈 때만 답변에 사용한다. 이 기준은 질문 언어와 무관하다. 다른 완전한
+근거가 없으면 정확한 원본 읽기를 위한 locator를 포함해 거부한다.
+
 
 ## 29. Agent-facing CLI and JSON contracts
 
@@ -3163,8 +3169,8 @@ Agent Skill이 다음을 강제한다.
 `kip` CLI는 AI agent가 사용하는 안정된 application boundary다. 다음을 만족해야 한다.
 
 - command 이름과 JSON schema는 database·parser·graph backend보다 오래 유지한다.
-- stdout에는 machine-readable JSON만 출력한다.
-- stderr에는 사람용 진단 로그만 출력한다.
+- 데이터 명령의 성공 envelope는 stdout에, 도메인 오류 envelope는 stderr에
+  JSON으로 출력한다. Help/인자 파싱 오류와 운영 진단은 별도의 CLI 메시지다.
 - exit code는 오류 종류를 안정적으로 구분한다.
 - 명령은 기본적으로 non-interactive다.
 - destructive operation은 명시적인 flag와 별도 capability를 요구한다.
@@ -3730,7 +3736,13 @@ Agent instructions MUST state that such content is quoted evidence. It may be su
 
 ### 30.9 Agent regression tests
 
-Prompt fixtures verify that agents:
+The 2026-09-10 native MCP client exercise and its limitations are recorded in
+[`AGENT_QUALITY.md`](AGENT_QUALITY.md). It is a manual model-behavior observation,
+not an automatic CI model-quality gate. MCP schema/error checks are separate.
+
+These are agent-behavior acceptance targets. Unit tests of tool contracts and
+skill files do not establish model behavior. A fresh-client tool trace and
+claim-level review are needed to measure whether agents:
 
 - do not answer from snippets alone
 - use `vocab` on 0-result queries
@@ -4594,9 +4606,8 @@ AND unauthorized result count = 0
 ```
 
 The executable local-first evaluation and promotion design is recorded in
-`docs/adr/ADR-005-local-first-hybrid-retrieval.md`. Its implementation plan and report
-contracts live under `docs/plans/2026-07-30-rag-quality-stack-implementation.md` and
-`evaluation/schemas/`.
+`docs/adr/ADR-005-local-first-hybrid-retrieval.md`. Current operating instructions
+and report contracts live in `docs/RAG_EVALUATION.md` and `evaluation/schemas/`.
 
 ### 36.12 Neo4j parity tests
 
@@ -5172,6 +5183,7 @@ stand for implicit accepted decisions.
 | ADR-055 | Focus agent instructions and harden local entry points | Accepted |
 | ADR-056 | Current filesystem roots authorize existing evidence | Accepted |
 | ADR-057 | Approved setup controls the effective runtime | Accepted |
+| ADR-058 | Use complete evidence and discoverable MCP contracts | Accepted |
 
 ---
 

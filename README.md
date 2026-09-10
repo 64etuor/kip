@@ -16,6 +16,10 @@ projection으로만 취급합니다.
 [`docs/PRODUCTION_DESIGN_ALIGNMENT.md`](docs/PRODUCTION_DESIGN_ALIGNMENT.md)에
 분리해 기록합니다. PRD/TRD의 목표 문구만 보고 현재 준비 상태를 추정하지 마세요.
 
+자연어 요청에서 실제 MCP 도구 선택과 근거 읽기를 점검한 결과는
+[`에이전트 품질 기록`](docs/AGENT_QUALITY.md)에 있습니다. 합성 사례 7건의
+결과이며 모든 문서·모델의 답변 품질을 보장하는 수치는 아닙니다.
+
 ## 검증된 소스 ZIP
 
 인터넷 연결 환경에 소스와 필수 운영 문서만 전달하려면 작업 디렉터리를 직접
@@ -427,7 +431,7 @@ gate에 따라 semantic search는 비활성 상태입니다.
 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`, `docs/RAG_EVALUATION.md`,
 `evaluation/reports/`에 있습니다. 전체 corpus의 parser, retrieval, semantic,
 graph, ontology audit는
-[`docs/RAG_QUALITY_AUDIT_2026-08-06.md`](docs/RAG_QUALITY_AUDIT_2026-08-06.md)에
+[`2026-08-06 기록`](https://github.com/64etuor/kip/blob/1b04bad685762fe3002d9c4ec6a75f267df9fb94/docs/RAG_QUALITY_AUDIT_2026-08-06.md)에
 기록돼 있습니다.
 
 ## 12. 라이선스

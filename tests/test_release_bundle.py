@@ -10,6 +10,8 @@ from pathlib import Path
 
 import yaml
 
+from kip.documentation import documentation_link_errors
+
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 PINNED_IMAGE = "registry.example/kip@sha256:" + "1" * 64
@@ -73,6 +75,12 @@ def _build_bundle(tmp_path: Path) -> Path:
 
 def test_release_bundle_contains_verified_starter_artifacts(tmp_path: Path) -> None:
     bundle = _build_bundle(tmp_path)
+    assert not (bundle / "starter/docs/plans").exists()
+    assert not (bundle / "starter/docs/RAG_QUALITY_AUDIT_2026-08-06.md").exists()
+    assert documentation_link_errors({
+        path.relative_to(bundle / "starter").as_posix(): path.read_bytes()
+        for path in (bundle / "starter").rglob("*") if path.is_file()
+    }) == []
 
     required = [
         f"artifacts/wheels/kip_knowledge_fabric-{VERSION}-py3-none-any.whl",

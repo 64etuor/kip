@@ -18,6 +18,8 @@ from email.parser import BytesParser
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from kip.starter_archive_policy import DOCUMENT_FILES, ROOT_FILES
+
 IMAGE_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/:+-]*@sha256:[0-9a-f]{64}$")
 FORBIDDEN_PARTS = frozenset(
     {
@@ -59,29 +61,11 @@ SAFE_EXAMPLE_PASSWORDS = frozenset(
         "testpassword",
     }
 )
-ROOT_FILES = (
-    ".dockerignore",
-    ".env.example",
-    ".gitignore",
-    ".mcp.json",
-    "AGENTS.md",
-    "CLAUDE.md",
-    "Dockerfile",
-    "LICENSE",
-    "Makefile",
-    "README.md",
-    "VERSION",
-    "compose.production.yaml",
-    "compose.yaml",
-    "pyproject.toml",
-    "uv.lock",
-)
 ROOT_DIRECTORIES = (
     ".claude",
     ".github",
     "contracts",
     "deploy",
-    "docs",
     "examples",
     "migrations",
     "ontology",
@@ -200,6 +184,11 @@ def _copy_starter(root: Path, destination: Path) -> None:
         if not source.is_dir():
             raise ReleaseError(f"required starter directory is missing: {relative}")
         _copy_tree(source, destination / relative)
+    for relative in DOCUMENT_FILES:
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(root / relative, target)
+    _copy_tree(root / "docs/adr", destination / "docs/adr")
     config = destination / "config"
     config.mkdir()
     for name in CONFIG_FILES:

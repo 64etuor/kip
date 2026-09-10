@@ -216,7 +216,7 @@ def test_starter_archive_is_deterministic_and_excludes_local_material(
     assert "src/kip/starter_archive.py" in relative_names
     assert "docs/adr/ADR-052-verified-online-source-zip.md" in relative_names
     assert "config/kip.toml" not in relative_names
-    assert "docs/plans/2026-08-17-online-zip-starter-kit.md" not in relative_names
+    assert "docs/plans/2026-08-17-online-zip-starter-kit-design.md" not in relative_names
     assert "evaluation/golden/private-onedrive-nl.yaml" not in relative_names
     assert not any(".egg-info/" in name for name in relative_names)
 

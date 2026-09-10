@@ -15,9 +15,9 @@ Public v1 `SearchRequest.mode` exposes `lexical`, `vector`, `hybrid`, and
 fingerprinted comparison surface; a one-off explicit mode request is diagnostic
 evidence and never substitutes for projection promotion and activation.
 
-The latest loaded-corpus audit, including the corrected unmeasured-metric
+The historical loaded-corpus audit, including the corrected unmeasured-metric
 semantics and all four retrieval variants, is
-[`RAG_QUALITY_AUDIT_2026-08-06.md`](RAG_QUALITY_AUDIT_2026-08-06.md).
+[`2026-08-06 audit`](https://github.com/64etuor/kip/blob/1b04bad685762fe3002d9c4ec6a75f267df9fb94/docs/RAG_QUALITY_AUDIT_2026-08-06.md).
 
 ## Reviewed private shadow: 2026-08-13 historical `c4000` run
 

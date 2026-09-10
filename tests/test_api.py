@@ -135,7 +135,15 @@ def test_rest_answer_requires_exact_xlsx_read_for_numeric_claim(test_container):
     answer = response.json()["data"]
     assert answer["refused"] is True
     assert answer["refusal_reason"] == "exact_xlsx_read_required"
-    assert answer["citations"] == []
+    assert len(answer["citations"]) == 1
+    citation = answer["citations"][0]
+    assert citation["locator"] == {"type": "xlsx_sheet", "data": {"sheet": "정산", "range": "A1:B2"}}
+    exact = client.get(
+        f"/v1/xlsx/{citation['artifact_id']}/range", headers=headers,
+        params={"sheet": citation["locator"]["data"]["sheet"], "cell_range": citation["locator"]["data"]["range"]},
+    )
+    assert exact.status_code == 200
+    assert exact.json()["data"]["cells"][1][1]["value"] == 1500000
 
 
 def test_rest_answer_refuses_without_authorized_evidence(test_container):

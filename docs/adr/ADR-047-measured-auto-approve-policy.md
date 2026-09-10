@@ -87,6 +87,6 @@ measured, revocable policy; silent promotion is forbidden."
   `src/kip/domain/knowledge.py` (`PredicateReviewStats`,
   `AUTO_APPROVE_POLICY_PRINCIPAL`)
 - `AGENTS.md` architecture rule 10 (revised wording)
-- `docs/plans/2026-08-14-llm-capability-scaling.md` item 4
+- [historical design](https://github.com/64etuor/kip/blob/1b04bad685762fe3002d9c4ec6a75f267df9fb94/docs/plans/2026-08-14-llm-capability-scaling.md) item 4
 - ADR-025 (fully-human review baseline this policy calibrates),
   ADR-045 (the sample-audit pattern this generalizes)

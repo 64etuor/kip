@@ -3,7 +3,7 @@
 - **Status:** Living conformance register
 - **Last reviewed:** 2026-09-10 (source scope, bounded OneDrive probes, and isolated setup runtime; older corpus measurements retain their dates)
 - **Target:** `docs/PRD.md`, `docs/TRD.md`, and the approved
-  `docs/plans/2026-08-09-production-rag-starter-kit-design.md`
+  [historical design](https://github.com/64etuor/kip/blob/1b04bad685762fe3002d9c4ec6a75f267df9fb94/docs/plans/2026-08-09-production-rag-starter-kit-design.md)
 - **Current truth:** generated contracts, the current checkout, measured
   evaluation reports, and `docs/IMPLEMENTATION_STATUS.md`
 
@@ -26,6 +26,12 @@ and synchronized updates to the affected canonical documents.
 | Dated plans and audits | Historical intent or evidence; never current status by themselves |
 
 ## Current alignment
+
+The follow-up 2026-09-10 [native agent exercise](AGENT_QUALITY.md) covers seven
+synthetic requests, not broad production answer quality. MCP descriptions,
+mutation hints and error envelopes are now tested; table completeness is
+checked before answering. Superseded implementation checklists were removed,
+and archive-aware Markdown link checks protect both document payloads.
 
 The isolated 2026-09-10 setup acceptance completed frozen bootstrap, guided
 plan/apply/verify, standalone Compose startup, migration, API/worker operation,

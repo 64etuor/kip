@@ -332,6 +332,30 @@ def test_xlsx_numeric_intent_requires_exact_range_before_generation(
     assert generator.requests == []
 
 
+def test_filtered_table_evidence_does_not_leave_an_uncitable_ontology_context(tmp_path, monkeypatch):
+    from kip.application.ontology_context import OntologyEvidenceContext
+    from kip.domain.models import OntologyAnswerContext, SearchRequest
+
+    generator = RecordingGenerator()
+    container = _container(tmp_path, generator)
+    _ingest(container, "budget.txt", "The approved budget is 450000.")
+    workbook = Workbook()
+    workbook.active.append(["budget", "amount"])
+    workbook.save(tmp_path / "source/budget.xlsx")
+    context = container.application.operations.request_context()
+    container.application.ingestion.sync_filesystem(context, "fixture")
+    hits = container.application.retrieval.search(context, SearchRequest(query="budget"))
+    sheet = next(container.application.evidence.read_unit(context, hit.unit_id) for hit in hits if hit.locator.type == "xlsx_sheet")
+    monkeypatch.setattr(container.application.ontology_context, "build", lambda *args, **kwargs: OntologyEvidenceContext(
+        context=OntologyAnswerContext(evidence_unit_ids=[sheet.unit.id]),
+        evidence=(sheet,), had_stale_evidence=False,
+    ))
+    response = container.application.answering.answer(context, AnswerRequest(query="What is the approved budget?"))
+    assert response.refused is False
+    assert response.ontology_context is None
+    assert all(item.id != sheet.unit.id for item in generator.requests[0].evidence)
+
+
 def test_rest_answer_uses_same_generated_answer_service(tmp_path: Path) -> None:
     generator = RecordingGenerator()
     container = _container(tmp_path, generator)

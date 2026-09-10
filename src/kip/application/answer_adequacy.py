@@ -162,27 +162,76 @@ def _refusal(
     )
 
 
-def _requires_exact_xlsx(request: AnswerRequest, evidence: EvidenceRead) -> bool:
-    return evidence.unit.locator.type == "xlsx_sheet" and any(
-        term in request.query for term in _NUMERIC_INTENT
-    )
+def _table_evidence(
+    evidence: list[EvidenceRead],
+) -> tuple[list[EvidenceRead], list[EvidenceRead], list[EvidenceRead]]:
+    """Separate complete evidence from workbook discovery and incomplete CSVs.
+
+    Completeness is a property of the source units, not a guess about the
+    user's language. CSV chunks qualify together only with exact row coverage
+    from the same artifact, extraction, and source revision.
+    """
+    csv_groups: dict[tuple[str, str, str], list[EvidenceRead]] = {}
+    for item in evidence:
+        if item.unit.locator.type == "csv_rows" and item.unit.metadata.get("csv_partial_table") is not False:
+            key = (item.unit.artifact_id, item.unit.extraction_id, item.indexed_source_sha256)
+            csv_groups.setdefault(key, []).append(item)
+    complete_csv_ids: set[str] = set()
+    for items in csv_groups.values():
+        total = items[0].unit.metadata.get("csv_total_row_count")
+        if type(total) is not int or total < 1:
+            continue
+        intervals: list[tuple[int, int]] = []
+        for item in {item.unit.id: item for item in items}.values():
+            start = item.unit.locator.data.get("start_row")
+            end = item.unit.locator.data.get("end_row")
+            if (
+                item.unit.metadata.get("csv_total_row_count") != total
+                or type(start) is not int or type(end) is not int
+                or not 2 <= start <= end <= total + 1
+            ):
+                break
+            intervals.append((start, end))
+        else:
+            cursor = 2  # Row 1 is the header, repeated in each chunk body.
+            for start, end in sorted(intervals):
+                if start != cursor:
+                    break
+                cursor = end + 1
+            else:
+                if cursor == total + 2:
+                    complete_csv_ids.update(item.unit.id for item in items)
+    usable, shallow, partial = [], [], []
+    for item in evidence:
+        if item.unit.locator.type == "xlsx_sheet":
+            shallow.append(item)
+        elif (
+            item.unit.locator.type == "csv_rows"
+            and item.unit.metadata.get("csv_partial_table") is not False
+            and item.unit.id not in complete_csv_ids
+        ):
+            partial.append(item)
+        else:
+            usable.append(item)
+    return usable, shallow, partial
 
 
-def _requires_full_csv_read(request: AnswerRequest, evidence: EvidenceRead) -> bool:
-    # Unlike xlsx (whose shallow shared-string index deliberately excludes
-    # numeric values), CsvTableParser indexes CSV numeric content verbatim,
-    # so it never trips exact_xlsx_read_required. But a CSV split into
-    # multiple row chunks (unit.metadata["csv_partial_table"], set by
-    # CsvTableParser) means no single unit's body is the full table: an
-    # aggregate/numeric question answered from one chunk - e.g. a
-    # total-row chunk - can look sufficient while most line items live in a
-    # different, uncited chunk. Reuse the same numeric-intent detection as
-    # the xlsx check instead of a separate vocabulary.
-    return (
-        evidence.unit.locator.type == "csv_rows"
-        and bool(evidence.unit.metadata.get("csv_partial_table"))
-        and any(term in request.query for term in _NUMERIC_INTENT)
-    )
+def _table_refusal(
+    request: AnswerRequest, shallow: list[EvidenceRead], partial: list[EvidenceRead],
+) -> AnswerPreparation | None:
+    if shallow:
+        reason: AnswerRefusalReason = "exact_xlsx_read_required"
+        message = "원본 워크북 범위를 지정해 xlsx-read로 확인해야 합니다."
+        discovery = shallow
+    elif partial:
+        reason = "csv_full_table_required"
+        message = "CSV 전체 행을 포함한 정확한 근거가 필요합니다. 일부 조각만으로 답을 확정할 수 없습니다."
+        discovery = partial
+    else:
+        return None
+    response = _refusal(request, reason, message)
+    response.citations = [citation_from_evidence(item) for item in discovery]
+    return AnswerPreparation(evidence=(), refusal=response)
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,24 +257,11 @@ def prepare_answer_evidence(
         ]
     else:
         relevant = list(evidence)
-    if any(_requires_exact_xlsx(request, item) for item in relevant):
-        return AnswerPreparation(
-            evidence=(),
-            refusal=_refusal(
-                request,
-                "exact_xlsx_read_required",
-                "원본 워크북 범위를 지정해 xlsx-read로 확인해야 합니다.",
-            ),
-        )
-    if any(_requires_full_csv_read(request, item) for item in relevant):
-        return AnswerPreparation(
-            evidence=(),
-            refusal=_refusal(
-                request,
-                "csv_full_table_required",
-                "CSV 파일이 여러 조각으로 분할되어 있어 전체 표를 다시 확인해야 합니다.",
-            ),
-        )
+    relevant, shallow, partial = _table_evidence(relevant)
+    if not relevant:
+        table_refusal = _table_refusal(request, shallow, partial)
+        if table_refusal is not None:
+            return table_refusal
     identifier_evidence = [
         item for item in relevant if _contains_requested_identifiers(request.query, item)
     ]
@@ -261,6 +297,13 @@ def prepare_answer_evidence(
             ),
         )
     relevant = value_evidence
+    # Focus/value filters may remove a CSV chunk; never retain a now-partial
+    # group merely because it was complete before those filters.
+    relevant, shallow, partial = _table_evidence(relevant)
+    if not relevant:
+        table_refusal = _table_refusal(request, shallow, partial)
+        if table_refusal is not None:
+            return table_refusal
     if _requires_clarification(request, relevant):
         return AnswerPreparation(
             evidence=(),
@@ -307,4 +350,14 @@ def prepare_answer_evidence(
                 "현재 접근 가능하고 최신인 근거만으로는 답을 확정할 수 없습니다.",
             ),
         )
+    remaining = request.max_chars
+    for item in relevant:
+        if item.unit.locator.type == "csv_rows" and len(item.unit.body) > remaining:
+            response = _refusal(
+                request, "csv_full_table_required",
+                "CSV 전체 근거가 max_chars에 들어가지 않습니다. 범위를 좁히거나 문맥 한도를 높여 다시 확인하세요.",
+            )
+            response.citations = [citation_from_evidence(value) for value in relevant if value.unit.locator.type == "csv_rows"]
+            return AnswerPreparation(evidence=(), refusal=response)
+        remaining = max(0, remaining - len(item.unit.body))
     return AnswerPreparation(evidence=tuple(relevant))

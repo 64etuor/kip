@@ -50,8 +50,11 @@
    제시하게 한다. receipt의 `runtime_readiness` 실패 항목과 `limitations`를
    먼저 해결한다. apply는 설정 파일 생성, verify는 파일과 runtime 준비 점검이며 아직 아무것도 색인되지
    않는다.
-7. receipt의 `next_steps`대로 `./scripts/app-up.sh`부터 실행한다. 선택된 DB의
-   준비와 migration 뒤 API/worker가 시작된다. `app-up.sh`는 standalone
+7. receipt의 `next_steps`대로 `./scripts/app-up.sh --database-only`부터
+   실행한다. 선택된 DB만 준비하고 host migration을 수행하며, DB credential만
+   필요하고 API/worker 이미지는 빌드하지 않는다. external DB면 Docker를 띄우지
+   않는다. REST API나 worker가 필요할 때 전체 `./scripts/app-up.sh`를 실행하면
+   같은 준비 뒤 API/worker가 시작된다. `app-up.sh`는 standalone
    `compose.generated.yaml`만 선택하여 승인된 source mount와 생성 config를
    적용한다. 기본 Compose의 sample mount는 합쳐지지 않는다. 필요하면
    `./scripts/doctor.sh`로 환경을 점검한다.
@@ -180,11 +183,13 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 - 기존 설치를 4.8.0으로 올릴 때는 `./scripts/install-kordoc.sh`를 다시
   실행하고 로컬 `config/kip.toml`의 `expected_version`도 `4.8.0`으로 바꾼 뒤
   doctor와 read-only shadow sample을 통과시킨다.
-- Kordoc binary와 OCR model cache는 source ZIP에 넣지 않는다. 인터넷 연결
-  bootstrap이 격리된 `var/kordoc-4.8.0-r1`에 설치하며 `adm-zip` 0.6.0과
-  `sharp` 0.35.3을 강제한다. 2026-09-10 신규 설치 감사에서 이 버전에 대한
-  advisory가 확인됐다. 현재 Python 검증 통과만으로 npm 의존성 안전성을
-  판단하지 말고 [알려진 의존성 문제](SECURITY.md#dependency-safety)를 확인한다.
+- Kordoc binary와 OCR model cache는 source ZIP에 넣지 않는다. Node.js 20.9+가
+  필요하며, 인터넷 연결 bootstrap이 격리된 `var/kordoc-4.8.0-r2`에
+  `requirements/kordoc`의 manifest/lock을 그대로 `npm ci --omit=dev
+  --ignore-scripts`로 설치한다(`adm-zip` 0.6.0, `sharp` 0.35.4). 설치·이미지
+  빌드·CI·`verify.sh`가 `./scripts/audit-kordoc.sh`로 lock drift와 high 이상
+  advisory를 검사하므로 registry 접근이 필요하다. 남아 있는 moderate `adm-zip`
+  advisory는 [알려진 의존성 문제](SECURITY.md#dependency-safety)에서 확인한다.
 - OCR 운영 전 low-text PDF, 깨진 Korean font map, screenshot형 PPTX,
   중복 이미지, 대형 이미지, 실패/timeout 표본을 shadow extraction으로
   검증하고 원본 hash와 locator fidelity를 확인한다.

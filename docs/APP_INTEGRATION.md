@@ -17,6 +17,14 @@ and candidate-assertion inclusion. Missing fields use canonical defaults, and
 every edge delegates ranking, ACL, and refusal behavior to the shared
 application services. See `DATA_CONTRACTS.md` for the exact wire contract.
 
+3.7.0 adds fields to existing envelopes without changing their versions:
+`evidence_role` and `source_verification` on `SearchHit`, `source_verification`
+on `EvidenceRead`, `ContextItem`, and `AnswerCitation`, and `body_truncated` on
+`ContextItem`. Integrators must tolerate unknown fields rather than reject
+them. Treat every hit with `evidence_role=discovery` (and its
+`source_verification=not_checked`) as a pointer, not evidence: reopen the unit
+before quoting or citing it.
+
 Allowed filesystem directories come from the deployment's enabled source
 configuration, not REST/SDK request fields. This policy also hides previously
 indexed records after a source is removed or changed and the service reloads.

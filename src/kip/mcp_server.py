@@ -187,7 +187,12 @@ def create_server(container: Container | None = None) -> MCPServer:
         project_ids: list[str] | None = None,
         include_candidate_assertions: bool = False,
     ) -> str:
-        """Search evidence units. Treat snippets as discovery aids, then call kip_read."""
+        """Find candidate locations, not verified facts or proof of absence.
+
+        Search previews have source_verification=not_checked. Reopen only the
+        units needed for the user's question with kip_read; do not add facts
+        or whole-document absence claims from previews of other hits.
+        """
         request = SearchRequest(
             query=query,
             limit=limit,
@@ -211,7 +216,11 @@ def create_server(container: Container | None = None) -> MCPServer:
         project_ids: list[str] | None = None,
         include_candidate_assertions: bool = False,
     ) -> str:
-        """Build a bounded evidence pack with source hashes and locators."""
+        """Build a bounded pack with locators and per-item verification/truncation.
+
+        stat means size/mtime reuse, not a new hash check. A truncated body
+        cannot establish that a fact is absent. Use kip_read for exact claims.
+        """
         request = ContextRequest(
             query=query,
             limit=limit,

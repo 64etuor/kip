@@ -4,6 +4,95 @@ This is the current readiness inventory, not the target architecture. The
 target-to-current matrix and ordered gap register live in
 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`.
 
+## 2026-09-10 discovery evidence, retrieval and startup fixes
+
+Search hits now state their own status: `evidence_role` is always `discovery`
+and `source_verification` is always `not_checked`, because a hit's hashes
+describe the index rather than a live check. Reopened evidence reports how it
+was checked — `stat` (size/mtime still matched the indexed revision, no new
+digest), `sha256` (live file hashed), or `unavailable` (source unreadable, with
+`source_changed_since_index` true) — on `EvidenceRead`, `ContextItem`, and
+`AnswerCitation`. `ContextItem.body_truncated` marks a body that is only the
+leading portion of the unit. The fields are additive, envelope versions are
+unchanged, and generated `contracts/` carry them.
+
+Both Memory and PostgreSQL, lexical and vector, now build the same
+paragraph-bounded, query-aware preview (`src/kip/domain/snippets.py`): the
+paragraph with the most distinct query terms, source order breaking ties, a
+bounded 360-character window, NFC-normalized. PostgreSQL previously returned
+the first 500 whitespace-collapsed characters. This is presentation only; it is
+not censorship and not exact evidence.
+
+The ACL-scoped vocabulary abstention check now also considers stems of common
+Korean particles (의/은/는/이/가/을/를/에/로/와/과/도/에서/으로/에게/까지/
+부터/에서는/으로는/에게는) together with NFC normalization. An inferred stem
+permits retrieval only if it exists in the visible corpus; ACL checks are
+unchanged.
+
+When an entire `answer` query equals the basename of a `file://` source, the
+answer returns that document's extracts with citations instead of the
+body-relevance refusal. If more than one allowed file with that exact name has
+differing content, the answer refuses with `clarification_required`; the check
+runs over the ACL-visible corpus before the result limit, so `limit=1` cannot
+hide it, and identical copies count as one document. A filename inside a longer
+factual question scopes evidence to that document; the rest of the question
+must still be present in it or the answer refuses with `answer_not_present`;
+a bare name with punctuation or a display verb returns the document, several
+named files are a comparison rather than a duplicate, `말고`/`제외` excludes the
+named file, and approved ontology evidence is retained through scoping.
+Shallow XLSX evidence still returns `exact_xlsx_read_required`. Interrogative
+endings (언제야, 언제까지야, 누구야, 무엇인지, ...) are no longer subject
+keywords and unit titles count toward relevance, so `제출기한은 언제야?` over a
+single notice answers instead of refusing, and `A과제 과제번호가 뭐야?` over a
+shallow workbook reaches `exact_xlsx_read_required` rather than a generic
+refusal. These gates remain lexical heuristics with targeted regressions, not a
+measured calibration.
+
+A local probe on the bundled three-file `sample-data` source through both the
+CLI and the stdio MCP server on this host confirmed the wire behavior: particle
+queries (`정산의`) returned the notice and workbook units with
+`evidence_role=discovery`/`source_verification=not_checked`; `정산_안내.txt`
+answered with one `stat`-verified citation; `정산_안내.txt 최종 승인일이
+언제야?` refused `answer_not_present`; `A과제_정산.xlsx` refused
+`exact_xlsx_read_required`; context items reported `stat` and
+`body_truncated=false`; `app-up.sh --database-only` and `doctor.sh` passed with
+Node 26 and the r2 Kordoc root. The Dockerfile `kordoc` stage was also built
+on this host: the in-image audit reported only the four moderate adm-zip
+propagation findings and passed at the high threshold, `npm ci --ignore-scripts`
+completed, and the version probe and model check succeeded. BuildKit initially
+hung resolving the digest-pinned Dockerfile frontend behind the Docker Desktop
+proxy until the same image was pulled by tag; `TROUBLESHOOTING.md` records the
+workaround. This is a smoke of the shipped contract, not corpus-quality or
+external-model evidence.
+
+`./scripts/app-up.sh --database-only` is the guided CLI/MCP startup path. With
+a generated deployment it starts only the approved `postgres` service, checks
+that `config/kip.host.generated.toml` matches the plan fingerprint and database
+secret ref, and runs host `./scripts/migrate.sh`; only the database credential
+is required (API/worker/identity credentials are neither read nor required, and
+placeholders satisfy Compose interpolation). An external database is migrated
+without starting Docker, and no API/worker image is built. Full `app-up.sh` and
+`--down` are unchanged, and setup receipts name `--database-only` first in
+`next_steps` and `limitations`.
+
+The Kordoc npm graph is locked in `requirements/kordoc/` (kordoc 4.8.0 exact,
+`adm-zip` 0.6.0, `sharp` 0.35.4). The host installer (root
+`var/kordoc-4.8.0-r2`) and the Dockerfile stage install it with `npm ci
+--omit=dev --ignore-scripts --no-audit`, and `./scripts/audit-kordoc.sh`
+rejects lock/manifest drift before running `npm audit --package-lock-only
+--omit=dev --audit-level=high`; a registry or network error fails the gate. It
+runs in the installer, the image build, CI, `make audit`, and
+`./scripts/verify.sh`. Node 20.9+ is required. sharp GHSA-rgj7-g3m4-5g8c is
+fixed by 0.35.4.
+
+Remaining limits: the moderate adm-zip advisory GHSA-vwc7-r8mq-g2x9 has no
+patched release and stays in the graph — `--ignore-scripts` only stops the
+supported CPU installation path from executing the ONNX install-time
+extraction hook. Semantic retrieval is unchanged and still opt-in; the Korean
+and filename changes are lexical and do not prove general recall. No new
+answer-quality evaluation of external generation models has been run, so the
+adherence gaps recorded in the audit below are not re-measured.
+
 ## 2026-09-10 agent and distribution audit
 
 An independent dispatched follow-up of published 3.6.1 found correct core
@@ -13,8 +102,9 @@ embedded-instruction commentary. OneDrive exact reads and scope denials passed
 for two sampled files; a direct answer request refused. A new starter kit
 reached generated-config MCP retrieval after isolated database startup, while
 full app startup stalled at Dockerfile frontend resolution. Bootstrap exposed
-sharp/adm-zip npm advisories outside the Python audit gate. These are open
-quality/security limitations, not a full pass; see the detailed
+sharp/adm-zip npm advisories outside the Python audit gate. This was not a full
+pass; the section above records which of these limitations 3.7.0 addressed and
+which remain open. For the audit itself see the detailed
 [dispatched evaluation](AGENT_QUALITY.md#independent-dispatched-follow-up-2026-09-10).
 
 Seven controlled native-MCP agent requests were reviewed for tool choice,

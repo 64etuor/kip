@@ -58,6 +58,7 @@ from kip.domain.models import (
     StatusReport,
     VocabularyItem,
 )
+from kip.domain.snippets import discovery_snippet
 from kip.domain.source_access import FilesystemAccessPolicy
 from kip.errors import (
     AuthorizationError,
@@ -1240,21 +1241,34 @@ class PostgresDatabase:
         )
 
     def has_identifier_match(self, context: RequestContext, request: SearchRequest) -> bool:
+        return self._identifier_document_count(context, request, exact_filename=False) > 0
+
+    def has_ambiguous_filename(self, context: RequestContext, request: SearchRequest) -> bool:
+        # Counts distinct allowed file contents with this exact name before
+        # limit; identical copies in several roots are not ambiguous.
+        return self._identifier_document_count(context, request, exact_filename=True) > 1
+
+    def _identifier_document_count(
+        self, context: RequestContext, request: SearchRequest, *, exact_filename: bool,
+    ) -> int:
         if not request.query:
-            return False
+            return 0
         conditions = [
             "l.workspace_id=%s",
             "(cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])",
             "kip.acl_snapshot_is_fresh(u.acl_snapshot_id)",
             "kip.source_artifact_is_allowed(u.artifact_id)",
-            "(l.identifier_text ILIKE %s ESCAPE '!' OR l.identifier_text ILIKE %s ESCAPE '!')",
         ]
-        params: list[Any] = [
-            context.workspace,
-            context.acl_scopes,
-            _literal_like_pattern(normalize("NFC", request.query)),
-            _literal_like_pattern(normalize("NFD", request.query)),
-        ]
+        params: list[Any] = [context.workspace, context.acl_scopes]
+        if exact_filename:
+            conditions.append("lower(normalize(a.file_name, NFC)) = lower(normalize(%s, NFC))")
+            params.append(request.query.strip())
+        else:
+            conditions.append("(l.identifier_text ILIKE %s ESCAPE '!' OR l.identifier_text ILIKE %s ESCAPE '!')")
+            params.extend([
+                _literal_like_pattern(normalize("NFC", request.query)),
+                _literal_like_pattern(normalize("NFD", request.query)),
+            ])
         for values, condition in (
             (request.source_kinds, "l.source_kind = ANY(%s::text[])"),
             (request.document_types, "d.document_type = ANY(%s::text[])"),
@@ -1266,20 +1280,22 @@ class PostgresDatabase:
         with self._connection(context) as connection, connection.cursor() as cursor:
             cursor.execute(
                 f"""
-                SELECT EXISTS (
-                    SELECT 1 FROM search.lexical_units l
+                SELECT count(*) AS matched FROM (
+                    SELECT DISTINCT {"a.sha256" if exact_filename else "coalesce(l.document_id,l.artifact_id)"}
+                    FROM search.lexical_units l
                     JOIN content.units u ON u.id=l.unit_id
                     JOIN content.artifacts a ON a.id=l.artifact_id
                     JOIN source.revisions r ON r.id=a.revision_id
                     JOIN source.objects o ON o.id=r.object_id AND o.current_revision_id=r.id
                     LEFT JOIN content.logical_documents d ON d.id=l.document_id
                     WHERE {" AND ".join(conditions)}
-                ) AS matched
+                    LIMIT {2 if exact_filename else 1}
+                ) matches
                 """,
                 params,
             )
             row = cursor.fetchone()
-            return bool(row and row["matched"])
+            return int(row["matched"]) if row else 0
 
     def search(
         self, context: RequestContext, request: SearchRequest, lexemes: str
@@ -1316,6 +1332,7 @@ class PostgresDatabase:
         sql = f"""
             SELECT
                 q.*,
+                snippet_unit.body AS snippet_body,
                 coalesce(
                     q.revision_modified_at >= (
                         SELECT max(r2.source_modified_at)
@@ -1334,7 +1351,6 @@ class PostgresDatabase:
                 SELECT
                     l.unit_id, l.document_id, l.artifact_id, l.source_kind,
                     l.title, l.source_sha256, l.source_modified_at,
-                    left(regexp_replace(l.body, '\\s+', ' ', 'g'), 500) AS snippet,
                     (
                         CASE WHEN l.identifier_text ILIKE %s ESCAPE '!' OR l.identifier_text ILIKE %s ESCAPE '!' THEN 30 ELSE 0 END
                       + CASE WHEN l.title ILIKE %s ESCAPE '!' THEN 10 ELSE 0 END
@@ -1355,7 +1371,7 @@ class PostgresDatabase:
             )
             SELECT
                 m.unit_id, m.document_id, m.artifact_id, m.source_kind,
-                m.title, m.snippet, m.score,
+                m.title, m.score,
                 u.locator, o.canonical_uri AS source_uri, m.source_sha256,
                 m.source_modified_at, a.file_name, d.document_type,
                 r.source_modified_at AS revision_modified_at
@@ -1369,6 +1385,7 @@ class PostgresDatabase:
             ORDER BY m.score DESC, m.unit_id
             LIMIT %s
             ) q
+            JOIN content.units snippet_unit ON snippet_unit.id=q.unit_id
             ORDER BY q.score DESC, q.unit_id
         """
         score_params = [
@@ -1408,7 +1425,7 @@ class PostgresDatabase:
                 artifact_id=row["artifact_id"],
                 source_kind=row["source_kind"],
                 title=row["title"],
-                snippet=row["snippet"],
+                snippet=discovery_snippet(row["snippet_body"], request.query),
                 score=float(row["score"] or 0),
                 locator=EvidenceLocator.model_validate(row["locator"]),
                 source_uri=row["source_uri"],
@@ -1673,7 +1690,7 @@ class PostgresDatabase:
             )
             SELECT
                 l.unit_id,l.document_id,l.artifact_id,l.source_kind,l.title,
-                left(regexp_replace(l.body, '\\s+', ' ', 'g'), 500) AS snippet,
+                u.body AS snippet_body,
                 1 - n.distance AS score,
                 u.locator,o.canonical_uri AS source_uri,l.source_sha256,
                 l.source_modified_at,a.file_name,d.document_type,
@@ -1728,7 +1745,7 @@ class PostgresDatabase:
                 artifact_id=row["artifact_id"],
                 source_kind=row["source_kind"],
                 title=row["title"],
-                snippet=row["snippet"],
+                snippet=discovery_snippet(row["snippet_body"], request.query),
                 score=float(row["score"]),
                 locator=EvidenceLocator.model_validate(row["locator"]),
                 source_uri=row["source_uri"],
@@ -1817,27 +1834,37 @@ class PostgresDatabase:
         # ACL-filtered count of documents whose lexical projection contains
         # each whole term. Used by the abstention gate to decide whether the
         # query's vocabulary exists in the reachable corpus at all.
-        cleaned = [term for term in dict.fromkeys(terms) if term]
+        frequencies = {term: 0 for term in dict.fromkeys(terms) if term}
+        # A term that is only quotes/backslashes has no tsquery form; it
+        # stays reported as absent instead of raising a driver syntax error.
+        cleaned = [
+            term for term in frequencies if term.strip().replace("'", "").replace("\\", "")
+        ]
         if not cleaned:
-            return {}
+            return frequencies
+        tsqueries = ["'" + term.strip().replace("'", "").replace("\\", "") + "'" for term in cleaned]
+        # One round trip for every term (particle stems double the candidate
+        # list); each lateral branch keeps the ACL/scope predicates.
         with self._connection(context) as connection, connection.cursor() as cursor:
-            frequencies: dict[str, int] = {}
-            for term in cleaned:
-                tsquery = "'" + term.replace("'", "").replace("\\", "") + "'"
-                cursor.execute(
-                    """
-                    SELECT count(DISTINCT l.document_id)::int AS df
+            cursor.execute(
+                """
+                SELECT t.term, count(d.document_id)::int AS df
+                FROM unnest(%s::text[], %s::text[]) AS t(term, tsquery)
+                LEFT JOIN LATERAL (
+                    SELECT DISTINCT l.document_id
                     FROM search.lexical_units l
                     JOIN content.units u ON u.id=l.unit_id
                     WHERE l.workspace_id=%s
                       AND (cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])
                       AND (kip.acl_snapshot_is_fresh(u.acl_snapshot_id) AND kip.source_artifact_is_allowed(u.artifact_id))
-                      AND l.tsv @@ to_tsquery('simple', %s)
-                    """,
-                    (context.workspace, context.acl_scopes, tsquery),
-                )
-                row = cursor.fetchone()
-                frequencies[term] = int(row["df"]) if row else 0
+                      AND l.tsv @@ to_tsquery('simple', t.tsquery)
+                ) d ON true
+                GROUP BY t.term
+                """,
+                (cleaned, tsqueries, context.workspace, context.acl_scopes),
+            )
+            for row in cursor.fetchall():
+                frequencies[row["term"]] = int(row["df"])
         return frequencies
 
     def get_content_units(

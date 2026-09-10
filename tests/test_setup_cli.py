@@ -148,7 +148,7 @@ def test_setup_cli_answers_previews_plans_applies_and_verifies(
     assert "database_secret" in readiness_names
     assert "source_readable:company-docs" in readiness_names
     assert receipt["next_steps"][:2] == [
-        "./scripts/app-up.sh",
+        "./scripts/app-up.sh --database-only",
         "./scripts/kip sync run --source company-docs",
     ]
     assert any(

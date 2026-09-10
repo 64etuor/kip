@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from pathlib import PurePosixPath
+from unicodedata import normalize
+from urllib.parse import unquote, urlsplit
 
 from kip.application.citations import citation_from_evidence
 from kip.domain.models import (
@@ -26,6 +29,44 @@ _QUESTION_WORDS = frozenset(
         "내야",
         "해야",
         "뭐야",
+        # Interrogative endings carry no subject; keeping them as keywords
+        # made a one-topic question look off-topic to its own evidence.
+        "언제야",
+        "언제까지",
+        "언제까지야",
+        "언제인가",
+        "언제인지",
+        "어디야",
+        "어디인지",
+        "누구야",
+        "누구인지",
+        "무엇인가",
+        "무엇인지",
+        "얼마야",
+        "얼마인지",
+        "알려주세요",
+        "말해줘",
+        "보여줘",
+        "보여주세요",
+        "열어줘",
+        "읽어줘",
+        "찾아줘",
+        "찾아주세요",
+        "요약해줘",
+        # Exclusion and generic document words name scope, not a subject:
+        # "A.txt 말고 다른 자료의 제출기한" asks about 제출기한.
+        "말고",
+        "빼고",
+        "제외",
+        "제외하고",
+        "외에",
+        "이외",
+        "이외에",
+        "나머지",
+        "다른",
+        "자료",
+        "문서",
+        "파일",
     }
 )
 _PARTICLE_SUFFIXES = (
@@ -79,13 +120,125 @@ def _keywords(text: str) -> set[str]:
     return keywords
 
 
-def _is_relevant(query: str, body: str) -> bool:
+def _is_relevant(query: str, text: str) -> bool:
     keywords = _keywords(query)
     if keywords:
-        matches = sum(keyword in body.casefold() for keyword in keywords)
+        matches = sum(keyword in text.casefold() for keyword in keywords)
         return matches >= min(2, len(keywords))
     query_bigrams = _bigrams(query)
-    return bool(query_bigrams) and len(query_bigrams & _bigrams(body)) / len(query_bigrams) >= 0.5
+    return bool(query_bigrams) and len(query_bigrams & _bigrams(text)) / len(query_bigrams) >= 0.5
+
+
+def _relevance_text(evidence: EvidenceRead) -> str:
+    # A unit's title (document name, sheet) names its subject as much as the
+    # body does; identifier and focus gates already read both.
+    return f"{evidence.unit.title or ''} {evidence.unit.body}"
+
+
+def is_exact_file_reference(query: str, evidence: EvidenceRead) -> bool:
+    """A bare filename requests that document's extracts, not a factual claim.
+
+    Do not relax question adequacy just because a filename occurs somewhere
+    in a longer question. Match the entire query and only a filesystem URI.
+    """
+    source = urlsplit(evidence.source_uri)
+    if source.scheme != "file" or not evidence.unit.body.strip():
+        return False
+    filename = PurePosixPath(unquote(source.path)).name
+    return bool(filename) and normalize("NFC", query.strip()).casefold() == normalize("NFC", filename).casefold()
+
+
+_REFERENCE_PUNCTUATION = "?!.,:;)(\"'\u201c\u201d\u2018\u2019"
+_REFERENCE_PARTICLES = (
+    "에서는", "으로는", "에게는", "에서", "으로", "에게", "까지", "부터", "이랑",
+    "의", "은", "는", "이", "가", "을", "를", "에", "로", "와", "과", "도", "랑",
+)
+# A question that sets a named document aside asks about the others. Each
+# entry is a regex fragment; 제외 must close the clause ("제외하고", "제외,
+# 다른 ...") because "제외 대상" is a heading inside the document, not scope.
+_EXCLUSION_MARKERS = (
+    "말고", "빼고", "외에", "이외", "아닌",
+    r"제외(?:하고서|하고|하면|하며|하여|한|시키고)",
+    r"제외(?=\s*(?:다른|나머지|기타|[,·]|$))",
+)
+_EXCLUSION_STARTS = ("말고", "빼고", "외에", "이외", "아닌", "제외")
+
+
+def _file_reference_pattern(filename: str) -> re.Pattern[str]:
+    """Match the whole basename at a token boundary, allowing one known particle."""
+    escaped = re.escape(normalize("NFC", filename).casefold())
+    boundary = re.escape(_REFERENCE_PUNCTUATION)
+    particles = "|".join(re.escape(particle) for particle in _REFERENCE_PARTICLES)
+    # "A.txt말고" is ordinary spacing; an attached exclusion word still ends the name.
+    markers = "|".join(re.escape(marker) for marker in _EXCLUSION_STARTS)
+    return re.compile(rf"(?<!\S){escaped}(?:{particles})?(?=$|\s|[{boundary}]|{markers})")
+
+
+def _file_exclusion_pattern(filename: str) -> re.Pattern[str]:
+    """Match the basename immediately followed by an exclusion marker.
+
+    Only "A.txt 말고", "A.txt를 제외하고", "A.txt 외에" set the file aside. A
+    marker elsewhere in the question ("정규직이 아닌 인력") is content.
+    """
+    escaped = re.escape(normalize("NFC", filename).casefold())
+    particles = "|".join(re.escape(particle) for particle in _REFERENCE_PARTICLES)
+    markers = "|".join(_EXCLUSION_MARKERS)
+    return re.compile(rf"(?<!\S){escaped}(?:{particles})?\s*(?:{markers})")
+
+
+def _evidence_filename(evidence: EvidenceRead) -> str | None:
+    source = urlsplit(evidence.source_uri)
+    if source.scheme != "file" or not evidence.unit.body.strip():
+        return None
+    return PurePosixPath(unquote(source.path)).name or None
+
+
+def _name_key(filename: str) -> str:
+    return normalize("NFC", filename).casefold()
+
+
+def referenced_filename(query: str, evidence: EvidenceRead) -> str | None:
+    """The file's basename when the question names it, exactly or embedded.
+
+    Naming a file scopes evidence to it without relaxing adequacy: the rest of
+    the question still has to be present in that document. An embedded
+    mention needs an extension; a bare common word is not a scope directive.
+    """
+    filename = _evidence_filename(evidence)
+    if filename is None:
+        return None
+    lowered = normalize("NFC", query).casefold()
+    if lowered.strip() == _name_key(filename):
+        return filename
+    if not PurePosixPath(filename).suffix:
+        return None
+    return filename if _file_reference_pattern(filename).search(lowered) else None
+
+
+def excluded_filename(query: str, evidence: EvidenceRead) -> str | None:
+    """The file's basename when the question sets this file aside."""
+    filename = referenced_filename(query, evidence)
+    if filename is None:
+        return None
+    return filename if _file_exclusion_pattern(filename).search(normalize("NFC", query).casefold()) else None
+
+
+
+def _without_file_references(query: str, evidence: list[EvidenceRead]) -> str:
+    remainder = normalize("NFC", query).casefold()
+    for filename in {name for item in evidence if (name := _evidence_filename(item))}:
+        remainder = _file_reference_pattern(filename).sub(" ", remainder)
+    return " ".join(remainder.split())
+
+
+def _without_exclusions(query: str, excluded: list[EvidenceRead]) -> str:
+    # Remove the name together with its marker ("A.txt를 제외한"); a leftover
+    # inflected marker would otherwise become a required subject keyword.
+    remainder = normalize("NFC", query).casefold()
+    for filename in {name for item in excluded if (name := _evidence_filename(item))}:
+        remainder = _file_exclusion_pattern(filename).sub(" ", remainder)
+        remainder = _file_reference_pattern(filename).sub(" ", remainder)
+    return " ".join(remainder.split())
 
 
 def _decision_subject_score(query: str, body: str) -> int:
@@ -249,13 +402,71 @@ def prepare_answer_evidence(
     apply_lexical_gate: bool = True,
 ) -> AnswerPreparation:
     ontology_ids = ontology_evidence_ids or set()
-    if apply_lexical_gate:
+    gate_request = request
+    reference_ids = {item.unit.id for item in evidence if is_exact_file_reference(request.query, item)}
+    mentioned: dict[str, str] = {}
+    if not reference_ids:
+        # "A.txt 말고 ..." asks about the other documents: drop the named
+        # file from the evidence and gate on the rest of the question.
+        excluded = [
+            item for item in evidence
+            if item.unit.id not in ontology_ids and excluded_filename(request.query, item) is not None
+        ]
+        if excluded:
+            excluded_ids = {item.unit.id for item in excluded}
+            evidence = [item for item in evidence if item.unit.id not in excluded_ids]
+            gate_request = request.model_copy(update={"query": _without_exclusions(request.query, excluded)})
+        mentioned = {
+            item.unit.id: name
+            for item in evidence
+            if item.unit.id not in ontology_ids
+            and (name := referenced_filename(gate_request.query, item)) is not None
+        }
+    if reference_ids or mentioned:
+        # Ambiguity is per name: two different files named together are a
+        # comparison, not a duplicate. Approved ontology evidence stays.
+        contents_by_name: dict[str, set[str]] = {}
+        for item in evidence:
+            name = _evidence_filename(item) if item.unit.id in reference_ids else mentioned.get(item.unit.id)
+            if name is not None:
+                contents_by_name.setdefault(_name_key(name), set()).add(item.indexed_source_sha256)
+        if any(len(contents) > 1 for contents in contents_by_name.values()):
+            return AnswerPreparation(
+                evidence=(),
+                refusal=_refusal(request, "clarification_required", "같은 이름의 문서가 여러 개입니다. 원본 위치를 확인하고 대상 문서를 지정해 주세요."),
+            )
+        named_ids = (reference_ids or set(mentioned)) | ontology_ids
+        relevant = [item for item in evidence if item.unit.id in named_ids]
+    if mentioned:
+        remainder = _without_file_references(gate_request.query, relevant)
+        if not _keywords(remainder):
+            # "계약서.pdf?" or "계약서.pdf 보여줘" asks for the document itself.
+            reference_ids = set(mentioned)
+        else:
+            # The named document is the scope; the rest of the question is
+            # what must be present in it. Its own name is not an identifier.
+            gate_request = request.model_copy(update={"query": remainder})
+            if apply_lexical_gate:
+                relevant = [
+                    item for item in relevant
+                    if item.unit.id in ontology_ids or _is_relevant(remainder, _relevance_text(item))
+                ]
+                if not relevant:
+                    return AnswerPreparation(
+                        evidence=(),
+                        refusal=_refusal(
+                            request,
+                            "answer_not_present",
+                            "지정한 문서는 찾았지만 요청한 내용이 그 문서의 현재 근거에 없습니다.",
+                        ),
+                    )
+    elif not reference_ids and apply_lexical_gate:
         relevant = [
             item
             for item in evidence
-            if item.unit.id in ontology_ids or _is_relevant(request.query, item.unit.body)
+            if item.unit.id in ontology_ids or _is_relevant(gate_request.query, _relevance_text(item))
         ]
-    else:
+    elif not reference_ids:
         relevant = list(evidence)
     relevant, shallow, partial = _table_evidence(relevant)
     if not relevant:
@@ -263,7 +474,7 @@ def prepare_answer_evidence(
         if table_refusal is not None:
             return table_refusal
     identifier_evidence = [
-        item for item in relevant if _contains_requested_identifiers(request.query, item)
+        item for item in relevant if item.unit.id in reference_ids or item.unit.id in ontology_ids or _contains_requested_identifiers(gate_request.query, item)
     ]
     if relevant and not identifier_evidence:
         return AnswerPreparation(
@@ -275,7 +486,7 @@ def prepare_answer_evidence(
             ),
         )
     relevant = identifier_evidence
-    focus_evidence = [item for item in relevant if _contains_answer_focus(request, item)]
+    focus_evidence = [item for item in relevant if item.unit.id in reference_ids or item.unit.id in ontology_ids or _contains_answer_focus(gate_request, item)]
     if relevant and not focus_evidence:
         return AnswerPreparation(
             evidence=(),
@@ -286,7 +497,7 @@ def prepare_answer_evidence(
             ),
         )
     relevant = focus_evidence
-    value_evidence = [item for item in relevant if _has_requested_value(request, item)]
+    value_evidence = [item for item in relevant if item.unit.id in reference_ids or item.unit.id in ontology_ids or _has_requested_value(gate_request, item)]
     if relevant and not value_evidence:
         return AnswerPreparation(
             evidence=(),
@@ -304,7 +515,7 @@ def prepare_answer_evidence(
         table_refusal = _table_refusal(request, shallow, partial)
         if table_refusal is not None:
             return table_refusal
-    if _requires_clarification(request, relevant):
+    if not reference_ids and not mentioned and _requires_clarification(gate_request, relevant):
         return AnswerPreparation(
             evidence=(),
             refusal=_refusal(
@@ -313,9 +524,9 @@ def prepare_answer_evidence(
                 "여러 문서가 해당하므로 대상이나 업무 범위를 더 구체적으로 지정해 주세요.",
             ),
         )
-    if apply_lexical_gate and "승인" in request.query and relevant:
+    if apply_lexical_gate and not reference_ids and "승인" in gate_request.query and relevant:
         subject_scores = [
-            _decision_subject_score(request.query, item.unit.body) for item in relevant
+            _decision_subject_score(gate_request.query, item.unit.body) for item in relevant
         ]
         best_subject_score = max(subject_scores)
         decision_evidence = (

@@ -4,7 +4,7 @@ import math
 from dataclasses import dataclass
 
 from kip.adapters.repository.memory.acl import unit_is_visible
-from kip.adapters.repository.memory.lexical import revision_is_latest, snippet
+from kip.adapters.repository.memory.lexical import revision_is_latest
 from kip.adapters.repository.memory.state import MemoryState
 from kip.domain.json_types import JsonObject
 from kip.domain.models import (
@@ -16,6 +16,7 @@ from kip.domain.models import (
     SearchHit,
     SearchRequest,
 )
+from kip.domain.snippets import discovery_snippet
 from kip.errors import ConflictError, NotFoundError, ValidationError
 
 
@@ -228,7 +229,7 @@ def _vector_hit(
         source_kind=source_object.system_kind,
         title=unit.title
         or (view.document.title if view.document else view.artifact.file_name),
-        snippet=snippet(unit.body, request.query.split()),
+        snippet=discovery_snippet(unit.body, request.query),
         score=score,
         locator=unit.locator,
         source_uri=source_object.canonical_uri,

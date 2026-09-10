@@ -163,12 +163,12 @@ class SetupService:
             )
         limitations.append(
             "setup apply/verify only generate configuration; nothing is indexed "
-            "or served until ./scripts/app-up.sh (or the app profile) and a "
-            "source sync have completed"
+            "until ./scripts/app-up.sh --database-only and a source sync have completed. "
+            "For the API and worker, run ./scripts/app-up.sh"
         )
         first_source = plan.sources[0].name if plan.sources else "SOURCE"
         next_steps = [
-            "./scripts/app-up.sh",
+            "./scripts/app-up.sh --database-only",
             f"./scripts/kip sync run --source {first_source}",
             './scripts/kip search "smoke test query" --limit 5',
             "./scripts/kip read UNIT_ID",

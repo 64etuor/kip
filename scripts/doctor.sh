@@ -2,6 +2,7 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
+source "$SCRIPT_DIR/kordoc-runtime.sh"
 cd "$PROJECT_ROOT"
 
 fail=0
@@ -26,12 +27,14 @@ optional() {
   if "$@" >/dev/null 2>&1; then printf '[ok] %s\n' "$label"; else printf '[optional unavailable] %s\n' "$label"; fi
 }
 
-node_18_ready() {
-  node -e 'const [major] = process.versions.node.split(".").map(Number); process.exit(major >= 18 ? 0 : 1)'
+node_20_9_ready() {
+  node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major > 20 || (major === 20 && minor >= 9) ? 0 : 1)'
 }
 
 kordoc_version_ready() {
-  [[ "$(kordoc --version 2>/dev/null)" == "4.8.0" ]]
+  local expected
+  expected="$(kordoc_expected_version 2>/dev/null)" || return 1
+  [[ "$(kordoc --version 2>/dev/null)" == "$expected" ]]
 }
 
 kordoc_ppocr_ready() {
@@ -65,10 +68,10 @@ optional "Docker" docker version
 if command -v docker >/dev/null 2>&1; then
   optional "PostgreSQL container" docker compose exec -T postgres pg_isready -U "${POSTGRES_USER:-kip_owner}" -d "${POSTGRES_DB:-kip}"
 fi
-required "Node 18+ for Kordoc OCR" \
-  "install Node.js 18+, then run ./scripts/bootstrap.sh" \
-  node_18_ready
-required "Kordoc 4.8.0" \
+required "Node 20.9+ for Kordoc OCR" \
+  "install Node.js 20.9+, then run ./scripts/bootstrap.sh" \
+  node_20_9_ready
+required "Kordoc $(kordoc_expected_version 2>/dev/null || printf 'pinned version')" \
   "run ./scripts/bootstrap.sh to install the exact local Kordoc runtime" \
   kordoc_version_ready
 required "Kordoc PP-OCRv5 Korean models" \

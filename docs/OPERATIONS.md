@@ -5,10 +5,21 @@
 
 ## 자주 하는 작업 (Everyday tasks)
 
-Guided setup 배포는 `./scripts/app-up.sh`부터 실행한다. standalone generated
-Compose가 DB 준비와 migration을 순서대로 수행하며 승인된 source mount만
-연결한다. wrapper는 generated host config를 기본 선택하고, 명시적 config나
-exported override는 유지한다. 기본 `env:KIP_DATABASE_URL`은 bundled local DB와
+CLI/MCP만 쓰는 배포는 `./scripts/app-up.sh --database-only`부터 실행한다.
+generated 배포에서는 승인된 `postgres` 서비스만 기동해 준비를 기다린 뒤
+`config/kip.host.generated.toml`의 plan fingerprint와 database secret ref가
+generated config와 일치하는지 확인하고 host `./scripts/migrate.sh`를 실행한다.
+DB credential만 필요하며 API/worker/identity credential은 읽지도 요구하지도
+않는다(Compose 보간용 placeholder만 주입). external DB(번들 postgres 서비스가
+없는 plan)는 Docker를 띄우지 않고 migration만 수행한다. generated 배포가 아니면
+`compose.yaml`의 `postgres`만 올린 뒤 migration한다. 이 경로는 API/worker 이미지를
+빌드하지 않는다. 인자는 하나만 받는다.
+
+REST API나 worker(예약 sync, parser worker)가 필요할 때만 전체
+`./scripts/app-up.sh`를 실행한다. standalone generated Compose가 DB 준비와
+migration을 순서대로 수행하며 승인된 source mount만 연결한다. 중지는
+`./scripts/app-up.sh --down`이다. wrapper는 generated host config를 기본
+선택하고, 명시적 config나 exported override는 유지한다. 기본 `env:KIP_DATABASE_URL`은 bundled local DB와
 일치해야 하며 external DB는 별도 변수의 secret reference를 선택한다. 모든
 서비스와 host CLI가 같은 DB를 사용하는지 receipt/readiness로 확인한다.
 
@@ -83,7 +94,11 @@ Ruff, mypy, and pip-audit and fails with a bootstrap remediation if any tool is
 missing. With uv it uses the frozen lock; without uv it runs modules from the
 project interpreter, including tools installed by `./scripts/bootstrap.sh`.
 Only a completed gate is verification evidence. Private golden-set skips remain
-explicit and do not prove private-corpus acceptance.
+explicit and do not prove private-corpus acceptance. The private gate skips when
+the reviewed dataset or floor is absent, the repository is in-memory, the
+workspace is empty, or none of the reviewed set's expected documents are indexed
+there (for example a workspace holding only `sample-data`); with
+`KIP_REQUIRE_PRIVATE_GOLDEN=1` each of those conditions fails instead.
 
 Portable skill installation is `./scripts/install-agent-files.sh personal` or
 `./scripts/install-agent-files.sh project /path/to/project`. It replaces only
@@ -833,20 +848,27 @@ binary, version drift, timeout, malformed JSON, or OCR failure makes the current
 extraction partial while retaining native PDF/PPTX units; it does not replace a
 previous active extraction.
 
-The installer downloads into the ignored versioned runtime
-`var/kordoc-4.8.0-r1` and the production image builds the same isolated npm
-root. Both override transitive `adm-zip` to 0.6.0 and `sharp` to 0.35.3; the
-resulting production dependency graph must report zero high-severity findings.
-Kordoc binaries and model caches are never part of the source starter ZIP.
+Kordoc requires Node.js 20.9+; `doctor.sh` and the installer both refuse an
+older runtime. The installer downloads into the ignored versioned runtime
+`var/kordoc-4.8.0-r2`, and the production image builds the same isolated npm
+root. Both copy `requirements/kordoc/package.json` and its lock and run
+`npm ci --omit=dev --ignore-scripts --no-audit`, so the host and the image
+install the identical graph: kordoc 4.8.0 with transitive `adm-zip` overridden
+to 0.6.0 and `sharp` to 0.35.4. Kordoc binaries and model caches are never part
+of the source starter ZIP.
 
-The 2026-09-10 dispatched cold-install audit found that the 3.6.1 pins no longer
-meet this high-severity requirement: sharp 0.35.3 has a high advisory, propagated
-to three npm package entries, and adm-zip has a separate moderate finding.
-`verify.sh` currently audits Python requirements only, so its success does not
-establish this npm requirement. The isolated sharp 0.35.4 candidate passed a
-macOS image/OCR smoke but was not installed into the release; the moderate
-installation-path finding remains. See [dependency safety](SECURITY.md#dependency-safety)
-and [agent quality evidence](AGENT_QUALITY.md) before making readiness claims.
+`./scripts/audit-kordoc.sh` gates that graph. It first rejects lock/manifest
+drift (lock root name, version, dependency and engine blocks, exact pins, and
+override versions in every nested copy), then runs
+`npm audit --package-lock-only --omit=dev --audit-level=high`. A registry or
+network error exits nonzero and fails the gate; it is not a skip. The audit runs
+inside `install-kordoc.sh`, in the Docker kordoc stage, in CI (Python 3.12 leg),
+in `make audit`, and in `./scripts/verify.sh`, so it needs registry access
+during setup, verification, and builds — never during retrieval. The moderate
+`adm-zip` advisory GHSA-vwc7-r8mq-g2x9 is still in the graph with no patched
+release; `--ignore-scripts` means the ONNX install-time extraction hook that
+used it is not executed by the supported CPU installation path, but the advisory
+is not removed. See [dependency safety](SECURITY.md#dependency-safety).
 
 Existing deployments are not rewritten. To upgrade one, rerun
 `./scripts/install-kordoc.sh`, set `[parsers.ocr.kordoc].enabled = true` and

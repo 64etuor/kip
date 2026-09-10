@@ -25,9 +25,11 @@ Run from the KIP repository with `./scripts/kip`. On a fresh clone, use
    and failed `runtime_readiness` items with their remediation.
 
 Setup is configuration-only. Follow the receipt's `next_steps` within the
-authorized setup: `./scripts/app-up.sh` (database readiness and migration precede
-services), source sync, then search and exact-read smoke. `app-up.sh` selects
-the standalone generated Compose. All-cloud sources need user-selected local
+authorized setup: `./scripts/app-up.sh --database-only` (database readiness and
+migration for CLI/MCP; only the database credential is required and no
+API/worker image is built), source sync, then search and exact-read smoke. Run
+`./scripts/app-up.sh` only when the API and worker are needed. Both select the
+standalone generated Compose. All-cloud sources need user-selected local
 downloads; a local generation choice still needs a separately verified service.
 `sync_schedule` is declarative metadata; a scheduler must be installed separately.
 A missing evaluation dataset means installation-ready, not production-ready.

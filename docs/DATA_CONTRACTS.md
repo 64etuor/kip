@@ -139,6 +139,29 @@ Channel ranks, `is_latest`, diversity backfill, and degradation markers live in
 metadata. Array order is result rank. The snippet and score remain discovery
 data, never final evidence.
 
+`SearchHit.evidence_role` is always `discovery` and
+`SearchHit.source_verification` is always `not_checked`: the hashes on a hit
+describe the index, not a live source check. Both lexical and vector results,
+in the Memory and PostgreSQL backends, carry one paragraph-bounded,
+query-aware preview: the paragraph containing the most distinct query terms,
+ties broken by source order, cut to a bounded window and NFC-normalized. The
+preview is presentation only. It is neither content filtering nor an exact
+quote, so a fact must still be reopened with `read` (or `xlsx-read` for
+workbook values) before it is cited. Previews are computed from the full unit
+body in the application layer, so `extraction.max_chars_per_unit` also bounds
+the per-hit transfer from PostgreSQL.
+
+Verification fields report how the source was checked when the unit was
+reopened. `EvidenceRead.source_verification`,
+`ContextItem.source_verification`, and `AnswerCitation.source_verification` are
+one of `stat` (size and modification time still matched the indexed revision,
+so no new digest was computed), `sha256` (the live file was hashed), or
+`unavailable` (the source could not be read, in which case
+`source_changed_since_index` is true). `ContextItem.body_truncated` is true
+when the returned body is only the leading portion of the unit; a truncated
+context item cannot show that something is absent. These fields are additive:
+envelope versions are unchanged and readers must tolerate unknown fields.
+
 ## PDF evidence boundary
 
 The configured PDF backend always emits one `pdf_page` per original 1-indexed
@@ -306,6 +329,19 @@ no admissible or fresh evidence, requested facts absent from the reopened
 evidence (`answer_not_present`), unresolved short multi-document ambiguity
 (`clarification_required`), exact XLSX-read requirements, egress denial,
 provider unavailability, and invalid generated citations.
+
+When the entire `answer` query equals the basename of a `file://` source, the
+request is treated as a request for that document's extracts and is answered
+with citations instead of the body-relevance refusal. If more than one allowed
+file with that exact name has differing content, the answer refuses with
+`clarification_required`; identical copies count as one document. The
+ambiguity check runs over the ACL-visible corpus before the result limit is
+applied, so `limit=1` cannot hide a conflicting file. A filename embedded in a
+longer factual question (`보고서.txt 제출기한은?`) scopes the evidence to that
+document without relaxing adequacy: the remaining question must be present in
+it, otherwise the answer refuses with `answer_not_present`, and the same
+ambiguity rule applies. A shallow XLSX extract still returns
+`exact_xlsx_read_required`.
 Extractive fallback is visible through `retrieval_mode` and `warnings`; it is
 the primary local behavior when structured generation is disabled. When
 generation is enabled, a generator failure falls back only when

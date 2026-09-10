@@ -5,7 +5,11 @@ import re
 from datetime import UTC, datetime
 from time import perf_counter
 
-from kip.application.answer_adequacy import prepare_answer_evidence
+from kip.application.answer_adequacy import (
+    excluded_filename,
+    prepare_answer_evidence,
+    referenced_filename,
+)
 from kip.application.answers import assemble_extractive_answer
 from kip.application.citations import assemble_generated_answer
 from kip.application.egress import EgressPolicyUseCases
@@ -142,6 +146,22 @@ class AnsweringUseCases:
             fresh.append(item)
             seen_ids.add(item.unit.id)
         had_stale_evidence = had_stale_evidence or ontology_bundle.had_stale_evidence
+        named_files = {
+            name
+            for item in fresh
+            if (name := referenced_filename(request.query, item))
+            and excluded_filename(request.query, item) is None
+        }
+        # Ambiguity is decided across the ACL-visible corpus, not the limited
+        # hits: a same-named file with other content may not be in `fresh`.
+        if any(
+            self._retrieval.has_ambiguous_filename(context, request.model_copy(update={"query": name}))
+            for name in sorted(named_files)
+        ):
+            return AnswerResponse(
+                query=request.query, refused=True, refusal_reason="clarification_required",
+                answer="같은 이름의 문서가 여러 개입니다. 검색 결과의 원본 위치를 확인하고 대상 문서를 지정해 주세요.",
+            )
         prepared = prepare_answer_evidence(
             request,
             fresh,

@@ -18,6 +18,10 @@ from kip.settings import Settings
 def main() -> int:
     root = Path(os.environ["PROJECT_ROOT"])
     config_path = root / "config/kip.generated.toml"
+    database_only = sys.argv[1:] == ["--database-only"]
+    if "--database-only" in sys.argv[1:] and not database_only:
+        print("--database-only does not accept additional arguments", file=sys.stderr)
+        return 2
     try:
         with config_path.open("rb") as handle:
             config = tomllib.load(handle)
@@ -45,7 +49,7 @@ def main() -> int:
                     environment[name] = "unused-during-teardown"
         else:
             resolver = Settings.for_test()
-            for reference in references:
+            for reference in references[:1] if database_only else references:
                 value = resolver.resolve_secret_reference(reference)
                 if any(marker in value for marker in ("change-me-before-use", "replace-with-")):
                     raise ConfigurationError("replace example credentials before starting the deployment")
@@ -73,6 +77,45 @@ def main() -> int:
                     name = reference[4:]
                     environment[name] = value
                     environment.pop(f"{name}_FILE", None)
+        if database_only:
+            host_config_path = root / "config/kip.host.generated.toml"
+            with host_config_path.open("rb") as handle:
+                host_config = tomllib.load(handle)
+            if (
+                host_config["setup"]["plan_fingerprint"] != config["setup"]["plan_fingerprint"]
+                or host_config["database"]["secret_ref"] != config["database"]["secret_ref"]
+            ):
+                raise ConfigurationError("generated host config is mismatched; regenerate and apply a setup plan")
+            # Compose interpolates every service, including the API and worker
+            # that this mode never starts. Migration also loads identity settings.
+            # Their credentials are deliberately neither read nor required here.
+            database_ref = config["database"]["secret_ref"]
+            database_name = database_ref[4:] if database_ref.startswith("env:") else None
+            identity_keys = host_config.get("identity", {}).get("api_key", {})
+            unused_names = {reference[4:] for reference in references[1:] if reference.startswith("env:")}
+            unused_names.update({
+                identity_keys.get("api_key_env", "KIP_API_KEY"),
+                identity_keys.get("admin_key_env", "KIP_ADMIN_KEY"),
+            })
+            for name in unused_names - {database_name}:
+                environment[name] = "unused-during-database-only"
+                environment.pop(f"{name}_FILE", None)
+            environment["KIP_CONFIG"] = str(host_config_path)
+            environment["KIP_PROJECT_ROOT"] = str(root)
+            # common.sh already loaded this deployment. Do not restore an unused
+            # *_FILE from .env alongside its migration-only placeholder.
+            environment["KIP_SKIP_DOTENV"] = "1"
+            if "postgres" in compose["services"]:
+                result = subprocess.run(
+                    ["docker", "compose", "-f", "compose.generated.yaml", "--profile", "app",
+                     "up", "-d", "--wait", "--wait-timeout", "60", "postgres"],
+                    cwd=root, env=environment, check=False,
+                )
+                if result.returncode:
+                    return result.returncode
+            return subprocess.run(
+                [str(root / "scripts/migrate.sh")], cwd=root, env=environment, check=False,
+            ).returncode
         return subprocess.run(
             ["docker", "compose", "-f", "compose.generated.yaml", "--profile", "app", *sys.argv[1:]],
             cwd=root, env=environment, check=False,

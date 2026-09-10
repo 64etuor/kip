@@ -7,6 +7,12 @@
           "title": "Body",
           "type": "string"
         },
+        "body_truncated": {
+          "default": false,
+          "description": "When true, body is only the leading portion of the evidence unit.",
+          "title": "Body Truncated",
+          "type": "boolean"
+        },
         "current_source_sha256": {
           "anyOf": [
             {
@@ -33,6 +39,16 @@
           ],
           "default": null,
           "title": "Source Changed Since Index"
+        },
+        "source_verification": {
+          "default": "unavailable",
+          "enum": [
+            "stat",
+            "sha256",
+            "unavailable"
+          ],
+          "title": "Source Verification",
+          "type": "string"
         }
       },
       "required": [
@@ -81,6 +97,13 @@
           "default": null,
           "title": "Document Id"
         },
+        "evidence_role": {
+          "const": "discovery",
+          "default": "discovery",
+          "description": "Candidate preview; reopen the unit before citing facts.",
+          "title": "Evidence Role",
+          "type": "string"
+        },
         "locator": {
           "$ref": "#/$defs/EvidenceLocator"
         },
@@ -120,6 +143,13 @@
         },
         "source_uri": {
           "title": "Source Uri",
+          "type": "string"
+        },
+        "source_verification": {
+          "const": "not_checked",
+          "default": "not_checked",
+          "description": "Search hashes describe the index, not a live source check.",
+          "title": "Source Verification",
           "type": "string"
         },
         "title": {

@@ -18,6 +18,10 @@ from kip.domain.models import (
 
 
 class RetrievalStore(Protocol):
+    def has_ambiguous_filename(self, context: RequestContext, request: SearchRequest) -> bool:
+        """More than one allowed document has this exact basename, before limit."""
+        ...
+
     def has_identifier_match(
         self, context: RequestContext, request: SearchRequest
     ) -> bool:

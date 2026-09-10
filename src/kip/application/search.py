@@ -148,6 +148,9 @@ class RetrievalUseCases:
     ) -> list[VocabularyItem]:
         return self._store.vocabulary(context, prefix, limit)
 
+    def has_ambiguous_filename(self, context: RequestContext, request: SearchRequest) -> bool:
+        return self._store.has_ambiguous_filename(context, request)
+
     def context_bundle(
         self,
         context: RequestContext,
@@ -191,6 +194,8 @@ class RetrievalUseCases:
                     body=body,
                     current_source_sha256=evidence.current_source_sha256,
                     source_changed_since_index=evidence.source_changed_since_index,
+                    source_verification=evidence.source_verification,
+                    body_truncated=len(body) < len(evidence.unit.body),
                 )
             )
             total_chars += len(body)

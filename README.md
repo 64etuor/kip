@@ -117,13 +117,13 @@ ACL을 제안하고, preview가 local/cloud-only 파일을 구분합니다. 다�
 
 ### 준비물
 
-Python 3.12+, Node.js 18+, Docker Compose, 최소 10GB의 여유 디스크가
+Python 3.12+, Node.js 20.9+, Docker Compose, 최소 10GB의 여유 디스크가
 필요합니다. 런타임 이미지 약 2GB, OCR 모델 약 0.8GB, Python 환경 약 1GB,
 데이터베이스 공간을 포함한 최소치입니다.
 
 ```bash
 python3 --version        # 3.12 이상
-node --version           # 18 이상
+node --version           # 20.9 이상
 docker compose version   # Docker Desktop 실행 상태
 df -h .                  # 여유 공간 10GB 이상
 ```
@@ -135,6 +135,8 @@ Windows에서는 PowerShell/cmd가 아니라 WSL2 Ubuntu 안에서 실행해야 
 
 Bootstrap은 `uv.lock`의 고정된 의존성을 `uv sync --frozen`으로 설치하고,
 고정된 Kordoc OCR runtime과 한국어 model cache를 설치·검증합니다.
+OCR npm 의존성도 lock 파일로 고정하며 설치 후처리를 실행하지 않습니다.
+알려진 high 이상 취약점이나 감사 실패가 있으면 설치를 중단합니다.
 uv가 없으면 별도 도구 환경에 0.8.22를 준비합니다. 새 `.env`에는 무작위
 credential을 생성하며 기존 `.env`와 config는 보존합니다.
 정상 색인 중에는 parser package나 model을 내려받지 않습니다.

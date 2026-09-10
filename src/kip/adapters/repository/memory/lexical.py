@@ -15,6 +15,7 @@ from kip.domain.models import (
     SearchRequest,
     VocabularyItem,
 )
+from kip.domain.snippets import discovery_snippet
 from kip.errors import ValidationError
 
 
@@ -52,7 +53,7 @@ class MemoryLexicalStore:
                 score,
                 unit,
                 view,
-                raw_terms or unique_terms,
+                request.query,
                 is_latest=revision_is_latest(self.state, view),
             )
             for score, unit, view in scored[: request.limit]
@@ -64,6 +65,19 @@ class MemoryLexicalStore:
             needle in normalize("NFC", _identifier_text(view)).lower()
             for _, view in self._visible_units(context, request)
         )
+
+    def has_ambiguous_filename(self, context: RequestContext, request: SearchRequest) -> bool:
+        # Logical documents key on the relative path, so two sources holding
+        # the same name share one document. Distinct content is the ambiguity
+        # that matters; identical copies answer identically wherever cited.
+        needle = normalize("NFC", request.query.strip()).casefold()
+        contents: set[str] = set()
+        for _unit, view in self._visible_units(context, request):
+            if normalize("NFC", view.artifact.file_name).casefold() == needle:
+                contents.add(view.artifact.sha256)
+                if len(contents) > 1:
+                    return True
+        return False
 
     def _visible_units(
         self, context: RequestContext, request: SearchRequest
@@ -204,23 +218,6 @@ def _identifier_text(view: ArtifactView) -> str:
     ]))
 
 
-def snippet(body: str, terms: list[str], width: int = 360) -> str:
-    normalized = " ".join(body.split())
-    lower = normalized.lower()
-    positions = [
-        lower.find(term.lower())
-        for term in terms
-        if term and lower.find(term.lower()) >= 0
-    ]
-    start = max(0, min(positions) - width // 3) if positions else 0
-    text = normalized[start : start + width]
-    if start:
-        text = "…" + text
-    if start + width < len(normalized):
-        text += "…"
-    return text
-
-
 def revision_is_latest(state: MemoryState, view: ArtifactView) -> bool:
     if (
         view.document is None
@@ -236,7 +233,7 @@ def _search_hit(
     score: float,
     unit: ContentUnit,
     view: ArtifactView,
-    terms: list[str],
+    query: str,
     *,
     is_latest: bool,
 ) -> SearchHit:
@@ -251,7 +248,7 @@ def _search_hit(
         source_kind=source_object.system_kind,
         title=unit.title
         or (view.document.title if view.document else view.artifact.file_name),
-        snippet=snippet(unit.body, terms),
+        snippet=discovery_snippet(unit.body, query),
         score=round(score, 4),
         locator=unit.locator,
         source_uri=source_object.canonical_uri,

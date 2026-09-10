@@ -17,6 +17,7 @@ for module in pytest ruff mypy pip_audit; do
     exit 1
   fi
 done
+"$SCRIPT_DIR/audit-kordoc.sh"
 "$PY" -m compileall -q src tests scripts sdk
 while IFS= read -r script; do
   bash -n "$script"

@@ -1,0 +1,15 @@
+{
+  "name": "kip-kordoc-runtime",
+  "version": "2.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "dependencies": {
+    "kordoc": "4.8.0"
+  },
+  "overrides": {
+    "adm-zip": "0.6.0",
+    "sharp": "0.35.4"
+  }
+}

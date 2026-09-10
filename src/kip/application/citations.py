@@ -24,6 +24,7 @@ def citation_from_evidence(item: EvidenceRead) -> AnswerCitation:
         indexed_source_sha256=item.indexed_source_sha256,
         current_source_sha256=item.current_source_sha256,
         source_changed_since_index=False,
+        source_verification=item.source_verification,
     )
 
 

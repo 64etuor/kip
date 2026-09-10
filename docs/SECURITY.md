@@ -230,10 +230,14 @@ against a concurrent filesystem attacker. See ADR-056.
   and model download boundary; runtime `npm`/`npx` execution is rejected,
   production preloads SHA-256-verified PP-OCRv5 Korean files, and indexing sets
   `KORDOC_OFFLINE=1`.
-- The isolated Kordoc install root overrides `adm-zip` to 0.6.0 and `sharp` to
-  0.35.3, including nested copies. These pins have newly observed advisories
-  in the 2026-09-10 audit below. The source ZIP carries
-  only this installer policy, never the downloaded binary or model cache.
+- The host installer and the image build stage share one npm manifest and lock
+  (`requirements/kordoc/`) and install it with `npm ci --omit=dev
+  --ignore-scripts --no-audit`, so both roots resolve the same graph: kordoc
+  4.8.0 with `adm-zip` overridden to 0.6.0 and `sharp` to 0.35.4, including
+  nested copies. Node.js 20.9+ is required. Dependency lifecycle scripts are
+  disabled, so no package install hook executes during setup or build. The
+  source ZIP carries only this installer policy, never the downloaded binary or
+  model cache.
 - PPTX OCR writes selected image bytes only to a private temporary directory,
   removes it after the batch, deduplicates by SHA-256, and enforces image count,
   per-image bytes, total bytes, and minimum dimensions. OCR failure never
@@ -245,12 +249,24 @@ against a concurrent filesystem attacker. See ADR-056.
   [GHSA-rgj7-g3m4-5g8c](https://github.com/advisories/GHSA-rgj7-g3m4-5g8c)
   (high; fixed in 0.35.4) and adm-zip
   [GHSA-vwc7-r8mq-g2x9](https://github.com/advisories/GHSA-vwc7-r8mq-g2x9)
-  (moderate; no patched release at audit time). Five npm package findings
-  represent propagation of these two advisories. The adm-zip extraction path
-  is in ONNX installation, outside parser isolation; it was not exercised by
-  the default macOS arm64 install. No exploit or compromise was demonstrated.
-  The current Python audit gate does not cover this npm graph. These findings
-  remain open in 3.6.1; see [evaluation scope](AGENT_QUALITY.md).
+  (moderate; no patched release). Five npm package findings represent
+  propagation of these two advisories; no exploit or compromise was
+  demonstrated. See [evaluation scope](AGENT_QUALITY.md) for that audit's
+  scope.
+- 3.7.0 pins sharp at 0.35.4 and puts the npm graph under an explicit gate.
+  `./scripts/audit-kordoc.sh` first rejects lock/manifest drift (lock root
+  name, version, dependency and engine blocks, exact pins, and override
+  versions across nested copies), then runs `npm audit --package-lock-only
+  --omit=dev --audit-level=high`. A registry or network error exits nonzero and
+  fails the gate rather than skipping it. The gate runs in
+  `install-kordoc.sh`, in the Docker kordoc stage, in CI (Python 3.12 matrix
+  leg), in `make audit`, and in `./scripts/verify.sh`, so registry access is
+  needed during setup, verification, and builds — never during retrieval.
+- The adm-zip advisory has no patched release and remains in the graph. Its
+  identified path is ONNX's install-time extraction hook, which
+  `--ignore-scripts` prevents the supported CPU installation path from
+  executing; the advisory itself is not removed. Custom GPU or source-build
+  npm workflows are outside this validated runtime.
 - The production image installs only hash-locked `requirements/runtime.txt`.
   A contract test requires every core project dependency to appear in that
   lock, preventing a wheel-only dependency from being absent at runtime.

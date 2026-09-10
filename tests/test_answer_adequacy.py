@@ -337,3 +337,166 @@ def test_missing_csv_completeness_metadata_is_not_treated_as_a_complete_table():
     )
     assert prepared.refusal is not None
     assert prepared.refusal.refusal_reason == "csv_full_table_required"
+
+
+def test_naming_a_file_keeps_approved_ontology_evidence() -> None:
+    document = _evidence("u1", "계약 상대방은 한빛전자이다.", document_id="ldoc_1")
+    graph = _evidence("u3", "계약 상대방 관계 근거", document_id="ldoc_3").model_copy(
+        update={"source_uri": "slack://workspace/channel/message-3"}
+    )
+
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query="u1.txt 계약 상대방은 누구인가?"),
+        [document, graph],
+        had_stale_evidence=False,
+        ontology_evidence_ids={"u3"},
+    )
+
+    assert prepared.refusal is None
+    assert [item.unit.id for item in prepared.evidence] == ["u1", "u3"]
+
+
+def test_bare_named_file_keeps_approved_ontology_evidence() -> None:
+    document = _evidence("u1", "계약 상대방은 한빛전자이다.", document_id="ldoc_1")
+    graph = _evidence("u3", "계약 상대방 관계 근거", document_id="ldoc_3").model_copy(
+        update={"source_uri": "slack://workspace/channel/message-3"}
+    )
+
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query="u1.txt"), [document, graph],
+        had_stale_evidence=False, ontology_evidence_ids={"u3"},
+    )
+
+    assert prepared.refusal is None
+    assert [item.unit.id for item in prepared.evidence] == ["u1", "u3"]
+
+
+def test_named_file_scoping_applies_without_the_lexical_gate() -> None:
+    named = _evidence("u1", "계약 상대방은 한빛전자이다.", document_id="ldoc_1")
+    other = _evidence("u2", "계약 상대방은 다른 회사이다.", document_id="ldoc_2")
+
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query="u1.txt 계약 상대방은 누구인가?"), [named, other],
+        had_stale_evidence=False, apply_lexical_gate=False,
+    )
+
+    assert prepared.refusal is None
+    assert [item.unit.id for item in prepared.evidence] == ["u1"]
+
+
+def test_content_negation_is_not_a_file_exclusion() -> None:
+    named = _evidence("q2", "정규직이 아닌 인력의 제출기한은 2026년 8월 15일이다.", document_id="ldoc_q2").model_copy(
+        update={"source_uri": "file:///2분기정산.txt"}
+    )
+    other = _evidence("q1", "정규직 인력의 제출기한은 2026년 5월 10일이다.", document_id="ldoc_q1").model_copy(
+        update={"source_uri": "file:///1분기정산.txt"}
+    )
+
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query="2분기정산.txt에서 정규직이 아닌 인력의 제출기한은?"),
+        [other, named],
+        had_stale_evidence=False,
+    )
+
+    assert prepared.refusal is None
+    assert [item.unit.id for item in prepared.evidence] == ["q2"]
+
+
+@pytest.mark.parametrize("query", ["u1.txt 말고 제출기한은?", "u1.txt를 제외하고 제출기한은?", "u1.txt 외에 제출기한은?"])
+def test_adjacent_exclusion_drops_the_named_file(query: str) -> None:
+    excluded = _evidence("u1", "제출기한은 2026년 5월 10일이다.", document_id="ldoc_1")
+    other = _evidence("u2", "제출기한은 2026년 8월 15일이다.", document_id="ldoc_2")
+
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query=query), [excluded, other], had_stale_evidence=False,
+    )
+
+    assert prepared.refusal is None
+    assert [item.unit.id for item in prepared.evidence] == ["u2"]
+
+
+@pytest.mark.parametrize("filename", ["회의록.txt", "협의안.txt", "금액표.txt", "ADM-713_의결문.txt"])
+def test_bare_named_file_keeps_ontology_evidence_regardless_of_its_name(filename: str) -> None:
+    document = _evidence("u1", "계약 상대방은 한빛전자이다.", document_id="ldoc_1").model_copy(
+        update={"source_uri": f"file:///{filename}"}
+    )
+    graph = _evidence("u9", "계약 상대방 관계 근거", document_id="ldoc_9").model_copy(
+        update={"source_uri": "slack://workspace/channel/message-9"}
+    )
+
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query=filename), [document, graph],
+        had_stale_evidence=False, ontology_evidence_ids={"u9"},
+    )
+
+    assert prepared.refusal is None
+    assert [item.unit.id for item in prepared.evidence] == ["u1", "u9"]
+
+
+def test_extensionless_common_word_basename_is_not_a_scope_directive() -> None:
+    memo = _evidence("m1", "메모 담당자는 연구팀이다.", document_id="ldoc_m").model_copy(
+        update={"source_uri": "file:///메모"}
+    )
+    notice = _evidence("n1", "메모에 있는 제출기한은 2026년 8월 15일이다.", document_id="ldoc_n")
+
+    # Without scoping, both documents pass through the ordinary lexical gate.
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query="메모에 있는 제출기한은?"), [memo, notice], had_stale_evidence=False,
+    )
+
+    assert prepared.refusal is None
+    assert [item.unit.id for item in prepared.evidence] == ["n1"]
+    exact = prepare_answer_evidence(AnswerRequest(query="메모"), [memo, notice], had_stale_evidence=False)
+    assert exact.refusal is None
+    assert [item.unit.id for item in exact.evidence] == ["m1"]
+
+
+@pytest.mark.parametrize("query", [
+    "u1.txt 말고 u2.txt의 제출기한은?",
+    "u1.txt를 제외하고 u2.txt의 제출기한은?",
+    "u1.txt말고 제출기한은?",
+])
+def test_exclusion_then_another_named_or_remaining_file_answers(query: str) -> None:
+    excluded = _evidence("u1", "제출기한은 2026년 5월 10일이다.", document_id="ldoc_1")
+    other = _evidence("u2", "제출기한은 2026년 8월 15일이다.", document_id="ldoc_2")
+
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query=query), [excluded, other], had_stale_evidence=False,
+    )
+
+    assert prepared.refusal is None, prepared.refusal
+    assert [item.unit.id for item in prepared.evidence] == ["u2"]
+
+
+def test_exclusion_heading_inside_the_document_is_not_a_scope_directive() -> None:
+    notice = _evidence("s1", "정산 제외 대상은 계약직이다.", document_id="ldoc_s").model_copy(
+        update={"source_uri": "file:///정산.txt"}
+    )
+    other = _evidence("s2", "다른 정산 담당자는 회계팀이다.", document_id="ldoc_o")
+
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query="정산.txt 제외 대상은 누구야?"), [notice, other], had_stale_evidence=False,
+    )
+
+    assert prepared.refusal is None, prepared.refusal
+    assert [item.unit.id for item in prepared.evidence] == ["s1"]
+
+
+@pytest.mark.parametrize("query", [
+    "정산.txt를 제외한 나머지 자료의 제출기한은?",
+    "정산.txt 제외하면 제출기한은?",
+    "정산.txt를 제외하여 제출기한은?",
+    "정산.txt 제외, 다른 자료의 제출기한은?",
+])
+def test_inflected_exclusion_markers_do_not_become_required_keywords(query: str) -> None:
+    excluded = _evidence("s1", "정산 제출기한은 2026년 5월 10일이다.", document_id="ldoc_s").model_copy(
+        update={"source_uri": "file:///정산.txt"}
+    )
+    other = _evidence("s2", "나머지 자료 제출기한은 2026년 7월 7일이다.", document_id="ldoc_o")
+
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query=query), [excluded, other], had_stale_evidence=False,
+    )
+
+    assert prepared.refusal is None, prepared.refusal
+    assert [item.unit.id for item in prepared.evidence] == ["s2"]

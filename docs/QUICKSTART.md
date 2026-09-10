@@ -31,18 +31,25 @@ agent는 `kip-setup` Skill에 따라 매번 하나의 누락된 결정만 질문
 색인되려면 receipt의 `next_steps`를 순서대로 실행해야 한다.
 
 ```bash
-./scripts/app-up.sh
+./scripts/app-up.sh --database-only
 ./scripts/kip sync run --source SOURCE
 ./scripts/kip search "스모크 테스트 질의" --limit 5
 ./scripts/kip read UNIT_ID
 ```
 
-`./scripts/app-up.sh`는 `compose.generated.yaml`과
-`config/kip.generated.toml`이 있으면 standalone generated Compose만 선택하여
-승인된 read-only source mount, CAS 경로, 생성 config를 적용한다. DB 준비와
-migration 후 서비스가 시작된다. 둘 다 없으면 안내와 함께 기본 app profile로
-동작하고 하나만 있으면 불완전한 설정으로 실패한다.
-`./scripts/app-up.sh --down`으로 종료한다.
+`./scripts/app-up.sh --database-only`는 CLI/MCP에 필요한 DB 준비와 migration만
+수행한다. generated 배포에서는 승인된 `postgres` 서비스만 기동해 준비를 기다린
+뒤 `config/kip.host.generated.toml`이 같은 plan과 database secret ref를
+가리키는지 확인하고 host migration을 실행한다. DB credential만 필요하고
+API/worker/identity credential은 읽지 않는다. external DB면 Docker 없이
+migration만 한다. API/worker 이미지는 빌드하지 않는다.
+
+REST API나 worker가 필요하면 전체 `./scripts/app-up.sh`를 실행한다.
+`compose.generated.yaml`과 `config/kip.generated.toml`이 있으면 standalone
+generated Compose만 선택하여 승인된 read-only source mount, CAS 경로, 생성
+config를 적용한다. DB 준비와 migration 후 서비스가 시작된다. 둘 다 없으면
+안내와 함께 기본 app profile로 동작하고 하나만 있으면 불완전한 설정으로
+실패한다. `./scripts/app-up.sh --down`으로 종료한다.
 
 실제 credential 대신 `env:KIP_DATABASE_URL` 같은 secret reference만 답한다.
 런타임은 `env:`와 (모델 credential에 한해) `file:` reference만 해석하며,
@@ -109,8 +116,9 @@ For a real read-only OneDrive audit, use [`docs/AI_OPERATOR_RUNBOOK.md`](AI_OPER
 curl http://127.0.0.1:8080/readyz
 ```
 
-`app-up.sh`는 guided setup의 standalone Compose와 secret references를 함께
-해석한다. 직접 base Compose와 합치면 승인되지 않은 mount가 추가될 수 있으므로
+API와 worker가 필요할 때만 전체 프로파일을 띄운다. CLI/MCP만 쓰면
+`./scripts/app-up.sh --database-only`로 충분하다. `app-up.sh`는 guided setup의
+standalone Compose와 secret references를 함께 해석한다. 직접 base Compose와 합치면 승인되지 않은 mount가 추가될 수 있으므로
 생성 배포는 wrapper로 실행한다.
 
 The API and CLI call the same service layer. App integrations should use REST/OpenAPI unless the calling system specifically supports MCP.

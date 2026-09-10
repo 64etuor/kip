@@ -17,6 +17,7 @@ from pathlib import Path
 
 from kip.container import build_container
 from kip.domain.models import SearchHit, SearchRequest
+from kip.errors import NotFoundError
 from kip.evaluation.models import GoldenCase
 from kip.evaluation.runner import load_dataset, run_evaluation
 from kip.settings import Settings
@@ -52,6 +53,22 @@ def main() -> int:
         return _private_gate_unavailable("durable corpus is empty")
 
     dataset = load_dataset(_DATASET)
+    # Any indexed corpus is not the reviewed one. A workspace holding only
+    # sample or unrelated documents must skip (or fail closed when required)
+    # instead of reporting a fake zero-recall regression.
+    evidence_context = container.application.operations.request_context()
+    expected = {document for case in dataset.cases for document in case.expected_documents}
+    indexed = 0
+    for document_id in sorted(expected):
+        try:
+            container.application.evidence.get_document(evidence_context, document_id)
+        except NotFoundError:
+            continue
+        indexed += 1
+    if indexed == 0:
+        return _private_gate_unavailable("reviewed corpus is not indexed in this workspace")
+    if indexed < len(expected):
+        print(f"golden-gate: {len(expected) - indexed}/{len(expected)} expected documents are not indexed")
     floor = json.loads(_FLOOR.read_text(encoding="utf-8"))
 
     def search_case(case: GoldenCase, variant: str) -> list[SearchHit]:

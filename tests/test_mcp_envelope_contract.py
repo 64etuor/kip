@@ -19,6 +19,30 @@ from kip import __version__
 from kip.mcp_server import create_server
 
 
+def test_mcp_discovery_and_read_distinguish_freshness(test_container):
+    from mcp.client import Client
+
+    source = test_container.settings.project_root / "source" / "freshness.txt"
+    source.write_text("신선도검증 자료")
+    context = test_container.application.operations.request_context()
+    test_container.application.ingestion.sync_filesystem(context, "fixture")
+
+    async def invoke():
+        async with Client(create_server(test_container)) as client:
+            found = await client.call_tool("kip_search", {"query": "신선도검증"})
+            hit = json.loads(found.content[0].text)["data"][0]
+            read = await client.call_tool("kip_read", {"unit_id": hit["unit_id"]})
+            pack = await client.call_tool("kip_context", {"query": "신선도검증"})
+            return hit, json.loads(read.content[0].text), json.loads(pack.content[0].text)
+
+    hit, read, pack = anyio.run(invoke)
+    assert hit["evidence_role"] == "discovery"
+    assert hit["source_verification"] == "not_checked"
+    assert read["data"]["source_verification"] == "sha256"
+    assert pack["data"]["items"][0]["source_verification"] == "stat"
+    assert pack["data"]["items"][0]["body_truncated"] is False
+
+
 @pytest.mark.parametrize("name,arguments", [
     ("kip_search", {"query": "audit", "limit": 0}),
     ("kip_context", {"query": "audit", "max_chars": 1}),

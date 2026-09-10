@@ -25,12 +25,50 @@ python3 --version
 rm -rf .venv && ./scripts/bootstrap.sh
 ```
 
+### `Kordoc OCR requires Node.js 20.9+` (bootstrap 또는 doctor 실패)
+Kordoc OCR 런타임은 Node.js 20.9 이상을 요구합니다. `doctor.sh`의
+`Node 20.9+ for Kordoc OCR` 항목도 같은 이유로 실패합니다.
+
+```bash
+node --version
+# 20.9 미만이면 Node.js를 올린 뒤
+./scripts/install-kordoc.sh
+```
+
+### `Kordoc lock validation failed` 또는 npm audit 실패
+`./scripts/audit-kordoc.sh`가 실패한 것입니다. 앞의 메시지는
+`requirements/kordoc/package.json`과 `package-lock.json`이 어긋났다는 뜻이므로
+lock을 되돌리거나 manifest와 함께 다시 생성합니다. 뒤이은 `npm audit` 실패는
+high 이상 advisory이거나 registry/네트워크 오류이며, 두 경우 모두 실패로
+취급합니다. 감사는 setup/verify/build에서만 registry에 접근하고 검색·읽기
+경로에서는 사용하지 않으므로, 사내망에서는 npm registry 접근을 열어 준 뒤 다시
+실행하세요. `--ignore-scripts`나 audit 생략으로 우회하지 않습니다.
+
 ### `docker: command not found` / `Cannot connect to the Docker daemon`
 Docker Desktop이 설치되지 않았거나 실행 중이 아닙니다. Docker Desktop을 실행한
 뒤(고래 아이콘이 "Running"이 될 때까지 기다린 후) 다시 시도하세요.
 
 ```bash
 docker compose version   # 여기서 버전이 나와야 정상입니다
+```
+
+### `generated host config is mismatched; regenerate and apply a setup plan`
+`./scripts/app-up.sh --database-only`가 `config/kip.host.generated.toml`의 plan
+fingerprint 또는 database secret ref가 `config/kip.generated.toml`과 다른 것을
+발견한 경우입니다. 두 파일을 손으로 맞추지 말고 setup으로 plan을 다시 생성해
+승인·apply한 뒤 명령을 다시 실행하세요.
+
+### `docker build`가 `resolve image config for docker-image://docker.io/docker/dockerfile:1.18@sha256:…`에서 멈춤
+Dockerfile 첫 줄의 digest 고정 frontend를 BuildKit이 registry에 digest로
+조회하는 단계입니다. Docker Desktop 내장 proxy(`http.docker.internal:3128`)
+환경에서 이 HEAD 요청만 응답 없이 멈추는 사례가 있었습니다. 같은 digest의
+이미지를 태그로 한 번 받아 두면 이후 빌드가 진행됩니다. digest가 Dockerfile의
+값과 같은지 확인한 뒤 다시 빌드하세요. 고정된 digest를 지우거나 바꾸지 않습니다.
+
+```bash
+docker pull docker/dockerfile:1.18
+docker image inspect docker/dockerfile:1.18 --format '{{index .RepoDigests 0}}'
+# Dockerfile의 # syntax= 줄과 같은 sha256이어야 합니다
 ```
 
 ### `port is already allocated` / `address already in use` (5432)

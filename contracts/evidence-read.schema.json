@@ -171,6 +171,16 @@
       "title": "Source Uri",
       "type": "string"
     },
+    "source_verification": {
+      "default": "unavailable",
+      "enum": [
+        "stat",
+        "sha256",
+        "unavailable"
+      ],
+      "title": "Source Verification",
+      "type": "string"
+    },
     "unit": {
       "$ref": "#/$defs/ContentUnit"
     }

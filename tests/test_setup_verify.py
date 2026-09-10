@@ -49,7 +49,7 @@ def test_verify_reports_runtime_readiness_without_failing_config_checks(
     source = readiness["source_readable:company-docs"]
     assert source.ok is True
     assert receipt.next_steps == [
-        "./scripts/app-up.sh",
+        "./scripts/app-up.sh --database-only",
         "./scripts/kip sync run --source company-docs",
         './scripts/kip search "smoke test query" --limit 5',
         "./scripts/kip read UNIT_ID",

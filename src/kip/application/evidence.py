@@ -46,6 +46,7 @@ class EvidenceUseCases:
                 indexed_source_sha256=view.revision.sha256,
                 current_source_sha256=view.revision.sha256,
                 source_changed_since_index=False,
+                source_verification="stat",
             )
         current_hash = self._current_hash(view.artifact.source_path)
         return EvidenceRead(
@@ -54,6 +55,7 @@ class EvidenceUseCases:
             indexed_source_sha256=view.revision.sha256,
             current_source_sha256=current_hash,
             source_changed_since_index=current_hash != view.revision.sha256,
+            source_verification="sha256" if current_hash is not None else "unavailable",
         )
 
     def _stat_matches_revision(self, view: ArtifactView) -> bool:

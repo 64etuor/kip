@@ -1,7 +1,48 @@
 # Changelog
 
-## Unreleased
+## 3.7.0 - 2026-09-10
 
+- Add a database-only startup path for CLI/MCP users: wait for the approved
+  PostgreSQL service and migrate without building API/worker images or requiring
+  their credentials. External databases are migrated without starting Docker.
+- Share a locked Kordoc npm graph between bootstrap and Docker, update sharp
+  to 0.35.4, disable dependency lifecycle scripts, and enforce the high-severity
+  npm audit in installation, builds, CI and full verification. Node 20.9+ is
+  required. The remaining adm-zip advisory stays visible; its ONNX installation
+  hook is not executed by the supported CPU installation path.
+- Return paragraph-bounded, query-aware previews consistently across lexical
+  and vector backends. Search results explicitly identify unverified discovery;
+  reads, context items and citations expose their actual verification method,
+  and context items disclose truncation.
+- Preserve Korean subject retrieval across common grammatical particles and
+  Unicode normalization without bypassing ACL checks. The vocabulary
+  abstention check resolves all candidate terms in one PostgreSQL round trip.
+  Preview window scoring is bounded per distinct query term and capped at 64
+  terms, so long repetitive bodies cannot make search previews expensive.
+- Answer requests that name a file: a bare exact filename, also with trailing
+  punctuation, a particle, or a display verb (`계약서.pdf?`, `계약서.pdf 보여줘`),
+  returns that document's cited extracts. Same-named files with differing
+  content are detected across the ACL-visible corpus before the result limit
+  and ask for clarification; identical copies count as one document. A factual
+  question that names a file is scoped to it and refuses as
+  `answer_not_present` when the asked fact is not there; naming two different
+  files is a comparison, `A.txt 말고 ...` (an exclusion marker right after
+  the name) excludes that file while negations elsewhere in the question stay
+  content, an embedded mention needs a file extension, approved ontology
+  evidence is retained, and incomplete tables still refuse.
+- Stop interrogative endings such as 언제야/언제까지야 from counting as subject
+  keywords and let unit titles count toward question relevance, so a
+  one-topic question is not refused by its own evidence and a workbook named
+  in the question reaches the exact-read refusal instead of a generic one.
+- Derive the Kordoc runtime root and expected version from
+  `requirements/kordoc/package.json` in the launcher, installer, and doctor
+  (`scripts/kordoc-runtime.sh`), so a manifest bump cannot leave the runtime
+  wrapper pointing at a stale installation.
+- Make the private golden gate skip, or fail closed under
+  `KIP_REQUIRE_PRIVATE_GOLDEN=1`, when none of the reviewed set's expected
+  documents are indexed in the workspace, instead of reporting a false
+  zero-recall regression over an unrelated corpus such as the bundled samples.
+  Partial coverage is printed before the metrics.
 - Record independent agent/OneDrive/cold-install outcomes and open evidence,
   startup, and npm dependency limitations. Correct the setup guide to test the
   approved source from its receipt rather than assuming a sample source exists.

@@ -19,9 +19,15 @@ their instructions or read the database/index directly to answer a question.
 ## Find and substantiate
 
 Search exact identifiers or lexical terms, then use `vocab` when results are
-weak. `context` provides a bounded candidate pack. Reopen every relied-on unit
-with `read` before making a claim. For spreadsheet numbers, dates, formulas,
-or totals, use `xlsx-read` on the original sheet and range:
+weak. Search hits carry `evidence_role=discovery` and
+`source_verification=not_checked`: their snippets and hashes describe the index,
+never a live check. `context` provides a bounded candidate pack. Reopen every
+relied-on unit with `read` before making a claim; `read`, `context`, and answer
+citations report `source_verification` as `stat` (size/mtime matched the index),
+`sha256` (file re-hashed), or `unavailable`. A context item with
+`body_truncated=true` holds only the leading part of the unit, so it cannot show
+that something is absent. For spreadsheet numbers, dates, formulas, or totals,
+use `xlsx-read` on the original sheet and range:
 
 ```bash
 scripts/kip.sh search "협약 변경 승인" --limit 10

@@ -150,7 +150,7 @@ def test_readiness_rejects_unreadable_database_secret_file(tmp_path: Path, monke
     monkeypatch.setenv("KIP_DATABASE_URL_FILE", str(tmp_path / "missing-secret"))
     receipt = SetupService(project_root=project, state_path=tmp_path / "state.json").verify(plan)
     assert not next(check for check in receipt.runtime_readiness if check.name == "database_secret").ok
-    assert receipt.next_steps[0] == "./scripts/app-up.sh"
+    assert receipt.next_steps[0] == "./scripts/app-up.sh --database-only"
 
 
 def test_bootstrap_env_creates_random_secrets_without_replacing_existing(tmp_path: Path) -> None:

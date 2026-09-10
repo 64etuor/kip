@@ -74,6 +74,12 @@ def test_verify_runs_every_gate_with_the_selected_environment(tmp_path: Path, us
     scripts.mkdir()
     (tmp_path / "examples").mkdir()
     shutil.copy2(ROOT / "scripts/verify.sh", scripts / "verify.sh")
+    # The npm gate is a separate executable; verify.sh must invoke it before
+    # the Python checks, even when Node/npm are only available to that script.
+    (scripts / "audit-kordoc.sh").write_text(
+        '#!/bin/bash\nprintf "audit-kordoc\\n" >> "${0%/*}/../commands"\n'
+    )
+    (scripts / "audit-kordoc.sh").chmod(0o755)
     (scripts / "common.sh").write_text(
         'PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"\n'
         'python_cmd() { printf "%s\\n" "$PROJECT_ROOT/fake-python"; }\n'
@@ -89,6 +95,7 @@ def test_verify_runs_every_gate_with_the_selected_environment(tmp_path: Path, us
     )
     commands = (tmp_path / "commands").read_text().splitlines()
     prefix = "run --frozen python -m" if use_uv else "-m"
+    assert commands.index("audit-kordoc") < commands.index(f"{prefix} ruff check src tests scripts")
     assert f"{prefix} ruff check src tests scripts" in commands
     assert f"{prefix} mypy src/kip" in commands
     assert f"{prefix} pip_audit --requirement requirements/runtime.txt --no-deps --disable-pip" in commands

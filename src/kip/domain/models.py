@@ -197,6 +197,12 @@ class SearchHit(StrictModel):
     source_sha256: str
     source_modified_at: datetime | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+    evidence_role: Literal["discovery"] = Field(
+        default="discovery", description="Candidate preview; reopen the unit before citing facts."
+    )
+    source_verification: Literal["not_checked"] = Field(
+        default="not_checked", description="Search hashes describe the index, not a live source check."
+    )
 
 
 class EmbeddingSpace(StrictModel):
@@ -234,6 +240,10 @@ class ContextItem(StrictModel):
     body: str
     current_source_sha256: str | None = None
     source_changed_since_index: bool | None = None
+    source_verification: Literal["stat", "sha256", "unavailable"] = "unavailable"
+    body_truncated: bool = Field(
+        default=False, description="When true, body is only the leading portion of the evidence unit."
+    )
 
 
 class ContextBundle(StrictModel):
@@ -255,6 +265,7 @@ class AnswerCitation(StrictModel):
     indexed_source_sha256: str
     current_source_sha256: str | None = None
     source_changed_since_index: bool
+    source_verification: Literal["stat", "sha256", "unavailable"] = "unavailable"
 
 
 class AnswerGeneration(StrictModel):
@@ -650,6 +661,7 @@ class EvidenceRead(StrictModel):
     indexed_source_sha256: str
     current_source_sha256: str | None = None
     source_changed_since_index: bool | None = None
+    source_verification: Literal["stat", "sha256", "unavailable"] = "unavailable"
 
 
 class XlsxRangeRead(StrictModel):

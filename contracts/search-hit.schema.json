@@ -39,6 +39,13 @@
       "default": null,
       "title": "Document Id"
     },
+    "evidence_role": {
+      "const": "discovery",
+      "default": "discovery",
+      "description": "Candidate preview; reopen the unit before citing facts.",
+      "title": "Evidence Role",
+      "type": "string"
+    },
     "locator": {
       "$ref": "#/$defs/EvidenceLocator"
     },
@@ -78,6 +85,13 @@
     },
     "source_uri": {
       "title": "Source Uri",
+      "type": "string"
+    },
+    "source_verification": {
+      "const": "not_checked",
+      "default": "not_checked",
+      "description": "Search hashes describe the index, not a live source check.",
+      "title": "Source Verification",
       "type": "string"
     },
     "title": {

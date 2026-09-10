@@ -31,6 +31,7 @@ typecheck:
 
 audit:
 	uv run pip-audit --requirement requirements/runtime.txt --no-deps --disable-pip
+	./scripts/audit-kordoc.sh
 
 verify:
 	./scripts/verify.sh

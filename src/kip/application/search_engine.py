@@ -8,6 +8,7 @@ from kip.application.retrieval import apply_rerank, reciprocal_rank_fusion
 from kip.application.semantic import SemanticProjectionUseCases
 from kip.domain.knowledge import normalize_entity_name
 from kip.domain.models import RequestContext, SearchHit, SearchRequest
+from kip.domain.text import normalize_text
 from kip.errors import DependencyUnavailableError, ValidationError
 from kip.ports.embedding import EmbeddingPort
 from kip.ports.knowledge import KnowledgeStore
@@ -43,6 +44,22 @@ class _AnalyzedQuery:
 # opposed to the n-gram fragments the index also stores. These are what the
 # abstention gate checks against corpus document frequency.
 _CONTENT_TOKEN_RE = re.compile(r"[0-9A-Za-z]{2,}|[가-힣]{2,}")
+_PARTICLES = ("에서는", "으로는", "에게는", "에서", "으로", "에게", "까지", "부터", "의", "은", "는", "이", "가", "을", "를", "에", "로", "와", "과", "도")
+
+
+def _content_terms(text: str) -> list[str]:
+    tokens = _CONTENT_TOKEN_RE.findall(normalize_text(text).casefold())
+    terms = list(tokens)
+    for token in tokens:
+        if not all("가" <= char <= "힣" for char in token):
+            continue
+        for suffix in _PARTICLES:
+            if token.endswith(suffix) and len(token) - len(suffix) >= 2:
+                terms.append(token[:-len(suffix)])
+                break
+    # These are only candidates for the ACL-scoped vocabulary check. An
+    # inferred stem cannot permit retrieval unless it exists in the corpus.
+    return list(dict.fromkeys(terms))
 
 
 class SearchEngine:
@@ -214,10 +231,10 @@ class SearchEngine:
             # into the rerank query measurably promoted synonym-dense but
             # off-target documents on the golden set.
             lexemes = f"{lexemes} {self._analyzer.analyze(' '.join(expansion))}"
-        content_tokens = list(dict.fromkeys(_CONTENT_TOKEN_RE.findall(query_text.lower())))
+        content_tokens = _content_terms(query_text)
         expansion_terms = list(
             dict.fromkeys(
-                token for term in expansion for token in _CONTENT_TOKEN_RE.findall(term.lower())
+                token for term in expansion for token in _content_terms(term)
             )
         )
         return _AnalyzedQuery(

@@ -5,7 +5,7 @@ from kip.adapters.parsers.pdf_tables import (
     PdfTableResult,
 )
 from kip.domain.models import ContentUnit, EvidenceLocator
-from kip.domain.text import normalize_text
+from kip.domain.text import normalize_text, strip_inline_markup
 from kip.ids import stable_id
 
 
@@ -23,7 +23,7 @@ def extract_markdown_table_units(
         if rows < 2 or columns < 2:
             continue
         body = "\n".join(block) + "\n"
-        normalized = normalize_text(body)
+        normalized = normalize_text(strip_inline_markup(body))
         units.append(
             ContentUnit(
                 id=stable_id(

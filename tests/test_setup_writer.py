@@ -164,7 +164,7 @@ def test_generated_configs_enable_pinned_korean_ocr(tmp_path: Path) -> None:
             "enabled": True,
             "argv": ["kordoc", "--format", "json", "--ocr", "--silent"],
             "version_argv": ["kordoc", "--version"],
-            "expected_version": "4.8.0",
+            "expected_version": "4.13.1",
         }
         assert config["parsers"]["pdf"] == {
             "backend": "pdf_inspector",

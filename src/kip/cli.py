@@ -13,7 +13,11 @@ from pydantic import BaseModel
 from pydantic import ValidationError as PydanticValidationError
 
 from kip import __version__
-from kip.adapters.ocr.kordoc import KordocOcrConfig, probe_kordoc_version
+from kip.adapters.ocr.kordoc import (
+    KordocOcrConfig,
+    probe_kordoc_version,
+    resolve_kordoc_expected_version,
+)
 from kip.container import Container, build_container
 from kip.domain.interactions import (
     ClarificationAnswer,
@@ -539,7 +543,7 @@ def _kordoc_ocr_doctor_check(settings: Settings) -> dict[str, Any]:
         KordocOcrConfig(
             argv=tuple(str(item) for item in kordoc_config.get("argv", [])),
             version_argv=tuple(str(item) for item in kordoc_config.get("version_argv", [])),
-            expected_version=str(kordoc_config.get("expected_version", "4.8.0")),
+            expected_version=resolve_kordoc_expected_version(kordoc_config.get("expected_version")),
             timeout_seconds=_KORDOC_DOCTOR_PROBE_TIMEOUT_SECONDS,
         )
     )
@@ -1051,22 +1055,33 @@ def parser_reextract(
         "--activate",
         help="Atomically replace active units after all safety gates pass",
     ),
+    extension: list[str] | None = typer.Option(
+        None,
+        "--extension",
+        help="File extension to re-extract, repeatable (e.g. --extension .pdf); default .hwp and .hwpx",
+    ),
 ) -> None:
     """Re-run parsing for a filesystem source into a shadow extraction (safe by default).
 
     Without `--activate` nothing changes; the previous active extraction stays
     live until every safety gate passes and `--activate` replaces it atomically.
+    Use `--extension .pdf` after a PDF parser upgrade to compare and activate
+    the new PDF extractions the same way.
     """
 
     def action(runtime: Runtime) -> Any:
         selected = _resolve_sync_source(runtime, source)
         if selected not in _enabled_filesystem_sources(runtime):
             raise ValidationError("parser re-extraction requires one filesystem source")
-        return runtime.container.application.ingestion.reextract_filesystem(
-            runtime.context,
-            selected,
-            activate=activate,
-        )
+        ingestion = runtime.container.application.ingestion
+        if extension:
+            return ingestion.reextract_filesystem(
+                runtime.context,
+                selected,
+                activate=activate,
+                extensions=frozenset(extension),
+            )
+        return ingestion.reextract_filesystem(runtime.context, selected, activate=activate)
 
     _run(ctx, action)
 

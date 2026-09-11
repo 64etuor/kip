@@ -240,14 +240,15 @@ against a concurrent filesystem attacker. See ADR-056.
   denial in the outer launch/container policy.
 - PPTX parsing reads OOXML locally, never executes VBA or fetches external
   relationships, and records rather than expands embedded OLE/package objects.
-- The default PDF backend is the local MIT-licensed `pdf-inspector` 1.14.2
+- The default PDF backend is the local MIT-licensed `pdf-inspector` 1.19.0
   native extension. It performs no model or network calls and is loaded only
-  inside the adapter. The pin includes bounds for Form XObject expansion, CMap
+  inside the adapter; KIP calls only `extract_pages_markdown`, never the
+  optional OCR that pdf-inspector ships since 1.15. The pin includes bounds for Form XObject expansion, CMap
   ranges, decoded content streams, detector lookback, and rectangle clustering.
   Parser-worker CPU/RSS/wall/output limits remain the outer denial-of-service
   boundary. A native failure becomes a typed failed shadow extraction; it does
   not silently switch parsers or replace the active extraction.
-- Default PDF/PPTX OCR accepts only an installed Kordoc 4.8.0 binary with an
+- Default PDF/PPTX OCR accepts only an installed Kordoc 4.13.1 binary with an
   exact version probe. Bootstrap or the image-build stage is the only package
   and model download boundary; runtime `npm`/`npx` execution is rejected,
   production preloads SHA-256-verified PP-OCRv5 Korean files, and indexing sets
@@ -255,7 +256,7 @@ against a concurrent filesystem attacker. See ADR-056.
 - The host installer and the image build stage share one npm manifest and lock
   (`requirements/kordoc/`) and install it with `npm ci --omit=dev
   --ignore-scripts --no-audit`, so both roots resolve the same graph: kordoc
-  4.8.0 with `adm-zip` overridden to 0.6.0 and `sharp` to 0.35.4, including
+  4.13.1 with `adm-zip` overridden to 0.6.0 and `sharp` to 0.35.4, including
   nested copies. Node.js 20.9+ is required. Dependency lifecycle scripts are
   disabled, so no package install hook executes during setup or build. The
   source ZIP carries only this installer policy, never the downloaded binary or
@@ -296,6 +297,9 @@ membership. Administrator credentials are entered only in the native terminal/UI
   `install-kordoc.sh`, in the Docker kordoc stage, in CI (Python 3.12 matrix
   leg), in `make audit`, and in `./scripts/verify.sh`, so registry access is
   needed during setup, verification, and builds — never during retrieval.
+- 3.11.0 raises kordoc from 4.8.0 to 4.13.1 with the same overrides; the lock
+  change is only the kordoc package itself. The npm advisory set is unchanged
+  (only the known moderate adm-zip chain) and `--audit-level=high` passes.
 - The adm-zip advisory has no patched release and remains in the graph. Its
   identified path is ONNX's install-time extraction hook, which
   `--ignore-scripts` prevents the supported CPU installation path from

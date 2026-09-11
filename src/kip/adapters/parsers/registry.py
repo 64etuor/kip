@@ -4,7 +4,11 @@ from pathlib import Path
 
 from pydantic import TypeAdapter
 
-from kip.adapters.ocr.kordoc import KordocOcrAdapter, KordocOcrConfig
+from kip.adapters.ocr.kordoc import (
+    KordocOcrAdapter,
+    KordocOcrConfig,
+    resolve_kordoc_expected_version,
+)
 from kip.adapters.parsers.csv_table import CsvTableParser
 from kip.adapters.parsers.docx import DocxParser
 from kip.adapters.parsers.hwp_broker import CommandParserConfig, HwpParserBroker
@@ -168,10 +172,10 @@ def _kordoc_ocr(settings: Settings) -> KordocOcrAdapter | None:
         raise ConfigurationError(
             "Kordoc OCR requires an installed Kordoc binary, not npm or npx"
         )
-    expected_version = str(config.get("expected_version", "4.8.0"))
+    expected_version = resolve_kordoc_expected_version(config.get("expected_version"))
     if expected_version != KordocOcrAdapter.version:
         raise ConfigurationError(
-            "Kordoc OCR adapter supports only pinned version 4.8.0"
+            f"Kordoc OCR adapter supports only pinned version {KordocOcrAdapter.version}"
         )
     version_argv = tuple(str(item) for item in config.get("version_argv", []))
     if not version_argv:

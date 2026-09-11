@@ -24,7 +24,9 @@ def test_rapidfuzz_reranker_recovers_a_korean_typo_locally() -> None:
     assert scores[0].index == 1
     assert all(math.isfinite(score.score) for score in scores)
     assert adapter.provider == "rapidfuzz"
-    assert adapter.revision == "3.14.5"
+    # The recorded revision is the installed library, which must be the reviewed pin.
+    pyproject = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+    assert f'"rapidfuzz=={adapter.revision}"' in pyproject
 
 
 def test_container_composes_rapidfuzz_behind_the_reranker_port(

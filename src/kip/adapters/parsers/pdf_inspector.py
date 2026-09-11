@@ -16,7 +16,7 @@ from kip.adapters.parsers.pdf_tables import (
 )
 from kip.domain.json_types import JsonObject, JsonValue
 from kip.domain.models import ContentUnit, EvidenceLocator, ExtractionRun
-from kip.domain.text import normalize_text
+from kip.domain.text import normalize_text, strip_inline_markup
 from kip.errors import DependencyUnavailableError, ParserError
 from kip.ids import new_id, sha256_bytes, stable_id
 from kip.ports.ocr import OcrPort
@@ -24,7 +24,7 @@ from kip.ports.ocr import OcrPort
 
 class PdfInspectorParser:
     name = "pdf-inspector"
-    version = "1.14.2"
+    version = "1.19.0"
 
     def __init__(self, ocr: OcrPort | None = None) -> None:
         self._ocr = ocr
@@ -74,7 +74,9 @@ class PdfInspectorParser:
                 warnings.append(f"page {page_number}: OCR candidate ({reason})")
             if page.needs_ocr:
                 inspector_ocr_pages.add(page_number)
-            normalized = normalize_text(page.markdown)
+            # `body` (read, snippets) keeps the extractor's Markdown as exact
+            # evidence; lexical search and embeddings use it without inline markup.
+            normalized = normalize_text(strip_inline_markup(page.markdown))
             units.append(
                 ContentUnit(
                     id=stable_id("unit", extraction_id, str(page.index)),

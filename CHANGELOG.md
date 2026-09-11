@@ -1,5 +1,38 @@
 # Changelog
 
+## 3.11.0 - 2026-09-11
+
+- Upgrade `pdf-inspector` 1.14.2 -> 1.19.0 (ADR-064). On the six public PDFs
+  in a separate migrated database: 6/6 documents and 70/70 pages, table units
+  37 -> 45, PyMuPDF fallback pages 7 -> 4, and the garbled statistics page that
+  needed OCR is now recovered natively with its tables; lexical Recall@10,
+  MRR and nDCG (100% / 98.6% / 99.0%) and the top-1 page for 30/30 cases are
+  unchanged, with zero unauthorized results. Existing indexes keep their
+  current extractions until re-extracted (see below).
+- Search text no longer contains presentation markup. pdf-inspector 1.19.0
+  marks bold, italic and superscripts inline (`**시범사업**을`), which split
+  Korean words for the n-gram index and the BM25 reranker. For pdf-inspector
+  page and table units, search text and reranker input now drop paired
+  Markdown emphasis (`*`, `**`, `***`) and inline presentation tags; unpaired
+  asterisks such as masked `홍**동` stay, other formats are scored verbatim,
+  and `read` still returns the extractor's Markdown unchanged.
+- `kip parser reextract --extension .pdf` (repeatable) re-extracts PDFs (or
+  any registered format) as a shadow candidate and, with `--activate`,
+  replaces them atomically. The default remains `.hwp`/`.hwpx`; unknown
+  suffixes are rejected, a run that finds no files of the requested formats
+  warns, and the summary lists `extensions`. The operations
+  guide previously pointed PDF upgrades at a command that scanned no PDFs.
+  After updating, run it once per PDF source to adopt the new parser.
+- Upgrade Kordoc 4.8.0 -> 4.13.1 (lock change limited to `kordoc`; advisory
+  set unchanged). OCR output on Korean scans, table scans and image-only PPTX
+  is identical to 4.8.0. A preserved deployment config that still pins
+  `expected_version = "4.8.0"` (or `"4.7.3"`) now resolves to the current pin,
+  so `kip update` needs no manual config edit; other values are still refused.
+- Dependencies: MCP Python SDK 2.2.0 (verified against a real stdio server),
+  rapidfuzz 3.14.6, build constraints setuptools 84.0.0 and wheel 0.48.0
+  (with packaging 26.3; the hash file now includes setuptools, which the
+  Dependabot proposal had dropped), and `docker/setup-buildx-action` v4.3.0.
+
 ## 3.10.0 - 2026-09-11
 
 - Retire the "starter kit" name. The release archive is `kip-<version>.zip`

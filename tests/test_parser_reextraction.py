@@ -11,7 +11,7 @@ from kip.container import build_container
 from kip.domain.egress import DataClassification
 from kip.domain.identity import AclSnapshot
 from kip.domain.models import DocumentPacket, SearchRequest
-from kip.errors import ConflictError
+from kip.errors import ConflictError, ValidationError
 from kip.ids import new_id, stable_id
 from kip.ports.ingestion import DiscoveredFile
 from kip.settings import Settings
@@ -363,3 +363,60 @@ def test_hwp_reextraction_rejects_candidates_below_the_quality_gate(
         context,
         SearchRequest(query="품질미달"),
     ) == []
+
+
+def test_pdf_reextraction_is_opt_in_by_extension_and_rejects_unparsable_suffixes(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    # Given an indexed HWP and an indexed native-text PDF in one source.
+    import pymupdf
+
+    monkeypatch.setitem(
+        sys.modules,
+        "hwp_hwpx_parser",
+        SimpleNamespace(Reader=_FakeReader),
+    )
+    _FakeReader.text = "기존계약문구"
+    container = _native_hwp_container(tmp_path)
+    document = pymupdf.open()
+    document.new_page().insert_text((72, 72), "Quarterly budget evidence for the PDF upgrade")
+    document.save(tmp_path / "source" / "report.pdf")
+    document.close()
+    context = container.application.operations.request_context()
+    synced = container.application.ingestion.sync_filesystem(context, "fixture")
+    assert synced.inserted == 2
+    ingestion = container.application.ingestion
+
+    # When the default run and an explicit PDF run are prepared.
+    default = ingestion.reextract_filesystem(context, "fixture")
+    pdf_shadow = ingestion.reextract_filesystem(context, "fixture", extensions=frozenset({"PDF"}))
+    pdf_active = ingestion.reextract_filesystem(
+        context, "fixture", activate=True, extensions=frozenset({".pdf"})
+    )
+
+    # Then the default keeps its HWP/HWPX scope and PDFs are re-extracted only on request.
+    assert default.extensions == [".hwp", ".hwpx"]
+    assert default.parser_counts == {"hwp-hwpx-parser": 1}
+    assert pdf_shadow.extensions == [".pdf"]
+    assert (pdf_shadow.parsed, pdf_shadow.activated) == (1, 0)
+    assert pdf_shadow.parser_counts == {"pdf-inspector": 1}
+    assert (pdf_active.parsed, pdf_active.activated, pdf_active.failed) == (1, 1, 0)
+    assert container.application.retrieval.search(context, SearchRequest(query="Quarterly budget"))
+
+    # And the signature-matched defaults can be named explicitly next to other formats.
+    both = ingestion.reextract_filesystem(context, "fixture", extensions=frozenset({".HWP", "pdf"}))
+    assert both.extensions == [".hwp", ".pdf"]
+    assert both.parser_counts == {"hwp-hwpx-parser": 1, "pdf-inspector": 1}
+    assert not any("were found" in warning for warning in both.warnings)
+
+    # And a requested format the source does not contain warns instead of passing silently.
+    empty = ingestion.reextract_filesystem(context, "fixture", extensions=frozenset({".docx"}))
+    assert empty.scanned == 0
+    assert any("no .docx files were found" in warning for warning in empty.warnings)
+
+    # And a suffix without a registered parser is an operator error, not a silent no-op.
+    with pytest.raises(ValidationError, match=r"no parser is registered for \.xyz"):
+        ingestion.reextract_filesystem(context, "fixture", extensions=frozenset({"xyz"}))
+    with pytest.raises(ValidationError, match="invalid file extension"):
+        ingestion.reextract_filesystem(context, "fixture", extensions=frozenset({"../pdf"}))

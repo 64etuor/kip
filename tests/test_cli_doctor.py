@@ -55,14 +55,14 @@ def test_kordoc_doctor_check_reports_ok_with_detected_version_when_resolvable(
 ) -> None:
     # Given an enabled Kordoc runtime whose version probe resolves and matches.
     command = tmp_path / "kordoc_ok.py"
-    command.write_text("print('4.8.0')", encoding="utf-8")
+    command.write_text("print('4.13.1')", encoding="utf-8")
     settings = _settings(
         tmp_path,
         kordoc={
             "enabled": True,
             "argv": [sys.executable, str(command)],
             "version_argv": [sys.executable, str(command)],
-            "expected_version": "4.8.0",
+            "expected_version": "4.13.1",
         },
     )
 
@@ -71,7 +71,7 @@ def test_kordoc_doctor_check_reports_ok_with_detected_version_when_resolvable(
 
     # Then it reports ok and surfaces the detected version.
     assert check["ok"] is True
-    assert check["details"] == {"enabled": True, "version": "4.8.0", "reason": None}
+    assert check["details"] == {"enabled": True, "version": "4.13.1", "reason": None}
 
 
 def test_kordoc_doctor_check_warns_with_actionable_reason_when_not_resolvable(
@@ -85,7 +85,7 @@ def test_kordoc_doctor_check_warns_with_actionable_reason_when_not_resolvable(
             "enabled": True,
             "argv": ["kordoc-not-on-path", "--format", "json", "--ocr"],
             "version_argv": ["kordoc-not-on-path", "--version"],
-            "expected_version": "4.8.0",
+            "expected_version": "4.13.1",
         },
     )
 
@@ -113,14 +113,14 @@ def test_kordoc_doctor_check_warns_on_version_mismatch(tmp_path: Path) -> None:
             "enabled": True,
             "argv": [sys.executable, str(command)],
             "version_argv": [sys.executable, str(command)],
-            "expected_version": "4.8.0",
+            "expected_version": "4.13.1",
         },
     )
 
     check = _kordoc_ocr_doctor_check(settings)
 
     assert check["ok"] is False
-    assert "expected 4.8.0" in check["details"]["reason"]
+    assert "expected 4.13.1" in check["details"]["reason"]
 
 
 def test_doctor_command_surfaces_kordoc_resolvability(
@@ -142,7 +142,7 @@ def test_doctor_command_surfaces_kordoc_resolvability(
                         "enabled": True,
                         "argv": ["kordoc-not-on-path", "--format", "json", "--ocr"],
                         "version_argv": ["kordoc-not-on-path", "--version"],
-                        "expected_version": "4.8.0",
+                        "expected_version": "4.13.1",
                     }
                 },
             },
@@ -209,3 +209,26 @@ def test_doctor_summary_is_clean_when_every_check_passes(
     assert "통과" in summary
     assert "경고" not in summary
     assert "문제" not in summary
+
+
+def test_kordoc_doctor_check_accepts_a_superseded_pin_left_in_a_preserved_config(tmp_path: Path) -> None:
+    # Given a deployment config written by an earlier release (expected 4.8.0)
+    # after `kip update` installed the currently pinned runtime.
+    command = tmp_path / "kordoc_current.py"
+    command.write_text("print('4.13.1')", encoding="utf-8")
+    settings = _settings(
+        tmp_path,
+        kordoc={
+            "enabled": True,
+            "argv": [sys.executable, str(command)],
+            "version_argv": [sys.executable, str(command)],
+            "expected_version": "4.8.0",
+        },
+    )
+
+    # When doctor probes the runtime.
+    check = _kordoc_ocr_doctor_check(settings)
+
+    # Then the superseded pin means "the pinned runtime" and no config edit is needed.
+    assert check["ok"] is True
+    assert check["details"]["version"] == "4.13.1"

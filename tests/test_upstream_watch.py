@@ -92,7 +92,7 @@ set -euo pipefail
 url="${@: -1}"
 case "$url" in
   */kordoc/latest) printf '{"version":"4.9.0"}\\n' ;;
-  */pdf-inspector/json) printf '{"info":{"version":"1.14.2"}}\\n' ;;
+  */pdf-inspector/json) printf '{"info":{"version":"1.19.0"}}\\n' ;;
   */Qwen/Qwen3-Embedding-0.6B) printf '{"sha":"embedding-current"}\\n' ;;
   */BAAI/bge-reranker-v2-m3) printf '{"sha":"reranker-current"}\\n' ;;
   *) exit 64 ;;
@@ -142,7 +142,7 @@ set -euo pipefail
 url="${@: -1}"
 case "$url" in
   */kordoc/latest) printf '{"version":"4.8.0"}\\n' ;;
-  */pdf-inspector/json) printf '{"info":{"version":"1.14.2"}}\\n' ;;
+  */pdf-inspector/json) printf '{"info":{"version":"1.19.0"}}\\n' ;;
   */Qwen/Qwen3-Embedding-0.6B) printf '{"sha":"embedding-current"}\\n' ;;
   */BAAI/bge-reranker-v2-m3) printf '{"sha":"reranker-current"}\\n' ;;
   *) exit 64 ;;

@@ -1994,7 +1994,7 @@ HWP parser 구조와 paired PDF 페이지를 매핑할 수 있으면 dual locato
 
 ### 19.1 Fast path
 
-- default `pdf-inspector==1.14.2` local Rust extraction to per-page Markdown
+- default `pdf-inspector==1.19.0` local Rust extraction to per-page Markdown
 - page boundary preservation
 - table/multi-column detection and per-page OCR reasons
 - valid Markdown tables promoted to `pdf_table`; detected table pages without
@@ -2005,7 +2005,15 @@ HWP parser 구조와 paired PDF 페이지를 매핑할 수 있으면 dual locato
 `pymupdf` as the explicit rollback. The six-public-PDF gate measured 19.2x raw
 parser and 3.23x isolated sync speedup with unchanged lexical Recall@10/MRR
 (1.0000/0.9861) and zero ACL leaks (ADR-054). Existing extractions change only
-through shadow re-extraction and activation.
+through shadow re-extraction and activation (`parser reextract --extension
+.pdf`, then `--activate`). The 1.19.0 upgrade (ADR-064) kept lexical
+Recall@10/MRR/nDCG@10 and the top-1 (document, page) hit of all 30 public
+relevance cases identical while table units rose from 37 to 45 and the garbled
+page no longer needed OCR. For pdf-inspector units, search text and reranker
+input strip paired Markdown emphasis and inline presentation tags; the unit `body` returned by `read` keeps
+the extractor Markdown. KIP calls only `extract_pages_markdown`, never
+pdf-inspector's own optional OCR, and a failed PDF is recorded as failed
+without a per-document PyMuPDF fallback.
 
 ### 19.2 OCR trigger
 
@@ -2019,7 +2027,7 @@ through shadow re-extraction and activation.
 ### 19.3 Korean OCR candidate enrichment
 
 OCR은 원본을 수정하거나 native unit을 대체하지 않는다. 활성화된 경우
-선택된 PDF parser가 후보가 하나 이상인 원본 PDF를 Kordoc 4.8.0 PP-OCRv5 Korean
+선택된 PDF parser가 후보가 하나 이상인 원본 PDF를 Kordoc 4.13.1 PP-OCRv5 Korean
 adapter에 한 번 전달한다. 후보 page의 non-empty text/table block만
 `pdf_ocr` unit으로 추가하며 page와 pixel bbox를 보존한다. Kordoc의 image
 reference block은 lexical evidence가 아니므로 제외한다.
@@ -2035,11 +2043,13 @@ Original PDF artifact (read-only)
 `parser_name=pdf-inspector+kordoc-ppocrv5-korean` 또는 rollback backend 이름이
 provenance를 기록한다. OCR
 failure와 low-confidence warning은 native page를 지우지 않고 extraction을
-`partial`로 만든다. Reference bootstrap과 production image는 Kordoc 4.8.0과
+`partial`로 만든다. Reference bootstrap과 production image는 Kordoc 4.13.1과
 SHA-256 검증된 PP-OCRv5 Korean cache를 설치하고, runtime registry는 executable과 별도
-`--version` probe가 모두 정확히 4.8.0인지 확인하며 `npm`/`npx` 실행을
+`--version` probe가 모두 정확히 4.13.1인지 확인하며 `npm`/`npx` 실행을
 거부한다. Production은 사전 검증된 model cache와 `KORDOC_OFFLINE=1`을
-사용한다. 기존 설치의 사용자 `config/kip.toml`은 자동 변경하지 않는다.
+사용한다. 기존 설치의 사용자 `config/kip.toml`은 자동 변경하지 않는다. 이전 KIP
+release가 기록한 `expected_version`(`4.8.0`, `4.7.3`)은 현재 pin으로 해석하고,
+그 밖의 다른 값은 거부한다.
 
 ### 19.4 Structured parser escalation
 
@@ -5202,6 +5212,7 @@ stand for implicit accepted decisions.
 | ADR-056 | Current filesystem roots authorize existing evidence | Accepted |
 | ADR-057 | Approved setup controls the effective runtime | Accepted |
 | ADR-058 | Use complete evidence and discoverable MCP contracts | Accepted |
+| ADR-064 | Upgrade pdf-inspector to 1.19.0 and Kordoc to 4.13.1 with PDF re-extraction | Accepted |
 
 ---
 

@@ -97,7 +97,11 @@ non-mutating shadow mode first. Activation is a separate operator action:
 ./scripts/kip parser reextract --source company-nas --activate
 ```
 
-The operation hashes only configured HWP/HWPX candidates. Activation inherits
+By default the operation hashes only configured HWP/HWPX candidates. Add a
+repeatable `--extension` (for example `--extension .pdf`; the leading dot is
+optional and matching is case-insensitive) to re-extract another format after
+its parser changes; an extension without a registered parser is rejected, and
+the JSON summary lists the scanned `extensions`. Activation inherits
 and rechecks the current canonical source ACL snapshot and classification,
 retains extraction history, replaces only the rebuildable active lexical
 projection, and commits each document atomically. It never writes to the source
@@ -126,13 +130,21 @@ per-page Markdown, layout/table signals, and OCR reasons without network calls.
 Valid Markdown tables become additive table units. A detected table page whose
 Markdown has no valid table block runs the existing PyMuPDF `lines_strict`
 fallback for that page only. Set `backend = "pymupdf"` to roll back; do not
-silently mix backends after a parse failure. Existing indexed PDFs require
-shadow re-extraction before activation because page bodies change from plain
-text to Markdown.
+silently mix backends after a parse failure (a PDF that pdf-inspector cannot
+parse is recorded as failed, with no per-document PyMuPDF fallback). Search
+text and reranker input drop paired Markdown emphasis and inline presentation
+tags (pdf-inspector units only; unpaired asterisks stay), while the unit
+body returned by `read` keeps the extractor Markdown exactly. The pinned
+pdf-inspector 1.19.0 ships optional OCR of its own; KIP calls only
+`extract_pages_markdown` and sends OCR candidates to Kordoc. Existing indexed
+PDFs require shadow re-extraction with `parser reextract --extension .pdf`
+before activation because page bodies change from plain text to Markdown, and
+a pdf-inspector pin upgrade leaves existing extractions unchanged until they
+are re-extracted the same way.
 
 ## Local Korean OCR adapter
 
-PDF and PPTX parsers share the default Kordoc 4.8.0 adapter in new reference
+PDF and PPTX parsers share the default Kordoc 4.13.1 adapter in new reference
 installations. Bootstrap installs the exact runtime and model cache:
 
 ```bash
@@ -141,13 +153,15 @@ installations. Bootstrap installs the exact runtime and model cache:
 ```
 
 The launcher sets `KORDOC_OFFLINE=1` for indexing. The registry requires
-`argv`, `version_argv`, and `expected_version = "4.8.0"`, and rejects `npm` or
+`argv`, `version_argv`, and `expected_version = "4.13.1"`, and rejects `npm` or
 `npx` as the runtime command. PDF OCR runs only when native text quality crosses
 a candidate signal. PPTX OCR batches eligible pictures, deduplicates identical
 bytes, and applies count and byte budgets from `[parsers.ocr.pptx]`. Both paths
 append located candidate units and preserve native units on failure.
 Existing local configurations retain their explicit enabled/disabled value and
-must be upgraded deliberately.
+must be upgraded deliberately. An `expected_version` of `4.8.0` or `4.7.3`
+written by an earlier KIP release resolves to the current pin; any other
+non-current value is rejected.
 
 ## Slack
 

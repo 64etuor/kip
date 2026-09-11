@@ -73,7 +73,7 @@ print(json.dumps({
 
 
 def test_kordoc_ocr_rejects_unexpected_runtime_version(tmp_path: Path) -> None:
-    # Given a configured Kordoc 4.8.0 adapter backed by a different executable version.
+    # Given a configured Kordoc 4.13.1 adapter backed by a different executable version.
     command = tmp_path / "wrong_version.py"
     command.write_text("print('4.7.3')", encoding="utf-8")
     image = tmp_path / "scan.png"
@@ -82,13 +82,13 @@ def test_kordoc_ocr_rejects_unexpected_runtime_version(tmp_path: Path) -> None:
         KordocOcrConfig(
             argv=(sys.executable, str(command)),
             version_argv=(sys.executable, str(command)),
-            expected_version="4.8.0",
+            expected_version="4.13.1",
             timeout_seconds=5,
         )
     )
 
     # When OCR begins.
-    with pytest.raises(ParserError, match=r"expected 4\.8\.0"):
+    with pytest.raises(ParserError, match=r"expected 4\.13\.1"):
         adapter.recognize((image,))
 
     # Then unreviewed model/runtime drift is rejected before document parsing.
@@ -180,7 +180,7 @@ def test_registry_enables_pinned_korean_ocr_from_settings(tmp_path: Path) -> Non
                         "enabled": True,
                         "argv": ["/opt/kordoc/bin/kordoc", "--format", "json", "--ocr"],
                         "version_argv": ["/opt/kordoc/bin/kordoc", "--version"],
-                        "expected_version": "4.8.0",
+                        "expected_version": "4.13.1",
                     }
                 }
             }
@@ -196,7 +196,7 @@ def test_registry_enables_pinned_korean_ocr_from_settings(tmp_path: Path) -> Non
     )
     assert pdf._ocr is not None
     assert pdf._ocr.name == "kordoc-ppocrv5-korean"
-    assert pdf._ocr.version == "4.8.0"
+    assert pdf._ocr.version == "4.13.1"
 
 
 def test_registry_rejects_enabled_ocr_without_version_check(tmp_path: Path) -> None:
@@ -210,7 +210,7 @@ def test_registry_rejects_enabled_ocr_without_version_check(tmp_path: Path) -> N
                     "kordoc": {
                         "enabled": True,
                         "argv": ["/opt/kordoc/bin/kordoc", "--format", "json", "--ocr"],
-                        "expected_version": "4.8.0",
+                        "expected_version": "4.13.1",
                     }
                 }
             }
@@ -236,7 +236,7 @@ def test_registry_rejects_runtime_package_download_command(tmp_path: Path) -> No
                         "enabled": True,
                         "argv": ["npx", "kordoc@4.8.0", "--format", "json", "--ocr"],
                         "version_argv": ["npx", "kordoc@4.8.0", "--version"],
-                        "expected_version": "4.8.0",
+                        "expected_version": "4.13.1",
                     }
                 }
             }
@@ -248,3 +248,45 @@ def test_registry_rejects_runtime_package_download_command(tmp_path: Path) -> No
         ParserRegistry.from_settings(settings)
 
     # Then indexing never performs an implicit package download.
+
+
+def test_kordoc_pin_resolution_accepts_only_current_and_superseded_kip_pins() -> None:
+    from kip.adapters.ocr.kordoc import KORDOC_VERSION, resolve_kordoc_expected_version
+
+    assert resolve_kordoc_expected_version(None) == KORDOC_VERSION
+    assert resolve_kordoc_expected_version(KORDOC_VERSION) == KORDOC_VERSION
+    assert resolve_kordoc_expected_version("4.8.0") == KORDOC_VERSION
+    assert resolve_kordoc_expected_version("4.7.3") == KORDOC_VERSION
+    # An arbitrary other version is passed through so the registry rejects it.
+    assert resolve_kordoc_expected_version("4.9.9") == "4.9.9"
+
+
+def test_registry_rejects_an_unreviewed_kordoc_pin(tmp_path: Path) -> None:
+    settings = Settings(
+        project_root=tmp_path,
+        config_path=tmp_path / "kip.toml",
+        raw={
+            "parsers": {
+                "ocr": {
+                    "kordoc": {
+                        "enabled": True,
+                        "argv": ["kordoc", "--format", "json", "--ocr"],
+                        "version_argv": ["kordoc", "--version"],
+                        "expected_version": "4.9.9",
+                    }
+                }
+            }
+        },
+    )
+
+    with pytest.raises(ConfigurationError, match=r"supports only pinned version 4\.13\.1"):
+        ParserRegistry.from_settings(settings)
+
+
+def test_kordoc_manifest_installs_the_adapter_pin() -> None:
+    import json
+
+    from kip.adapters.ocr.kordoc import KORDOC_VERSION
+
+    manifest = json.loads((Path(__file__).resolve().parents[1] / "requirements/kordoc/package.json").read_text())
+    assert manifest["dependencies"]["kordoc"] == KORDOC_VERSION

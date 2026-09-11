@@ -4,6 +4,68 @@ This is the current readiness inventory, not the target architecture. The
 target-to-current matrix and ordered gap register live in
 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`.
 
+## 2026-09-11 pdf-inspector 1.19.0, Kordoc 4.13.1 and PDF re-extraction (3.11.0)
+
+`pdf-inspector` moves from 1.14.2 to 1.19.0 (ADR-064). `pdf_inspector` stays the
+default backend, `pymupdf` the explicit rollback, and PyMuPDF `lines_strict`
+still runs only on table pages the inspector flags without a Markdown table; a
+PDF the inspector cannot parse is recorded as failed, with no per-document
+PyMuPDF fallback. KIP calls only `extract_pages_markdown`, not the optional OCR
+pdf-inspector ships since 1.15, so OCR candidates still go to Kordoc. Because
+1.19.0 emits far more inline `**bold**` and `<sup>` markup, search text
+(`body_normalized`/`lexical_text` of pdf-inspector page and table units, and
+the reranker input for those units) now strips paired Markdown emphasis
+(`*`, `**`, `***`) and inline presentation tags (u, sup, sub, b, i, em,
+strong, s, del, ins, mark, small); unpaired asterisks such as masked names
+stay, other formats are scored verbatim, and the `body`
+returned by `read` keeps the extractor Markdown exactly. `kip parser reextract`
+gains a repeatable `--extension` option (leading dot optional,
+case-insensitive; default still `.hwp`/`.hwpx`; an extension without a
+registered parser is a validation error; the summary lists `extensions`), so
+the documented PDF path is now `parser reextract --source SOURCE --extension
+.pdf` in shadow, then the same command with `--activate`. Before this, the
+documented PDF re-extraction scanned 0 PDFs. Existing indexes keep 1.14.2
+extractions until re-extracted.
+
+A/B evidence in a separate migrated PostgreSQL database over the six licensed
+public PDFs (1.14.2 baseline synced, candidate activated through the new
+path): 6/6 documents and 70/70 pages with 0 rejected/failed; table units 37 to
+45, PyMuPDF-fallback table units 3 to 1 and fallback pages 7 to 4; OCR
+candidate pages 1 to 0 and OCR units 13 to 0 because the garbled statistics
+page (adoption-reform page 8) is now recovered natively as text and Markdown
+tables; lexical Recall@10 100%, MRR 98.6%, nDCG@10 99.0% and zero unauthorized
+results, identical to baseline; identical top-1 (document, page) hit for 30/30
+public relevance cases; p50 about 34 ms on both; raw parse time unchanged at
+about 0.34 s for all six. Without the markup normalization one case fell from
+rank 1 to 2 (MRR 97.2%).
+
+Kordoc moves from 4.8.0 to 4.13.1 (runtime root `var/kordoc-4.13.1-r2`;
+`adm-zip` 0.6.0 and `sharp` 0.35.4 overrides unchanged; the lock change is
+only the kordoc package; the npm advisory set is unchanged and
+`--audit-level=high` passes). Example, container and setup-generated configs
+write `expected_version = "4.13.1"`; a preserved config still naming `4.8.0` or
+`4.7.3` (a pin from an earlier KIP release) resolves to the current pin, so
+`kip update` needs no config edit, while any other non-current value is
+rejected. The PP-OCRv5 Korean cache is reused offline. The `--format json --ocr
+--silent` contract (top-level keys, block keys, warning format) and the HWPX
+parse shape (`pageMode: section`) are identical; a synthetic 200-dpi Korean
+scanned PDF, a 150-dpi scanned table and an image-only PPTX scored character
+similarity 1.0000 on both versions with identical table structure; and a real
+`./scripts/kip sync` in the isolated database produced searchable `pdf_ocr` and
+`pptx_ocr` units with bbox locators, read through the stdio MCP server.
+Upstream 4.9-4.13 changes are mostly HWP/HWPX rendering, generation and PDF
+table-grid work; the HWP broker Kordoc path stays disabled by default.
+
+Other updates: MCP Python SDK 2.0.0 to 2.2.0 (a real `./scripts/mcp.sh` stdio
+client saw the server version on initialize, 31 tools, `kip.envelope.v1` from
+`kip_capabilities`/`kip_search`/`kip_read`, and a KIP `not_found` envelope for
+a missing unit), rapidfuzz 3.14.5 to 3.14.6, build constraints setuptools
+80.9.0 to 84.0.0 and wheel 0.45.1 to 0.48.0 (with packaging 26.3), and
+`docker/setup-buildx-action` v4.3.0. Limits: the PDF evidence covers six public
+PDFs only; private-corpus table accuracy, OCR CER/WER on real scans, and
+semantic/reranked parity were not re-measured because the model sidecar was
+not part of this A/B.
+
 ## 2026-09-11 package naming, global launcher and `kip update` (3.10.0)
 
 The distributable is now simply the KIP package: `kip-<version>.zip` with its
@@ -195,9 +257,9 @@ without starting Docker, and no API/worker image is built. Full `app-up.sh` and
 `--down` are unchanged, and setup receipts name `--database-only` first in
 `next_steps` and `limitations`.
 
-The Kordoc npm graph is locked in `requirements/kordoc/` (kordoc 4.8.0 exact,
-`adm-zip` 0.6.0, `sharp` 0.35.4). The host installer (root
-`var/kordoc-4.8.0-r2`) and the Dockerfile stage install it with `npm ci
+The Kordoc npm graph is locked in `requirements/kordoc/` (kordoc 4.13.1 exact
+since 3.11.0, `adm-zip` 0.6.0, `sharp` 0.35.4). The host installer (root
+`var/kordoc-4.13.1-r2`) and the Dockerfile stage install it with `npm ci
 --omit=dev --ignore-scripts --no-audit`, and `./scripts/audit-kordoc.sh`
 rejects lock/manifest drift before running `npm audit --package-lock-only
 --omit=dev --audit-level=high`; a registry or network error fails the gate. It
@@ -319,7 +381,7 @@ substitutes for that full-corpus benchmark.
 | Text/CSV parsers | Ready for pilot | A leading comment line no longer defeats delimiter sniffing (previously every row collapsed into one field at quality 1.0 with no warning), and control-byte binary that decodes as valid UTF-8 is now flagged `BINARY_SUSPECTED` with reduced quality instead of passing as clean text. Plain text/Markdown decode through a bounded encoding ladder (BOM strip, UTF-8 strict, CP949 strict, then visible degraded fallback with replacement-ratio warnings and content-derived quality — CP949 Korean exports no longer index silently as mojibake). `.csv` routes to a structural parser: sniffed delimiter, header-column metadata, row-boundary chunking, `csv_rows` start/end-row locators, ragged rows warn without failing; numeric CSV values are indexed verbatim (unlike XLSX shallow) |
 | DOCX parser | Ready for pilot | Footnote/endnote text is extracted as dedicated units (it was silently dropped at full reported quality until 2026-08-16), `w:noBreakHyphen` no longer glues words together, tracked deletions stay excluded while insertions stay included, and field codes yield their cached display text — each locked by regression tests. Symbol-font glyphs (`w:sym`) remain a known drop (needs a per-font mapping). Structural single-pass XML walk (measured 2026-08-15 rebuild): paragraph-range chunk locators (`docx_paragraphs`), dedicated table units (gridSpan/vMerge without duplication), header/footer parts, hyperlink targets and heading levels in metadata, text boxes extracted once as `docx_textbox` units (mc:Choice/Fallback dedup), image counts, per-part partial isolation, and content-derived quality. Previously a single flat whole-document unit that dropped headers/footers and duplicated text boxes; re-extract existing DOCX to benefit |
 | XLSX shallow/deep | Ready for pilot | Hidden sheets are indexed but now flagged (`hidden` per unit, `hidden_sheet_count` per extraction); shared formulas, error cells, and 1904-date-system workbooks are verified correct by regression tests; named ranges remain unextracted. Quality is content-derived (sheet success ratio × replacement penalty; a corrupt sheet degrades instead of aborting). Shared-string shallow index and exact-shape `.xlsx`/`.xlsm` range reader; JSON-safe scalar/cached values, normal/array/data-table formulas, Excel serials/formats, merged cells, and hidden/filtered dimensions are explicit. Date/datetime/time use ISO 8601, durations use ISO 8601 duration strings, non-finite numerics stay labeled rather than becoming null, and dense validated ranges are capped at 100,000 cells |
-| PDF parser | Ready for starter/pilot | The default `pdf_inspector` 1.14.2 backend emits structured per-page Markdown, table/column signals, and per-page OCR reasons; valid Markdown tables become additive `pdf_table` units and detected table pages without valid Markdown use selective PyMuPDF `lines_strict` fallback (ADR-054). `pymupdf` remains the explicit rollback backend. Separate migrated PostgreSQL A/B databases over six public PDFs produced 6/6 successful syncs, 70 pages on both sides, 37 candidate tables versus 44 baseline tables, and 13 OCR units on one garbled page; raw parsing was 19.2x faster and isolated sync 3.23x faster while lexical Recall@10/MRR remained 1.0000/0.9861 with zero ACL leaks. Explicit reranked evaluation remained unavailable because the embedding sidecar was not running. Kordoc 4.8.0 PP-OCRv5 Korean remains the offline candidate enrichment path with audited npm overrides. Private table accuracy, OCR CER/WER, semantic/reranked parity, memory peaks, encrypted PDFs, and full-corpus quality still require deployment-specific shadow evidence |
+| PDF parser | Ready for starter/pilot | The default `pdf_inspector` 1.19.0 backend emits structured per-page Markdown, table/column signals, and per-page OCR reasons; valid Markdown tables become additive `pdf_table` units and detected table pages without valid Markdown use selective PyMuPDF `lines_strict` fallback (ADR-054). `pymupdf` remains the explicit rollback backend. Separate migrated PostgreSQL A/B databases over six public PDFs produced 6/6 successful syncs, 70 pages on both sides, 37 candidate tables versus 44 baseline tables, and 13 OCR units on one garbled page; raw parsing was 19.2x faster and isolated sync 3.23x faster while lexical Recall@10/MRR remained 1.0000/0.9861 with zero ACL leaks. Explicit reranked evaluation remained unavailable because the embedding sidecar was not running. The 1.19.0 upgrade (ADR-064), re-extracted and activated with `parser reextract --extension .pdf` in a separate migrated database, kept 6/6 documents and 70/70 pages with 0 rejected/failed, raised table units from 37 to 45 (PyMuPDF-fallback tables 3 to 1), recovered the garbled page natively (OCR units 13 to 0), and kept lexical Recall@10/MRR/nDCG@10 100%/98.6%/99.0%, zero unauthorized results and 30/30 identical top-1 (document, page) hits; search text and reranker input strip paired inline Markdown emphasis and presentation tags for pdf-inspector units while `read` keeps the extractor Markdown. A pdf-inspector failure fails that file, with no per-document PyMuPDF fallback. Kordoc 4.13.1 PP-OCRv5 Korean remains the offline candidate enrichment path with audited npm overrides. Private table accuracy, OCR CER/WER, semantic/reranked parity, memory peaks, encrypted PDFs, and full-corpus quality still require deployment-specific shadow evidence |
 | PPTX parser | Ready for retrieval pilot | Grouped-shape geometry is now converted to slide-absolute coordinates (a group moved after grouping previously reported raw local coordinates while claiming `coordinate_space: slide_emu`, corrupting position and reading order); ancestor rotation is deliberately not folded into the bbox. `python-pptx` plus bounded OOXML scan and default Korean picture OCR in new reference installs; text, merged tables, sparse chart caches, image metadata/hash, nested groups, notes, legacy comments, SmartArt text, hidden slides, geometry, source z-order, and derived reading order are structured. A read-only SolarEdge `5_PROJECT` run parsed 55/55 PPTX files into 77,922 JSON-valid native units with zero source-stat changes. OCR QA added 28 located units from seven images in `GEN2 적용 예시.pptx` and 124 from thirteen images in `FAT문제점 및 차트들.pptx`, with unchanged sources and explicit low-confidence warnings. No legacy `.ppt`, media transcription, modern threaded comments, or OLE expansion. Quality is content-derived (part-failure ratio × replacement penalty), and `kip doctor` verifies Kordoc resolvability when OCR is enabled |
 | HWP broker | Ready for retrieval pilot | Native HWP/HWPX signatures and 86/86 real-file extraction are validated; guarded shadow/atomic activation preserves prior extractions. Parser 1.1 chunks with a 400-char overlap so boundary-spanning facts stay retrievable (86/86 re-extracted and activated). Kordoc-compatible command output preserves structured table/image/span/footnote/list/link metadata and warning page context. Evidence units now carry a verified `section` index (ADR-049: native per-section reconstruction checked byte-for-byte against the library's own `extract_text()`, falling back to `section: null` with a warning rather than guessing; the label is numeric even though the dependency orders section files lexically). Page locators remain impossible on this format and paragraph/table locators remain incomplete; quality now uses the shared hangul/printable content formula instead of a flat constant |
 | Slack connector | Reference adapter | Threads are ingested as one semantic event keyed on the root message (replies become revisions); validate scopes, rate limits, edits/deletes, and retention |
@@ -334,7 +396,7 @@ substitutes for that full-corpus benchmark.
 | Adaptive ontology and interaction memory | Ready for pilot | Empty starter profile, one-question setup selection (including an explicit, generation-provider-gated `relation_mining_mode` decision), TTL owner-scoped clarifications, confirmed preferences, structured non-trace feedback, per-principal discovery candidates, PostgreSQL RLS, and CLI/REST/MCP parity. Generated host/container configs carry the selected bounded relation-mining table. Low-risk `review: not_required` mined relations gain a measured auto-approve lane (ADR-047, opt-in/default-off after ADR-048: precision >= 0.95 over >= 20 human decisions, confidence >= 0.8, fail-closed, tamper-resistant via a dedicated `auto_approved` column and revocation-aware, reported and revocable); conditional/required predicates stay fully human, and ontology mutation requires the admin role on every surface. Admin approval of an entity-type or predicate discovery candidate materializes an additive ontology release automatically (ADR-044): shadow-validated, comment-preserving, idempotent targeted YAML edits with a minor version bump and review-policy sync; auto-released predicates default to `review: required`/`risk: high`. Long-running API/worker/MCP processes report `catalog_refresh: "restart_required"` and pick up the release on restart; each CLI invocation sees it immediately. The shipped configurations enable `interaction.enabled` and `ontology.adaptive_discovery` by default |
 | Evidence-bounded answer | Ready for bounded pilot; broad quality gate pending | CLI/API/MCP/SDK share search, exact reopen, freshness, XLSX, egress, generation validation, citations, extractive fallback, and approved-graph context. Identifier, numeric, focused-fact, and short multi-document adequacy gates return typed `answer_not_present` or `clarification_required`; broader reviewed answer/citation/refusal coverage remains required |
 | Local embedding sidecar | Runtime validated; current shadow rebuild required | Infinity 0.0.77, Qwen3 0.6B 1024d, pinned revisions, and MPS smoke passed; resumable projection uses current active ACL-fresh units and versioned bounded input. The 2026-08-13 `c4000` private space completed 30,565/30,565 with vector Recall@10/MRR 0.947/0.822, P95 133.75 ms, and zero ACL leaks. Current code/reference config uses a distinct 12,000-character `c12000` identity, which has not been rebuilt or evaluated, and stale-warning evidence is absent. The historical report cannot activate the current configuration (`evaluation/reports/semantic-qwen3-all-modes-final-20260813/decision.md`) |
-| Local reranker | BM25 active; RapidFuzz fallback; model adapters shadow | RapidFuzz 3.14.5 reranks bounded ACL-filtered lexical candidates locally and passed the private OneDrive retrieval gate; BGE/Jina model adapters remain opt-in shadow candidates. A candidate-local Okapi BM25 backend (`models.reranker.backend = "bm25"`, word+bigram Korean tokens, no model or extension dependency) beat RapidFuzz on the 19-case grounded draft set (Recall@10 0.842 vs 0.684, MRR 0.639 vs 0.566, lower P95; see `evaluation/reports/reranker-ab-20260811/decision.md`) and was promoted on 2026-08-11 after the dataset was adversarially re-verified and versioned (`reviewed 1.0.0`, ADR-034); RapidFuzz remains the fallback backend |
+| Local reranker | BM25 active; RapidFuzz fallback; model adapters shadow | RapidFuzz (pinned 3.14.6; the gate ran on 3.14.5) reranks bounded ACL-filtered lexical candidates locally and passed the private OneDrive retrieval gate; BGE/Jina model adapters remain opt-in shadow candidates. A candidate-local Okapi BM25 backend (`models.reranker.backend = "bm25"`, word+bigram Korean tokens, no model or extension dependency) beat RapidFuzz on the 19-case grounded draft set (Recall@10 0.842 vs 0.684, MRR 0.639 vs 0.566, lower P95; see `evaluation/reports/reranker-ab-20260811/decision.md`) and was promoted on 2026-08-11 after the dataset was adversarially re-verified and versioned (`reviewed 1.0.0`, ADR-034); RapidFuzz remains the fallback backend |
 | Search result diversity | Active | Per-document cap (`search.max_hits_per_document`, default 3) with tail backfill across every search path, so one file cannot occupy all result slots |
 | pgvector and HNSW | Production-profile ready; current semantic shadow absent | PostgreSQL 18/pgvector 0.8.2, RLS/source-hash filtering, and migration 0018 HNSW with bounded strict iterative scan are implemented; EXPLAIN confirmed the index path. The complete 30,565/30,565 private Qwen3 space used the former `c4000` identity. Current `c12000` configuration requires a new rebuild and evaluation before activation |
 | Hybrid retrieval | Implementation complete; current shadow unverified | ACL-prefiltered exact vector search, RRF, bounded reranking that preserves the un-reranked fused tail up to the request limit, and explicit activation are implemented. On the historical reviewed 19-case `c4000` run, vector-only Recall@10/MRR was 0.947/0.822, ahead of hybrid at 0.895/0.702 and reranked at 0.842/0.656; the current `c12000` identity has no matching report |
@@ -365,7 +427,8 @@ substitutes for that full-corpus benchmark.
   database login URLs, regular secret files, immutable image digests, storage,
   TLS/IAP, and deployment-level rollback, dashboards, and paging.
 - The default sync mode is incremental. HWP/HWPX has an explicit non-mutating
-  `parser reextract` shadow command and a separate guarded `--activate` action.
+  `parser reextract` shadow command and a separate guarded `--activate` action;
+  other registered formats such as PDF are selected with `--extension`.
   Generic all-format forced re-extraction and destructive source
   reconciliation are intentionally not exposed as one-step starter commands.
 - Filesystem deletion reconciliation is complete-scan-only and fail-safe: a
@@ -420,7 +483,7 @@ substitutes for that full-corpus benchmark.
   `file:` resolves only for the model credential, and the database URL and
   bootstrap identity keys accept `env:` alone.
 - Optional HWP parser commands, Slack scopes, Apple Mail Automation permissions, and IMAP provider behavior must be validated against the target environment.
-- PPTX structural extraction and default Kordoc 4.8.0/PP-OCRv5 Korean image
+- PPTX structural extraction and default Kordoc 4.13.1/PP-OCRv5 Korean image
   OCR are local and non-executing in new reference installs. The runtime and
   model cache are installed and verified before offline indexing. Audio/video transcription,
   embedded OLE/package expansion, modern threaded comments, formula OCR, and

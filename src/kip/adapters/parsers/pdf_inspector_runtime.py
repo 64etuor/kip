@@ -8,7 +8,7 @@ import pdf_inspector
 
 from kip.errors import DependencyUnavailableError
 
-PDF_INSPECTOR_VERSION = "1.14.2"
+PDF_INSPECTOR_VERSION = "1.19.0"
 
 
 @dataclass(frozen=True, slots=True)

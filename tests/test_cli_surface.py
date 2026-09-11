@@ -100,6 +100,23 @@ def test_parser_reextract_defaults_to_non_mutating_shadow_mode() -> None:
     assert payload["schema_version"] == "kip.envelope.v1"
     assert payload["data"]["activate"] is False
     assert payload["data"]["activated"] == 0
+    assert payload["data"]["extensions"] == [".hwp", ".hwpx"]
+
+    pdf = runner.invoke(
+        app,
+        ["parser", "reextract", "--source", "sample", "--extension", ".PDF"],
+        env=_env(),
+    )
+    assert pdf.exit_code == 0, pdf.stdout
+    assert json.loads(pdf.stdout)["data"]["extensions"] == [".pdf"]
+
+    unknown = runner.invoke(
+        app,
+        ["parser", "reextract", "--source", "sample", "--extension", ".xyz"],
+        env=_env(),
+    )
+    assert unknown.exit_code != 0
+    assert "no parser is registered for .xyz" in unknown.output
 
 
 def test_answer_command_returns_versioned_evidence_response() -> None:

@@ -97,7 +97,8 @@ rollback을 다룬다.
 9. 같은 source로 `sync -> search -> context -> read`를 완료한다.
    엑셀 파일이 포함된 경우 해당 원본의 `xlsx-read`까지 확인한다.
 10. 기존 HWP/HWPX index가 있으면 `parser reextract --source SOURCE`로 shadow
-    결과를 검토하고, 별도 승인 후에만 `--activate`를 실행한다.
+    결과를 검토하고, 별도 승인 후에만 `--activate`를 실행한다. 기존 PDF index는
+    같은 명령에 `--extension .pdf`를 붙인다.
 11. `docs/AI_OPERATOR_RUNBOOK.md`의 real-corpus cycle을 수행하고 결과를 새 audit 문서로 보존한다.
 12. `./scripts/verify.sh`가 통과한 뒤에만 파일럿 사용자에게 연다.
 
@@ -202,22 +203,27 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 - 활성화가 문서별 PostgreSQL transaction이고 이전 extraction과 unit을
   보존하는지, 동일 artifact에 active extraction이 하나뿐인지 검증한다.
 - 한글 PDF OCR 후보는 rendered page와 사람이 검토한 transcript로 CER/WER, 표 구조, locator fidelity를 별도 측정한다.
-- 새 PDF 기본값은 `backend = "pdf_inspector"`다. 기존 corpus는 공개 6문서
-  결과만으로 즉시 바꾸지 말고 shadow re-extraction에서 page/table/OCR 수,
-  exact locator, 실제 내부 질의, source hash를 비교한 뒤 활성화한다.
+- 새 PDF 기본값은 `backend = "pdf_inspector"`(`pdf-inspector` 1.19.0)다. 기존
+  corpus는 공개 6문서 결과만으로 즉시 바꾸지 말고
+  `./scripts/kip parser reextract --source SOURCE --extension .pdf` shadow
+  re-extraction에서 page/table/OCR 수, exact locator, 실제 내부 질의, source
+  hash를 비교한 뒤 같은 명령에 `--activate`를 붙여 활성화한다. `kip update`로
+  pin이 올라가도 기존 extraction은 re-extraction 전까지 이전 결과를 유지한다.
   `backend = "pymupdf"`는 명시적 rollback 경로다.
 - PPTX는 text-only 성공으로 판정하지 않는다. merged table, cached chart
   data, image alt/hash, nested group, notes, hidden slide, comment/SmartArt,
   정확한 slide/shape locator와 partial warning을 실제 조직 표본에서 확인한다.
-- 새 reference install은 `./scripts/bootstrap.sh`에서 `kordoc@4.8.0`과
+- 새 reference install은 `./scripts/bootstrap.sh`에서 `kordoc@4.13.1`과
   PP-OCRv5 Korean cache를 설치·SHA 검증한다. `./scripts/doctor.sh`와
   `./scripts/kordoc models --status`로 준비 상태를 확인하며, production
   indexing은 offline launcher를 사용하고 `npx`를 parser argv로 사용하지 않는다.
-- 기존 설치를 4.8.0으로 올릴 때는 `./scripts/install-kordoc.sh`를 다시
-  실행하고 로컬 `config/kip.toml`의 `expected_version`도 `4.8.0`으로 바꾼 뒤
-  doctor와 read-only shadow sample을 통과시킨다.
+- 기존 설치는 `kip update`의 bootstrap이 4.13.1 runtime을 설치한다. 이전 KIP
+  release가 기록한 `expected_version = "4.8.0"`(또는 `"4.7.3"`)은 현재 pin으로
+  해석되므로 로컬 `config/kip.toml`을 고칠 필요가 없고, 그 밖의 다른 값은
+  거부된다. PP-OCRv5 Korean model cache는 offline으로 재사용된다. doctor와
+  read-only shadow sample을 통과시킨다.
 - Kordoc binary와 OCR model cache는 source ZIP에 넣지 않는다. Node.js 20.9+가
-  필요하며, 인터넷 연결 bootstrap이 격리된 `var/kordoc-4.8.0-r2`에
+  필요하며, 인터넷 연결 bootstrap이 격리된 `var/kordoc-4.13.1-r2`에
   `requirements/kordoc`의 manifest/lock을 그대로 `npm ci --omit=dev
   --ignore-scripts`로 설치한다(`adm-zip` 0.6.0, `sharp` 0.35.4). 설치·이미지
   빌드·CI·`verify.sh`가 `./scripts/audit-kordoc.sh`로 lock drift와 high 이상
@@ -454,7 +460,8 @@ kip update
 
 1. `--dry-run`으로 교체·삭제·보존되는 파일 수와 설치된 버전 이후의 CHANGELOG
    항목을 확인한다. 그 범위에 `reextract`가 언급되면 함께 표시되므로 migrate
-   뒤의 `./scripts/kip parser reextract --source SOURCE`를 계획한다. `--dry-run`은
+   뒤의 `./scripts/kip parser reextract --source SOURCE`를 계획한다(PDF parser
+   변경이면 `--extension .pdf`를 붙인다). `--dry-run`은
    `--latest`/`--version`에서도 동작하며 아카이브를 내려받아 digest를 검증한 뒤
    계획만 출력한다.
 2. `./scripts/backup.sh`로 데이터베이스와 배포 소유 경로를 백업한다.

@@ -51,7 +51,7 @@ LGPL's own notice and relinking obligations.
 | PyYAML | 6.0.3 | MIT |
 | tomli-w | 1.2.0 | MIT |
 | httpx | 0.28.1 | BSD-3-Clause |
-| rapidfuzz | 3.14.5 | MIT |
+| rapidfuzz | 3.14.6 | MIT |
 
 ### Optional extras
 
@@ -63,14 +63,14 @@ LGPL's own notice and relinking obligations.
 | uvicorn | 0.52.3 | BSD-3-Clause | `api` |
 | PyJWT | 2.13.0 | MIT | `identity` |
 | openpyxl | 3.1.5 | MIT | `extractors` |
-| pdf-inspector | 1.14.2 | MIT | `extractors` |
+| pdf-inspector | 1.19.0 | MIT | `extractors` |
 | PyMuPDF | 1.28.2 | **AGPL-3.0 or Artifex commercial** | `extractors` |
 | python-pptx | 1.0.2 | MIT | `extractors` |
 | hwp-hwpx-parser | 1.0.0 | Apache-2.0 | `extractors` |
 | torch | 2.13.0 | Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND MIT | `semantic` |
 | transformers | 5.15.0 | Apache-2.0 | `semantic` |
 | einops | 0.8.2 | MIT | `semantic` |
-| mcp | 2.0.0 | MIT | `mcp` |
+| mcp | 2.2.0 | MIT | `mcp` |
 | opentelemetry-* | 1.30+ | Apache-2.0 | `telemetry` |
 
 Development-only dependencies (`dev` extra: pytest, ruff, mypy, pip-audit and
@@ -80,7 +80,7 @@ their type stubs) are not distributed in the runtime image.
 
 | Component | Version | License | How it is used |
 | --- | --- | --- | --- |
-| Kordoc | 4.8.0 | MIT | Pinned offline OCR/document runtime installed under `var/` by `./scripts/install-kordoc.sh`; never vendored into this repository (ADR-053) |
+| Kordoc | 4.13.1 | MIT | Pinned offline OCR/document runtime installed under `var/` by `./scripts/install-kordoc.sh`; never vendored into this repository (ADR-053, ADR-064) |
 | PostgreSQL | 18 | PostgreSQL License | Database engine, via the container image |
 | pgvector | 0.8.2 | PostgreSQL License | Vector index extension, via `pgvector/pgvector:0.8.2-pg18-trixie` |
 

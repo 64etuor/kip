@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from kip.adapters.ocr.kordoc import KORDOC_VERSION
 from kip.domain.json_types import JsonObject, JsonValue
 from kip.setup.models import SetupPlan
 
@@ -159,7 +160,7 @@ def build_config_payload(plan: SetupPlan, *, container: bool) -> JsonObject:
                     "enabled": True,
                     "argv": ["kordoc", "--format", "json", "--ocr", "--silent"],
                     "version_argv": ["kordoc", "--version"],
-                    "expected_version": "4.8.0",
+                    "expected_version": KORDOC_VERSION,
                 },
                 "pptx": {
                     "max_images": 128,

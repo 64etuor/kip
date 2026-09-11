@@ -378,11 +378,14 @@ PostgreSQL/lexical state를 교체합니다. 자세한 내용은 `docs/CONNECTOR
 
 ### PDF
 
-새 starter profile은 로컬 `pdf-inspector` 1.14.2로 구조화된 page Markdown,
+새 starter profile은 로컬 `pdf-inspector` 1.19.0으로 구조화된 page Markdown,
 layout/table signal, page별 OCR routing을 만듭니다. 유효한 Markdown table은
 `pdf_table` evidence가 되고, 표가 감지됐지만 구조화 Markdown이 없으면 그
 page에만 PyMuPDF `lines_strict` fallback을 적용합니다. 기존 `pymupdf` backend는
-rollback 경로로 유지합니다.
+rollback 경로로 유지합니다. pdf-inspector 실패 시 문서 단위 PyMuPDF 자동 fallback은
+없으며 해당 파일은 failed로 기록됩니다. 검색 text와 reranker 입력에서는 Markdown
+bold와 inline 표시 tag를 제거하지만 `read`가 반환하는 본문은 extractor Markdown을
+그대로 유지합니다.
 
 ```toml
 [parsers.pdf]
@@ -391,7 +394,13 @@ tables_enabled = true     # pymupdf rollback backend에서 사용
 ```
 
 기존 PDF index는 operator가 shadow re-extraction을 실행하고 candidate를 명시적으로
-활성화하기 전까지 바뀌지 않습니다. 원본 파일은 항상 읽기 전용입니다.
+활성화하기 전까지 바뀌지 않습니다. 원본 파일은 항상 읽기 전용입니다. `parser
+reextract`의 기본 대상은 HWP/HWPX이므로 PDF는 `--extension .pdf`를 지정합니다.
+
+```bash
+./scripts/kip parser reextract --source SOURCE_NAME --extension .pdf
+./scripts/kip parser reextract --source SOURCE_NAME --extension .pdf --activate
+```
 
 ### PPTX
 
@@ -410,11 +419,13 @@ KORDOC_OFFLINE=1 ./scripts/kip sync run --source company-nas
 ```
 
 Bootstrap과 production image는 색인 전에 모든 PP-OCRv5 Korean 파일을 검증합니다.
-KIP은 Kordoc 4.8.0만 허용하고 runtime `npm`/`npx` 명령을 거부하며 PPTX image
+KIP은 Kordoc 4.13.1만 허용하고 runtime `npm`/`npx` 명령을 거부하며 PPTX image
 batch를 제한합니다. OCR 실패 시에도 native evidence는 유지됩니다. 인식 결과는
 candidate evidence이므로 중요한 주장 전에 low-confidence warning을 검토하세요.
 기존 배포는 현재 `config/kip.toml`을 유지하므로 bootstrap을 다시 실행한 뒤
-의도적으로 opt-in해야 합니다.
+의도적으로 opt-in해야 합니다. 이전 KIP release가 기록한 `expected_version`
+(`4.8.0`, `4.7.3`)은 현재 pin으로 해석되므로 `kip update` 후 직접 고칠 필요가
+없습니다.
 
 ### Slack
 
@@ -490,11 +501,12 @@ stdio MCP adapter는 동일 application service를 사용하도록 구현돼 있
 
 지원하는 PostgreSQL profile은 semantic search가 꺼져 있어도 pgvector와 1024d HNSW
 index를 포함합니다. 설치는 활성화가 아닙니다. 변경되지 않은 HWP/HWPX revision은
-parser version이 바뀔 때 명시적 shadow/activate re-extraction을 사용합니다. 모든
-format을 강제로 다시 색인하는 일반 명령은 제공하지 않습니다.
+parser version이 바뀔 때 명시적 shadow/activate re-extraction을 사용하며, PDF 등
+다른 확장자는 `--extension`으로 지정합니다. 모든 format을 한 번에 강제로 다시
+색인하는 일반 명령은 제공하지 않습니다.
 
 Starter lexical path는 ACL-filtered candidate 최대 40개를 candidate-local BM25로
-rerank하며 RapidFuzz 3.14.5를 fallback으로 사용합니다. 검토된 private 19-case에서
+rerank하며 RapidFuzz 3.14.6을 fallback으로 사용합니다. 검토된 private 19-case에서
 최종 BM25는 Recall@10/MRR `0.789/0.646`, RapidFuzz는 `0.737/0.576`이었습니다.
 이는 retrieval 근거이지 answer 또는 ontology 품질 근거가 아닙니다. Lexical candidate
 set에 없는 문서는 reranking으로 복구할 수 없습니다.

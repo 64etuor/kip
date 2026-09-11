@@ -19,8 +19,8 @@ def test_extractor_profiles_pin_pdf_inspector() -> None:
     with (ROOT / "pyproject.toml").open("rb") as handle:
         project = tomllib.load(handle)["project"]
 
-    assert "pdf-inspector==1.14.2" in project["optional-dependencies"]["extractors"]
-    assert "pdf-inspector==1.14.2" in project["optional-dependencies"]["all"]
+    assert "pdf-inspector==1.19.0" in project["optional-dependencies"]["extractors"]
+    assert "pdf-inspector==1.19.0" in project["optional-dependencies"]["all"]
 
 
 @pytest.mark.parametrize(
@@ -41,7 +41,7 @@ def test_reference_configs_enable_pinned_kordoc_ocr_by_default(
 
     # Then Korean OCR is active and pinned for both image-bearing formats.
     assert kordoc["enabled"] is True
-    assert kordoc["expected_version"] == "4.8.0"
+    assert kordoc["expected_version"] == "4.13.1"
     assert settings.get("parsers.pdf.backend") == "pdf_inspector"
     assert all(parser.__class__.__name__ == "IsolatedParserAdapter" for parser in registry.parsers)
     assert pdf.__class__.__name__ == "PdfInspectorParser"
@@ -115,7 +115,7 @@ def test_kordoc_installer_verifies_version_and_prewarms_models(tmp_path: Path) -
         """
 const fs = require("node:fs")
 if (process.argv.includes("--version")) {
-  console.log("4.8.0")
+  console.log("4.13.1")
 } else if (process.argv.includes("check-ocr-models")) {
   fs.mkdirSync(process.env.KORDOC_MODEL_CACHE, {recursive: true})
   fs.writeFileSync(process.env.KORDOC_MODEL_CACHE + "/ready", "true")
@@ -174,9 +174,9 @@ def test_bootstrap_and_container_bake_the_same_pinned_kordoc_runtime() -> None:
     bootstrap_installer = '"$SCRIPT_DIR/install-kordoc.sh"'
     manifest = json.loads((ROOT / "requirements/kordoc/package.json").read_text())
 
-    # Then both default runtimes install 4.8.0 and prewarm Korean OCR models.
+    # Then both default runtimes install 4.13.1 and prewarm Korean OCR models.
     assert bootstrap_installer in bootstrap
-    assert manifest["dependencies"] == {"kordoc": "4.8.0"}
+    assert manifest["dependencies"] == {"kordoc": "4.13.1"}
     assert manifest["overrides"] == {"adm-zip": "0.6.0", "sharp": "0.35.4"}
     assert "COPY requirements/kordoc/package.json requirements/kordoc/package-lock.json" in dockerfile
     assert "npm ci --omit=dev --ignore-scripts --no-audit" in dockerfile

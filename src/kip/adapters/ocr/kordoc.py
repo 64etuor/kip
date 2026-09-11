@@ -16,12 +16,36 @@ from kip.ports.ocr import OcrBlock, OcrDocument
 
 _JSON_OBJECT: Final[TypeAdapter[JsonObject]] = TypeAdapter(JsonObject)
 
+# The reviewed Kordoc runtime. requirements/kordoc/package.json installs
+# exactly this version; tests keep the two in lockstep.
+KORDOC_VERSION: Final = "4.13.1"
+# Pins that earlier KIP releases wrote into deployment configs. The package
+# upgrade replaces the runtime itself (the launcher follows the manifest), so
+# a config that still names one of these means "the pinned runtime", not a
+# request for an older binary.
+SUPERSEDED_KORDOC_VERSIONS: Final = frozenset({"4.7.3", "4.8.0"})
+
+
+def resolve_kordoc_expected_version(configured: object) -> str:
+    """Map ``parsers.ocr.kordoc.expected_version`` to the version to enforce.
+
+    Missing, current and superseded KIP pins resolve to :data:`KORDOC_VERSION`
+    so ``kip update`` does not require editing a preserved deployment config.
+    Any other value is returned unchanged for the caller to reject.
+    """
+    if configured is None:
+        return KORDOC_VERSION
+    value = str(configured).strip()
+    if value in SUPERSEDED_KORDOC_VERSIONS:
+        return KORDOC_VERSION
+    return value
+
 
 @dataclass(frozen=True, slots=True)
 class KordocOcrConfig:
     argv: tuple[str, ...]
     version_argv: tuple[str, ...] = ()
-    expected_version: str = "4.8.0"
+    expected_version: str = KORDOC_VERSION
     timeout_seconds: int = 120
 
 
@@ -79,7 +103,7 @@ def probe_kordoc_version(config: KordocOcrConfig) -> KordocVersionProbe:
 
 class KordocOcrAdapter:
     name = "kordoc-ppocrv5-korean"
-    version = "4.8.0"
+    version = KORDOC_VERSION
 
     def __init__(self, config: KordocOcrConfig) -> None:
         self._config = config

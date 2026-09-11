@@ -180,7 +180,9 @@ def apply_upgrade(deployment: Path, archive: Path, *, dry_run: bool) -> int:
     if notes:
         print("\nChanges since the installed version:\n" + notes)
         if re.search(r"reextract", notes):
-            print("NOTE: this range mentions parser re-extraction; run `./scripts/kip parser reextract --source SOURCE` after migrating.")
+            print("NOTE: this range mentions parser re-extraction; after migrating run "
+                  "`./scripts/kip parser reextract --source SOURCE` (add `--extension .pdf` for PDF parser "
+                  "changes) as a shadow check, then repeat with `--activate`.")
     if dry_run:
         print("Dry run: nothing was changed.")
         return 0

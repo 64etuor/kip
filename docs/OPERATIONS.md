@@ -793,6 +793,12 @@ Prepare HWP/HWPX candidates without changing the active index:
 ./scripts/kip parser reextract --source company-nas
 ```
 
+To re-extract another format after its parser changes, name it with the
+repeatable `--extension` option (for example `--extension .pdf`; the leading
+dot is optional and matching is case-insensitive). An extension without a
+registered parser is rejected with a validation error, and the summary lists
+the scanned `extensions`.
+
 Review `eligible`, `parsed`, `rejected`, `failed`, `unit_count`,
 `parser_counts`, and every warning in the versioned JSON envelope. Compare a
 reviewed golden corpus and exact evidence before activation. Then run the
@@ -802,8 +808,9 @@ separate mutation command:
 ./scripts/kip parser reextract --source company-nas --activate
 ```
 
-The operation scans and hashes only configured HWP/HWPX files. Each candidate
-inherits the current canonical source ACL snapshot, scopes, and classification;
+The operation scans and hashes only configured files with the selected
+extensions (HWP/HWPX by default). Each candidate inherits the current canonical
+source ACL snapshot, scopes, and classification;
 parser re-extraction never applies a configuration policy change. Use normal
 source synchronization to change ACL policy. Activation then checks the
 current artifact revision, source hash, canonical access controls, and minimum
@@ -877,16 +884,54 @@ tables_enabled = true
 ```
 
 `pdf-inspector` is installed by the extractor profile and must report version
-1.14.2. Before changing an existing corpus, run `parser reextract` as a shadow
-candidate and compare page/table counts, OCR reasons, exact locators, source
-hashes, and the same golden dataset. Activate only after the measured candidate
-passes. Roll back by setting `backend = "pymupdf"`, rerunning shadow extraction,
-and activating that candidate; do not edit active rows or stamp projections.
+1.19.0. KIP calls only its `extract_pages_markdown`; the optional OCR that
+pdf-inspector ships since 1.15 is not used, and OCR candidates still go to
+Kordoc. A PDF that pdf-inspector cannot parse is recorded as failed; there is
+no per-document PyMuPDF fallback. Existing extractions keep the previous
+pdf-inspector output until re-extracted. Before changing an existing corpus,
+including after a `kip update` that raises the pin, prepare a shadow candidate:
 
-The public acceptance measured six successful documents, 70 page units, 37
-table units, 13 OCR units on one garbled page, 4.82 s isolated sync versus
-15.58 s baseline, and identical lexical Recall@10/MRR of 1.0000/0.9861. This is
-a starter/pilot gate, not private-corpus table or OCR certification.
+```bash
+./scripts/kip parser reextract --source SOURCE --extension .pdf
+```
+
+Check `parsed`, `rejected`, `failed`, `parser_counts`, and every warning, then
+compare page/table counts, OCR reasons, exact locators, source hashes, and the
+same golden dataset. Activate only after the measured candidate passes:
+
+```bash
+./scripts/kip parser reextract --source SOURCE --extension .pdf --activate
+```
+
+Roll back by setting `backend = "pymupdf"`, rerunning the same shadow
+extraction, and activating that candidate; do not edit active rows or stamp
+projections.
+
+The original public acceptance of pdf-inspector 1.14.2 against PyMuPDF
+measured six successful documents, 70 page units, 37 table units, 13 OCR units
+on one garbled page, 4.82 s isolated sync versus 15.58 s baseline, and
+identical lexical Recall@10/MRR of 1.0000/0.9861.
+
+The 1.19.0 upgrade was measured in a separate migrated PostgreSQL database over
+the same six licensed public PDFs, with the 1.14.2 baseline synced and the
+candidate activated through `parser reextract --extension .pdf`: 6/6 documents
+and 70/70 pages with 0 rejected or failed; table units rose from 37 to 45,
+PyMuPDF-fallback table units fell from 3 to 1 and fallback pages from 7 to 4;
+OCR candidate pages fell from 1 to 0 and OCR units from 13 to 0 because the
+garbled statistics page is now recovered natively as text and Markdown tables.
+Lexical Recall@10 100%, MRR 98.6%, nDCG@10 99.0%, and zero unauthorized results
+matched the baseline, the top-1 (document, page) hit was identical for 30/30
+public relevance cases, p50 latency stayed about 34 ms, and raw parse time was
+unchanged at about 0.34 s for all six. Because 1.19.0 emits much more inline
+bold and `<sup>` markup, search text (`body_normalized`/`lexical_text` of
+pdf-inspector page and table units, and the reranker input for those units)
+strips paired Markdown emphasis (`*`, `**`, `***`) and inline presentation tags
+(`u`, `sup`, `sub`, `b`, `i`, `em`, `strong`, `s`, `del`, `ins`, `mark`,
+`small`); unpaired asterisks such as masked names stay, and other formats are
+scored verbatim; without it one case dropped from
+rank 1 to 2 (MRR 97.2%). The unit `body` returned by `read` keeps the extractor
+Markdown exactly. These are starter/pilot gates, not private-corpus table or
+OCR certification.
 
 ## PPTX parser validation
 
@@ -911,7 +956,7 @@ reviewed runtime and pre-warms its Korean models:
 ./scripts/kordoc models --status
 ```
 
-The version must be exactly `4.8.0`; the `ppocr` group must report `allReady`
+The version must be exactly `4.13.1`; the `ppocr` group must report `allReady`
 and each detector, recognizer, and dictionary file must report `verified`.
 The reference configuration resolves the checked-in offline launcher:
 
@@ -923,7 +968,7 @@ timeout_seconds = 120
 enabled = true
 argv = ["kordoc", "--format", "json", "--ocr", "--silent"]
 version_argv = ["kordoc", "--version"]
-expected_version = "4.8.0"
+expected_version = "4.13.1"
 ```
 
 The launcher and production image set `KORDOC_OFFLINE=1` after the verified
@@ -934,10 +979,10 @@ previous active extraction.
 
 Kordoc requires Node.js 20.9+; `doctor.sh` and the installer both refuse an
 older runtime. The installer downloads into the ignored versioned runtime
-`var/kordoc-4.8.0-r2`, and the production image builds the same isolated npm
+`var/kordoc-4.13.1-r2`, and the production image builds the same isolated npm
 root. Both copy `requirements/kordoc/package.json` and its lock and run
 `npm ci --omit=dev --ignore-scripts --no-audit`, so the host and the image
-install the identical graph: kordoc 4.8.0 with transitive `adm-zip` overridden
+install the identical graph: kordoc 4.13.1 with transitive `adm-zip` overridden
 to 0.6.0 and `sharp` to 0.35.4. Kordoc binaries and model caches are never part
 of the source package ZIP.
 
@@ -954,10 +999,15 @@ release; `--ignore-scripts` means the ONNX install-time extraction hook that
 used it is not executed by the supported CPU installation path, but the advisory
 is not removed. See [dependency safety](SECURITY.md#dependency-safety).
 
-Existing deployments are not rewritten. To upgrade one, rerun
-`./scripts/install-kordoc.sh`, set `[parsers.ocr.kordoc].enabled = true` and
-`expected_version = "4.8.0"` in its local `config/kip.toml`, and run
-`./scripts/doctor.sh` before a shadow sample.
+Existing deployments are not rewritten. `kip update` reruns bootstrap, which
+installs the new runtime, and an `expected_version` of `4.8.0` or `4.7.3`
+written by an earlier KIP release resolves to the current pin, so the preserved
+`config/kip.toml` needs no version edit; any other non-current value is still
+rejected. The PP-OCRv5 Korean cache under `var/kordoc-models/ppocr` is reused
+offline and `check-ocr-models` skips files that already exist. To enable OCR
+on a deployment that has it off, set `[parsers.ocr.kordoc].enabled = true` in
+its local `config/kip.toml` and run `./scripts/doctor.sh` before a shadow
+sample.
 
 PPTX defaults accept at most 128 images, 20 MiB per image, 100 MiB total, and
 images at least 96x48 pixels. Adjust only after a read-only shadow sample. Check

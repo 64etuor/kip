@@ -8,8 +8,8 @@ from kip.application.retrieval import apply_rerank, reciprocal_rank_fusion
 from kip.application.semantic import SemanticProjectionUseCases
 from kip.domain.file_references import FilenameSearchRequest
 from kip.domain.knowledge import normalize_entity_name
-from kip.domain.models import RequestContext, SearchHit, SearchRequest
-from kip.domain.text import normalize_text
+from kip.domain.models import ContentUnit, RequestContext, SearchHit, SearchRequest
+from kip.domain.text import normalize_text, strip_inline_markup
 from kip.errors import DependencyUnavailableError, ValidationError
 from kip.ports.embedding import EmbeddingPort
 from kip.ports.knowledge import KnowledgeStore
@@ -375,7 +375,7 @@ class SearchEngine:
                 part
                 for part in (
                     hit.title,
-                    rerank_units[hit.unit_id].body,
+                    _rerank_body(rerank_units[hit.unit_id]),
                 )
                 if part
             )
@@ -403,3 +403,16 @@ class SearchEngine:
             )
             for rank, hit in enumerate(hits, start=1)
         ]
+
+
+def _rerank_body(unit: ContentUnit) -> str:
+    """Text scored by the reranker for one unit.
+
+    pdf-inspector Markdown marks bold/italic/superscript inline
+    (``**시범사업**을``), which would split words and hide the stem/suffix
+    terms BM25 relies on, so its units are scored as written. Other formats
+    are scored verbatim: their ``*`` or ``<b>`` characters are content.
+    """
+    if unit.metadata.get("source") == "pdf_inspector":
+        return strip_inline_markup(unit.body)
+    return unit.body

@@ -14,7 +14,7 @@ from kip.domain.models import (
     RequestContext,
     SyncSummary,
 )
-from kip.errors import ConfigurationError, KipError, ValidationError
+from kip.errors import ConfigurationError, KipError, ParserError, ValidationError
 from kip.ids import stable_id
 from kip.ports.evidence import EvidenceStore, SourceFileInspectorPort
 from kip.ports.ingestion import (
@@ -56,6 +56,7 @@ class IngestionUseCases:
             source_files,
         )
         self._events = EventIngestionWorkflow(store, analyzer, content_store)
+        self._parsers = parsers
         self._minimum_quality_score = minimum_quality_score
         self._deletion_grace_scans = deletion_grace_scans
 
@@ -223,11 +224,24 @@ class IngestionUseCases:
         source_name: str,
         *,
         activate: bool = False,
-        extensions: frozenset[str] = _DEFAULT_REEXTRACTION_EXTENSIONS,
+        extensions: frozenset[str] | None = None,
     ) -> ReextractionSummary:
+        # The default stays the HWP/HWPX broker set; explicitly requested
+        # suffixes (for example `.pdf` after a PDF parser upgrade) must each
+        # have a registered parser.
+        explicit = extensions is not None
+        extensions = (
+            _DEFAULT_REEXTRACTION_EXTENSIONS
+            if extensions is None
+            else self._reextraction_extensions(extensions)
+        )
         source = self._sources.filesystem(source_name)
         scope = source.acl_scope or f"workspace:{context.workspace}"
-        summary = ReextractionSummary(source=source_name, activate=activate)
+        summary = ReextractionSummary(
+            source=source_name,
+            activate=activate,
+            extensions=sorted(extensions),
+        )
         for record in source.scan(include_extensions=set(extensions)):
             summary.scanned += 1
             if record.path.suffix.lower() not in extensions:
@@ -277,7 +291,40 @@ class IngestionUseCases:
                 )
                 continue
             summary.activated += 1
+        if explicit and summary.scanned == 0:
+            summary.warnings.append(
+                f"no {', '.join(sorted(extensions))} files were found in source {source_name}; "
+                "check that its include_extensions lists them"
+            )
         return summary
+
+    def _reextraction_extensions(self, extensions: Iterable[str]) -> frozenset[str]:
+        """Normalize requested suffixes and require a registered parser for each.
+
+        A parser upgrade (for example a new pdf-inspector pin) is validated by
+        re-extracting only the affected formats, so an unknown or unparsable
+        suffix is an operator error rather than a silent zero-document run.
+        """
+        normalized: set[str] = set()
+        for raw in extensions:
+            value = raw.strip().lower()
+            if not value:
+                continue
+            value = value if value.startswith(".") else f".{value}"
+            if value == "." or "/" in value or not value[1:].isalnum():
+                raise ValidationError(f"invalid file extension for re-extraction: {raw!r}")
+            # HWP/HWPX parsers match on the file signature rather than the
+            # suffix, so a probe path cannot select them; they are the
+            # command's default formats and always have the broker registered.
+            if value not in _DEFAULT_REEXTRACTION_EXTENSIONS:
+                try:
+                    self._parsers.find(Path(f"probe{value}"))
+                except ParserError as error:
+                    raise ValidationError(f"no parser is registered for {value}") from error
+            normalized.add(value)
+        if not normalized:
+            raise ValidationError("re-extraction needs at least one file extension")
+        return frozenset(normalized)
 
     def sync_remote(
         self,

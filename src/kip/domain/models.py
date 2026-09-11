@@ -643,6 +643,7 @@ class SyncSummary(StrictModel):
 class ReextractionSummary(StrictModel):
     source: str
     activate: bool = False
+    extensions: list[str] = Field(default_factory=list)
     scanned: int = 0
     eligible: int = 0
     parsed: int = 0

@@ -923,6 +923,7 @@ KIP v3 baseline은 다음을 모두 만족해야 인수된다.
 | ADR-052 | Verified online source ZIP package | Accepted |
 | ADR-053 | Upgrade the pinned offline Kordoc runtime to 4.8.0 | Accepted |
 | ADR-054 | Use pdf-inspector with selective PyMuPDF table fallback | Accepted for starter and pilot |
+| ADR-064 | Upgrade pdf-inspector to 1.19.0 and Kordoc to 4.13.1 with PDF re-extraction | Accepted |
 
 ---
 

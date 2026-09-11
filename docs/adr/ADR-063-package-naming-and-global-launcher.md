@@ -35,6 +35,20 @@ updating.
   launcher directory on `PATH`. The block is replaced idempotently, nothing
   else is edited, and `--no-shell-profile` opts out. Bootstrap itself still
   does not touch profiles.
+- Amendment (3.12.1): `kip update` must not repoint `kip`. Until 3.12.0 every
+  upgrade through the installer rewrote `~/.local/bin/kip` and the profile
+  block with the defaults, so updating a second deployment (or one installed
+  with `--bin-dir`/`--no-shell-profile`) took over the global command or
+  added a profile block. `upgrade.sh --latest/--version` now passes
+  `--keep-launcher`: the launcher is refreshed only when it already opens that
+  deployment and the profile is left alone. Rerunning the installer by hand
+  still sets both and reports when it repoints a launcher from another
+  deployment. The next update of a 3.10.0-3.12.0 deployment still runs that
+  deployment's old installer, which rewrites the default launcher and
+  profile once; `kip update --archive` or the new installer with
+  `--keep-launcher` avoids it. Because updates no longer rewrite the profile
+  block, a future change to the block format reaches existing deployments
+  only through a hand-run installer.
 - `kip update` and `kip version` run without a database. `update` delegates
   to `scripts/upgrade.sh` so the CLI and the wrapper cannot drift.
 

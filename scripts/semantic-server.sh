@@ -44,7 +44,13 @@ fi
 
 mkdir -p "$MODEL_CACHE" "$RUN_DIR" "$LOG_DIR"
 export HF_HOME="$MODEL_CACHE"
-export SENTENCE_TRANSFORMERS_HOME="$MODEL_CACHE/sentence-transformers"
+# One cache for prefetch, the offline check and the runtime: the hub cache
+# under HF_HOME. A separate SENTENCE_TRANSFORMERS_HOME (or an inherited
+# transformers/hub cache variable) made the runtime look for the models
+# outside the prefetched snapshots, so a fresh install could not start offline.
+unset SENTENCE_TRANSFORMERS_HOME TRANSFORMERS_CACHE PYTORCH_TRANSFORMERS_CACHE \
+  PYTORCH_PRETRAINED_BERT_CACHE HUGGINGFACE_HUB_CACHE
+export HF_HUB_CACHE="$MODEL_CACHE/hub"
 export DO_NOT_TRACK=1
 export HF_HUB_DISABLE_TELEMETRY=1
 

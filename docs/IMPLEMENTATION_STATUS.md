@@ -4,6 +4,29 @@ This is the current readiness inventory, not the target architecture. The
 target-to-current matrix and ordered gap register live in
 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`.
 
+## 2026-09-12 offline semantic runtime and `kip update` launchers (3.12.1)
+
+The live 3.11.0 -> 3.12.0 upgrade of a deployment installed with
+`--no-shell-profile --bin-dir` showed that every upgrade through the installer
+rewrote `~/.local/bin/kip` and the shell-profile block with the defaults, which
+repoints `kip` when a second deployment is updated. `upgrade.sh --latest` and
+`--version` now pass `--keep-launcher`: the launcher is refreshed only when it
+already opens that deployment and the profile is untouched; a hand-run
+installer still sets both and reports a repointed launcher (ADR-063
+amendment). `tests/test_install_and_upgrade.py` runs the deployment's own
+`upgrade.sh` against another deployment's launcher and profile. The next
+update of a 3.10.0-3.12.0 deployment still runs its old installer, which
+rewrites the default launcher and profile once; `kip update --archive` or the
+new installer with `--keep-launcher` avoids that.
+
+The same live upgrade showed that a freshly prefetched runtime could not start
+offline: `semantic-server.sh` sent Sentence-Transformers to a separate
+`var/model-cache/sentence-transformers` folder while prefetch and the offline
+check used the hub cache. The runtime now uses the hub cache only; the
+upgraded deployment then started offline from its own prefetched snapshot and
+returned 1024-dimension embeddings. `tests/test_semantic_scripts.py` checks the
+runtime environment.
+
 ## 2026-09-11 hybrid semantic search on by default (3.12.0)
 
 Semantic search is the shipped default (ADR-065). Example, container and

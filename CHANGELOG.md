@@ -1,5 +1,39 @@
 # Changelog
 
+## 3.12.1 - 2026-09-12
+
+- Fresh 3.12.0 installs could not start the semantic runtime offline, so
+  search stayed lexical (`semantic_degraded`). Bootstrap prefetched the pinned
+  embedding snapshot into the hub cache under `var/model-cache`, but
+  `semantic-server.sh` pointed Sentence-Transformers at a separate
+  `var/model-cache/sentence-transformers` folder; once the offline check
+  passed the runtime looked only there and exited. The runtime now reads the
+  same hub cache (the compose `models` service already did) and ignores
+  inherited transformers/hub cache variables. Found in the live 3.11.0 ->
+  3.12.0 upgrade; checkouts whose runtime had downloaded the model online were
+  unaffected and may delete that folder (about 1.2 GB).
+- `kip update` no longer repoints the global `kip` command (ADR-063
+  amendment). Through 3.12.0 every upgrade that went through the installer
+  rewrote `~/.local/bin/kip` and the shell-profile block with the defaults, so
+  updating a second deployment, or one installed with `--bin-dir` or
+  `--no-shell-profile`, took over `kip` or added a profile block. Found in the
+  3.11.0 -> 3.12.0 live upgrade test. `upgrade.sh --latest`/`--version` now
+  call the installer with the new `--keep-launcher`: the launcher is refreshed
+  only when it already opens that deployment and the profile is not touched.
+  Rerunning the installer by hand still sets both and now reports when it
+  repoints a launcher that opened another deployment; `--keep-launcher` on a
+  fresh installation is refused before the download, and the installer
+  records one canonical absolute path per deployment (a trailing slash or
+  `./`/`../` no longer makes its own launcher look foreign; a relative
+  `--bin-dir` becomes absolute, and paths with newlines are rejected up
+  front).
+  The next update of a 3.10.0-3.12.0 deployment still runs that deployment's
+  old installer and rewrites the default launcher and profile block once:
+  with several deployments, or one installed with `--bin-dir` or
+  `--no-shell-profile`, update with `kip update --archive kip-3.12.1.zip` or
+  the new installer with `--keep-launcher`, or check `~/.local/bin/kip` and
+  the profile afterwards.
+
 ## 3.12.0 - 2026-09-12
 
 - Semantic search is on by default (ADR-065). New configs and

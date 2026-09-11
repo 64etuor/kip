@@ -63,7 +63,18 @@ rollback을 다룬다.
    아니면 `kip.bak`으로 백업한 뒤 덮어쓴다. 경로는 모두 셸 인용을 거치므로
    공백이나 특수문자가 든 디렉터리도 안전하다. `--dry-run`은 런처와 프로필도
    건드리지 않는다. `--no-shell-profile`은 프로필을 바꾸지 않으며 이때는
-   `PATH`와 `KIP_HOME`을 직접 설정한다. 셸을 다시 시작하거나 프로필을 `source`한 뒤에는
+   `PATH`와 `KIP_HOME`을 직접 설정한다. `kip update`(`upgrade.sh --latest`/
+   `--version`)는 `--keep-launcher`로 설치기를 불러, 런처가 이미 이 배포를
+   가리킬 때만 런처를 새로 쓰고 프로필은 바꾸지 않는다(3.12.1). 다른 배포의
+   런처나 `--bin-dir`로 둔 런처, `--no-shell-profile`로 설치한 배포의 프로필은
+   업데이트가 건드리지 않는다. 설치 명령을 직접 다시 실행하면 런처와 프로필을 그
+   배포로 맞추고, 다른 배포를 가리키던 런처였다면 그 경로를 알린다. 3.10.0-3.12.0
+   배포의 다음 `kip update`(3.12.0 이하로 `--rollback`한 뒤의 업데이트 포함)는
+   아직 그 배포의 이전 설치기가 실행하므로 기본 런처와 프로필 블록을 다시 쓴다.
+   배포가 여러 개이거나 `--bin-dir`/`--no-shell-profile`로 설치했다면
+   `kip update --archive kip-X.Y.Z.zip`(설치기를 거치지 않는다)이나 새 설치기
+   `curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh | bash -s -- 배포경로 --keep-launcher`로
+   올리거나, 업데이트 후 `~/.local/bin/kip`과 프로필 블록을 확인한다. 셸을 다시 시작하거나 프로필을 `source`한 뒤에는
    어느 디렉터리에서나 `kip --help`, `kip doctor`, `kip setup inspect`,
    `kip version`, `kip update`를 실행할 수 있다. 저장소를 복제해 쓰는 개발
    트리에서는 지금까지처럼 `./scripts/kip`를 쓴다.

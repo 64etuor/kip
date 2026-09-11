@@ -24,15 +24,16 @@ bash, curl 또는 wget, sha256sum 또는 shasum, unzip 또는 python3만 있으�
 Python은 bootstrap이 준비한다. digest가 맞지 않으면 아무것도 풀지 않는다.
 `--check`/`--install-docker`/`--without-docker`는 bootstrap으로 전달되고
 `--no-bootstrap`은 압축만 푼다. 같은 명령을 기존 패키지 배포 디렉터리에 실행하면
-그 자리에서 업그레이드하며, 배포 안에서는 `./scripts/upgrade.sh --latest`가
-같은 일을 한다.
+그 자리에서 업그레이드한다. 배포 안의 `./scripts/upgrade.sh --latest`(`kip
+update`)도 같은 패키지를 적용하지만, 런처는 이미 그 배포를 가리킬 때만 새로
+쓰고 셸 프로필은 건드리지 않는다(3.12.1).
 
 설치기는 전역 `kip` 런처를 `~/.local/bin/kip`에 쓰고(`--bin-dir DIR` 또는
 `KIP_BIN_DIR`로 변경) 로그인 셸 프로필(zsh는 `~/.zshrc`, bash는 Linux
 `~/.bashrc`·macOS `~/.bash_profile`, 그 외 `~/.profile`)에
 `# >>> KIP >>>` … `# <<< KIP <<<` 블록 하나를 추가해 `KIP_HOME`을 내보내고
-런처 디렉터리를 `PATH`에 넣는다. 블록은 매번 교체되며 그 밖의 내용은 건드리지
-않고, `--no-shell-profile`로 끌 수 있다. 셸을 다시 시작하거나 프로필을
+런처 디렉터리를 `PATH`에 넣는다. 설치기를 실행할 때마다 블록을 통째로
+교체하며 그 밖의 내용은 건드리지 않고, `--no-shell-profile`로 끌 수 있다. 셸을 다시 시작하거나 프로필을
 `source`하면 어느 디렉터리에서나 아래 명령을 쓸 수 있다.
 
 ```bash

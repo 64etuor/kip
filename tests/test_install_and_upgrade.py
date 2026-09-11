@@ -648,3 +648,126 @@ def test_installer_follows_a_relative_profile_symlink_under_zdotdir(tmp_path: Pa
     assert (zdot / ".zshrc").is_symlink()
     assert real_rc.read_text().startswith("# managed\n# >>> KIP >>>")
     assert not (home / "dotfiles").exists() and not (home / ".zshrc").exists()
+
+
+def _launcher_text(target: Path) -> str:
+    return (
+        "#!/usr/bin/env bash\n"
+        f"# KIP launcher written by install.sh. Deployment: {target}\n"
+        f"KIP_DEPLOYMENT='{target}'\n"
+        'exec "${KIP_HOME:-$KIP_DEPLOYMENT}/scripts/kip" "$@"\n'
+    )
+
+
+def _update_environment(tmp_path: Path) -> dict[str, str]:
+    _make_kit(tmp_path / "releases" / "v1.1.0", "1.1.0", NEW_KIT)
+    home = tmp_path / "home"
+    (home / ".local/bin").mkdir(parents=True)
+    env = {
+        **{key: value for key, value in os.environ.items() if not key.startswith("KIP_")},
+        "KIP_RELEASE_BASE_URL": (tmp_path / "releases").as_uri(), "HOME": str(home), "SHELL": "/bin/zsh",
+        "ZDOTDIR": str(home),
+    }
+    return env
+
+
+def test_kip_update_never_repoints_another_deployments_launcher_or_profile(tmp_path: Path) -> None:
+    deployment = _deploy(tmp_path, "1.0.0", OLD_KIT)
+    env = _update_environment(tmp_path)
+    home = Path(env["HOME"])
+    primary = tmp_path / "primary deployment"
+    launcher = home / ".local/bin/kip"
+    launcher.write_text(_launcher_text(primary))
+    rc = f"# rc\n# >>> KIP >>>\nexport KIP_HOME='{primary}'\n# <<< KIP <<<\n"
+    (home / ".zshrc").write_text(rc)
+
+    result = subprocess.run(
+        ["/bin/bash", str(deployment / "scripts/upgrade.sh"), "--version", "1.1.0", "--no-bootstrap"],
+        cwd=deployment, env=env, capture_output=True, text=True, check=False,
+    )
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert (deployment / "VERSION").read_text().strip() == "1.1.0"
+    assert launcher.read_text() == _launcher_text(primary)
+    assert (home / ".zshrc").read_text() == rc
+    assert "left unchanged" in result.stderr
+
+
+def test_kip_update_refreshes_its_own_launcher_without_adding_a_profile_block(tmp_path: Path) -> None:
+    deployment = _deploy(tmp_path, "1.0.0", OLD_KIT)
+    env = _update_environment(tmp_path)
+    home = Path(env["HOME"])
+    launcher = home / ".local/bin/kip"
+    launcher.write_text(_launcher_text(deployment) + "echo STALE\n")
+    (home / ".zshrc").write_text("# rc without a KIP block\n")
+
+    result = subprocess.run(
+        ["/bin/bash", str(deployment / "scripts/upgrade.sh"), "--version", "1.1.0", "--no-bootstrap"],
+        cwd=deployment, env=env, capture_output=True, text=True, check=False,
+    )
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert launcher.read_text() == _launcher_text(deployment)
+    assert (home / ".zshrc").read_text() == "# rc without a KIP block\n"
+    assert "left unchanged" not in result.stderr
+
+
+def test_rerunning_the_installer_by_hand_says_when_it_repoints_the_launcher(tmp_path: Path) -> None:
+    deployment = _deploy(tmp_path, "1.0.0", OLD_KIT)
+    env = _update_environment(tmp_path)
+    home = Path(env["HOME"])
+    primary = tmp_path / "primary"
+    launcher = home / ".local/bin/kip"
+    launcher.write_text(_launcher_text(primary))
+
+    result = subprocess.run(
+        ["/bin/bash", str(ROOT / "scripts/install.sh"), str(deployment), "--version", "1.1.0", "--no-bootstrap", "--no-shell-profile"],
+        env=env, capture_output=True, text=True, check=False,
+    )
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert launcher.read_text() == _launcher_text(deployment)
+    assert f"opened another deployment ({primary})" in result.stderr
+
+
+def test_keep_launcher_is_refused_for_a_fresh_installation(tmp_path: Path) -> None:
+    _, env = _release_files(tmp_path, "9.9.9", {"README.md": b"# kit\n", **_kit_scripts()})
+    home = Path(env["HOME"])
+    (home / ".local/bin").mkdir(parents=True)
+    other = home / ".local/bin/kip"
+    other.write_text(_launcher_text(tmp_path / "primary"))
+
+    result = subprocess.run(
+        ["/bin/bash", str(ROOT / "scripts/install.sh"), str(tmp_path / "second"), "--no-bootstrap", "--keep-launcher"],
+        env=env, capture_output=True, text=True, check=False,
+    )
+
+    assert result.returncode == 1 and "--keep-launcher applies to upgrades" in result.stderr
+    assert other.read_text() == _launcher_text(tmp_path / "primary")
+
+
+def test_a_target_spelled_with_a_trailing_slash_records_one_launcher_path(tmp_path: Path) -> None:
+    _, env = _release_files(tmp_path, "9.9.9", {"README.md": b"# kit\n", **_kit_scripts()})
+    target = tmp_path / "install"
+
+    result = subprocess.run(
+        ["/bin/bash", str(ROOT / "scripts/install.sh"), f"{target}/", "--no-bootstrap", "--no-shell-profile"],
+        env=env, capture_output=True, text=True, check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (Path(env["HOME"]) / ".local/bin/kip").read_text() == _launcher_text(target)
+
+
+def test_a_relative_target_with_dot_segments_records_the_canonical_path(tmp_path: Path) -> None:
+    _, env = _release_files(tmp_path, "9.9.9", {"README.md": b"# kit\n", **_kit_scripts()})
+    (tmp_path / "a").mkdir()
+
+    result = subprocess.run(
+        ["/bin/bash", str(ROOT / "scripts/install.sh"), "./a/../install", "--no-bootstrap", "--no-shell-profile", "--bin-dir", "bin"],
+        cwd=tmp_path, env=env, capture_output=True, text=True, check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    launcher = tmp_path / "bin/kip"
+    assert launcher.read_text() == _launcher_text(tmp_path / "install")

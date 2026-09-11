@@ -379,3 +379,20 @@ def test_run_waits_for_a_port_holder_and_takes_over_once_it_is_free(tmp_path: Pa
     assert process.returncode == 0, stderr
     assert "not loading a second copy" in stderr
     assert [line for line in _trace(trace) if line.startswith("infinity")]
+
+
+def test_runtime_reads_models_from_the_same_hub_cache_prefetch_fills(tmp_path: Path) -> None:
+    project, environment, trace = _semantic_project(
+        tmp_path, SENTENCE_TRANSFORMERS_HOME="/elsewhere", TRANSFORMERS_CACHE="/elsewhere", HF_HUB_CACHE="/elsewhere",
+    )
+    runtime = project / "var/semantic-venv/bin/infinity_emb"
+    runtime.write_text(
+        '#!/bin/bash\nprintf "cache hf=%s hub=%s st=%s tf=%s\\n" "$HF_HOME" "$HF_HUB_CACHE" '
+        '"${SENTENCE_TRANSFORMERS_HOME-unset}" "${TRANSFORMERS_CACHE-unset}" >> "$FAKE_TRACE"\n'
+    )
+
+    result = _script(project, environment, "semantic-server.sh", "run")
+
+    assert result.returncode == 0, result.stderr
+    cache = f"{project}/var/model-cache"
+    assert f"cache hf={cache} hub={cache}/hub st=unset tf=unset" in _trace(trace)

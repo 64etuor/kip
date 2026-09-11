@@ -69,7 +69,9 @@ if [[ "$finish" == 1 ]]; then
 fi
 if [[ -z "$archive" ]]; then
   if [[ "$latest" == 1 || -n "$version" ]]; then
-    install_args=("$PROJECT_ROOT")
+    # --keep-launcher: updating this deployment must not repoint a kip
+    # launcher or shell profile that belongs to another deployment.
+    install_args=("$PROJECT_ROOT" --keep-launcher)
     [[ -n "$version" ]] && install_args+=(--version "$version")
     [[ "$bootstrap" == 1 ]] || install_args+=(--no-bootstrap)
     [[ "$dry_run" == 0 ]] || install_args+=(--dry-run)

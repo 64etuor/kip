@@ -142,7 +142,7 @@ shasum, unzip 또는 python3만 있으면 됩니다. 버전이 지정된 배포 
 ```bash
 # 설치 위치와 버전을 고정
 curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh \
-  | bash -s -- ~/kip --version 3.12.0
+  | bash -s -- ~/kip --version 3.12.1
 ```
 
 `--check`, `--install-docker`, `--without-docker`는 bootstrap에 그대로
@@ -207,7 +207,11 @@ config, `var/`, `secrets/`는 그대로 두고 `.mcp.json`도 보존합니다. �
 `--rollback`으로 이전 패키지 파일을 되돌립니다. 데이터베이스는
 rollback 대상이 아니므로 마이그레이션을 지나는 업그레이드 전에는
 `./scripts/backup.sh`를 실행합니다. git 체크아웃은 설치기가 거부하며 `git pull`로
-갱신합니다. 3.10.0 이전에 설치한 배포도 그대로 올라갑니다(레거시
+갱신합니다. `kip update`와 `./scripts/upgrade.sh --latest`는 런처가 이미 이
+배포를 가리킬 때만 런처를 새로 쓰고 셸 프로필은 건드리지 않습니다(3.12.1).
+그래서 두 번째 배포를 올려도 `kip`이 그 배포로 바뀌지 않습니다. 설치 명령을
+직접 다시 실행하면 런처와 프로필 블록을 그 배포로 맞추고, 다른 배포를
+가리키던 런처였다면 그 사실을 알립니다. 3.10.0 이전에 설치한 배포도 그대로 올라갑니다(레거시
 `STARTER-KIT-MANIFEST.json`을 읽어 `KIP-MANIFEST.json`으로 교체합니다). 자세한
 절차는 [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md) 11장에 있습니다.
 

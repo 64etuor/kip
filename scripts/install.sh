@@ -20,6 +20,7 @@ usage() {
   cat <<'USAGE'
 Usage: install.sh [TARGET_DIR] [--version X.Y.Z] [--check] [--install-docker | --without-docker]
                   [--no-bootstrap] [--dry-run] [--keep-archive]
+                  [--no-shell-profile] [--bin-dir DIR] [--keep-launcher]
 
   TARGET_DIR        Installation directory (default: $KIP_HOME or ~/kip).
                     An existing package-based deployment there is upgraded in place.
@@ -33,6 +34,8 @@ Usage: install.sh [TARGET_DIR] [--version X.Y.Z] [--check] [--install-docker | -
   --keep-archive    Keep the downloaded archive next to TARGET_DIR.
   --no-shell-profile  Do not add the KIP block to your shell profile (PATH/KIP_HOME).
   --bin-dir DIR     Where the global `kip` launcher is written (default: ~/.local/bin).
+  --keep-launcher   Upgrade only (used by `kip update`): refresh the launcher only when
+                    it already opens TARGET_DIR and leave the shell profile unchanged.
 
 Environment: KIP_VERSION, KIP_HOME, KIP_BIN_DIR, KIP_RELEASE_BASE_URL, KIP_LATEST_URL.
 After installation `kip --help`, `kip doctor` and `kip update` work from any directory.
@@ -47,6 +50,7 @@ bootstrap=1
 keep_archive=0
 dry_run=0
 shell_profile=1
+keep_launcher=0
 bin_dir="${KIP_BIN_DIR:-$HOME/.local/bin}"
 bootstrap_args=()
 while [[ $# -gt 0 ]]; do
@@ -59,6 +63,7 @@ while [[ $# -gt 0 ]]; do
     --dry-run) dry_run=1; shift ;;
     --keep-archive) keep_archive=1; shift ;;
     --no-shell-profile) shell_profile=0; shift ;;
+    --keep-launcher) keep_launcher=1; shift ;;
     --bin-dir) [[ $# -ge 2 ]] || fail "--bin-dir needs a value"; bin_dir="$2"; shift 2 ;;
     --bin-dir=*) bin_dir="${1#--bin-dir=}"; shift ;;
     -*) usage >&2; fail "unknown option: $1" ;;
@@ -66,6 +71,18 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 target="${target:-${KIP_HOME:-$HOME/kip}}"
+# One spelling per deployment: absolute, without trailing slashes, and the
+# logical path an existing directory reports (what its scripts compute), so
+# the launcher it records can be recognised on the next update.
+[[ "$target$bin_dir" != *$'\n'* ]] || fail "installation paths must not contain newlines"
+[[ "$target" == /* ]] || target="$PWD/$target"
+while [[ "$target" == */ && "$target" != / ]]; do target="${target%/}"; done
+if [[ -d "$target" ]]; then target="$(cd "$target" && pwd)"; fi
+# A relative --bin-dir would put a relative directory on PATH.
+[[ "$bin_dir" == /* ]] || bin_dir="$PWD/$bin_dir"
+if [[ "$keep_launcher" == 1 ]] && ! [[ -f "$target/VERSION" && ( -f "$target/KIP-MANIFEST.json" || -f "$target/STARTER-KIT-MANIFEST.json" ) ]]; then
+  fail "--keep-launcher applies to upgrades; $target is not a KIP deployment (use --bin-dir/--no-shell-profile to control the launcher of a new installation)"
+fi
 
 fetch() {
   # fetch URL DEST: HTTPS-only (file:// allowed for local mirrors), bounded size.
@@ -123,7 +140,7 @@ launcher_abort() {
   # upgrade they are reported as warnings so the exit code keeps meaning
   # "was the upgrade applied".
   if [[ "${launcher_strict:-1}" == 1 ]]; then fail "$1"; fi
-  printf 'install.sh: warning: %s; the kip launcher/profile were not updated\n' "$1" >&2
+  printf 'install.sh: warning: %s; the shell profile was not updated\n' "$1" >&2
   launcher_hint="Rerun the installer once the profile problem is fixed, or use $target/scripts/kip"
   return 1
 }
@@ -135,6 +152,28 @@ shell_quote() {
   printf "'%s'" "$value"
 }
 
+launcher_opens_target() {
+  [[ -f "$bin_dir/kip" ]] \
+    && grep -q 'KIP launcher written by install.sh' "$bin_dir/kip" 2>/dev/null \
+    && grep -qxF "KIP_DEPLOYMENT=$(shell_quote "$target")" "$bin_dir/kip" 2>/dev/null
+}
+
+refresh_launcher() {
+  # `kip update` (--keep-launcher) keeps the launcher current only when it
+  # already opens this deployment. Another deployment's launcher, a custom
+  # --bin-dir and the shell profile stay exactly as the operator left them.
+  if [[ "$keep_launcher" == 1 ]]; then
+    if launcher_opens_target; then
+      shell_profile=0 install_launcher
+      launcher_hint=""
+    else
+      launcher_hint="The kip launcher and shell profile were left unchanged; use $target/scripts/kip, or rerun the installer on $target (with the same --bin-dir/--no-shell-profile options you installed with) to point kip at it."
+    fi
+  else
+    install_launcher
+  fi
+}
+
 install_launcher() {
   # A tiny launcher so `kip` works from any directory. Paths are single-quoted
   # (POSIX quoting, unlike %q which emits $'..' for non-ASCII names that sh
@@ -142,13 +181,17 @@ install_launcher() {
   # launcher or the profile. The launcher records the deployment; KIP_HOME
   # overrides it.
   if [[ "$target$bin_dir" == *$'\n'* ]]; then launcher_abort "installation paths must not contain newlines" || return 0; fi
-  local quoted_target quoted_bin
+  local quoted_target quoted_bin previous
   quoted_target="$(shell_quote "$target")"
   quoted_bin="$(shell_quote "$bin_dir")"
   mkdir -p "$bin_dir"
   if [[ -e "$bin_dir/kip" ]] && ! grep -q 'KIP launcher written by install.sh' "$bin_dir/kip" 2>/dev/null; then
     cp -p "$bin_dir/kip" "$bin_dir/kip.bak"
     printf 'install.sh: an existing %s/kip was backed up to kip.bak\n' "$bin_dir" >&2
+  elif [[ -e "$bin_dir/kip" ]] && ! launcher_opens_target; then
+    previous="$(sed -n 's/^# KIP launcher written by install.sh. Deployment: //p' "$bin_dir/kip" | head -n 1)"
+    printf 'install.sh: %s/kip opened another deployment (%s); it now opens %s\n' \
+      "$bin_dir" "${previous:-unknown}" "$target" >&2
   fi
   printf '#!/usr/bin/env bash\n# KIP launcher written by install.sh. Deployment: %s\nKIP_DEPLOYMENT=%s\nexec "${KIP_HOME:-$KIP_DEPLOYMENT}/scripts/kip" "$@"\n' \
     "$target" "$quoted_target" > "$bin_dir/kip.tmp"
@@ -247,7 +290,7 @@ if [[ -f "$target/VERSION" && ( -f "$target/KIP-MANIFEST.json" || -f "$target/ST
   [[ -x "$target/scripts/bootstrap.sh" ]] || fail "$target has a VERSION file but no scripts/bootstrap.sh; it looks like an interrupted install. Move it aside and rerun"
   if [[ "$current" == "$version" ]]; then
     launcher_hint=""
-    [[ "$dry_run" == 1 ]] || install_launcher  # keep the launcher and profile block current
+    [[ "$dry_run" == 1 ]] || refresh_launcher  # keep the launcher and profile block current
     printf 'KIP %s is already installed at %s; nothing to do.%s\n' "$version" "$target" "${launcher_hint:+ $launcher_hint}" >&2
     exit 0
   fi
@@ -283,8 +326,8 @@ if [[ -f "$target/VERSION" && ( -f "$target/KIP-MANIFEST.json" || -f "$target/ST
   if [[ "$applied" == 1 ]]; then
     # Files are committed (even when migrate deferred with exit 75): keep the
     # launcher current, and never turn a committed upgrade into exit 1 here.
-    launcher_strict=0 install_launcher
-    printf '%s\n' "$launcher_hint" >&2
+    launcher_strict=0 refresh_launcher
+    [[ -z "$launcher_hint" ]] || printf '%s\n' "$launcher_hint" >&2
   fi
   exit "$status"
 fi
@@ -300,7 +343,7 @@ mkdir -p "$work/extract"
 if command -v unzip >/dev/null 2>&1; then
   # -n: never prompt (stdin may be the script itself under curl | bash).
   unzip -qn "$work/$archive_name" -d "$work/extract"
-  if find "$work/extract" -type l | grep -q .; then
+  if [[ -n "$(find "$work/extract" -type l -print | head -n 1)" ]]; then
     fail "archive contains symbolic links; nothing was installed"
   fi
 elif command -v python3 >/dev/null 2>&1; then
@@ -328,6 +371,7 @@ roots=("$work"/extract/*/)
 # belongs to the user.
 [[ -d "$target" ]] || created_target="$target"
 mkdir -p "$target"
+target="$(cd "$target" && pwd)"  # resolve ./ and ../ the way the deployment's scripts will
 cp -R "${roots[0]}". "$target/"
 created_target=""
 printf 'Installed KIP %s into %s.\n' "$version" "$target" >&2

@@ -105,7 +105,12 @@ proposed`가 비어 있으면 할 일이 없습니다. 관계 채굴을 켜지 �
 `--dry-run`, `--rollback`(특정 기록은 `--rollback-id ID`), `--no-bootstrap`을
 그대로 받으며 스크립트 출력을 그대로 흘려보낸다. `--rollback`은 미리보기가
 없어 `--dry-run`·`--archive`·`--version`과 함께 주면 실행 전에 거부된다. `kip update`와 `kip version`은 데이터베이스 없이도 실행되고,
-git 체크아웃은 `git pull`을 쓰라며 거부된다.
+git 체크아웃은 `git pull`을 쓰라며 거부된다. `--latest`/`--version`은 설치기를
+`--keep-launcher`로 부르므로 런처가 이미 이 배포를 가리킬 때만 런처를 새로 쓰고
+셸 프로필은 바꾸지 않는다(3.12.1). 다른 배포를 가리키는 `kip`, `--bin-dir`로 둔
+런처, `--no-shell-profile`로 설치한 배포는 업데이트 후에도 그대로다. 단
+3.10.0-3.12.0 배포의 다음 업데이트는 그 배포의 이전 설치기가 실행해 기본 런처와
+프로필 블록을 한 번 다시 쓴다(`docs/DEPLOYMENT_GUIDE.md` 설치 절 참고).
 
 설치된 manifest나 새 manifest에 있는 패키지 소유 파일만 교체·삭제되고 `.env`,
 `config/kip*.toml`, `compose.generated.yaml`, `var/`, `secrets/`, ontology·golden

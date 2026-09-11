@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 from pathlib import Path
 
@@ -423,11 +424,15 @@ def test_update_and_version_commands_work_without_a_database(tmp_path, monkeypat
     assert runner.invoke(app, ["update"]).exit_code == 75
     assert calls[-1][1:] == ["--latest"]
 
+    def plain(text: str) -> str:
+        # Typer renders usage errors through rich: strip colour codes, box drawing and wrapping.
+        return " ".join(re.sub(r"\x1b\[[0-9;]*m", "", text).translate(str.maketrans("", "", "│╭╮╯╰─")).split())
+
     rejected = runner.invoke(app, ["update", "--rollback", "--dry-run"])
-    assert rejected.exit_code != 0 and "cannot be combined" in rejected.output
+    assert rejected.exit_code != 0 and "cannot be combined" in plain(rejected.output)
     assert calls[-1][1:] == ["--latest"]  # nothing was executed for the rejected combination
     orphan = runner.invoke(app, ["update", "--rollback-id", "20260101T000000Z-1.0.0-to-2.0.0"])
-    assert orphan.exit_code != 0 and "requires --rollback" in orphan.output
+    assert orphan.exit_code != 0 and "requires --rollback" in plain(orphan.output)
     assert runner.invoke(app, ["update", "--rollback", "--rollback-id", "abc"]).exit_code == 75
     assert calls[-1][1:] == ["--rollback", "abc"]
     assert runner.invoke(app, ["update", "--archive", "x.zip", "--no-bootstrap"]).exit_code == 75

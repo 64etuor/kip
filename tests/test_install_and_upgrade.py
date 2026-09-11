@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import shlex
+import shutil
 import stat
 import subprocess
 import sys
@@ -539,7 +540,7 @@ def test_launcher_and_profile_quote_hostile_paths_and_preserve_profile_identity(
     assert not marker.exists()
     assert (home / ".zshrc").is_symlink() and real_rc.read_text().startswith("export FOO=1\n")
     assert oct(real_rc.stat().st_mode & 0o777) == "0o600"
-    for shell in ("/bin/zsh", "/bin/bash", "/bin/sh", *(["/bin/dash"] if Path("/bin/dash").exists() else [])):
+    for shell in (path for path in ("/bin/zsh", "/bin/bash", "/bin/sh", "/bin/dash") if Path(path).exists()):
         # The profile block must be plain POSIX quoting so every login shell can read it.
         parsed = subprocess.run([shell, "-c", f". {shlex.quote(str(real_rc))}; printf %s \"$KIP_HOME\""], capture_output=True, text=True, check=False)
         assert parsed.returncode == 0 and parsed.stdout == str(target), (shell, parsed.stderr)
@@ -626,6 +627,7 @@ def test_legacy_archive_copy_matches_the_3_9_upgrader_contract(tmp_path: Path) -
     assert json.loads((deployment / "KIP-MANIFEST.json").read_text())["version"] == "2.0.0"
 
 
+@pytest.mark.skipif(shutil.which("zsh") is None, reason="ZDOTDIR is discovered by asking zsh itself")
 def test_installer_follows_a_relative_profile_symlink_under_zdotdir(tmp_path: Path) -> None:
     _, env = _release_files(tmp_path, "9.9.9", {"README.md": b"# kit\n", **_kit_scripts()})
     home = Path(env["HOME"])

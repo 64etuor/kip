@@ -1,5 +1,27 @@
 # Changelog
 
+## 3.9.0 - 2026-09-11
+
+- Add a one-command installer published with every release:
+  `curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh | bash`.
+  It needs only bash, curl or wget, a SHA-256 tool and unzip or python3,
+  downloads the versioned starter kit with its `.sha256` sidecar, refuses to
+  extract on any digest mismatch, installs into an empty directory and runs
+  `./scripts/bootstrap.sh` (passing `--check`, `--install-docker`,
+  `--without-docker`). `--version X.Y.Z` pins a release; `--no-bootstrap`
+  extracts only.
+- Add in-place upgrades for kit-based deployments: `./scripts/upgrade.sh
+  --latest|--version X|--archive ZIP`, also reached by running the installer
+  on an existing directory. The manifest diff decides what changes: files in
+  the installed or new `STARTER-KIT-MANIFEST.json` are replaced or removed,
+  everything else (`.env`, `config/kip*.toml`, `compose.generated.yaml`,
+  `var/`, `secrets/`, ontology and golden additions) is untouched, and
+  `.mcp.json` is preserved. Previous kit files and the plan are kept under
+  `var/upgrades/<id>/` for `--rollback`; `--dry-run` prints the plan and the
+  CHANGELOG entries between the versions. Downgrades, git checkouts and
+  archives whose digests do not match are refused. Bootstrap, migrate and
+  doctor run afterwards.
+
 ## 3.8.2 - 2026-09-11
 
 - Fail closed for every indexed extension: a question naming a file whose

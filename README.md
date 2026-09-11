@@ -37,12 +37,17 @@ credential, DB, CAS/output, private 평가 자료, 내부 plan, 생성형 packag
 외부 `.zip.sha256` 파일로 전달물을 독립적으로 검증할 수 있습니다. 정식 릴리스는
 clean tree에서 만들고, `--allow-dirty`는 이름이 명확한 로컬 candidate에만 씁니다.
 
+GitHub 릴리스에는 이 ZIP과 `.sha256`과 함께 `install.sh`(위의 [한 줄
+설치](#한-줄-설치))가 자산으로 게시됩니다. 내려받아 직접 검증·압축 해제하는
+경로는 그대로 유효합니다.
+
 ## 0. 처음 오셨나요?
 
 전문 용어 없이 요약하면 KIP은 **회사 문서를 모아 검색하고, 답변의 근거가 된
 원문 위치를 항상 함께 제시하는 시스템**입니다.
 
 - 용어가 어렵다면 → [`docs/GLOSSARY.md`](docs/GLOSSARY.md)
+- 한 줄로 설치하고 싶다면 → [한 줄 설치](#한-줄-설치)
 - 설치부터 하고 싶다면 → [`docs/QUICKSTART.md`](docs/QUICKSTART.md)
 - 설치 후 매일 쓰는 법 → [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 
@@ -115,6 +120,45 @@ ACL을 제안하고, preview가 local/cloud-only 파일을 구분합니다. 다�
 [`docs/STARTER_KIT_GUIDE.md`](docs/STARTER_KIT_GUIDE.md)를 읽으세요. 환경별
 결정, AI 변경 계약, 실제 corpus 인수 테스트, update notification, 승격/rollback
 기준이 한 경로에 정리돼 있습니다.
+
+### 한 줄 설치
+
+저장소를 복제하지 않고 최신 릴리스를 설치합니다. 설치 위치는 `$KIP_HOME`
+또는 `~/kip`이며, 비어 있거나 아직 없는 디렉터리여야 합니다.
+
+```bash
+curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh | bash
+```
+
+이 스크립트는 Python보다 먼저 실행되므로 bash, curl 또는 wget, sha256sum 또는
+shasum, unzip 또는 python3만 있으면 됩니다. 버전이 지정된 스타터 ZIP과 그
+`.sha256` sidecar를 내려받아 압축을 풀기 전에 digest를 검증하고, 값이 다르면
+아무것도 풀지 않고 중단합니다. 이후 `./scripts/bootstrap.sh`를 실행하고
+`./scripts/verify-starter-kit.sh`로 아카이브 전체를 다시 검증합니다.
+
+```bash
+# 설치 위치와 버전을 고정
+curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh \
+  | bash -s -- ~/kip --version 3.9.0
+```
+
+`--check`, `--install-docker`, `--without-docker`는 bootstrap에 그대로
+전달됩니다. `--no-bootstrap`은 압축만 풀고, `--keep-archive`는 내려받은 ZIP을
+남깁니다. Windows에서는 WSL2 Ubuntu 안에서 실행합니다.
+
+### 업데이트
+
+`VERSION`과 `STARTER-KIT-MANIFEST.json`이 있는 설치 디렉터리에 같은 명령을 다시
+실행하면 그 자리에서 업그레이드합니다. 배포 안에서
+`./scripts/upgrade.sh --latest`를 실행해도 같습니다. 교체되는 것은 manifest에 있는 kit 소유 파일뿐이며
+`.env`, 생성 config, `var/`, `secrets/`는 그대로 두고 `.mcp.json`도 보존합니다.
+`./scripts/upgrade.sh --latest --dry-run`(또는 `--archive ZIP --dry-run`)으로 계획과
+두 버전 사이의 CHANGELOG를 먼저 확인하고, 문제가 있으면
+`./scripts/upgrade.sh --rollback`으로 이전 kit 파일을 되돌립니다. 데이터베이스는
+rollback 대상이 아니므로 마이그레이션을 지나는 업그레이드 전에는
+`./scripts/backup.sh`를 실행합니다. git 체크아웃은 설치기가 거부하며 `git pull`로
+갱신합니다. 자세한 절차는
+[`docs/STARTER_KIT_GUIDE.md`](docs/STARTER_KIT_GUIDE.md) 11장에 있습니다.
 
 ### 준비물
 

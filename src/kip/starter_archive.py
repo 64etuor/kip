@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
+from unicodedata import normalize
 from urllib.parse import urlsplit, urlunsplit
 
 from kip.domain.starter_archive import (
@@ -107,7 +108,8 @@ def default_starter_archive_output(root: Path) -> Path:
 def _source_entries(root: Path) -> tuple[ArchiveEntry, ...]:
     entries: list[ArchiveEntry] = []
     for path in selected_source_files(root):
-        relative = path.relative_to(root).as_posix()
+        # NFC keeps kits byte-identical across macOS (NFD file names) and Linux.
+        relative = normalize("NFC", path.relative_to(root).as_posix())
         content = path.read_bytes()
         scan_content(content, relative)
         entries.append(

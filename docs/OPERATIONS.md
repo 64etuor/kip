@@ -81,6 +81,33 @@ proposed`가 비어 있으면 할 일이 없습니다. 관계 채굴을 켜지 �
 계속 비어 있는 것이 정상이며, 온톨로지 명령을 배우지 않아도 검색·답변은 그대로
 동작합니다.
 
+### 업그레이드
+
+kit으로 설치한 배포는 `./scripts/upgrade.sh`로 제자리에서 올린다. 같은
+디렉터리에 릴리스 설치기를 다시 실행해도 이 스크립트가 실행된다.
+
+```bash
+./scripts/upgrade.sh --latest --dry-run                          # 계획과 CHANGELOG만
+./scripts/backup.sh
+./scripts/upgrade.sh --latest    # 또는 --version X.Y.Z / --archive ZIP
+```
+
+설치된 manifest나 새 manifest에 있는 kit 소유 파일만 교체·삭제되고 `.env`,
+`config/kip*.toml`, `compose.generated.yaml`, `var/`, `secrets/`, ontology·golden
+추가분은 건드리지 않으며 `.mcp.json`은 보존된다. 교체·삭제된 파일과 `plan.json`은
+`var/upgrades/<id>/`에 남고 `./scripts/upgrade.sh --rollback [ID]`가 그 kit 파일을
+되돌린다(설치된 버전이 해당 업그레이드의 대상 버전이 아니면 거부한다). 적용 뒤에는
+`./scripts/bootstrap.sh`, `./scripts/migrate.sh`, `./scripts/kip doctor`가 이어지며,
+데이터베이스에 연결할 수 없으면 `Action required`와 함께 exit 75로 끝난다. 이때는
+`./scripts/app-up.sh --database-only`로 DB를 올린 뒤 `./scripts/migrate.sh`와
+`./scripts/kip doctor`를 실행한다. `--dry-run`은 `--latest`, `--version`, `--archive`
+모두에 적용되며 다운로드와 검증만 하고 파일은 바꾸지 않는다. 버전 하향, git 체크아웃(`git pull`로 갱신), digest나 manifest가 맞지 않는
+아카이브는 거부된다. rollback은 kit 파일만 되돌리고 데이터베이스는 복구하지
+않으므로, 마이그레이션을 지나는 업그레이드 전에는 반드시 `./scripts/backup.sh`를
+실행한다. 3.9.0 이전에 만든 배포에는 `scripts/upgrade.sh`가 없으므로
+[`STARTER_KIT_GUIDE.md`](STARTER_KIT_GUIDE.md) 11.5의 수동 절차를 한 번 거친 뒤
+설치기를 쓴다.
+
 ### Database readiness errors
 
 `kip` commands that need PostgreSQL fail within seconds with

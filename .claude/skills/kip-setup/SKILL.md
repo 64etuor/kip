@@ -7,7 +7,12 @@ description: Install or configure a KIP deployment through its guided setup stat
 
 Run from the KIP repository with `./scripts/kip`. On a fresh clone, use
 `./scripts/bootstrap.sh` first; it prepares Python 3.12+ and Node/npm locally
-when missing, without changing system runtimes or shell profiles. Use
+when missing, without changing system runtimes or shell profiles. A recipient
+without the repository can instead run the published installer
+(`curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh
+| bash`), which verifies the release archive before extracting into an empty
+directory and then runs bootstrap; `./scripts/upgrade.sh --latest` updates an
+existing kit deployment in place. Use
 `--check` for read-only prerequisite status. System Docker installation uses
 `--install-docker`; explain that action and obtain authorization if the request
 has not already provided it. Native administrator authentication and Desktop

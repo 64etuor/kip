@@ -120,6 +120,15 @@ against a concurrent filesystem attacker. See ADR-056.
 - A ZIP digest proves byte identity, not publisher identity. Production
   distribution still requires the signed release provenance and immutable
   image digest described in Operations.
+- The published one-command installer
+  (`curl -fsSL .../releases/latest/download/install.sh | bash`) trusts GitHub's
+  release hosting and TLS. Its `.sha256` sidecar is served from that same
+  origin, so it detects a corrupted or mismatched asset, not a compromised
+  origin. The digest is checked before anything is extracted, a fresh install
+  requires an empty target, and an upgrade replaces only manifest-listed
+  kit files. Where policy requires review, download `install.sh`, read it, and
+  pin `--version X.Y.Z`; the manual download, verify and unzip path is
+  unchanged.
 
 ## Telemetry boundary
 

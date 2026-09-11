@@ -22,6 +22,50 @@
 
 ## 1. 설치가 안 될 때
 
+### 한 줄 설치기가 checksum 불일치로 중단 (`nothing was extracted`)
+내려받은 ZIP이 `.sha256` sidecar의 digest와 다르거나 sidecar 형식이 잘못된
+경우입니다. 검증은 압축을 풀기 전에 하므로 대상 디렉터리는 그대로입니다.
+중단된 다운로드가 흔한 원인이니 같은 명령을 다시 실행하고, 버전을 고정했다면
+그 릴리스에 ZIP과 `.sha256`이 모두 있는지 확인하세요.
+
+```bash
+curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh \
+  | bash -s -- ~/kip --version 3.9.0
+```
+
+계속 실패하면 두 자산을 직접 내려받아
+`shasum -a 256 -c kip-starter-kit-X.Y.Z.zip.sha256`으로 확인하세요.
+
+### `... is not empty and is not a KIP deployment`
+새로 설치할 디렉터리는 비어 있거나 아직 없어야 합니다. 기존 배포 위에 실행할
+때는 `VERSION`과 `STARTER-KIT-MANIFEST.json`이 있어야 제자리 업그레이드로
+넘어갑니다. 다른 경로를 지정하거나(`bash -s -- ~/kip2`) 기존 내용을 먼저
+옮기세요. 설치기는 어떤 파일도 지우지 않습니다.
+
+### `... is a git checkout; update it with git pull`
+저장소를 복제해 쓰는 개발 트리입니다. 설치기와 `upgrade.sh`는 git 트리를
+건드리지 않습니다.
+
+```bash
+git pull
+./scripts/bootstrap.sh
+```
+
+### `... predates the in-place upgrader`
+3.9.0 이전에 만들어진 배포에는 `scripts/upgrade.sh`가 없습니다.
+[`STARTER_KIT_GUIDE.md`](STARTER_KIT_GUIDE.md) 11.5의 수동 절차를 한 번 수행하면
+그 뒤부터는 설치기와 `./scripts/upgrade.sh`로 올릴 수 있습니다.
+
+### 업그레이드가 `Action required`와 exit 75로 끝남
+새 kit 파일은 적용됐지만 데이터베이스에 연결할 수 없어 마이그레이션이 실행되지
+않은 상태입니다. DB를 올린 뒤 나머지를 직접 실행하세요.
+
+```bash
+./scripts/app-up.sh --database-only
+./scripts/migrate.sh
+./scripts/kip doctor
+```
+
 ### `./scripts/bootstrap.sh`가 Python 버전 오류로 멈춤
 새 환경에서는 `./scripts/bootstrap.sh`가 Python 3.12+를 준비합니다.
 기존 `.venv`가 손상됐거나 구버전이면 덮어쓰지 않습니다. 기존 환경을

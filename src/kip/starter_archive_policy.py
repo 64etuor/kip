@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path, PurePosixPath
 from typing import Final
+from unicodedata import normalize
 
 from kip.errors import ValidationError
 
@@ -169,7 +170,7 @@ def selected_source_files(root: Path) -> tuple[Path, ...]:
         if not tree.is_dir():
             raise ValidationError(f"required starter directory is missing: {relative}")
         selected.update(path for path in tree.rglob("*") if _is_selected_file(path, root))
-    return tuple(sorted(selected, key=lambda path: path.relative_to(root).as_posix()))
+    return tuple(sorted(selected, key=lambda path: normalize("NFC", path.relative_to(root).as_posix())))
 
 
 def validate_relative_path(relative: PurePosixPath) -> None:

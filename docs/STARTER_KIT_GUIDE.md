@@ -30,6 +30,13 @@
    필요는 없다. 최소 Linux에는 curl/wget, CA 인증서, tar/gzip, SHA-256 도구가
    있어야 한다. 의존성은 `uv.lock` frozen sync로 설치한다. 기존 `.env`,
    config, 호환되는 `.venv`, Docker context와 셸 프로필은 보존한다.
+   저장소 없이 kit만 받는 수신자는 릴리스에 게시된 한 줄 설치기로 이 단계까지
+   한 번에 수행할 수 있다. `curl -fsSL
+   https://github.com/64etuor/kip/releases/latest/download/install.sh | bash`은
+   버전이 지정된 ZIP과 `.sha256`을 내려받아 압축 전에 digest를 검증하고, 비어
+   있는 대상 디렉터리에 풀고 bootstrap을 실행한 뒤 `verify-starter-kit.sh`로
+   아카이브를 다시 검증한다. `--version X.Y.Z`로 릴리스를 고정하고
+   `--check`/`--install-docker`/`--without-docker`는 bootstrap으로 전달된다.
 2. AI agent에게 “KIP을 셋업해줘”라고 요청해 `kip-setup` Skill을 시작한다.
 3. `setup inspect`가 반환한 질문에 매번 하나씩 답한다. Agent가 먼저
    identity mode를 묻고, `proxy_jwt`이면 issuer/audience/JWKS/admin group을,
@@ -352,7 +359,9 @@ make verify-release BUNDLE="dist/kip-$(tr -d '[:space:]' < VERSION).tar.gz"
 ```
 
 패키지는 설치 가능한 wheel, digest image lock, SPDX SBOM, SLSA provenance,
-release manifest와 SHA-256 checksums, 독립 starter tree를 포함한다. verifier는
+release manifest와 SHA-256 checksums, 독립 starter tree를 포함한다. tag 릴리스에는
+스타터 ZIP과 `.zip.sha256`, wheel, release archive와 함께 `scripts/install.sh`가
+`install.sh` 자산으로 게시된다. verifier는
 비밀·사내 절대 경로·DB dump·CAS·개인 평가 자료가 섞이면 실패한다.
 배포 전 clean venv에서 base wheel만 설치한 `kip capabilities`와, pinned
 runtime requirements를 설치한 hardened image의 동일 명령을 각각 실행한다.
@@ -398,20 +407,38 @@ kit 버전으로 덮으면 MCP 서버가 배포의 생성 config 대신 kit 기�
 
 ### 11.3 절차
 
-1. 배포 소유 경로와 데이터베이스를 백업한다(`./scripts/backup.sh`).
-2. 새 kit을 기존 배포가 아닌 **별도 디렉터리**에 푼다.
-3. 새 kit의 `VERSION`과 `CHANGELOG.md`를 읽고, 계약·설정·마이그레이션
-   변경과 알려진 한계를 확인한다.
-4. 배포 소유 경로를 새 디렉터리로 옮긴다. `.mcp.json`도 함께 옮긴다.
-5. `./scripts/bootstrap.sh`를 실행한다.
-6. `./scripts/migrate.sh`를 실행한다. 마이그레이션은 append-only이므로
-   기존 데이터는 유지된다.
-7. `./scripts/verify.sh`와 `./scripts/doctor.sh`로 배포를 검증한다.
-8. `sync -> search -> read` 한 사이클로 실제 corpus 응답을 확인한 뒤
-   이전 디렉터리를 폐기한다.
+배포 안의 `./scripts/upgrade.sh`가 11.1의 경계를 기계적으로 적용한다. 같은
+디렉터리에 설치기를 다시 실행해도 이 스크립트로 넘어간다.
 
-파서나 추출 계약이 바뀐 릴리스는 6단계 뒤에 `parser reextract --source SOURCE`가
-필요하다. 해당 릴리스의 `CHANGELOG.md`가 이를 명시한다.
+```bash
+./scripts/upgrade.sh --latest --dry-run   # 또는 --version X.Y.Z / --archive ZIP
+./scripts/backup.sh
+./scripts/upgrade.sh --latest             # 또는 --version X.Y.Z / --archive ZIP
+```
+
+1. `--dry-run`으로 교체·삭제·보존되는 파일 수와 설치된 버전 이후의 CHANGELOG
+   항목을 확인한다. 그 범위에 `reextract`가 언급되면 함께 표시되므로 migrate
+   뒤의 `./scripts/kip parser reextract --source SOURCE`를 계획한다. `--dry-run`은
+   `--latest`/`--version`에서도 동작하며 아카이브를 내려받아 digest를 검증한 뒤
+   계획만 출력한다.
+2. `./scripts/backup.sh`로 데이터베이스와 배포 소유 경로를 백업한다.
+3. `--latest`, `--version X.Y.Z`, 또는 이미 받아 둔 `--archive
+   kip-starter-kit-X.Y.Z.zip`으로 적용한다. 설치된 manifest나 새 manifest에 있는
+   kit 소유 파일만 교체·삭제되고 나머지 경로는 건드리지 않으며 `.mcp.json`은
+   보존된다(11.2). 교체·삭제된 파일과 계획은
+   `var/upgrades/<id>/`(`previous-kit-files.tar.gz`, `plan.json`)에 남는다.
+4. 적용 후 `./scripts/bootstrap.sh`, `./scripts/migrate.sh`,
+   `./scripts/kip doctor`가 이어서 실행된다. 데이터베이스에 연결할 수 없으면
+   `Action required`와 함께 exit 75로 끝나므로 DB를 올린 뒤
+   `./scripts/migrate.sh`와 `./scripts/kip doctor`를 직접 실행한다.
+   `--no-bootstrap`은 파일만 적용한다.
+5. `sync -> search -> read` 한 사이클로 실제 corpus 응답을 확인한다.
+6. 문제가 있으면 `./scripts/upgrade.sh --rollback [ID]`로 직전(또는 지정한)
+   업그레이드의 kit 파일을 되돌리고 `./scripts/bootstrap.sh`를 다시 실행한다.
+   설치된 버전이 그 업그레이드의 대상 버전이 아니면 rollback을 거부한다.
+
+버전을 낮추는 아카이브, git 체크아웃(`git pull`로 갱신한다), digest나 manifest가
+맞지 않는 아카이브는 거부된다.
 
 ### 11.4 받은 kit의 출처 확인
 
@@ -426,3 +453,22 @@ python3 -c "import json;print(json.load(open('STARTER-KIT-MANIFEST.json'))['sour
 것이므로 `git_commit`만으로 내용을 재현할 수 없다. 배포용 kit은
 `tracked_changes: false`여야 한다. `repository`가 `null`이면 공유 가능한
 http(s) origin이 없는 환경에서 빌드된 것이므로, 전달자에게 출처를 확인한다.
+
+### 11.5 3.9.0 이전 배포와 rollback의 한계
+
+3.9.0 이전에 만들어진 배포에는 `scripts/upgrade.sh`가 없다. 설치기가 이를
+감지해 거부하므로 다음 수동 절차를 한 번만 수행하고, 그 뒤부터는 11.3을 쓴다.
+
+1. 배포 소유 경로와 데이터베이스를 백업한다(`./scripts/backup.sh`).
+2. 새 kit을 기존 배포가 아닌 **별도 디렉터리**에 푼다.
+3. 새 kit의 `VERSION`과 `CHANGELOG.md`에서 계약·설정·마이그레이션 변경과
+   알려진 한계를 확인한다.
+4. 11.1의 배포 소유 경로를 새 디렉터리로 옮긴다. `.mcp.json`도 함께 옮긴다.
+5. `./scripts/bootstrap.sh`와 `./scripts/migrate.sh`를 실행한다. 마이그레이션은
+   append-only이므로 기존 데이터는 유지된다.
+6. `./scripts/verify.sh`와 `./scripts/doctor.sh`로 검증하고 `sync -> search ->
+   read` 한 사이클을 확인한 뒤 이전 디렉터리를 폐기한다.
+
+`--rollback`은 kit 파일만 되돌린다. 적용된 마이그레이션과 데이터베이스 내용은
+되돌리지 않으므로, 마이그레이션을 지나는 업그레이드는 미리 받아 둔
+`./scripts/backup.sh` 덤프로만 복구할 수 있다.

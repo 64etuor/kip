@@ -4,6 +4,35 @@ This is the current readiness inventory, not the target architecture. The
 target-to-current matrix and ordered gap register live in
 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`.
 
+## 2026-09-11 one-command install and in-place upgrade (3.9.0)
+
+An adopter can install a published release with a single command
+(`curl -fsSL .../releases/latest/download/install.sh | bash`, default `$KIP_HOME`
+or `~/kip`) and update the same deployment in place, either by rerunning that
+command on the existing directory or with `./scripts/upgrade.sh
+--latest|--version X.Y.Z|--archive ZIP`. The installer is standalone Bash: it
+needs only bash, curl or wget, a SHA-256 tool and unzip or python3, verifies the
+archive against its `.sha256` sidecar before extracting anything, requires an
+absent or empty directory for a fresh install, then runs `./scripts/bootstrap.sh`
+and the full `./scripts/verify-starter-kit.sh` check. Upgrades apply section 11's
+boundary mechanically from the manifest diff: kit-owned paths are replaced or
+removed, deployment-owned paths are untouched, `.mcp.json` is preserved, and the
+previous kit files plus `plan.json` are kept under `var/upgrades/<id>/` for
+`--rollback`; `--dry-run` prints the plan and the CHANGELOG entries between the
+two versions. `tests/test_install_and_upgrade.py` covers sidecar verification,
+refusal of a tampered archive with nothing extracted, latest-tag resolution and
+refusal of a non-empty target, an in-place upgrade that preserves deployment
+state, rollback, refusal of downgrades and git checkouts, a forged archive whose
+internal digests disagree, and that both scripts are standalone and executable.
+Limits: `curl | bash` trusts GitHub's release hosting and TLS and the sidecar is
+served from that same origin, so it detects corruption rather than a compromised
+origin (SECURITY); deployments created before 3.9.0 have no `scripts/upgrade.sh`
+and take the manual STARTER_KIT_GUIDE 11.5 procedure once; `--rollback` restores
+kit files only and does not roll back the database, so a pre-upgrade
+`./scripts/backup.sh` is required across a migration boundary; and the tests run
+against local file-URL release fixtures with bootstrap skipped, so a real
+cold-network install from a published release is not exercised in CI.
+
 ## 2026-09-11 review corrections (3.8.2)
 
 An independent review of 3.7.1–3.8.1 found that the named-file fail-closed

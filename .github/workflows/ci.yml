@@ -372,16 +372,23 @@ jobs:
           cat > "$notes" <<NOTES
           Container image: \`ghcr.io/${{ github.repository }}:$version\`
 
-          ### Install
-          Download \`kip-starter-kit-$version.zip\`, verify it against
-          \`kip-starter-kit-$version.zip.sha256\`, unzip it, then follow
-          \`docs/STARTER_KIT_GUIDE.md\` section 2.
+          ### Install (one command)
+          \`\`\`bash
+          curl -fsSL https://github.com/${{ github.repository }}/releases/download/v$version/install.sh | bash -s -- ~/kip --version $version
+          \`\`\`
+          The installer downloads \`kip-starter-kit-$version.zip\`, verifies it
+          against \`kip-starter-kit-$version.zip.sha256\` before extracting, then
+          runs \`./scripts/bootstrap.sh\`. Review \`install.sh\` first if your
+          policy requires it; the manual path (download, verify, unzip, follow
+          \`docs/STARTER_KIT_GUIDE.md\` section 2) is unchanged.
 
           ### Upgrading an existing deployment
-          Do not unzip over a running deployment. \`docs/STARTER_KIT_GUIDE.md\`
-          section 11 lists which paths the kit replaces, which belong to the
-          deployment and must survive, and why \`.mcp.json\` must not be
-          overwritten.
+          Run the same command with the existing directory, or
+          \`./scripts/upgrade.sh --version $version\` inside it. Only kit-owned
+          files listed in the manifests are replaced; \`.env\`, \`config/kip*.toml\`,
+          \`.mcp.json\`, \`var/\` and ontology additions are preserved, previous kit
+          files are kept under \`var/upgrades/\` for \`--rollback\`. See
+          \`docs/STARTER_KIT_GUIDE.md\` section 11.
 
           ### Licensing
           KIP is MIT. It ships AGPL-3.0 PyMuPDF and LGPL-3.0 psycopg; see
@@ -394,6 +401,7 @@ jobs:
             "dist/kip-starter-kit-$version.zip"
             "dist/kip-starter-kit-$version.zip.sha256"
             "dist/release.tar.gz"
+            "scripts/install.sh"
           )
           for extra in dist/wheels/*.whl dist/release/artifacts/*.json; do
             assets+=("$extra")

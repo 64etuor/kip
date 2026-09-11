@@ -11,7 +11,23 @@
 agent는 `kip-setup` Skill에 따라 매번 하나의 누락된 결정만 질문하고, CLI가
 수집 범위를 미리 계산한 뒤 승인된 plan만 원자적으로 적용한다.
 
-새로 복제한 저장소에서는 `./scripts/kip`가 `.venv`를 요구하므로 먼저
+가장 빠른 설치 경로는 릴리스에 게시된 한 줄 설치기다. 저장소 복제 없이 최신
+스타터 kit을 내려받아 digest를 검증한 뒤 `$KIP_HOME` 또는 `~/kip`(비어 있거나
+아직 없는 디렉터리)에 풀고 bootstrap까지 실행한다.
+
+```bash
+curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh | bash
+# 위치와 버전 고정: | bash -s -- ~/kip --version 3.9.0
+```
+
+bash, curl 또는 wget, sha256sum 또는 shasum, unzip 또는 python3만 있으면 되고
+Python은 bootstrap이 준비한다. digest가 맞지 않으면 아무것도 풀지 않는다.
+`--check`/`--install-docker`/`--without-docker`는 bootstrap으로 전달되고
+`--no-bootstrap`은 압축만 푼다. 같은 명령을 기존 kit 배포 디렉터리에 실행하면
+그 자리에서 업그레이드하며, 배포 안에서는 `./scripts/upgrade.sh --latest`가
+같은 일을 한다.
+
+저장소를 복제해 개발하는 경우에는 `./scripts/kip`가 `.venv`를 요구하므로 먼저
 `./scripts/bootstrap.sh`를 실행한다. 필요한 Python·Node는 프로젝트 안에
 준비한다. Docker 시스템 설치를 허용하려면 `--install-docker`, 외부 DB만
 사용하면 `--without-docker`를 붙인다. `--check`는 읽기 전용 준비 점검이다.

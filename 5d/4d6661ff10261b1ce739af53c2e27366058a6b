@@ -1,0 +1,94 @@
+scripts/install.sh
+  s_16a999dee6ecf2::t_1b8fae3bf3060e 1-21,23-30,32-43,45-52,54-78,89-93,99-104,109-125,127-134,140-142,144-150,156-164,167-175,180-181,183-189,192-201
+  s_16a999dee6ecf2::t_3699f5e3ad2757 95-98
+  s_16a999dee6ecf2::t_3db6927913cd26 165-166,177-179
+  s_16a999dee6ecf2::t_a604e8216e4fea 22,79-88,94,105-108,126,137-139,151-155,176,182
+  s_16a999dee6ecf2::t_9a679ca5319f9a 31,44,53,135,143
+  s_16a999dee6ecf2::t_69eed41c7d396f 136,190-191
+contracts/openapi.yaml
+  s_16a999dee6ecf2::t_ec29e6729cc6b1 6
+docs/IMPLEMENTATION_STATUS.md
+  s_16a999dee6ecf2::t_cf9053220796b8 7-35
+docs/adr/ADR-062-one-command-install-and-manifest-upgrade.md
+  s_16a999dee6ecf2::t_ec29e6729cc6b1 1-45
+scripts/upgrade_kit.py
+  s_16a999dee6ecf2::t_9f7fc1ba20bf27 26,45-47,83,93
+  s_16a999dee6ecf2::t_aac77254321a3b 1-25,27-29,32-44,48-63,65-68,75-82,84,88-92,94-96,99-107,109-125,131-173,192-209,224-227,234-235,239-240,243-245,255-287
+  s_16a999dee6ecf2::t_3db6927913cd26 69-74,228-233,236-238,246-254
+  s_16a999dee6ecf2::t_ce6eeed6a166b3 108
+  s_16a999dee6ecf2::t_a604e8216e4fea 30-31,64,85-87,97-98,126-130,174-191,210-223,241-242
+tests/test_install_and_upgrade.py
+  s_16a999dee6ecf2::t_69eed41c7d396f 1-35,37-61,63-83,85-98,100-264,284-288
+  s_16a999dee6ecf2::t_9f7fc1ba20bf27 289-304
+  s_16a999dee6ecf2::t_c0595146e64532 309-399,401-419
+  s_16a999dee6ecf2::t_a83c825ccdaee5 62,84,99,400
+  s_16a999dee6ecf2::t_3db6927913cd26 420-450
+  s_16a999dee6ecf2::t_ce6eeed6a166b3 36
+  s_16a999dee6ecf2::t_9a679ca5319f9a 265-283
+  s_16a999dee6ecf2::t_6c218e82af740b 305-308
+docs/OPERATIONS.md
+  s_16a999dee6ecf2::t_0b85b46edd1579 84-89,91-102,105-110
+  s_16a999dee6ecf2::t_0574ea052d0818 90,103-104
+src/kip/starter_archive.py
+  s_16a999dee6ecf2::t_9f7fc1ba20bf27 15,111-112
+docs/TROUBLESHOOTING.md
+  s_16a999dee6ecf2::t_9ed86a27753031 25-68
+src/kip/__init__.py
+  s_16a999dee6ecf2::t_ec29e6729cc6b1 3
+.claude/skills/kip-setup/SKILL.md
+  s_16a999dee6ecf2::t_941932efdddfa7 10-15
+VERSION
+  s_16a999dee6ecf2::t_ec29e6729cc6b1 1
+docs/PRODUCTION_DESIGN_ALIGNMENT.md
+  s_16a999dee6ecf2::t_f621d153c7b639 107
+pyproject.toml
+  s_16a999dee6ecf2::t_ec29e6729cc6b1 7
+README.md
+  s_16a999dee6ecf2::t_0574ea052d0818 155-156
+  s_16a999dee6ecf2::t_5fb9bdd5209113 124-151,154,157-162
+  s_16a999dee6ecf2::t_d11d78b04b540e 152-153
+  s_16a999dee6ecf2::t_9a8da0ceda3c1a 40-43,50
+src/kip/starter_archive_policy.py
+  s_16a999dee6ecf2::t_9f7fc1ba20bf27 6,173
+CHANGELOG.md
+  s_16a999dee6ecf2::t_ec29e6729cc6b1 3-24
+docs/SECURITY.md
+  s_16a999dee6ecf2::t_f022019ecffd50 123-131
+docs/QUICKSTART.md
+  s_16a999dee6ecf2::t_1d5015e8c59831 14-30
+skills/kip-setup/SKILL.md
+  s_16a999dee6ecf2::t_941932efdddfa7 10-15
+docs/STARTER_KIT_GUIDE.md
+  s_16a999dee6ecf2::t_a39d2f61285ba1 410-413,415-420,424-441,456-474
+  s_16a999dee6ecf2::t_d496bb32e5312b 33-39,362-364
+  s_16a999dee6ecf2::t_16391812c53ef0 421
+  s_16a999dee6ecf2::t_0574ea052d0818 414,422-423
+.github/workflows/ci.yml
+  s_16a999dee6ecf2::t_ec29e6729cc6b1 375-383,386-391,404
+scripts/upgrade.sh
+  s_16a999dee6ecf2::t_3db6927913cd26 71-75
+  s_16a999dee6ecf2::t_a604e8216e4fea 28,30
+  s_16a999dee6ecf2::t_9a679ca5319f9a 52
+  s_16a999dee6ecf2::t_69eed41c7d396f 53,65-66
+  s_16a999dee6ecf2::t_aac77254321a3b 1-27,29,31-51,54-64,67-70
+contracts/openapi.json
+  s_16a999dee6ecf2::t_ec29e6729cc6b1 1098
+uv.lock
+  s_16a999dee6ecf2::t_6504e954383bbf 928
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "5d4d6661ff10261b1ce739af53c2e27366058a6b",
+  "prompts": {},
+  "sessions": {
+    "s_16a999dee6ecf2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b9abc8ac-2c56-4e22-a7c7-3deb16f779f3",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

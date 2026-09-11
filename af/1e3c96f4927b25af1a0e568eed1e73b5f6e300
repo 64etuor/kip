@@ -1,0 +1,136 @@
+src/kip/api.py
+  s_16a999dee6ecf2::t_feb22daee38a6a 311-312
+  s_16a999dee6ecf2::t_7eef03d7545b2a 251,256-258,303-304
+docs/OPERATIONS.md
+  s_16a999dee6ecf2::t_05edfc63862ccd 84-89,94
+  s_16a999dee6ecf2::t_ca6d03945ec676 90-93
+  s_16a999dee6ecf2::t_76382174bcb1a2 95-108,117-130
+tests/test_postgres_unreachable.py
+  s_16a999dee6ecf2::t_9ded2431a12b79 1-13,15-25
+  s_16a999dee6ecf2::t_53aa79aed7fe0a 14,26
+src/kip/adapters/repository/memory/lexical.py
+  s_16a999dee6ecf2::t_e953ab840d77bb 109-118
+  s_16a999dee6ecf2::t_bcbbc41a6852d9 82-83,91-93,99,107-108
+  s_16a999dee6ecf2::t_feb22daee38a6a 9-14,95-96,100-106
+scripts/runtime-path.sh
+  s_16a999dee6ecf2::t_fbc58a8fa347a8 5-13,15,17
+src/kip/cli.py
+  s_16a999dee6ecf2::t_7eef03d7545b2a 729-733
+  s_16a999dee6ecf2::t_ca6d03945ec676 788-792
+docs/SECURITY.md
+  s_16a999dee6ecf2::t_05edfc63862ccd 303
+  s_16a999dee6ecf2::t_3c486f49a65361 250,252-253
+  s_16a999dee6ecf2::t_f21cfbafcbf183 251
+docs/DATA_CONTRACTS.md
+  s_16a999dee6ecf2::t_b8f688a9e91c02 365-367
+  s_16a999dee6ecf2::t_ca6d03945ec676 152-155,368-373
+  s_16a999dee6ecf2::t_ab204efa58ad0f 374
+tests/test_answer_source_scope.py
+  s_16a999dee6ecf2::t_43ac81fc75b457 298-313
+  s_16a999dee6ecf2::t_9ded2431a12b79 190-262
+  s_16a999dee6ecf2::t_ca6d03945ec676 263-297
+src/kip/application/search.py
+  s_16a999dee6ecf2::t_feb22daee38a6a 3,156,161
+  s_16a999dee6ecf2::t_7eef03d7545b2a 157-160,162,164,172
+  s_16a999dee6ecf2::t_43ac81fc75b457 30,163,165-171
+docs/adr/ADR-060-bind-answer-file-scope-before-retrieval.md
+  s_16a999dee6ecf2::t_05edfc63862ccd 17-20
+  s_16a999dee6ecf2::t_ca6d03945ec676 21-25
+docs/IMPLEMENTATION_STATUS.md
+  s_16a999dee6ecf2::t_05edfc63862ccd 7-23
+docs/AI_OPERATOR_RUNBOOK.md
+  s_16a999dee6ecf2::t_3c486f49a65361 62
+src/kip/ports/retrieval.py
+  s_16a999dee6ecf2::t_bcbbc41a6852d9 22-26
+src/kip/application/answering.py
+  s_16a999dee6ecf2::t_bcbbc41a6852d9 21-22,73-81,145-147,150-153,157-161
+src/kip/logging.py
+  s_16a999dee6ecf2::t_7eef03d7545b2a 29-31
+  s_16a999dee6ecf2::t_43ac81fc75b457 32-34
+src/kip/adapters/repository/memory/retrieval.py
+  s_16a999dee6ecf2::t_bcbbc41a6852d9 53-55
+src/kip/__init__.py
+  s_16a999dee6ecf2::t_30757b561ff926 3
+README.md
+  s_16a999dee6ecf2::t_288e5e3aef4ea3 100-101,159,162-164,176,237
+  s_16a999dee6ecf2::t_f21cfbafcbf183 102-103
+  s_16a999dee6ecf2::t_be501e4ecc64ce 238
+migrations/0027_lexical_units_artifact_index.sql
+  s_16a999dee6ecf2::t_fbc58a8fa347a8 1-5
+Makefile
+  s_16a999dee6ecf2::t_fbc58a8fa347a8 9
+scripts/prerequisites.py
+  s_16a999dee6ecf2::t_6d6ebbc8c37373 308-312
+VERSION
+  s_16a999dee6ecf2::t_30757b561ff926 1
+CHANGELOG.md
+  s_16a999dee6ecf2::t_ca6d03945ec676 12-16,22-24,29
+  s_16a999dee6ecf2::t_b8f688a9e91c02 3-11,17-21,25-28,30-32
+scripts/common.sh
+  s_16a999dee6ecf2::t_6d6ebbc8c37373 7
+  s_16a999dee6ecf2::t_53aa79aed7fe0a 8
+  s_16a999dee6ecf2::t_fbc58a8fa347a8 11-15
+scripts/prerequisites.sh
+  s_16a999dee6ecf2::t_6d6ebbc8c37373 102-105,115-118
+src/kip/domain/file_references.py
+  s_16a999dee6ecf2::t_43ac81fc75b457 178-180,182-186,190-191
+  s_16a999dee6ecf2::t_feb22daee38a6a 28-31,33,36,38,59,98-99,143-146,149-154,167-168,170-174,176-177,181,187-188
+  s_16a999dee6ecf2::t_bafbfd0f783999 5,24-27,32,35,37,39-58,60-73,116-142,147-148,155-166,175
+  s_16a999dee6ecf2::t_e953ab840d77bb 169
+migrations/0026_artifact_filename_key_index.sql
+  s_16a999dee6ecf2::t_6d6ebbc8c37373 1-6
+src/kip/adapters/repository/postgres/database.py
+  s_16a999dee6ecf2::t_b8f688a9e91c02 6,243-249
+  s_16a999dee6ecf2::t_bcbbc41a6852d9 1316-1321,1372-1388
+  s_16a999dee6ecf2::t_7dd396e36b4db6 8,87,89-98,250-252,257,260-261,280-287,316-322
+  s_16a999dee6ecf2::t_43ac81fc75b457 15,88,288,1322,1327,1331,1333-1338
+  s_16a999dee6ecf2::t_a8e74d802a9bfe 17
+  s_16a999dee6ecf2::t_feb22daee38a6a 26-31,1323-1326,1328-1330,1332,1344,1346
+  s_16a999dee6ecf2::t_db5db4aebe643d 323,1389
+tests/test_agent_runtime_scripts.py
+  s_16a999dee6ecf2::t_9ded2431a12b79 106-115
+src/kip/mcp_server.py
+  s_16a999dee6ecf2::t_7eef03d7545b2a 158,212-213
+  s_16a999dee6ecf2::t_283631f6f4f070 45-48,113,214
+  s_16a999dee6ecf2::t_feb22daee38a6a 131-134
+  s_16a999dee6ecf2::t_a0a512332ffefb 196
+  s_16a999dee6ecf2::t_ca6d03945ec676 227,243-245
+contracts/openapi.yaml
+  s_16a999dee6ecf2::t_30757b561ff926 6
+tests/test_file_references.py
+  s_16a999dee6ecf2::t_43ac81fc75b457 63,86-99
+  s_16a999dee6ecf2::t_9ded2431a12b79 56-62,64-84
+  s_16a999dee6ecf2::t_e953ab840d77bb 85
+pyproject.toml
+  s_16a999dee6ecf2::t_30757b561ff926 7
+docs/QUICKSTART.md
+  s_16a999dee6ecf2::t_3c486f49a65361 68
+tests/test_mcp_envelope_contract.py
+  s_16a999dee6ecf2::t_9ded2431a12b79 224-254,268-278
+  s_16a999dee6ecf2::t_ca6d03945ec676 255-267
+contracts/openapi.json
+  s_16a999dee6ecf2::t_30757b561ff926 1098
+docs/TROUBLESHOOTING.md
+  s_16a999dee6ecf2::t_3c486f49a65361 110,191
+  s_16a999dee6ecf2::t_b8f688a9e91c02 95-103
+src/kip/adapters/repository/postgres/retrieval.py
+  s_16a999dee6ecf2::t_bcbbc41a6852d9 53-55
+uv.lock
+  s_16a999dee6ecf2::t_8e448f14d2f8c2 928
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "af1e3c96f4927b25af1a0e568eed1e73b5f6e300",
+  "prompts": {},
+  "sessions": {
+    "s_16a999dee6ecf2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b9abc8ac-2c56-4e22-a7c7-3deb16f779f3",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

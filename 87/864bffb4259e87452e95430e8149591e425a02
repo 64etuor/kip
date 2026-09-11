@@ -1,0 +1,70 @@
+contracts/openapi.json
+  s_16a999dee6ecf2::t_237d3b3a5502cc 1098
+tests/test_install_and_upgrade.py
+  s_16a999dee6ecf2::t_4429951fe8d83c 760-773
+  s_16a999dee6ecf2::t_640c62ee8bae3c 651-700,702-730
+  s_16a999dee6ecf2::t_e0397f336d1355 701,731-759
+VERSION
+  s_16a999dee6ecf2::t_237d3b3a5502cc 1
+CHANGELOG.md
+  s_16a999dee6ecf2::t_d88f25d338a669 25-29
+  s_16a999dee6ecf2::t_5c8c32fb990c09 3-4,15-23,36
+  s_16a999dee6ecf2::t_16fc4c141e384f 5-10
+  s_16a999dee6ecf2::t_55d2d3755a2dd2 11-14,24,30-35
+docs/adr/ADR-063-package-naming-and-global-launcher.md
+  s_16a999dee6ecf2::t_55d2d3755a2dd2 46-51
+  s_16a999dee6ecf2::t_5c8c32fb990c09 38-45
+scripts/upgrade.sh
+  s_16a999dee6ecf2::t_4f4cb647d6ece9 72-74
+README.md
+  s_16a999dee6ecf2::t_5c8c32fb990c09 210-214
+  s_16a999dee6ecf2::t_237d3b3a5502cc 145
+src/kip/__init__.py
+  s_16a999dee6ecf2::t_237d3b3a5502cc 3
+docs/OPERATIONS.md
+  s_16a999dee6ecf2::t_55d2d3755a2dd2 108-110
+  s_16a999dee6ecf2::t_4429951fe8d83c 111-113
+docs/DEPLOYMENT_GUIDE.md
+  s_16a999dee6ecf2::t_5c8c32fb990c09 66-71
+  s_16a999dee6ecf2::t_55d2d3755a2dd2 72-77
+scripts/install.sh
+  s_16a999dee6ecf2::t_d73737fa5e23ba 23,74-76,78-80,143,170,192,194
+  s_16a999dee6ecf2::t_32b6ac756dc905 184
+  s_16a999dee6ecf2::t_53afbf45794187 77,81-85,346,374
+  s_16a999dee6ecf2::t_4f4cb647d6ece9 37-38,53,66,155-169,171-176,191,193,293,329-330
+pyproject.toml
+  s_16a999dee6ecf2::t_237d3b3a5502cc 7
+docs/QUICKSTART.md
+  s_16a999dee6ecf2::t_55d2d3755a2dd2 27-29,35-36
+contracts/openapi.yaml
+  s_16a999dee6ecf2::t_237d3b3a5502cc 6
+docs/IMPLEMENTATION_STATUS.md
+  s_16a999dee6ecf2::t_779135d6f4188d 9-16,29
+  s_16a999dee6ecf2::t_16fc4c141e384f 7-8
+  s_16a999dee6ecf2::t_9f5d102dfc8d87 21-28
+  s_16a999dee6ecf2::t_55d2d3755a2dd2 17-20
+scripts/semantic-server.sh
+  s_16a999dee6ecf2::t_4bedf17f70b172 47
+  s_16a999dee6ecf2::t_d73737fa5e23ba 48-53
+tests/test_semantic_scripts.py
+  s_16a999dee6ecf2::t_4bedf17f70b172 382-384,388-389,392-396
+  s_16a999dee6ecf2::t_32b6ac756dc905 385-387,390-391,397-398
+uv.lock
+  s_16a999dee6ecf2::t_73d949b614126f 928
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "87864bffb4259e87452e95430e8149591e425a02",
+  "prompts": {},
+  "sessions": {
+    "s_16a999dee6ecf2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b9abc8ac-2c56-4e22-a7c7-3deb16f779f3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

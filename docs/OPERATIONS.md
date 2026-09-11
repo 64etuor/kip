@@ -21,12 +21,20 @@ DB credential만 필요하며 API/worker/identity credential은 읽지도 요구
 않는다(Compose 보간용 placeholder만 주입). external DB(번들 postgres 서비스가
 없는 plan)는 Docker를 띄우지 않고 migration만 수행한다. generated 배포가 아니면
 `compose.yaml`의 `postgres`만 올린 뒤 migration한다. 이 경로는 API/worker 이미지를
-빌드하지 않는다. 인자는 하나만 받는다.
+빌드하지 않는다. 인자는 하나만 받는다. Host model runtime(`var/semantic-venv`)이
+설치돼 있고 `KIP_SEMANTIC=off`가 아니면 `semantic-server.sh start`와 `wait`로
+runtime을 띄우고 준비를 기다린다. 실패해도 경고만 남기고 검색은 lexical로
+동작한다([Semantic search](#semantic-search-default)).
 
 REST API나 worker(예약 sync, parser worker)가 필요할 때만 전체
 `./scripts/app-up.sh`를 실행한다. standalone generated Compose가 DB 준비와
 migration을 순서대로 수행하며 승인된 source mount만 연결한다. 중지는
-`./scripts/app-up.sh --down`이다. wrapper는 generated host config를 기본
+`./scripts/app-up.sh --down`이다. 전체 `app-up.sh`는 machine당 model runtime을
+하나만 띄운다. amd64에서는 compose `models` service(profile `semantic`)를 켜고
+`127.0.0.1:${KIP_SEMANTIC_PORT:-7997}`에 publish해 host CLI/MCP도 쓰게 한다.
+ARM이거나 host runtime이 이미 응답하면 host runtime을 쓰고, 이때 API/worker
+container는 lexical 검색(`semantic_degraded`)으로 동작한다. RAM이 8 GiB 미만이거나
+`KIP_SEMANTIC=off`면 runtime을 띄우지 않는다. wrapper는 generated host config를 기본
 선택하고, 명시적 config나 exported override는 유지한다. 기본 `env:KIP_DATABASE_URL`은 bundled local DB와
 일치해야 하며 external DB는 별도 변수의 secret reference를 선택한다. 모든
 서비스와 host CLI가 같은 DB를 사용하는지 receipt/readiness로 확인한다.
@@ -115,6 +123,11 @@ git 체크아웃은 `git pull`을 쓰라며 거부된다.
 [`DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md) 11.5의 수동 절차를 한 번 거친 뒤
 설치기를 쓴다.
 
+`kip update`는 `config/kip*.toml`을 보존하므로 `semantic_enabled = false`인 기존
+배포는 3.12.0 이후에도 lexical로 남는다. 기본 semantic search를 채택하는 절차는
+[Semantic search](#semantic-search-default)의 "Adopting the default on an existing
+deployment"에 있다.
+
 3.10.0 이전에 설치한 배포도 같은 절차로 올라간다. 업그레이드는 레거시
 `STARTER-KIT-MANIFEST.json`을 읽어 그대로 적용한 뒤 그 파일을 제거하고
 `KIP-MANIFEST.json`으로 대체하며, `--rollback`은 레거시 매니페스트까지
@@ -172,6 +185,10 @@ runs the resolved uv. `--check` is read-only; `--install-docker` and
 `--without-docker` are documented in ADR-061. Existing `.env` and config files
 are preserved; a fresh `.env` receives random credentials rather than sample
 placeholders. Bootstrap does not perform an unbounded dependency upgrade.
+Bootstrap then installs the isolated semantic model runtime and prefetches the
+pinned embedding snapshot unless `KIP_SEMANTIC=off` or the host has less than
+8 GiB of RAM; a failure there never fails bootstrap (see
+[Semantic search](#semantic-search-default)).
 
 For code or release validation, run `./scripts/verify.sh`. It preflights pytest,
 Ruff, mypy, and pip-audit and fails with a bootstrap remediation if any tool is
@@ -263,8 +280,42 @@ docker compose --env-file /etc/kip/production.env \
 docker compose --env-file /etc/kip/production.env \
   -f compose.production.yaml --profile migration run --rm migrate
 docker compose --env-file /etc/kip/production.env \
-  -f compose.production.yaml up -d api worker
+  -f compose.production.yaml --profile models-fetch run --rm models-fetch
+docker compose --env-file /etc/kip/production.env \
+  -f compose.production.yaml up -d models api worker
 ```
+
+The `models` service (ADR-065) runs the digest-pinned
+`michaelf34/infinity:0.0.77-cpu` image (linux/amd64, CPU; override with
+`KIP_MODELS_IMAGE`) read-only and offline (`HF_HUB_OFFLINE=1`) on the internal
+`models` network, serving the pinned embedding model on port 7997. Its command
+is embedding-only; to use the BGE reranker in containers, append
+`--model-id BAAI/bge-reranker-v2-m3 --revision
+953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e --served-model-name
+kip-bge-reranker-v2-m3 --batch-size 2 --dtype float32` to the service command
+and uncomment the `backend = "http"`, `base_url = "http://models:7997"`,
+`model`, and `revision` lines under `[models.reranker]` in
+`config/kip.container.toml` (the lexical path keeps BM25 through
+`[models.lexical_reranker]`). `models-fetch` is the
+only service with the `model-egress` network; run it once to populate the
+`kip_models` volume with both models, so enabling the reranker later works
+offline. In `compose.yaml` the service is in the `semantic` profile, which
+`app-up.sh` enables on amd64 hosts unless a host runtime of the checkout runs
+(even while it is still loading) or a runtime other than `models` answers on
+the port; it keeps the profile while `models` runs so an upgrade recreates it.
+API and worker reach
+`http://models:7997` because `security.model_service_hosts = ["models"]`
+treats that host as local while `allow_remote_model_egress` stays false. They
+do not depend on the service: search degrades to lexical while it starts.
+
+Both compose files pass PostgreSQL memory settings:
+`shared_buffers=${KIP_POSTGRES_SHARED_BUFFERS:-1GB}`,
+`effective_cache_size=${KIP_POSTGRES_EFFECTIVE_CACHE_SIZE:-3GB}`,
+`work_mem=${KIP_POSTGRES_WORK_MEM:-16MB}`, and
+`maintenance_work_mem=${KIP_POSTGRES_MAINTENANCE_WORK_MEM:-512MB}`. The 128MB
+default made lexical queries and HNSW inserts thrash on a corpus of about 180k
+units. An existing container picks these up only when recreated
+(`docker compose up -d postgres`).
 
 All three KIP image variables must use the same verified
 `repository@sha256:<64 lowercase hex>` reference. Secret paths must be absolute
@@ -423,12 +474,17 @@ database URL or encryption key in the archive or repository.
 ./scripts/uninstall-launchd.sh
 ```
 
-The installer manages four user launch agents: the host worker
+The installer manages up to five user launch agents: the host worker
 (`com.kip.knowledge-fabric.worker`), the periodic sync enqueue
 (`com.kip.knowledge-fabric.sync`), the daily sealed backup with retention
 (`com.kip.backup`, 03:15 local by default, `--backup-hour` to change,
-`RunAtLoad` disabled), and — only with `--with-ops-report` — the periodic
-`ops-report.sh` run (`com.kip.ops-report`, `--ops-interval`, default 1800s).
+`RunAtLoad` disabled), the semantic model runtime (`com.kip.semantic`,
+`semantic-server.sh run` with `KeepAlive`, added only when
+`var/semantic-venv` is installed and `KIP_SEMANTIC` is not `off`; the installer
+stops a server started by `app-up.sh` so launchd owns the port), and — only
+with `--with-ops-report` — the periodic `ops-report.sh` run
+(`com.kip.ops-report`, `--ops-interval`, default 1800s). Linux hosts use the
+`deploy/systemd/kip-semantic.service` user-unit template for the same runtime.
 
 The installer resolves the configuration once at install time — an explicit
 `KIP_CONFIG`, else `config/kip.host.generated.toml` when guided setup
@@ -495,6 +551,9 @@ does not pass the recovery gate.
 ## Projection rebuild
 
 Rebuild lexical, vector, and graph projections independently. Never delete approved assertions to rebuild a projection.
+Sync and activated re-extraction keep the semantic projection current (see
+[Semantic search](#semantic-search-default)); `kip projection rebuild --name
+semantic` resumes or repairs it.
 
 ## Ontology mining and review
 
@@ -671,44 +730,208 @@ never in TOML. Telemetry delivery failure is intentionally non-fatal to search,
 answering, and mining; use the canonical PostgreSQL trace table to diagnose
 collector loss.
 
-### Local semantic shadow
+### Semantic search (default)
 
-The supported PostgreSQL production reference profile includes pgvector through
-`0006_pgvector_1024_projection.sql` and the 1024-dimensional HNSW index through
-`0018_embeddings_1024_hnsw.sql`. Migration 0018 uses a transaction-local
-unlimited statement timeout for index construction; normal query timeouts remain
-unchanged. Semantic retrieval is still disabled when
-`search.semantic_enabled=false`.
+Since 3.12.0 (ADR-065) the shipped configs and setup-generated configs set
+`search.semantic_enabled = true`, `search.default_mode = "hybrid"` (lexical
+and vector candidates fused by reciprocal rank) and
+`search.semantic_auto_activate = true`, with `[models.embedding] enabled = true`
+serving Qwen/Qwen3-Embedding-0.6B as `kip-qwen3-embedding-0.6b` at revision
+`97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3`, 1024 dimensions. The supported
+PostgreSQL profile includes pgvector through `0006_pgvector_1024_projection.sql`
+and the 1024-dimensional HNSW index through `0018_embeddings_1024_hnsw.sql`.
+Migration 0018 uses a transaction-local unlimited statement timeout for index
+construction; normal query timeouts remain unchanged. A deployment with
+`search.semantic_enabled = false` stays lexical-only.
+
+`hybrid` is the default because it measured best on the reviewed private set
+(Recall@10/MRR 89.5%/89.5%, P95 2.42 s). BM25 reranking of the fused list
+lowered quality (78.9%/59.8%, below lexical), and the BGE cross-encoder raised
+recall but not ranking quality at 3-4x the latency on the reference Mac (P95
+7.2 s with 20 candidates, 16.2 s with 40). The BM25 reranker stays on for the
+lexical path (`search.lexical_rerank_enabled = true`,
+`models.reranker.backend = "bm25"`): lexical mode and the lexical fallback
+rerank with it. `reranked` remains an explicit mode. To rerank with the BGE
+reranker-v2-m3 cross-encoder, set `models.reranker.backend = "http"` and
+`models.reranker.max_document_chars = 2048` (the shipped 8000 is the BM25 cap;
+add `search.default_mode = "reranked"` if the default path should rerank) and start
+the runtime with `KIP_SEMANTIC_RERANKER=on`, which loads the reranker model
+(about 2 GB more memory). The cross-encoder then scores only the fused
+`reranked` pool: the BM25 lexical reranker stays on for lexical mode and the
+lexical fallback, so neither waits on nor fails with the model runtime. It
+is configured by the optional `[models.lexical_reranker]` table (see
+[Local lexical reranking](#local-lexical-reranking)).
+
+#### Model runtime
+
+`./scripts/bootstrap.sh` installs the isolated runtime into `var/semantic-venv`
+(Infinity 0.0.77 from the hash-locked `requirements/semantic.txt`, compiled from
+`requirements/semantic.in` and installed with `uv pip sync --require-hashes`)
+and prefetches the pinned embedding snapshot into `var/model-cache` (about
+1.2 GB, plus about 2.3 GB for the reranker when `KIP_SEMANTIC_RERANKER=on`) with
+`./scripts/semantic-server.sh prefetch`. `KIP_SEMANTIC=off`
+(environment for the installer or bootstrap, persisted into `.env`) skips it,
+and hosts with less than 8 GiB of RAM skip it automatically. A failure never
+fails bootstrap: search stays lexical and the retry command is printed:
 
 ```bash
-./scripts/bootstrap-semantic.sh
-./scripts/semantic-server.sh run
-./scripts/semantic-smoke.sh
-./scripts/kip projection rebuild --name semantic
-./scripts/kip projection verify --name semantic
+./scripts/bootstrap-semantic.sh && ./scripts/semantic-server.sh prefetch
 ```
 
-For an interactive shell, `semantic-server.sh start` backgrounds the process.
-For CI, agent runners, containers, launchd, systemd, or another supervisor, use
-`semantic-server.sh run` as the supervised foreground process; detached child
-lifetime is not guaranteed after an ephemeral runner command returns. Readiness
-is `GET http://127.0.0.1:7997/models`, and both served model names must be present
-before rebuild or evaluation.
+A freshly created `config/kip.toml` gets `semantic_enabled = false` when the
+runtime was not installed. Guided setup records `semantic_search` in the plan
+from whether `var/semantic-venv/bin/infinity_emb` exists and `KIP_SEMANTIC` is
+not `off`, and generates matching host and container configs; a lexical-only
+plan drops the compose `models` service and warns why.
 
-The isolated semantic environment pins Infinity 0.0.77 and Click 8.1.8.
-Click 8.4.x is incompatible with Infinity's Typer 0.12.5 dual boolean flags.
-Apple MPS also runs with BetterTransformer disabled because Infinity's optional
-Optimum precheck is invalid on that path. Defaults of four embedding inputs and
-two reranking pairs per server batch fit the validated 24 GB Apple Silicon
-profile. The application also bounds each document input to the configured
-`models.embedding.max_document_chars` (default 12000); this preprocessing value
-uses the versioned `head_tail_v1` strategy, preserving the title and sampling
-both ends of oversized units. The cap and strategy are part of the
-embedding-space identity, so changing either creates a new shadow space instead
-of mixing incompatible vectors. Adjust either batch size or input cap only
-after measuring. The completed 2026-08-13 private report used the former 4000
-character identity and is historical evidence; rebuild and evaluate a fresh
-`c12000` space before making any current activation claim.
+```bash
+./scripts/semantic-server.sh start    # background; also run by app-up.sh
+./scripts/semantic-server.sh wait     # block until GET /models answers
+./scripts/semantic-server.sh status
+./scripts/semantic-server.sh stop     # waits up to 20 s, then force-stops
+./scripts/semantic-server.sh run      # foreground, for a supervisor
+./scripts/semantic-smoke.sh
+```
+
+`./scripts/app-up.sh --database-only` starts the runtime and waits until it is
+ready. For CI, agent runners, containers, launchd, systemd, or another
+supervisor, use `semantic-server.sh run` as the supervised foreground process;
+detached child lifetime is not guaranteed after an ephemeral runner command
+returns. `./scripts/install-launchd.sh` adds the supervised `com.kip.semantic`
+item and `deploy/systemd/kip-semantic.service` is the Linux user-unit template.
+Readiness is `GET http://127.0.0.1:7997/models` with the embedding model (and
+the reranker when `KIP_SEMANTIC_RERANKER=on`) listed. The server binds to
+loopback only and runs offline (`HF_HUB_OFFLINE`) once the pinned snapshots are
+cached. `start` does nothing when a supervised (launchd/systemd) or other
+instance already runs, answers or holds the port (a compose `models` container
+that is still loading holds it before it answers); with
+`KIP_SEMANTIC_RERANKER=on`, `start` and `wait` fail if that instance does not
+list the reranker, and the instance must be stopped and started again. Model
+probes time out after 5 seconds. `run` never loads a second copy either: while
+another runtime runs (even while loading), answers or holds the port it logs once,
+re-checks every `KIP_SEMANTIC_RECHECK_SECONDS` (60), and takes over when the
+port is free, so launchd `KeepAlive` and systemd `Restart` do not keep
+reloading the models. `wait` also follows a supervised instance and points at
+`var/log/launchd-semantic.err.log` or `journalctl --user -u kip-semantic`.
+`status` exits 0 while a runtime process of the checkout runs, even before it
+answers. `stop` stops the instance that `start` launched; for a supervised
+instance it prints the `launchctl bootout` or `systemctl --user stop` command
+instead. It waits up to
+`KIP_SEMANTIC_STOP_SECONDS` (20) for in-flight requests and then force-stops
+(after re-checking that the PID is still the runtime), so a busy server cannot
+be orphaned with its model memory.
+
+The device is detected automatically: Apple Silicon uses `mps`, a visible
+NVIDIA GPU uses `cuda`, anything else `cpu` (override `KIP_SEMANTIC_DEVICE`).
+The dtype is float16 on a GPU and float32 on CPU (override
+`KIP_SEMANTIC_DTYPE`); float16 and float32 embeddings measured a cosine of at
+least 0.99998. On `mps`, `PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.5` and
+`PYTORCH_MPS_LOW_WATERMARK_RATIO=0.3` cap the Metal allocator cache unless the
+environment sets them. On the reference Apple Silicon (24 GB, float16,
+embedding model only) the runtime holds about 2.7 GB; with both models and long
+inputs it had reached 10-15 GB, which is why the reranker is opt-in, inputs are
+capped at 4000 characters, and the Metal allocator cache is capped. The
+isolated environment pins Infinity 0.0.77 and
+Click 8.1.8 (Click 8.4.x is incompatible with Infinity's Typer 0.12.5 dual
+boolean flags); Apple MPS runs with BetterTransformer disabled because
+Infinity's optional Optimum precheck is invalid on that path. Server batches of
+four embedding inputs and two reranking pairs fit the validated 24 GB Apple
+Silicon profile.
+
+`./scripts/kip doctor` reports a non-required `semantic_search` check with the
+runtime reachability, the projection state including the full completeness
+count (`stale` when the active space is missing units), and the command that
+fixes it:
+`./scripts/semantic-server.sh start` when the runtime is down,
+`./scripts/bootstrap-semantic.sh && ./scripts/semantic-server.sh prefetch` when
+it is not installed, and `kip sync run --source SOURCE` or
+`kip projection rebuild --name semantic` when the projection is missing,
+shadow, or stale.
+
+#### Embedding settings
+
+```toml
+[models]
+circuit_cooldown_seconds = 30
+
+[models.embedding]
+enabled = true
+batch_size = 32
+max_batch_chars = 16000
+max_document_chars = 4000
+timeout_seconds = 120
+query_timeout_seconds = 10
+```
+
+Each document input is bounded to `models.embedding.max_document_chars`
+(default 4000) with the versioned `head_tail_v1` strategy, preserving the title
+and sampling both ends of oversized units. At the former 12000 the runtime
+reached a 15 GB footprint on a 24 GB Mac and swapped heavily. A rebuild sends at
+most `batch_size` units per request, bounded by `max_batch_chars` characters,
+so one request never holds the runtime long enough to starve interactive query
+embeddings; query embeddings have their own 10-second timeout with a 3-second
+connect timeout. After a runtime failure a per-adapter circuit skips it for
+`models.circuit_cooldown_seconds` so queries do not each wait for a timeout.
+The embedding cap, strategy, model, revision, dimensions, and query
+instruction are the embedding-space identity; changing any of them creates a
+new shadow space instead of mixing incompatible vectors. The opt-in HTTP
+reranker (`models.reranker.backend = "http"`, BGE reranker-v2-m3 on the same
+runtime with `KIP_SEMANTIC_RERANKER=on`) caps its input with
+`models.reranker.max_document_chars` (2048 when unset).
+
+#### Projection maintenance
+
+Every sync (`kip sync run`, REST `POST /v1/sync/filesystem/{source}?enqueue=false`,
+worker `sync.source` jobs) and every activated `parser reextract` embeds new or
+changed units. When the projection is complete and its identity is in
+`RELEASE_REVIEWED_EMBEDDING_IDENTITIES` (the pinned default above: provider
+`infinity`, model, revision, 1024 dimensions, 4000 characters, `head_tail_v1`,
+and the default query instruction), it is activated automatically;
+`kip projection rebuild --name semantic` does the same for a complete reviewed
+space. Other identities are completed but wait for evaluation and
+`kip projection activate` (ADR-036/037). `search.semantic_auto_activate = false`
+restores fully manual activation.
+
+Sync and re-extraction summaries carry an optional `semantic_projection`
+object (`status` `disabled|current|updated|incomplete|unavailable`,
+`space_id`, `newly_indexed_units`, `indexed_units`, `content_units`,
+`active`, `activated`, `reason`); the reason is also added to `warnings`. CLI
+syncs print `semantic projection: embedded N/M new or changed units` on
+stderr. A runtime that is down during sync yields `unavailable`, not a sync
+failure; the next sync resumes. Rebuild is resumable: it pages through pending
+current ACL-fresh units 1000 at a time (`models.embedding.page_size`) and
+embeds only units whose vector is missing or whose source hash changed.
+`projection verify` uses that same current-unit set as its denominator,
+accepts a complete `shadow` or `active` space, and ignores vectors from
+inactive extractions or superseded revisions. `projection activate` refuses an
+incomplete space.
+
+The first full projection of a large corpus is slow. On the reference Apple
+Silicon (24 GB) throughput was about 100 short units per second and roughly
+2,800-5,000 characters per second for longer units; a 1,912-file OneDrive
+corpus with about 176,500 units (about 44 M characters at the 4000 cap) needs
+on the order of three hours. Search stays lexical, with a `semantic_degraded`
+warning, until the projection is complete and active.
+
+#### Degradation
+
+Default-mode search falls back to the lexical path (BM25-reranked) with the
+envelope warning `semantic_degraded` when the runtime or the active projection
+is unavailable. When a deployment sets `search.default_mode = "reranked"` and
+only the reranker fails, it keeps the fused lexical+vector ranking with
+`rerank_degraded`; `lexical_rerank_degraded` still marks a failed lexical
+reranker and now also a fallback left in lexical order because lexical rerank
+is enabled without a reranker (`models.reranker.enabled = false`). These warnings
+appear in the search and context envelope `meta.warnings` on CLI, REST, and
+MCP, not only in traces. Public v1 `SearchRequest.mode` accepts `lexical`,
+`vector`, `hybrid`, and `reranked`; an explicit `--mode vector|hybrid|reranked`
+request fails instead of degrading. `capabilities` stays cheap because MCP
+clients call it first: `semantic_search` is true and `semantic_projection_status`
+is `active` when the active space matches the configured identity
+(otherwise `incompatible`, `shadow`, or `missing`). The full completeness count,
+with a `stale` verdict when the active space is missing units, is reported by
+`kip doctor` and `kip projection verify`; every sync keeps the projection
+current.
 
 The reference HNSW query settings are:
 
@@ -720,29 +943,40 @@ hnsw_max_scan_tuples = 100000
 
 Each vector query also sets `hnsw.iterative_scan=strict_order` transaction
 locally. Change these bounds only with an exact-search recall comparison and
-filtered ACL/freshness candidate-sufficiency evidence.
+filtered ACL/freshness candidate-sufficiency evidence. Projection queries
+evaluate ACL freshness and source policy once per artifact and snapshot rather
+than per unit; per-unit checks had exceeded the 15-second statement timeout at
+about 176k units. Projection statements (pending pages, progress counts, scope
+listing, embedding upserts) use `database.projection_statement_timeout_ms`
+(default 300000) instead of the interactive `database.statement_timeout_ms`,
+because a multi-hour first build had hit the interactive limit.
 
-`projection rebuild` is resumable for a stable embedding-space identity: it
-embeds only current active ACL-fresh units whose vector is missing or whose
-source hash changed. `projection verify` uses that same current-unit set as its
-denominator, accepts a complete `shadow` or `active` space, and ignores vectors
-from inactive extractions or superseded revisions. `projection activate`
-refuses an incomplete space. Activation is still a separate operator decision
-after `evaluate compare`; both the public pilot and the current private
-Qwen3 report say to keep it disabled, for different measured reasons.
+#### Adopting the default on an existing deployment
 
-Public v1 `SearchRequest.mode` accepts `lexical`, `vector`, `hybrid`, and
-`reranked` across CLI, REST, MCP, and SDK. An explicit vector-family request is
-diagnostic access, not activation evidence: only after a fingerprint-matched
-promotion, `projection activate`, and a separate reviewed
-`search.semantic_enabled=true` configuration change may the deployment default
-use a semantic mode. `capabilities.semantic_search` must be true before clients
-offer that path as ready.
+`kip update` keeps each deployment's config, so a config with
+`semantic_enabled = false` stays lexical. To adopt the default:
+
+```bash
+./scripts/bootstrap-semantic.sh && ./scripts/semantic-server.sh prefetch
+# set search.semantic_enabled = true, search.default_mode = "hybrid" (the
+# earlier example value "reranked" BM25-reranks the fused list and measured
+# lower) and [models.embedding] enabled = true with the defaults above (or
+# re-apply guided setup)
+./scripts/semantic-server.sh start
+./scripts/kip sync run --source SOURCE   # or: ./scripts/kip projection rebuild --name semantic
+```
+
+The reviewed space activates itself when complete. A config that keeps
+`max_document_chars = 12000` forms a different, unreviewed identity and needs
+evaluation and manual activation. The 3.12.0 measurements are recorded in
+`docs/IMPLEMENTATION_STATUS.md` and `docs/RAG_EVALUATION.md`.
 
 ### Periodic public scorecard
 
-Enable the `public-government` source and both model adapters in the local
-`config/kip.toml`, then run:
+Enable the `public-government` source in the local `config/kip.toml` (the
+embedding adapter and the BM25 reranker are on by default since 3.12.0; the BGE
+`reranked` variant also needs `models.reranker.backend = "http"` and
+`KIP_SEMANTIC_RERANKER=on`), then run:
 
 ```bash
 make fetch-corpus
@@ -761,19 +995,34 @@ to `evaluate run` only for a deliberate cold-start measurement.
 ### Merge and private-corpus regression gates
 
 ```bash
-./scripts/portable_golden_gate.py
-./scripts/golden_gate.py
-KIP_REQUIRE_PRIVATE_GOLDEN=1 ./scripts/golden_gate.py
+./scripts/golden-gate.sh --portable
+./scripts/golden-gate.sh --private
+KIP_REQUIRE_PRIVATE_GOLDEN=1 ./scripts/golden-gate.sh --private
 ```
+
+`./scripts/golden-gate.sh` is the supported wrapper and `verify.sh` uses it; the
+former `./scripts/golden_gate.py` and `./scripts/portable_golden_gate.py`
+invocations were not executable and ran outside the project interpreter.
 
 The portable gate expands the checked-in 20-document manifest into 100 positive
 query contracts and 20 ACL-negative cases. It always runs in hosted CI and
 protects search stages, filters, envelope behavior, and authorization without
-shipping private data. It is synthetic contract evidence, not a production
-quality score.
+shipping private data. It runs both lexical and the shipped default mode, the
+latter with a deterministic character-bigram hashing embedding so no model is
+needed, and requires recall and MRR 1.0, zero ACL leaks, and P95 at most
+100 ms for each. It is synthetic contract evidence, not a production quality
+score.
 
-The private gate uses the approved real corpus. Developer environments may skip
-it when that corpus is intentionally absent. Protected corpus-bearing runners
+The private gate uses the approved real corpus. Its floor file supports
+per-variant floors: `hybrid` (recall 0.84, MRR 0.84, P95 at most 8000 ms) and
+the `lexical` fallback (recall 0.84, MRR 0.60, P95 at most 8000 ms). It fails when
+the reviewed corpus is indexed but semantic search is configured and not
+ready; when a deployment disables semantic search, the semantic floors are
+skipped with a message. It also fails when the deployment's own default mode
+(`search.default_mode`, or `lexical` when semantic search is disabled) has no
+floor, and when the floor file's `variants` object is empty or holds a
+malformed entry. Developer environments may skip it when that corpus is
+intentionally absent. Protected corpus-bearing runners
 must set `KIP_REQUIRE_PRIVATE_GOLDEN=1`; missing dataset, empty repository, or a
 skip then fails closed. Do not report a merge as private-corpus-gated unless that
 protected job actually ran.
@@ -1016,7 +1265,8 @@ page/shape locators, all warnings, and source SHA/mtime before activation.
 
 ## Local lexical reranking
 
-The starter profiles rerank at most 40 ACL-filtered lexical candidates with
+In lexical mode, including the lexical fallback of the default semantic mode,
+the starter profiles rerank at most 40 ACL-filtered lexical candidates with
 candidate-local Okapi BM25. This is local, deterministic, and does not build
 embeddings or send document text to a model endpoint. RapidFuzz remains the
 supported fallback backend:
@@ -1032,6 +1282,29 @@ backend = "bm25"
 max_document_chars = 8000
 baseline_weight = 0.15
 ```
+
+When `[models.reranker]` selects a model backend (`http` or `huggingface`),
+lexical mode and the `semantic_degraded` fallback keep a local reranker from
+the optional `[models.lexical_reranker]` table instead of calling the model.
+Its keys and defaults match the shipped BM25 settings above, so lexical
+results do not change: `backend` (`bm25`, or `rapidfuzz`),
+`max_document_chars` (8000), `bm25_k1`/`bm25_b` (1.2/0.75), and
+`baseline_weight` (0.15, RapidFuzz only). With a `bm25` or `rapidfuzz`
+`[models.reranker]` backend the table is ignored and both paths share that
+reranker. `models.reranker.enabled = false` still disables both, and
+`search.lexical_rerank_enabled` still decides whether lexical results are
+reranked at all.
+
+Query n-grams present in at least `search.lexical_common_term_fraction`
+(default 0.02) of lexical units are left out of candidate matching; KIP adds
+file and folder names to every unit's lexical text, so a folder name such as
+`절차` had matched 55k of 104k units. The BM25 reranker still scores the full
+question, and `0` disables the exclusion. The abstention gate uses an
+existence check (`any_term_visible`, about 2 ms instead of up to seconds).
+On the private reviewed set (19 cases, full 1,912-file corpus, lexical mode)
+this moved recall@10 from 78.9% to 89.5%, MRR from 58.3% to 63.8%, nDCG from
+63.6% to 70.2%, P50 from 4.40 s to 1.45 s, and P95 from 11.11 s to 2.22 s
+(warmed release evaluation).
 
 Candidate documents are reopened through the same ACL- and freshness-aware
 repository before reranking. If the adapter is unavailable, KIP preserves the
@@ -1055,6 +1328,9 @@ Dependabot proposes Python, GitHub Actions, and Docker updates weekly. The
 and reranker revisions with upstream. It creates or updates one GitHub issue
 when drift is detected and closes that issue after every watched pin matches
 again. Run `./scripts/check-upstream-updates.sh` for the same read-only check
-locally, or dispatch the workflow manually. Both are discovery surfaces only:
+locally, or dispatch the workflow manually. `scripts/audit-semantic.sh` (run by
+`verify.sh`; it needs network access like the Kordoc audit) audits the model
+runtime lock `requirements/semantic.txt`; reviewed advisories are listed with
+their reasons in `docs/SECURITY.md` and any new advisory fails. Both are discovery surfaces only:
 follow `DEPLOYMENT_GUIDE.md` and the quality experiment workflow before
 changing a production pin or activating a projection.

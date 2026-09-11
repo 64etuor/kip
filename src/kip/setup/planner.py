@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import platform
 from pathlib import Path, PurePosixPath
 
 from kip.errors import ValidationError
@@ -185,7 +186,8 @@ def build_setup_plan(
             "compose.generated.yaml",
             ".mcp.json",
         ],
-        warnings=warnings,
+        warnings=[*warnings, *_semantic_warnings(project_root)],
+        semantic_search=semantic_runtime_ready(project_root),
         runtime_uid=os.getuid(),
         runtime_gid=os.getgid(),
         runtime_supplementary_gids=sorted(set(os.getgroups()) - {os.getgid()}),
@@ -193,6 +195,37 @@ def build_setup_plan(
     return plan.model_copy(
         update={"plan_fingerprint": plan.calculate_fingerprint()}
     )
+
+
+def semantic_runtime_ready(project_root: Path) -> bool:
+    """Hybrid lexical+vector search is the default wherever its runtime exists.
+
+    Bootstrap installs the isolated model runtime unless ``KIP_SEMANTIC=off``
+    or the machine has too little memory; generated configs follow that
+    outcome so a lexical-only machine does not warn on every query.
+    """
+    if os.environ.get("KIP_SEMANTIC", "on").strip().lower() == "off":
+        return False
+    return (project_root / "var/semantic-venv/bin/infinity_emb").is_file()
+
+
+def _semantic_warnings(project_root: Path) -> list[str]:
+    if semantic_runtime_ready(project_root):
+        if platform.machine().lower() in {"arm64", "aarch64"}:
+            # The pinned compose `models` image is linux/amd64 only.
+            return [
+                "the compose models image is linux/amd64: on this ARM machine containers run it "
+                "under emulation (slow) or not at all; host CLI/MCP use the native runtime, or set "
+                "KIP_MODELS_IMAGE to an arm64 build"
+            ]
+        return []
+    if os.environ.get("KIP_SEMANTIC", "on").strip().lower() == "off":
+        return ["semantic search stays off because KIP_SEMANTIC=off"]
+    return [
+        "semantic search stays off: the model runtime is not installed; run "
+        "./scripts/bootstrap-semantic.sh && ./scripts/semantic-server.sh prefetch, "
+        "then apply setup again"
+    ]
 
 
 def _first_missing_question(answers: SetupAnswers) -> SetupQuestion | None:

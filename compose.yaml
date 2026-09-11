@@ -18,6 +18,58 @@ services:
       timeout: 5s
       retries: 20
     shm_size: 1gb
+    # The lexical index and vector projection outgrow the 128MB default on a
+    # real corpus; size these to the host (see docs/OPERATIONS.md).
+    command:
+      - postgres
+      - -c
+      - shared_buffers=${KIP_POSTGRES_SHARED_BUFFERS:-1GB}
+      - -c
+      - effective_cache_size=${KIP_POSTGRES_EFFECTIVE_CACHE_SIZE:-3GB}
+      - -c
+      - work_mem=${KIP_POSTGRES_WORK_MEM:-16MB}
+      - -c
+      - maintenance_work_mem=${KIP_POSTGRES_MAINTENANCE_WORK_MEM:-512MB}
+    security_opt:
+      - no-new-privileges:true
+
+  # Embedding and reranker runtime for default semantic search (ADR-065).
+  # Linux amd64 CPU image pinned by digest; the pinned model revisions are
+  # downloaded once into kip_models. It has its own profile so a machine runs
+  # exactly one model runtime: app-up.sh enables it on amd64 hosts (and
+  # publishes it on loopback for host CLI/MCP) and uses the native host
+  # runtime elsewhere. API and worker do not depend on it: search falls back
+  # to lexical while it starts.
+  models:
+    profiles: ["semantic"]
+    image: ${KIP_MODELS_IMAGE:-michaelf34/infinity:0.0.77-cpu@sha256:94db836145f609c508f3f296f3b9bd0e78ae088025e879664d073dfd9f929e96}
+    restart: unless-stopped
+    environment:
+      HF_HOME: /models
+      DO_NOT_TRACK: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+    # Embedding model only: the default hybrid mode does not call a
+    # cross-encoder. For `models.reranker.backend = "http"`, append the
+    # BAAI/bge-reranker-v2-m3 revision 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
+    # as a second --model-id/--revision/--served-model-name/--batch-size/--dtype.
+    command: ["v2", "--host", "0.0.0.0", "--port", "7997",
+              "--engine", "torch", "--device", "cpu", "--no-bettertransformer",
+              "--model-id", "Qwen/Qwen3-Embedding-0.6B",
+              "--revision", "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+              "--served-model-name", "kip-qwen3-embedding-0.6b",
+              "--batch-size", "4", "--dtype", "float32"]
+    ports:
+      - "127.0.0.1:${KIP_SEMANTIC_PORT:-7997}:7997"
+    volumes:
+      - kip_models:/models
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7997/models', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 120s
+    cap_drop:
+      - ALL
     security_opt:
       - no-new-privileges:true
 
@@ -117,3 +169,4 @@ services:
 volumes:
   kip_pgdata:
   kip_cas:
+  kip_models:

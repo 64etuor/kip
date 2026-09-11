@@ -35,6 +35,15 @@ rollback을 다룬다.
    필요는 없다. 최소 Linux에는 curl/wget, CA 인증서, tar/gzip, SHA-256 도구가
    있어야 한다. 의존성은 `uv.lock` frozen sync로 설치한다. 기존 `.env`,
    config, 호환되는 `.venv`, Docker context와 셸 프로필은 보존한다.
+   기본 semantic search(ADR-065)를 위해 격리된 model runtime(`var/semantic-venv`,
+   hash-locked `requirements/semantic.txt`의 Infinity 0.0.77을
+   `uv pip sync --require-hashes`로 설치)과 고정된 embedding snapshot
+   (`var/model-cache`, 약 1.2GB, `./scripts/semantic-server.sh prefetch`)도
+   준비한다. Reranker snapshot(약 2.3GB)은 `KIP_SEMANTIC_RERANKER=on`일 때만
+   함께 받는다. `KIP_SEMANTIC=off`는 이 단계를 건너뛰고 `.env`에 기록되며, RAM이
+   8GiB 미만이면 자동으로 건너뛴다. 실패해도 bootstrap은 실패하지 않고 검색은
+   lexical로 남으며 재시도 명령을 출력한다. Runtime 없이 새로 만든
+   `config/kip.toml`은 `semantic_enabled = false`로 시작한다.
    저장소 없이 패키지만 받는 수신자는 릴리스에 게시된 한 줄 설치기로 이 단계까지
    한 번에 수행할 수 있다. `curl -fsSL
    https://github.com/64etuor/kip/releases/latest/download/install.sh | bash`은
@@ -87,10 +96,20 @@ rollback을 다룬다.
    실행한다. 선택된 DB만 준비하고 host migration을 수행하며, DB credential만
    필요하고 API/worker 이미지는 빌드하지 않는다. external DB면 Docker를 띄우지
    않는다. REST API나 worker가 필요할 때 전체 `./scripts/app-up.sh`를 실행하면
-   같은 준비 뒤 API/worker가 시작된다. `app-up.sh`는 standalone
+   같은 준비 뒤 API/worker가 시작된다. 이때 machine당 model runtime은 하나만
+   뜬다. amd64에서는 compose `models` 서비스(profile `semantic`)가
+   `127.0.0.1:${KIP_SEMANTIC_PORT:-7997}`에 publish되어 host CLI/MCP도 쓰고,
+   ARM이거나 host runtime이 이미 응답하면 host runtime을 쓰며 API/worker
+   container는 lexical 검색(`semantic_degraded`)으로 동작한다. RAM 8GiB 미만이나
+   `KIP_SEMANTIC=off`면 runtime을 띄우지 않는다. `app-up.sh`는 standalone
    `compose.generated.yaml`만 선택하여 승인된 source mount와 생성 config를
    적용한다. 기본 Compose의 sample mount는 합쳐지지 않는다. 필요하면
-   `./scripts/doctor.sh`로 환경을 점검한다.
+   `./scripts/doctor.sh`로 환경을 점검한다. `--database-only`는 설치된 host model
+   runtime도 시작하고 준비될 때까지 기다린다. Setup plan의 `semantic_search`는
+   `var/semantic-venv/bin/infinity_emb`가 있고 `KIP_SEMANTIC`이 `off`가 아닌지로
+   정해지며, lexical 전용 plan은 compose `models` 서비스를 빼고 이유를 경고한다.
+   `./scripts/kip doctor`의 선택 항목 `semantic_search`가 runtime 연결과 projection
+   완성도(`stale` 포함), 고칠 명령을 보고한다.
 8. receipt의 `next_steps`에 나온 승인된 source 이름으로 먼저
    `sync run --source SOURCE --dry-run`을 실행해 범위와 건수를 확인한다.
    사용자 폴더만 설정했다면 `sample` source가 있다고 가정하지 않는다.
@@ -238,27 +257,62 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 - 모델 ID뿐 아니라 immutable revision, dimensions, instruction, tokenizer/runtime을 pin한다.
 - 한국어 내부 질문에 대해 lexical baseline과 Recall/MRR/nDCG, ACL leak, P95, 비용을 비교한다.
 - public MTEB 순위는 후보 선택 자료일 뿐 KIP corpus 승격 근거가 아니다.
-- starter 기본 lexical path는 ACL과 freshness가 적용된 최대 40개 후보만
-  candidate-local BM25로 재정렬한다. embedding이나 외부 전송은 발생하지
-  않으며, 실패 시 lexical 순서와 `lexical_rerank_degraded` 표식을 보존한다.
-  RapidFuzz는 fallback backend다.
+- 3.12.0 기본 검색 mode는 `hybrid`다(ADR-065). lexical과 vector 후보를
+  reciprocal-rank fusion으로 합친다. 검토된 private 19-case에서 hybrid는
+  Recall@10/MRR 89.5%/89.5%(P95 2.42 s)였고, fused 결과를 BM25로 rerank하면
+  78.9%/59.8%로 lexical보다 낮았으며, BGE cross-encoder는 recall은 올렸지만 순위
+  품질은 올리지 못하고 기준 Mac에서 지연이 3-4배(후보 20개 P95 7.2 s, 40개
+  16.2 s)였다. Model runtime이나 active projection이 없으면 `semantic_degraded`
+  경고와 함께 lexical path로 동작한다. `--mode`로 명시한 vector 계열 요청은
+  degrade하지 않고 실패한다.
+- `reranked`는 명시적 mode이자 cross-encoder를 켠 배포의 설정값으로 남는다.
+  BGE reranker-v2-m3를 쓰려면 `models.reranker.backend = "http"`와
+  `models.reranker.max_document_chars = 2048`(기본값 8000은 BM25용이다. 기본
+  경로도 rerank하려면 `search.default_mode = "reranked"`)로 설정하고 runtime을
+  `KIP_SEMANTIC_RERANKER=on`으로 시작한다(메모리 약 2GB 추가). 이런 배포에서
+  reranker만 실패하면 `rerank_degraded` 경고와 함께 fused 순위로 동작한다.
+- lexical path(lexical mode와 fallback)는 기본으로 켜진 BM25 reranker
+  (`search.lexical_rerank_enabled = true`, `models.reranker.backend = "bm25"`)로
+  ACL과 freshness가 적용된 최대 40개 후보만 candidate-local BM25로 재정렬한다.
+  embedding이나 외부 전송은 발생하지 않으며, 실패 시 lexical 순서와
+  `lexical_rerank_degraded` 표식을 보존한다. RapidFuzz는 fallback backend다.
 - 2026-08-10 OneDrive HWP/HWPX source-derived 253-query A/B는 RapidFuzz를
   먼저 승격했지만 reviewed natural-language answer/ontology 평가가 아니었다.
   ADR-034가 이후 reviewed 19-case 비교로 BM25를 기본값으로 승격했다. Kiwi
   analyzer는 이 corpus에서 유의미한 이득이 없어 포함하지 않는다.
-- Semantic shadow는 `evaluate run --variants lexical,vector,hybrid,reranked`로
+- Semantic 후보는 `evaluate run --variants lexical,vector,hybrid,reranked`로
   비교한다. Public v1 `SearchRequest.mode`로도 같은 네 mode를 명시할 수
   있지만, `capabilities.semantic_search`가 false인 배포에서 vector 계열
-  mode를 운영 기본값으로 간주하지 않는다. Shadow 평가 성공과 명시적
-  projection activation은 서로 다른 승인 단계다.
+  mode를 운영 기본값으로 간주하지 않는다. Release가 검토한 기본 embedding
+  identity(`RELEASE_REVIEWED_EMBEDDING_IDENTITIES`)만 projection이 완성될 때
+  자동 활성화된다. 다른 모델·revision·dimensions·`max_document_chars`·instruction은
+  shadow로 완성된 뒤 평가와 명시적 `kip projection activate`를 거친다
+  (ADR-036/037). Shadow 평가 성공과 명시적 activation은 서로 다른 승인 단계다.
 - 배포 가능한 저장소 CI는 private corpus가 없어도 checksum-pinned
   `production-regression.yaml`의 100개 positive 검색과 20개 ACL-negative
   계약을 항상 실행한다. 실제 조직 corpus gate는 이 portable gate를
   대체하지 않으며, `KIP_REQUIRE_PRIVATE_GOLDEN=1`인 보호 runner에서 corpus
   부재 또는 skip을 실패로 취급한다.
 - PostgreSQL 프로덕션 참조 profile은 pgvector와 1024차원 HNSW migration을
-  포함한다. 의미 검색은 기본 비활성이고, 완전한 active space와 품질,
-  freshness, ACL, 지연시간 gate가 모두 확인될 때만 capability가 true다.
+  포함한다. 의미 검색은 3.12.0부터 기본 활성이며, `capabilities.semantic_search`는
+  active space가 설정된 embedding identity와 일치할 때만 true다. 완성도 검사와
+  `stale` 판정은 `kip doctor`와 `kip projection verify`가 보고한다. Sync와
+  활성화된 re-extraction이 새·변경 unit을 embedding해 projection을 최신으로
+  유지한다. Projection 문장(pending page, 진행 count, scope 목록, embedding
+  upsert)은 15초 interactive timeout 대신
+  `database.projection_statement_timeout_ms`(기본 300000)를 쓴다.
+- Compose(`compose.yaml`, `compose.production.yaml`)는 digest-pinned
+  `michaelf34/infinity:0.0.77-cpu`(linux/amd64 CPU) `models` 서비스로 같은 고정
+  embedding model을 port 7997에 제공한다(`compose.yaml`에서는 profile
+  `semantic`). BGE reranker를 쓰려면 compose 주석대로 service command에 고정
+  revision을 추가한다. API/worker는 `security.model_service_hosts =
+  ["models"]`로 `http://models:7997`에 연결하며 `allow_remote_model_egress`는
+  false로 유지된다. Apple Silicon은 host runtime을 쓴다. Production compose는
+  이 서비스를 read-only, offline으로 내부 `models` network에서 실행하므로
+  `kip_models` volume을 한 번 채운다:
+  `docker compose -f compose.production.yaml --profile models-fetch run --rm models-fetch`.
+  `models-fetch`는 두 model을 모두 받으므로 나중에 reranker를 켜도 offline으로
+  동작한다.
 
 ### Ontology와 graph
 
@@ -536,3 +590,30 @@ http(s) origin이 없는 환경에서 빌드된 것이므로, 전달자에게 �
   내려받는다.
 - 3.9.0 이전(3.8.2 이하) 배포에는 `scripts/upgrade.sh`가 없다. 11.5의 수동
   절차를 한 번 수행한 뒤부터 11.3과 `kip update`를 쓴다.
+
+### 11.7 3.12.0 기본 semantic search 채택
+
+`kip update`는 배포의 config를 보존하므로 `semantic_enabled = false`인 기존
+배포는 업그레이드 후에도 lexical로 남는다. 업그레이드가 실행하는 bootstrap은
+`KIP_SEMANTIC=off`가 아니면 model runtime과 고정 embedding snapshot(약 1.2GB)을
+준비한다. 기본값을 채택하려면 다음을 수행한다.
+
+1. Runtime이 없으면 `./scripts/bootstrap-semantic.sh && ./scripts/semantic-server.sh prefetch`.
+2. `search.semantic_enabled = true`, `search.default_mode = "hybrid"`(이전
+   example config의 `reranked`는 fused 결과를 BM25로 rerank해 품질이 더 낮았다),
+   `[models.embedding] enabled = true`와
+   `config/kip.example.toml`의 기본값(`max_document_chars = 4000`,
+   `batch_size = 32`, `max_batch_chars = 16000`, `query_timeout_seconds = 10`)을
+   설정하거나 setup을 다시 적용한다.
+3. `./scripts/semantic-server.sh start`(또는 `./scripts/app-up.sh --database-only`,
+   `./scripts/install-launchd.sh`)로 runtime을 띄운다.
+4. `./scripts/kip sync run --source SOURCE` 또는
+   `./scripts/kip projection rebuild --name semantic`. 검토된 space는 완성되면
+   스스로 활성화된다.
+
+`max_document_chars = 12000`을 유지한 config는 검토되지 않은 다른 embedding
+identity이므로 자동 활성화되지 않고 평가와 `kip projection activate`가 필요하다.
+Compose 파일은 PostgreSQL 메모리 설정(`KIP_POSTGRES_SHARED_BUFFERS` 기본 1GB,
+`KIP_POSTGRES_EFFECTIVE_CACHE_SIZE` 3GB, `KIP_POSTGRES_WORK_MEM` 16MB,
+`KIP_POSTGRES_MAINTENANCE_WORK_MEM` 512MB)을 전달한다. 기존 container는
+`docker compose up -d postgres`로 다시 만들어야 적용된다.

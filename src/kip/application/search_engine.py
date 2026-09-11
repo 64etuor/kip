@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum, unique
 
 from kip.application.retrieval import apply_rerank, reciprocal_rank_fusion
-from kip.application.semantic import SemanticProjectionUseCases
+from kip.application.semantic import SEMANTIC_DEFAULT_MODE, SemanticProjectionUseCases
 from kip.domain.file_references import FilenameSearchRequest
 from kip.domain.knowledge import normalize_entity_name
 from kip.domain.models import ContentUnit, RequestContext, SearchHit, SearchRequest
@@ -73,13 +73,21 @@ class SearchEngine:
         semantic: SemanticProjectionUseCases,
         reranker: RerankerPort | None = None,
         knowledge: KnowledgeStore | None = None,
+        *,
+        lexical_reranker: RerankerPort | None = None,
     ) -> None:
         self._settings = settings
         self._store = store
         self._analyzer = analyzer
         self._embedding = embedding
         self._semantic = semantic
+        # `reranker` scores the fused lexical+vector pool (`reranked` mode);
+        # `lexical_reranker` scores lexical mode and the `semantic_degraded`
+        # fallback. They differ when an opt-in model cross-encoder is
+        # configured, so lexical ranking never waits on (or fails with) the
+        # model runtime.
         self._reranker = reranker
+        self._lexical_reranker = lexical_reranker
         self._knowledge = knowledge
 
     def _diversify(self, hits: list[SearchHit], limit: int) -> list[SearchHit]:
@@ -208,13 +216,12 @@ class SearchEngine:
         if not tokens:
             return False
         candidates = list(dict.fromkeys([*tokens, *query.expansion_terms]))
-        frequencies = self._store.term_document_frequencies(context, candidates)
-        return max(frequencies.values(), default=0) == 0
+        return not self._store.any_term_visible(context, candidates)
 
     def _resolve_mode(self, mode: str | None) -> _QueryPlan:
         explicit = mode is not None
         configured_mode = (
-            str(self._settings.get("search.default_mode", "reranked"))
+            str(self._settings.get("search.default_mode", SEMANTIC_DEFAULT_MODE))
             if self._settings.get("search.semantic_enabled", False)
             else SearchMode.LEXICAL.value
         )
@@ -282,14 +289,20 @@ class SearchEngine:
         if not bool(self._settings.get("search.lexical_rerank_enabled", False)):
             candidate_limit = self._candidate_limit(request, "search.hybrid_candidate_limit")
             return self._candidate_pool(context, request, query, candidate_limit)
-        candidate_limit = self._candidate_limit(request, "search.lexical_rerank_candidate_limit")
-        lexical = self._candidate_pool(context, request, query, candidate_limit)
-        if self._reranker is None:
+        if self._lexical_reranker is None:
             raise DependencyUnavailableError(
                 "lexical reranking is enabled without a reranker adapter"
             )
+        candidate_limit = self._candidate_limit(request, "search.lexical_rerank_candidate_limit")
+        lexical = self._candidate_pool(context, request, query, candidate_limit)
         try:
-            return self._rerank(context, request, lexical, candidate_limit=candidate_limit)
+            return self._rerank(
+                context,
+                request,
+                lexical,
+                self._lexical_reranker,
+                candidate_limit=candidate_limit,
+            )
         except DependencyUnavailableError:
             return self._mark(lexical, "lexical_rerank_degraded")
 
@@ -302,7 +315,6 @@ class SearchEngine:
     ) -> list[SearchHit]:
         candidate_limit = self._candidate_limit(request, "search.hybrid_candidate_limit")
         candidate_request = request.model_copy(update={"limit": candidate_limit})
-        lexical: list[SearchHit] | None = None
         try:
             space = self._semantic.search_space(context, explicit=plan.explicit)
             vector = self._store.vector_search(
@@ -321,26 +333,39 @@ class SearchEngine:
                 limit=candidate_limit,
                 rank_constant=int(self._settings.get("search.rrf_rank_constant", 60)),
             )
-            if plan.mode is SearchMode.HYBRID:
-                return fused
-            return self._rerank(context, request, fused)
         except DependencyUnavailableError:
             if plan.explicit:
                 raise
-            if lexical is None:
-                lexical = self._candidate_pool(
-                    context,
-                    request,
-                    query,
-                    candidate_limit,
+            # Fall back to exactly the lexical mode users and the private
+            # gate's lexical floor measure, BM25 rerank included.
+            if self._lexical_reranker is None and bool(
+                self._settings.get("search.lexical_rerank_enabled", False)
+            ):
+                # Lexical rerank is enabled without an adapter (reranker
+                # disabled): the fallback still answers, in lexical order.
+                pool = self._mark(
+                    self._candidate_pool(context, request, query, candidate_limit),
+                    "lexical_rerank_degraded",
                 )
-            return self._mark(lexical, "semantic_degraded")
+            else:
+                pool = self._lexical_pool(context, request, query)
+            return self._mark(pool, "semantic_degraded")
+        if plan.mode is SearchMode.HYBRID:
+            return fused
+        try:
+            return self._rerank(context, request, fused, self._reranker)
+        except DependencyUnavailableError:
+            # Only the reranker failed: keep the fused lexical+vector ranking
+            # rather than discarding the vector channel as well.
+            if plan.explicit:
+                raise
+            return self._mark(fused, "rerank_degraded")
 
     @staticmethod
-    def _mark(hits: list[SearchHit], flag: str) -> list[SearchHit]:
+    def _mark(hits: list[SearchHit], flag: str, value: object = True) -> list[SearchHit]:
         return [
             hit.model_copy(
-                update={"metadata": {**hit.metadata, flag: True}},
+                update={"metadata": {**hit.metadata, flag: value}},
                 deep=True,
             )
             for hit in hits
@@ -351,10 +376,11 @@ class SearchEngine:
         context: RequestContext,
         request: SearchRequest,
         fused: list[SearchHit],
+        reranker: RerankerPort | None,
         *,
         candidate_limit: int | None = None,
     ) -> list[SearchHit]:
-        if self._reranker is None:
+        if reranker is None:
             raise DependencyUnavailableError("reranker adapter is disabled")
         rerank_depth = min(
             len(fused),
@@ -381,10 +407,15 @@ class SearchEngine:
             )
             for hit in rerank_hits
         ]
-        scores = self._reranker.rerank(request.query, documents)
+        scores = reranker.rerank(request.query, documents)
         # Return the full ranked pool (reranked head + fused tail); the
-        # caller applies per-document diversity before truncating.
-        reranked = apply_rerank(rerank_hits, scores, limit=len(rerank_hits))
+        # caller applies per-document diversity before truncating. The head
+        # records which model scored it, so traces name the right reranker.
+        reranked = self._mark(
+            apply_rerank(rerank_hits, scores, limit=len(rerank_hits)),
+            "rerank_model",
+            reranker.model,
+        )
         reranked.extend(fused[rerank_depth:])
         return reranked
 

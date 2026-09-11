@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import assert_never
+from typing import Any, assert_never
 
 from kip.adapters.analyzers import KoreanNgramAnalyzer
 from kip.adapters.connectors.registry import ConfiguredSourceCatalog
@@ -19,6 +20,7 @@ from kip.adapters.identity import (
     JwtIdentityAdapter,
     JwtIdentityConfig,
 )
+from kip.adapters.model_circuit import GuardedEmbedding, GuardedReranker, ModelCircuit
 from kip.adapters.parsers.registry import ParserRegistry
 from kip.adapters.relation_miners import GeneratorRelationMiner
 from kip.adapters.repository.memory import MemoryRepository
@@ -76,6 +78,7 @@ class Container:
     application: Application
     embedding: EmbeddingPort
     reranker: RerankerPort | None
+    lexical_reranker: RerankerPort | None
     generator: GenerationPort | None
     relation_miner: RelationMinerPort | None
     identity: IdentityResolverPort
@@ -93,6 +96,7 @@ def build_container(
     trace_exporters: tuple[QueryTraceExporter, ...] | None = None,
     *,
     load_models: bool = True,
+    lexical_reranker: RerankerPort | None = None,
 ) -> Container:
     selected = settings or Settings.load()
     selected_identity = _build_identity(selected)
@@ -112,6 +116,12 @@ def build_container(
             hnsw_max_scan_tuples=int(
                 selected.get("search.hnsw_max_scan_tuples", 100_000)
             ),
+            lexical_common_term_fraction=float(
+                selected.get("search.lexical_common_term_fraction", 0.02)
+            ),
+            projection_statement_timeout_ms=int(
+                selected.get("database.projection_statement_timeout_ms", 300_000)
+            ),
         )
     parsers = ParserRegistry.from_settings(selected)
     # Injected repositories obey the same deployment boundary as built-ins.
@@ -121,6 +131,10 @@ def build_container(
         max_n=int(selected.get("search.korean_ngram_max", 4)),
     )
     allow_remote_egress = bool(selected.get("security.allow_remote_model_egress", False))
+    model_circuit_seconds = float(selected.get("models.circuit_cooldown_seconds", 30))
+    model_service_hosts = tuple(
+        str(host) for host in (selected.get("security.model_service_hosts", []) or [])
+    )
     embedding_config = selected.get("models.embedding", {}) or {}
     selected_embedding = embedding
     if (
@@ -136,46 +150,48 @@ def build_container(
             query_instruction=str(embedding_config.get("query_instruction", "")),
             allow_remote_egress=allow_remote_egress,
             timeout_seconds=float(embedding_config.get("timeout_seconds", 30)),
+            query_timeout_seconds=float(embedding_config.get("query_timeout_seconds", 10)),
+            model_service_hosts=model_service_hosts,
+        )
+        selected_embedding = GuardedEmbedding(
+            selected_embedding,
+            ModelCircuit(cooldown_seconds=model_circuit_seconds),
         )
     selected_embedding = selected_embedding or DisabledEmbeddingAdapter()
 
     reranker_config = selected.get("models.reranker", {}) or {}
+    backend = (
+        parse_reranker_backend(str(reranker_config.get("backend", "http")))
+        if reranker is None and reranker_config.get("enabled", False)
+        else None
+    )
     selected_reranker = reranker
-    if selected_reranker is None and reranker_config.get("enabled", False):
-        backend = parse_reranker_backend(str(reranker_config.get("backend", "http")))
+    if backend is not None:
         match backend:
-            case RerankerBackend.RAPIDFUZZ:
-                selected_reranker = RapidFuzzRerankerAdapter(
-                    max_document_chars=int(
-                        reranker_config.get("max_document_chars", 8000)
-                    ),
-                    baseline_weight=float(
-                        reranker_config.get("baseline_weight", 0.15)
-                    ),
-                )
-            case RerankerBackend.BM25:
-                selected_reranker = Bm25RerankerAdapter(
-                    max_document_chars=int(
-                        reranker_config.get("max_document_chars", 8000)
-                    ),
-                    k1=float(reranker_config.get("bm25_k1", 1.2)),
-                    b=float(reranker_config.get("bm25_b", 0.75)),
-                )
+            case RerankerBackend.RAPIDFUZZ | RerankerBackend.BM25:
+                selected_reranker = _build_lexical_reranker(backend, reranker_config)
             case RerankerBackend.HTTP:
                 if load_models:
-                    selected_reranker = HttpRerankerAdapter(
-                        base_url=str(
-                            reranker_config.get(
-                                "base_url",
-                                "http://127.0.0.1:7997",
-                            )
+                    selected_reranker = GuardedReranker(
+                        HttpRerankerAdapter(
+                            base_url=str(
+                                reranker_config.get(
+                                    "base_url",
+                                    "http://127.0.0.1:7997",
+                                )
+                            ),
+                            model=str(reranker_config["model"]),
+                            revision=str(reranker_config["revision"]),
+                            allow_remote_egress=allow_remote_egress,
+                            timeout_seconds=float(
+                                reranker_config.get("timeout_seconds", 30)
+                            ),
+                            max_document_chars=int(
+                                reranker_config.get("max_document_chars", 2048)
+                            ),
+                            model_service_hosts=model_service_hosts,
                         ),
-                        model=str(reranker_config["model"]),
-                        revision=str(reranker_config["revision"]),
-                        allow_remote_egress=allow_remote_egress,
-                        timeout_seconds=float(
-                            reranker_config.get("timeout_seconds", 30)
-                        ),
+                        ModelCircuit(cooldown_seconds=model_circuit_seconds),
                     )
             case RerankerBackend.HUGGINGFACE:
                 if load_models:
@@ -189,6 +205,29 @@ def build_container(
                     )
             case unreachable:
                 assert_never(unreachable)
+    # Lexical mode and the `semantic_degraded` fallback keep a local lexical
+    # reranker even when `reranked` mode uses a model cross-encoder, so they
+    # neither wait on nor fail with the model runtime.
+    selected_lexical_reranker = lexical_reranker
+    if selected_lexical_reranker is None:
+        if reranker is not None:
+            selected_lexical_reranker = reranker
+        elif backend in _LEXICAL_RERANKER_BACKENDS:
+            selected_lexical_reranker = selected_reranker
+        elif backend is not None:
+            lexical_config = selected.get("models.lexical_reranker", {}) or {}
+            if not isinstance(lexical_config, dict):
+                raise ConfigurationError("models.lexical_reranker must be a table")
+            lexical_backend = parse_reranker_backend(
+                str(lexical_config.get("backend", RerankerBackend.BM25.value))
+            )
+            if lexical_backend not in _LEXICAL_RERANKER_BACKENDS:
+                raise ConfigurationError(
+                    "models.lexical_reranker.backend must be bm25 or rapidfuzz"
+                )
+            selected_lexical_reranker = _build_lexical_reranker(
+                lexical_backend, lexical_config
+            )
     selected_generator = generator
     generation_config = selected.get("models.generation", {}) or {}
     if not isinstance(generation_config, dict):
@@ -255,6 +294,7 @@ def build_container(
         selected_reranker,
         telemetry,
         selected_repository.knowledge,
+        lexical_reranker=selected_lexical_reranker,
     )
     ontology_root = selected.project_root / "ontology"
     ontology_profile = str(
@@ -525,11 +565,33 @@ def build_container(
         application=application,
         embedding=selected_embedding,
         reranker=selected_reranker,
+        lexical_reranker=selected_lexical_reranker,
         generator=selected_generator,
         relation_miner=selected_relation_miner,
         identity=selected_identity,
         trace_exporters=selected_trace_exporters,
         ontology=ontology,
+    )
+
+
+_LEXICAL_RERANKER_BACKENDS = frozenset({RerankerBackend.BM25, RerankerBackend.RAPIDFUZZ})
+
+
+def _build_lexical_reranker(
+    backend: RerankerBackend,
+    config: Mapping[str, Any],
+) -> RerankerPort:
+    """A local, model-free reranker from a `models.reranker`-shaped table."""
+    max_document_chars = int(config.get("max_document_chars", 8000))
+    if backend is RerankerBackend.RAPIDFUZZ:
+        return RapidFuzzRerankerAdapter(
+            max_document_chars=max_document_chars,
+            baseline_weight=float(config.get("baseline_weight", 0.15)),
+        )
+    return Bm25RerankerAdapter(
+        max_document_chars=max_document_chars,
+        k1=float(config.get("bm25_k1", 1.2)),
+        b=float(config.get("bm25_b", 0.75)),
     )
 
 

@@ -6,6 +6,7 @@ import uuid
 
 from pydantic import ValidationError as PydanticValidationError
 
+from kip.application.projection_maintenance import after_sync
 from kip.container import Container, build_container
 from kip.domain.models import JobRecord, RequestContext
 from kip.errors import ValidationError
@@ -35,9 +36,12 @@ def process_job(container: Container, job: JobRecord) -> None:
         source_name = str(job.payload["source_name"])
         source = container.settings.filesystem_source(source_name)
         if source:
-            container.application.ingestion.sync_filesystem(context, source_name)
-            return
-        container.application.ingestion.sync_remote(context, source_name)
+            summary = container.application.ingestion.sync_filesystem(context, source_name)
+        else:
+            summary = container.application.ingestion.sync_remote(context, source_name)
+        update = after_sync(container.application.retrieval, context, summary).semantic_projection
+        if update is not None and update.status in {"unavailable", "incomplete"}:
+            LOGGER.warning("semantic projection after sync %s: %s (%s)", source_name, update.status, update.reason)
         return
     if job.job_type == "rebuild.projection":
         projection = str(job.payload["projection"])

@@ -413,6 +413,18 @@
       "title": "Schema Version",
       "type": "string"
     },
+    "semantic_search": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Semantic Search"
+    },
     "source_ownership": {
       "enum": [
         "company",

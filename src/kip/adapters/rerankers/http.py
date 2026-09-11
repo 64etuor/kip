@@ -22,13 +22,20 @@ class HttpRerankerAdapter:
         revision: str,
         allow_remote_egress: bool = False,
         timeout_seconds: float = 30.0,
+        max_document_chars: int = 2048,
+        model_service_hosts: Sequence[str] = (),
         client: httpx.Client | None = None,
     ) -> None:
-        self.base_url = require_allowed_model_url(base_url, allow_remote_egress)
+        if max_document_chars < 100:
+            raise ValueError("reranker max_document_chars must be at least 100")
+        self.base_url = require_allowed_model_url(base_url, allow_remote_egress, model_service_hosts)
         self.model = model
         self.revision = revision
+        # A cross-encoder reads a bounded window per candidate; sending whole
+        # 12k-character units only adds transfer and tokenization latency.
+        self.max_document_chars = max_document_chars
         self.client = client or httpx.Client(
-            timeout=timeout_seconds,
+            timeout=httpx.Timeout(timeout_seconds, connect=min(3.0, timeout_seconds)),
             trust_env=False,
         )
 
@@ -41,7 +48,7 @@ class HttpRerankerAdapter:
                 json={
                     "model": self.model,
                     "query": query,
-                    "documents": list(documents),
+                    "documents": [document[: self.max_document_chars] for document in documents],
                     "return_documents": False,
                 },
             )

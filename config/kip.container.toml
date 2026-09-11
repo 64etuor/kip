@@ -6,6 +6,8 @@ log_level = "INFO"
 [database]
 url_env = "KIP_DATABASE_URL"
 statement_timeout_ms = 15000
+# Background vector projection builds scan and insert far more rows.
+projection_statement_timeout_ms = 300000
 pool_max_size = 10
 
 [storage]
@@ -18,11 +20,18 @@ max_request_bytes = 10485760
 
 [security]
 allow_remote_model_egress = false
+# The compose `models` service (ADR-065) is on the private network.
+model_service_hosts = ["models"]
 follow_symlinks = false
 max_file_bytes = 524288000
 
 [search]
-semantic_enabled = false
+semantic_enabled = true
+default_mode = "hybrid"
+semantic_auto_activate = true
+hybrid_candidate_limit = 40
+rerank_candidate_limit = 40
+lexical_common_term_fraction = 0.02
 # Overall answer context size is set per request via --max-chars (default 120000), not a config key.
 context_item_max_chars = 16000
 korean_ngram_min = 2
@@ -30,11 +39,36 @@ korean_ngram_max = 4
 lexical_rerank_enabled = true
 lexical_rerank_candidate_limit = 40
 
+[models]
+circuit_cooldown_seconds = 30
+
+[models.embedding]
+enabled = true
+base_url = "http://models:7997"
+model = "kip-qwen3-embedding-0.6b"
+revision = "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
+dimensions = 1024
+batch_size = 32
+max_batch_chars = 16000
+max_document_chars = 4000
+timeout_seconds = 120
+query_timeout_seconds = 10
+query_instruction = "Retrieve relevant Korean evidence for this query: "
+space_name = "qwen3-embedding-0.6b-1024"
+
 [models.reranker]
 enabled = true
 backend = "bm25"  # promoted 2026-08-11 on the reviewed NL set (ADR-034); rapidfuzz remains the fallback backend
-max_document_chars = 8000
+max_document_chars = 8000  # BM25 cap; set 2048 when backend = "http" (the HTTP reranker's default cap)
 baseline_weight = 0.15
+# BGE cross-encoder: the compose `models` command is embedding-only, so it must
+# then also serve the reranker by appending `--model-id BAAI/bge-reranker-v2-m3
+# --revision 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e --served-model-name
+# kip-bge-reranker-v2-m3 --batch-size 2 --dtype float32` to its command.
+# backend = "http"
+# base_url = "http://models:7997"
+# model = "kip-bge-reranker-v2-m3"
+# revision = "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
 
 [ontology]
 domain_profile = "research-project"

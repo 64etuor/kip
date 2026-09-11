@@ -62,6 +62,9 @@ class MemorySemanticStore:
             None,
         )
 
+    def embedding_space_exists(self, context: RequestContext, space_id: str) -> bool:
+        return space_id in self.state.embedding_spaces
+
     def activate_embedding_space(
         self,
         context: RequestContext,

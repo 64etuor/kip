@@ -308,11 +308,17 @@ class SetupPlan(StrictModel):
     runtime_uid: int | None = Field(default=None, ge=1)
     runtime_gid: int | None = Field(default=None, ge=1)
     runtime_supplementary_gids: list[int] | None = None
+    # Whether generated configs turn on hybrid lexical+vector search
+    # (ADR-065; the model cross-encoder reranker stays opt-in); decided from
+    # the installed model runtime and KIP_SEMANTIC.
+    semantic_search: bool | None = None
 
     def calculate_fingerprint(self) -> str:
         excluded_fields = {"plan_fingerprint"}
         if self.relation_mining_mode is None:
             excluded_fields.add("relation_mining_mode")
+        if self.semantic_search is None:
+            excluded_fields.add("semantic_search")
         if self.runtime_uid is None:
             excluded_fields.add("runtime_uid")
         if self.runtime_gid is None:

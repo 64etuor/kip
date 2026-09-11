@@ -106,11 +106,16 @@ else
   resolved_config="$PROJECT_ROOT/config/kip.toml"
 fi
 printf 'Using KIP_CONFIG=%s for launchd jobs.\n' "$resolved_config"
+# Supervise the model runtime when it is installed and not opted out.
+with_semantic=0
+if [[ "${KIP_SEMANTIC:-on}" != off && -x "$PROJECT_ROOT/var/semantic-venv/bin/infinity_emb" ]]; then
+  with_semantic=1
+fi
 
 PROJECT_ROOT="$PROJECT_ROOT" INTERVAL="$interval" AGENT_DIR="$agent_dir" \
 LOG_DIR="$log_dir" RETAIN="$retain" BACKUP_HOUR="$backup_hour" \
 WITH_OPS_REPORT="$with_ops_report" OPS_INTERVAL="$ops_interval" \
-RESOLVED_KIP_CONFIG="$resolved_config" python3 - <<'PY'
+RESOLVED_KIP_CONFIG="$resolved_config" WITH_SEMANTIC="$with_semantic" python3 - <<'PY'
 import os
 import plistlib
 from pathlib import Path
@@ -163,6 +168,21 @@ items = {
         "StandardErrorPath": str(log_dir / "launchd-backup.err.log"),
     },
 }
+if os.environ["WITH_SEMANTIC"] == "1":
+    # The embedding/reranker runtime (ADR-065). `run` stays in the foreground
+    # so launchd owns restarts; the worker and search degrade to lexical while
+    # it starts or restarts.
+    items["com.kip.semantic"] = {
+        "Label": "com.kip.semantic",
+        "ProgramArguments": ["/bin/bash", str(root / "scripts/semantic-server.sh"), "run"],
+        "WorkingDirectory": str(root),
+        "EnvironmentVariables": environment_variables,
+        "RunAtLoad": True,
+        "KeepAlive": True,
+        "ThrottleInterval": 30,
+        "StandardOutPath": str(log_dir / "launchd-semantic.out.log"),
+        "StandardErrorPath": str(log_dir / "launchd-semantic.err.log"),
+    }
 if os.environ["WITH_OPS_REPORT"] == "1":
     items["com.kip.ops-report"] = {
         "Label": "com.kip.ops-report",
@@ -181,6 +201,9 @@ print("\n".join(sorted(items)))
 PY
 
 labels=(com.kip.knowledge-fabric.worker com.kip.knowledge-fabric.sync com.kip.backup)
+if (( with_semantic )); then
+  labels+=(com.kip.semantic)
+fi
 if (( with_ops_report )); then
   labels+=(com.kip.ops-report)
 fi
@@ -193,7 +216,7 @@ newsyslog_conf="$PROJECT_ROOT/var/newsyslog.kip.conf"
   printf '# newsyslog.d configuration for KIP launchd job logs.\n'
   printf '# Install with: sudo install -m 644 %q /etc/newsyslog.d/kip.conf\n' "$newsyslog_conf"
   printf '# logfilename                                     [owner:group]  mode count size(KB) when flags\n'
-  for stem in worker sync backup ops-report; do
+  for stem in worker sync backup ops-report semantic; do
     for stream in out err; do
       printf '%s  %s  644  5  10240  *  J\n' \
         "$log_dir/launchd-$stem.$stream.log" "$(id -un):staff"
@@ -213,6 +236,14 @@ if (( dry_run )); then
   exit 0
 fi
 
+if (( with_semantic )); then
+  # A server started by app-up.sh would hold the port; launchd takes over.
+  "$SCRIPT_DIR/semantic-server.sh" stop >/dev/null 2>&1 || true
+else
+  # Opted out (or runtime removed) since an earlier install: retire the job.
+  launchctl bootout "gui/$(id -u)/com.kip.semantic" 2>/dev/null || true
+  rm -f "$agent_dir/com.kip.semantic.plist"
+fi
 for label in "${labels[@]}"; do
   plist="$agent_dir/$label.plist"
   launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Final
 
 from pydantic import TypeAdapter
@@ -11,6 +13,7 @@ from kip.domain.models import (
     EmbeddingRecord,
     EmbeddingSpace,
     RequestContext,
+    SemanticProjectionUpdate,
 )
 from kip.errors import ConfigurationError, ConflictError, DependencyUnavailableError
 from kip.ids import stable_id
@@ -21,6 +24,56 @@ from kip.settings import Settings
 _STR_MAP: Final = TypeAdapter(dict[str, str])
 _DOCUMENT_PROJECTION: Final = "head_tail_v1"
 _TRUNCATION_MARKER: Final = "\n…\n"
+
+
+@dataclass(frozen=True, slots=True)
+class ReviewedEmbeddingIdentity:
+    """An embedding space identity whose retrieval quality a KIP release measured.
+
+    Only these identities are activated automatically once complete (ADR-065);
+    any other model, revision, dimension, truncation or instruction still goes
+    through evaluation and an explicit ``kip projection activate``.
+    """
+
+    provider: str
+    model: str
+    revision: str
+    dimensions: int
+    max_document_chars: int
+    document_projection: str
+    query_instruction: str
+
+
+# Shipped semantic defaults (ADR-065). Setup, the example and container
+# configs and the portable gate all read these so they cannot drift.
+SEMANTIC_DEFAULT_MODE: Final = "hybrid"
+EMBEDDING_DEFAULTS: Final[dict[str, str | int]] = {
+    "model": "kip-qwen3-embedding-0.6b",
+    "revision": "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+    "dimensions": 1024,
+    "batch_size": 32,
+    "max_batch_chars": 16000,
+    "max_document_chars": 4000,
+    "timeout_seconds": 120,
+    "query_timeout_seconds": 10,
+    "query_instruction": "Retrieve relevant Korean evidence for this query: ",
+    "space_name": "qwen3-embedding-0.6b-1024",
+}
+
+# Append new identities; never drop one a release shipped. Auto-activation
+# only replaces an active space whose identity is listed here, so removing an
+# earlier default would strand deployments on it as if activated by hand.
+RELEASE_REVIEWED_EMBEDDING_IDENTITIES: Final = (
+    ReviewedEmbeddingIdentity(
+        provider="infinity",
+        model="kip-qwen3-embedding-0.6b",
+        revision="97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+        dimensions=1024,
+        max_document_chars=4000,
+        document_projection=_DOCUMENT_PROJECTION,
+        query_instruction="Retrieve relevant Korean evidence for this query: ",
+    ),
+)
 
 
 def _embedding_text(unit: EmbeddableUnit, max_chars: int) -> str:
@@ -44,6 +97,29 @@ def _embedding_text(unit: EmbeddableUnit, max_chars: int) -> str:
         + _TRUNCATION_MARKER
         + tail
     )
+
+
+def _bounded_batches(
+    units: list[EmbeddableUnit],
+    *,
+    max_units: int,
+    max_chars: int,
+    max_document_chars: int,
+) -> list[list[EmbeddableUnit]]:
+    """Group units by count and total characters; a long unit may stand alone."""
+    batches: list[list[EmbeddableUnit]] = []
+    current: list[EmbeddableUnit] = []
+    current_chars = 0
+    for unit in units:
+        length = _embedding_input_length(unit, max_document_chars)
+        if current and (len(current) >= max_units or current_chars + length > max_chars):
+            batches.append(current)
+            current, current_chars = [], 0
+        current.append(unit)
+        current_chars += length
+    if current:
+        batches.append(current)
+    return batches
 
 
 def _embedding_input_length(unit: EmbeddableUnit, max_chars: int) -> int:
@@ -113,46 +189,77 @@ class SemanticProjectionUseCases:
             configuration=configuration,
         )
 
-    def rebuild(self, context: RequestContext) -> JsonObject:
+    def rebuild(
+        self,
+        context: RequestContext,
+        on_progress: Callable[[int, int], None] | None = None,
+    ) -> JsonObject:
         if self._embedding.name == "disabled":
             raise ConfigurationError("no embedding adapter is configured")
         space = self._store.save_embedding_space(
             context,
             self.embedding_space(context),
         )
-        units = self._store.list_pending_embeddable_units(context, space.id)
         batch_size = int(self._settings.get("models.embedding.batch_size", 16))
         max_document_chars = self._max_document_chars()
-        units.sort(
-            key=lambda unit: (
-                _embedding_input_length(unit, max_document_chars),
-                unit.unit_id,
-            )
-        )
+        page_size = int(self._settings.get("models.embedding.page_size", 1000))
+        if page_size < 1:
+            raise ConfigurationError("embedding page_size must be positive")
+        before = self._store.embedding_projection_progress(context, space.id)
+        pending_total = max(before.content_units - before.indexed_units, 0)
         newly_indexed = 0
-        for offset in range(0, len(units), batch_size):
-            batch = units[offset : offset + batch_size]
-            texts = [
-                _embedding_text(unit, max_document_chars)
-                for unit in batch
-            ]
-            embeddings = self._embedding.embed_documents(texts)
-            if len(embeddings) != len(batch):
-                raise DependencyUnavailableError(
-                    "embedding response count does not match semantic rebuild batch"
-                )
-            newly_indexed += self._store.upsert_embeddings(
+        done = 0
+        after_unit_id: str | None = None
+        while True:
+            # Keyset pages keep memory flat on large corpora; each page is
+            # sorted by length so a model batch holds similar-sized inputs.
+            units = self._store.list_pending_embeddable_units(
                 context,
                 space.id,
-                [
-                    EmbeddingRecord(
-                        unit_id=unit.unit_id,
-                        embedding=embedding,
-                        source_hash=unit.source_hash,
-                    )
-                    for unit, embedding in zip(batch, embeddings, strict=True)
-                ],
+                after_unit_id=after_unit_id,
+                limit=page_size,
             )
+            if not units:
+                break
+            after_unit_id = max(unit.unit_id for unit in units)
+            units.sort(
+                key=lambda unit: (
+                    _embedding_input_length(unit, max_document_chars),
+                    unit.unit_id,
+                )
+            )
+            for batch in _bounded_batches(
+                units,
+                max_units=batch_size,
+                max_chars=self._max_batch_chars(),
+                max_document_chars=max_document_chars,
+            ):
+                texts = [
+                    _embedding_text(unit, max_document_chars)
+                    for unit in batch
+                ]
+                embeddings = self._embedding.embed_documents(texts)
+                if len(embeddings) != len(batch):
+                    raise DependencyUnavailableError(
+                        "embedding response count does not match semantic rebuild batch"
+                    )
+                newly_indexed += self._store.upsert_embeddings(
+                    context,
+                    space.id,
+                    [
+                        EmbeddingRecord(
+                            unit_id=unit.unit_id,
+                            embedding=embedding,
+                            source_hash=unit.source_hash,
+                        )
+                        for unit, embedding in zip(batch, embeddings, strict=True)
+                    ],
+                )
+                done += len(batch)
+                if on_progress is not None:
+                    on_progress(done, max(pending_total, done))
+            if len(units) < page_size:
+                break
         progress = self._store.embedding_projection_progress(context, space.id)
         return {
             "projection": "semantic",
@@ -167,6 +274,138 @@ class SemanticProjectionUseCases:
             "newly_indexed_units": newly_indexed,
             "in_sync": progress.indexed_units == progress.content_units,
         }
+
+    def is_release_reviewed(self, space: EmbeddingSpace) -> bool:
+        configured = dict(self._settings.get("models.embedding", {}) or {})
+        if configured.get("document_instruction"):
+            return False
+        return any(
+            space.provider == identity.provider
+            and space.model == identity.model
+            and space.revision == identity.revision
+            and space.dimensions == identity.dimensions
+            and str(space.configuration.get("max_document_chars"))
+            == str(identity.max_document_chars)
+            and space.configuration.get("document_projection")
+            == identity.document_projection
+            and str(configured.get("query_instruction", "")) == identity.query_instruction
+            for identity in RELEASE_REVIEWED_EMBEDDING_IDENTITIES
+        )
+
+    def maintain(
+        self,
+        context: RequestContext,
+        on_progress: Callable[[int, int], None] | None = None,
+    ) -> SemanticProjectionUpdate:
+        """Embed new or changed units and activate a reviewed, complete space.
+
+        Runs after every sync and activated re-extraction so the vector channel
+        follows the lexical index without a separate operator step. The model
+        runtime being down is not a sync failure: search degrades to the
+        lexical path and the next run resumes where this one stopped.
+        """
+        if not bool(self._settings.get("search.semantic_enabled", False)):
+            return SemanticProjectionUpdate(status="disabled")
+        if self._embedding.name == "disabled":
+            return SemanticProjectionUpdate(
+                status="disabled",
+                reason="semantic search is enabled but models.embedding is not",
+            )
+        system = self.projection_context(context)
+        space = self.embedding_space(system)
+        try:
+            rebuilt = self.rebuild(system, on_progress)
+        except DependencyUnavailableError as error:
+            return SemanticProjectionUpdate(
+                status="unavailable",
+                space_id=space.id,
+                active=self._is_active(system, space.id),
+                reason=(
+                    f"{error}; start the model runtime (./scripts/semantic-server.sh start) "
+                    "and the next sync or `kip projection rebuild --name semantic` resumes"
+                ),
+            )
+        indexed = int(str(rebuilt.get("indexed_units", 0)))
+        total = int(str(rebuilt.get("content_units", 0)))
+        complete = rebuilt.get("in_sync") is True
+        active = self._is_active(system, space.id)
+        activated = False
+        reason: str | None = None
+        if complete and not active:
+            activated, reason = self._auto_activate(system, space)
+            active = activated
+        elif not complete:
+            reason = (
+                f"{indexed} of {total} units are embedded; the next sync or "
+                "`kip projection rebuild --name semantic` resumes"
+            )
+        newly = int(str(rebuilt.get("newly_indexed_units", 0)))
+        status: str = "updated" if newly else "current"
+        if not complete:
+            status = "incomplete"
+        return SemanticProjectionUpdate.model_validate(
+            {
+                "status": status,
+                "space_id": space.id,
+                "newly_indexed_units": newly,
+                "indexed_units": indexed,
+                "content_units": total,
+                "active": active,
+                "activated": activated,
+                "reason": reason,
+            }
+        )
+
+    def projection_context(self, context: RequestContext) -> RequestContext:
+        """The caller's context widened to every ACL scope of the workspace.
+
+        The projection is workspace data: it must hold units of every scope,
+        and completeness must be judged against all of them. Search still
+        filters vectors by the caller's own scopes.
+        """
+        scopes = sorted({*context.acl_scopes, *self._store.workspace_acl_scopes(context)})
+        return context.model_copy(update={"acl_scopes": scopes})
+
+    def activate_if_reviewed(self, context: RequestContext, space: EmbeddingSpace) -> bool:
+        """Activate a complete space whose identity the release measured (ADR-065)."""
+        system = self.projection_context(context)
+        if self.verify(system, space_id=space.id).get("ok") is not True:
+            return False
+        activated, _ = self._auto_activate(system, space)
+        return activated
+
+    def _auto_activate(self, system: RequestContext, space: EmbeddingSpace) -> tuple[bool, str | None]:
+        if not bool(self._settings.get("search.semantic_enabled", False)):
+            return False, None
+        if not bool(self._settings.get("search.semantic_auto_activate", True)):
+            return False, "the space is complete; automatic activation is off, run `kip projection activate`"
+        if not self.is_release_reviewed(space):
+            return False, (
+                "the space is complete but not active: this embedding identity was "
+                "not reviewed by the KIP release, so evaluate it and run "
+                "`kip projection activate`"
+            )
+        current = self._store.active_embedding_space(system)
+        if current is not None and current.id != space.id and not self.is_release_reviewed(current):
+            # Never replace a space an operator activated explicitly.
+            return False, (
+                f"space {current.name} was activated explicitly; run `kip projection activate` "
+                "to switch to the release-reviewed space"
+            )
+        self._store.activate_embedding_space(system, space.id)
+        return True, None
+
+    def _is_active(self, context: RequestContext, space_id: str) -> bool:
+        active = self._store.active_embedding_space(context)
+        return active is not None and active.id == space_id
+
+    def _max_batch_chars(self) -> int:
+        # One request should not hold the shared model runtime for long:
+        # interactive query embeddings wait behind it (ADR-065).
+        configured = int(self._settings.get("models.embedding.max_batch_chars", 16000))
+        if configured < 1:
+            raise ConfigurationError("embedding max_batch_chars must be positive")
+        return configured
 
     def _max_document_chars(self) -> int:
         configured = int(

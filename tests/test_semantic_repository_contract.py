@@ -41,8 +41,11 @@ def test_embedding_spaces_coexist_and_vector_search_is_acl_safe(
             "revision": "b1",
         }
     )
+    assert repository.embedding_space_exists(context, first.id) is False
     repository.save_embedding_space(context, first)
     repository.save_embedding_space(context, second)
+    assert repository.embedding_space_exists(context, first.id) is True
+    assert repository.embedding_space_exists(context, "espace_missing") is False
     repository.upsert_embeddings(
         context,
         first.id,

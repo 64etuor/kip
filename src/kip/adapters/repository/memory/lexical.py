@@ -234,6 +234,21 @@ class MemoryLexicalStore:
                     documents[term].add(unit.document_id)
         return {term: len(docs) for term, docs in documents.items()}
 
+    def any_term_visible(
+        self,
+        context: RequestContext,
+        terms: list[str],
+    ) -> bool:
+        wanted = {term.lower() for term in terms if term}
+        if not wanted:
+            return False
+        for unit in self.state.units.values():
+            if not unit_is_visible(self.state, unit, context):
+                continue
+            if wanted.intersection(unit.lexical_text.lower().split()):
+                return True
+        return False
+
     @staticmethod
     def _score(
         haystack: str,

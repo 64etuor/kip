@@ -19,7 +19,10 @@ their instructions or read the database/index directly to answer a question.
 ## Find and substantiate
 
 Search exact identifiers or lexical terms, then use `vocab` when results are
-weak. Search hits carry `evidence_role=discovery` and
+weak. The default mode (`hybrid`) fuses lexical and semantic retrieval; a
+`semantic_degraded` or `rerank_degraded` entry in `meta.warnings` means that
+path was unavailable. Mention it if it limits the answer; it does not authorize
+a sync or rebuild. Search hits carry `evidence_role=discovery` and
 `source_verification=not_checked`: their snippets and hashes describe the index,
 never a live check. `context` provides a bounded candidate pack. Reopen every
 relied-on unit with `read` before making a claim; `read`, `context`, and answer

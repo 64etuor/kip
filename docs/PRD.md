@@ -74,7 +74,7 @@ PostgreSQL 18
   ├─ 엔티티·온톨로지·검증된 assertion
   ├─ 전문 검색 projection
   ├─ 관계형 graph projection
-  └─ pgvector semantic projection(선택 활성)
+  └─ pgvector semantic projection(기본 활성, ADR-065)
           │
           ▼
 Shell CLI + versioned JSON
@@ -92,7 +92,7 @@ Claude Code / Codex / 기타 AI agent
 |---|---|---|
 | SQLite 단일 DB | 소형·오프라인·개인용 경량 배포의 미래 옵션 | 기준 구현에서 제외 |
 | PostgreSQL | canonical state, 동시 수집, ACL, 감사, 검색 projection의 기준 저장소 | **채택** |
-| pgvector | 의미 검색용 재생성 가능한 projection | **PostgreSQL 프로덕션 참조 profile에 필수; 의미 검색은 기본 비활성** |
+| pgvector | 의미 검색용 재생성 가능한 projection | **PostgreSQL 프로덕션 참조 profile에 필수; 3.12.0부터 의미 검색 기본 활성(ADR-065), `KIP_SEMANTIC=off`로 lexical 전용** |
 | Neo4j | 깊은 경로 탐색·그래프 알고리즘이 입증된 뒤 붙이는 read projection | **MVP 제외, 도입 게이트 통과 시 전용 포트와 함께 도입** |
 | Apache AGE | PostgreSQL 내부 graph adapter 후보 | 기본 제외 |
 
@@ -109,13 +109,13 @@ Neo4j는 온톨로지 원장으로 사용하지 않는다. 그래프가 중요�
 | 리비전·검토 transaction | 가능하나 worker 조정 필요 | **강함** | PostgreSQL과 동일 | 관계에는 강하나 전체 원장에는 부적합 |
 | source ACL·RLS | application 구현 부담 | **내장 RLS 활용** | PostgreSQL과 동일 | 별도 ACL 설계·projection 필요 |
 | 정확 문자열·한국어 검색 | FTS5 + custom tokenizer | **pre-tokenized FTS + pg_trgm** | 대체하지 않음 | 주력 기능 아님 |
-| 의미 유사 검색 | 별도 vector engine | 별도 extension 필요 | **적합, 선택 활성** | vector index가 있어도 canonical search와 분리 필요 |
+| 의미 유사 검색 | 별도 vector engine | 별도 extension 필요 | **적합, 기본 활성(ADR-065)** | vector index가 있어도 canonical search와 분리 필요 |
 | 1-4 hop 승인 관계 | recursive CTE 가능 | **충분** | PostgreSQL과 동일 | 가능하지만 운영 store 추가 |
 | 깊은 경로·graph algorithms | 제한적 | 제한적 | 제한적 | **가장 적합** |
 | 백업·감사·다중 worker | 단순하지만 단일 파일 제약 | **가장 균형적** | PostgreSQL 운영에 포함 | 추가 백업·동기화 필요 |
 | 도구 제거 시 축소 | 매우 쉬움 | semantic/graph 기능만 비활성화 가능 | projection 삭제 가능 | projection 삭제 후 PostgreSQL로 fallback 필요 |
 
-결론은 `PostgreSQL canonical + PostgreSQL lexical + pgvector production profile + optional Neo4j projection`이다. pgvector 설치와 semantic 활성화는 별개다. 참조 profile은 배포·migration 일관성을 위해 pgvector를 포함하지만, vector projection은 재생성 가능하고 품질·ACL·freshness·지연시간 gate 전에는 검색 기본 경로에서 비활성이다.
+결론은 `PostgreSQL canonical + PostgreSQL lexical + pgvector production profile + optional Neo4j projection`이다. pgvector 설치와 semantic 활성화는 별개다. 참조 profile은 배포·migration 일관성을 위해 pgvector를 포함하고 vector projection은 재생성 가능하다. 3.12.0부터 release가 품질·ACL·지연시간을 검토한 기본 embedding identity는 검색 기본 경로(`hybrid`)에 포함되며 projection이 완성되면 자동 활성화된다(ADR-065). 그 밖의 identity는 gate를 통과하고 명시적으로 활성화되기 전까지 비활성이며, runtime이나 active projection이 없으면 기본 검색은 lexical로 동작한다.
 
 ### 1.3 제품 인터페이스 선택
 
@@ -666,7 +666,7 @@ Agent 흐름:
 - **NFR-RET-002 MUST**: XLSX 셀 문자열 질문 Recall@10 95% 이상을 목표로 한다.
 - **NFR-RET-003 MUST**: 중요 답변의 locator 정확도 98% 이상을 목표로 한다.
 - **NFR-RET-004 MUST**: stale source가 있는 답변은 100% 경고해야 한다.
-- **NFR-RET-005 SHOULD**: vector search는 lexical baseline보다 유의미한 개선이 있을 때만 기본 활성화한다.
+- **NFR-RET-005 SHOULD**: vector search는 lexical baseline보다 유의미한 개선이 있을 때만 기본 활성화한다. 3.12.0의 기본 활성화 근거는 ADR-065와 `IMPLEMENTATION_STATUS.md`의 release 평가에 기록한다.
 - **NFR-RET-006 MUST**: 공개 저장소 CI는 최소 100개 positive 검색 계약과
   ACL-negative 계약을 매 merge에 실행해야 한다. Synthetic portable gate는
   실제 조직 corpus 품질 승격 근거를 대체하지 않는다.
@@ -726,12 +726,18 @@ Agent는 다음을 지켜야 한다.
 - `pg_trgm`, FTS, recursive CTE, pgvector를 같은 운영 단위에서 사용할 수 있다.
 - `pg_dump`와 표준 클라이언트 생태계를 사용할 수 있다.
 
-### 12.2 pgvector를 설치하되 기본 비활성화하는 이유
+### 12.2 pgvector와 의미 검색의 기본 활성 조건
 
-- 설치 비용은 낮지만 embedding 생성 비용과 모델 종속성은 별도다.
-- 정확한 문서번호·기관명·헤더 검색에는 lexical search가 우선이다.
+- 설치 비용은 낮지만 embedding 생성 비용과 모델 종속성은 별도다. 3.12.0부터
+  bootstrap이 격리된 model runtime과 고정 embedding model을 설치하며(ADR-065;
+  BGE reranker는 선택 사항),
+  `KIP_SEMANTIC=off` 또는 8GiB 미만 RAM에서는 lexical 전용으로 남는다.
+- 정확한 문서번호·기관명·헤더 검색에는 lexical search가 우선이다. 기본
+  `hybrid` mode는 lexical channel을 항상 함께 실행하고, 의미 검색을 쓸 수
+  없으면 lexical로 degrade한다.
 - 의미 검색은 표현이 완전히 다른 유사 사례를 찾는 데 유용하다.
-- 모델이 바뀌면 projection을 병렬 생성해 평가한 뒤 전환할 수 있다.
+- 모델이 바뀌면 projection을 병렬 생성해 평가한 뒤 전환할 수 있다. Release가
+  검토한 identity만 자동 활성화되고, 다른 모델은 명시적 activation이 필요하다.
 
 ### 12.3 Neo4j를 기본 구성에서 제외하는 이유
 
@@ -924,6 +930,7 @@ KIP v3 baseline은 다음을 모두 만족해야 인수된다.
 | ADR-053 | Upgrade the pinned offline Kordoc runtime to 4.8.0 | Accepted |
 | ADR-054 | Use pdf-inspector with selective PyMuPDF table fallback | Accepted for starter and pilot |
 | ADR-064 | Upgrade pdf-inspector to 1.19.0 and Kordoc to 4.13.1 with PDF re-extraction | Accepted |
+| ADR-065 | Semantic search on by default | Accepted |
 
 ---
 

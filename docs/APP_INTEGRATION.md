@@ -32,6 +32,17 @@ them. Treat every hit with `evidence_role=discovery` (and its
 `source_verification=not_checked`) as a pointer, not evidence: reopen the unit
 before quoting or citing it.
 
+3.12.0 turns semantic search on by default (ADR-065) without changing envelope
+versions: the default mode is `hybrid`, and the BGE cross-encoder reranker is
+opt-in. Omit `mode` to get the deployment default; it degrades to lexical while
+the model runtime or projection is unavailable and lists `semantic_degraded`
+(or, where the deployment's default mode is `reranked`, `rerank_degraded` when
+only the reranker failed) in the search and context `meta.warnings`. Surface those warnings rather than
+presenting the result as semantic. An explicit `vector`, `hybrid`, or
+`reranked` mode fails instead of degrading. Inline sync and re-extraction
+summaries gain an optional `semantic_projection` object. Check
+`capabilities.semantic_search` before offering a semantic-only path.
+
 Allowed filesystem directories come from the deployment's enabled source
 configuration, not REST/SDK request fields. This policy also hides previously
 indexed records after a source is removed or changed and the service reloads.

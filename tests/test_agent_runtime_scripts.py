@@ -80,6 +80,11 @@ def test_verify_runs_every_gate_with_the_selected_environment(tmp_path: Path, us
         '#!/bin/bash\nprintf "audit-kordoc\\n" >> "${0%/*}/../commands"\n'
     )
     (scripts / "audit-kordoc.sh").chmod(0o755)
+    (scripts / "audit-semantic.sh").write_text(
+        '#!/bin/bash\nprintf "audit-semantic\\n" >> "${0%/*}/../commands"\n'
+    )
+    (scripts / "audit-semantic.sh").chmod(0o755)
+    shutil.copy2(ROOT / "scripts/golden-gate.sh", scripts / "golden-gate.sh")
     (scripts / "common.sh").write_text(
         'PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"\n'
         'python_cmd() { printf "%s\\n" "$PROJECT_ROOT/fake-python"; }\n'
@@ -100,8 +105,9 @@ def test_verify_runs_every_gate_with_the_selected_environment(tmp_path: Path, us
     assert f"{prefix} mypy src/kip" in commands
     assert f"{prefix} pip_audit --requirement requirements/runtime.txt --no-deps --disable-pip" in commands
     assert ("run --frozen pytest" if use_uv else "-m pytest") in commands
-    assert "scripts/portable_golden_gate.py" in commands
-    assert "scripts/golden_gate.py" in commands
+    assert "audit-semantic" in commands
+    assert any(line.endswith("scripts/portable_golden_gate.py") for line in commands)
+    assert any(line.endswith("scripts/golden_gate.py") for line in commands)
     assert "Verification passed" in result.stdout
 
 

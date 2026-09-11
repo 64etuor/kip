@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+from kip.application.semantic import EMBEDDING_DEFAULTS, SEMANTIC_DEFAULT_MODE
 from kip.errors import ConflictError
 from kip.setup.models import SecretReference
 from kip.setup.planner import build_setup_plan
@@ -134,19 +135,66 @@ def test_generated_host_config_uses_host_paths_for_mcp(tmp_path: Path) -> None:
     assert host_config["setup"]["plan_fingerprint"] == plan.plan_fingerprint
 
 
-def test_generated_config_defaults_to_reranked_search_mode(
+def test_generated_config_is_lexical_only_without_a_model_runtime(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # Given a machine where bootstrap did not install the model runtime.
+    monkeypatch.delenv("KIP_SEMANTIC", raising=False)
     project_root = tmp_path / "project"
     project_root.mkdir()
     plan = build_setup_plan(complete_setup_answers(tmp_path), project_root=project_root)
 
     apply_setup_plan(plan, project_root=project_root)
 
+    # Then generated configs keep lexical search (with BM25 rerank) and say why.
+    assert plan.semantic_search is False
+    assert any("model runtime is not installed" in warning for warning in plan.warnings)
     for name in ("config/kip.generated.toml", "config/kip.host.generated.toml"):
-        text = (project_root / name).read_text(encoding="utf-8")
-        assert 'default_mode = "reranked"' in text
-        assert "semantic_enabled = false" in text
+        with (project_root / name).open("rb") as handle:
+            config = tomllib.load(handle)
+        assert config["search"]["semantic_enabled"] is False
+        assert config["search"]["lexical_rerank_enabled"] is True
+        assert config["models"]["embedding"]["enabled"] is False
+    compose = yaml.safe_load((project_root / "compose.generated.yaml").read_text(encoding="utf-8"))
+    assert "models" not in compose["services"]
+
+
+def test_generated_config_turns_on_semantic_search_where_the_runtime_exists(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given bootstrap installed the isolated model runtime.
+    monkeypatch.delenv("KIP_SEMANTIC", raising=False)
+    project_root = tmp_path / "project"
+    runtime = project_root / "var/semantic-venv/bin/infinity_emb"
+    runtime.parent.mkdir(parents=True)
+    runtime.write_text("#!/bin/sh\n", encoding="utf-8")
+    plan = build_setup_plan(complete_setup_answers(tmp_path), project_root=project_root)
+
+    apply_setup_plan(plan, project_root=project_root)
+
+    # Then host and container configs use vector search with the shipped defaults.
+    assert plan.semantic_search is True
+    with (project_root / "config/kip.host.generated.toml").open("rb") as handle:
+        host = tomllib.load(handle)
+    with (project_root / "config/kip.generated.toml").open("rb") as handle:
+        container = tomllib.load(handle)
+    for config in (host, container):
+        assert config["search"]["semantic_enabled"] is True
+        assert config["search"]["default_mode"] == SEMANTIC_DEFAULT_MODE
+        assert config["models"]["embedding"]["enabled"] is True
+        assert config["models"]["embedding"]["revision"] == EMBEDDING_DEFAULTS["revision"]
+    assert host["models"]["embedding"]["base_url"] == "http://127.0.0.1:7997"
+    assert host["security"]["model_service_hosts"] == []
+    assert container["models"]["embedding"]["base_url"] == "http://models:7997"
+    assert container["security"]["model_service_hosts"] == ["models"]
+    compose = yaml.safe_load((project_root / "compose.generated.yaml").read_text(encoding="utf-8"))
+    assert "@sha256:" in compose["services"]["models"]["image"]
+
+    # And KIP_SEMANTIC=off still opts the same machine out.
+    monkeypatch.setenv("KIP_SEMANTIC", "off")
+    assert build_setup_plan(complete_setup_answers(tmp_path), project_root=project_root).semantic_search is False
 
 
 def test_generated_configs_enable_pinned_korean_ocr(tmp_path: Path) -> None:

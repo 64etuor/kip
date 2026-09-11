@@ -8,7 +8,7 @@
 3. PostgreSQL lexical search.
 4. Vocabulary and verified alias expansion.
 5. Approved graph traversal.
-6. Semantic search only when enabled and lexical retrieval is demonstrably weak.
+6. Default search (`hybrid`) already fuses vector and lexical candidates when the deployment's semantic projection is active, and reranks them only where the deployment chose `reranked`; a `semantic_degraded` or `rerank_degraded` warning means that ranking fell back, so treat the result as weaker. Request an explicit `vector` or `hybrid` mode only to diagnose, not to answer.
 7. Exact source read.
 
 ## Weak result signals

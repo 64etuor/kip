@@ -49,7 +49,16 @@ class RetrievalStore(Protocol):
         self,
         context: RequestContext,
         space_id: str,
-    ) -> list[EmbeddableUnit]: ...
+        *,
+        after_unit_id: str | None = None,
+        limit: int | None = None,
+    ) -> list[EmbeddableUnit]:
+        """Visible units missing or stale in ``space_id``, ordered by unit id.
+
+        ``after_unit_id``/``limit`` page through a large corpus so a rebuild
+        never loads every pending body at once.
+        """
+        ...
 
     def embedding_projection_progress(
         self,
@@ -64,6 +73,23 @@ class RetrievalStore(Protocol):
     ) -> EmbeddingSpace: ...
 
     def active_embedding_space(self, context: RequestContext) -> EmbeddingSpace | None: ...
+
+    def embedding_space_exists(self, context: RequestContext, space_id: str) -> bool:
+        """Whether the workspace has recorded `space_id`, in any status.
+
+        A single-row lookup for hot paths such as `capabilities`; unlike
+        `semantic_status` it never counts vectors.
+        """
+        ...
+
+    def workspace_acl_scopes(self, context: RequestContext) -> list[str]:
+        """Every ACL scope recorded by the workspace's source snapshots.
+
+        Projection maintenance runs as the system: the vector projection must
+        cover units of every scope (Slack, mail, custom source scopes), while
+        search keeps filtering by the caller's own scopes.
+        """
+        ...
 
     def activate_embedding_space(
         self,
@@ -102,6 +128,18 @@ class RetrievalStore(Protocol):
         context: RequestContext,
         terms: list[str],
     ) -> dict[str, int]: ...
+
+    def any_term_visible(
+        self,
+        context: RequestContext,
+        terms: list[str],
+    ) -> bool:
+        """Whether any whole term occurs in a unit this caller may see.
+
+        The abstention gate only needs existence, so implementations stop at
+        the first visible match instead of counting every document.
+        """
+        ...
 
     def get_content_units(
         self,

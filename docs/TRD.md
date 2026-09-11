@@ -65,7 +65,7 @@ related_documents:
 |---|---|---|---|
 | Canonical database | PostgreSQL 18 | managed PostgreSQL | 동시 write, RLS, transaction, audit, 확장성 |
 | Lexical search | PostgreSQL `tsvector` + `pg_trgm` + vocabulary | PGroonga, Tantivy, OpenSearch | 한국어 전처리와 정확 검색을 결합하고 구성 수를 줄임 |
-| Semantic search | pgvector production profile, disabled by default | external vector engine | 참조 profile은 extension과 HNSW를 포함하되 활성화는 별도 gate로 통제 |
+| Semantic search | pgvector production profile, on by default (`hybrid`, ADR-065) | external vector engine | 참조 profile은 extension과 HNSW를 포함한다. Release가 검토한 embedding identity만 완성 시 자동 활성화하고, 그 밖의 identity는 별도 gate로 통제 |
 | Graph query | PostgreSQL assertion tables + recursive CTE | Neo4j, Apache AGE | 현재 규모에서 충분하며 원장과 권한을 단순화 |
 | Graph database | None in baseline | Neo4j read projection | 입증 전 운영 비용을 만들지 않음 |
 | Raw object storage | local content-addressed filesystem | S3-compatible object store | Slack/EML raw snapshot과 첨부 보존 |
@@ -192,6 +192,7 @@ flowchart TB
 ```text
 PostgreSQL 18 + pgvector extension
 Postgres-native lexical projection
+Local embedding model runtime (semantic search, ADR-065; BGE reranker opt-in)
 Postgres recursive graph adapter
 Local CAS
 NAS + optional Slack/Mail connectors
@@ -204,7 +205,7 @@ Standard profile에서 다음을 비활성화한다.
 
 - Slack
 - Mail
-- embeddings
+- embeddings (`KIP_SEMANTIC=off`)
 - relation miner
 - graph projection worker
 
@@ -480,6 +481,7 @@ workspace = "company"
 [database]
 url_env = "KIP_DATABASE_URL"
 statement_timeout_ms = 15000
+projection_statement_timeout_ms = 300000
 pool_max_size = 10
 
 [storage]
@@ -496,8 +498,9 @@ acl_scope = "workspace:company"
 classification = "internal"
 
 [search]
-semantic_enabled = false
-default_mode = "reranked"
+semantic_enabled = true
+default_mode = "hybrid"
+semantic_auto_activate = true
 lexical_rerank_enabled = true
 lexical_rerank_candidate_limit = 40
 abstain_on_unknown_terms = true
@@ -509,12 +512,12 @@ max_document_chars = 8000
 baseline_weight = 0.15
 
 [models.embedding]
-enabled = false
-model = "replace-with-pinned-local-model"
-revision = "replace-with-immutable-revision"
+enabled = true
+model = "kip-qwen3-embedding-0.6b"
+revision = "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
 dimensions = 1024
-max_document_chars = 12000
-space_name = "replace-with-versioned-space"
+max_document_chars = 4000
+space_name = "qwen3-embedding-0.6b-1024"
 
 [security]
 allow_remote_model_egress = false
@@ -770,10 +773,14 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 The supported PostgreSQL production reference profile includes pgvector. Normal
 migration creates the extension, 1024-dimensional projection table, and HNSW
-index. This dependency does not activate semantic search: lexical commands
-continue to work with `search.semantic_enabled=false`, and
-`capabilities.semantic_search` remains false until the embedding adapter plus a
-compatible, complete, active space are verified. A future extension-free profile
+index. Since ADR-065 the shipped configuration enables semantic search, but the
+extension alone does not make it ready: lexical commands continue to work with
+`search.semantic_enabled=false`, default-mode search degrades to lexical while
+the model runtime or active space is unavailable, and
+`capabilities.semantic_search` remains false until the embedding adapter is
+configured and the active space matches the configured identity; completeness
+is verified by `kip doctor` and `kip projection verify`, and every sync keeps
+the projection current. A future extension-free profile
 would be a separate supported distribution with its own migration and test
 matrix; it is not the current production contract.
 
@@ -2558,6 +2565,16 @@ Semantic search는 다음을 만족한 뒤 활성화한다.
 6. 사람이 fingerprint-matched report를 검토한 뒤 projection activation과
    `search.semantic_enabled` configuration 변경을 각각 승인한다.
 
+ADR-065는 이 절차를 release 단위로 적용했다. Release가 검토한 기본 embedding
+identity(`RELEASE_REVIEWED_EMBEDDING_IDENTITIES`: provider `infinity`, pinned
+Qwen3-Embedding-0.6B revision, 1024 dimensions, 4000 characters,
+`head_tail_v1`, 기본 query instruction)는 기본 활성이며, 그 projection이
+완성되면 sync·활성화된 re-extraction·`projection rebuild`가 자동으로
+활성화한다(`search.semantic_auto_activate`, 기본 true). 다른 model, revision,
+dimensions, input cap, instruction은 새 identity이므로 위 1-6을 그대로 따르고
+`kip projection activate`로만 활성화한다. `semantic_auto_activate = false`는
+완전 수동 활성화로 되돌린다.
+
 ### 23.2 Embedding space metadata
 
 현재 metadata는 canonical migration에, 1024차원 vector row는 reference
@@ -2639,9 +2656,10 @@ normalized content unit body
 -> max_document_chars 경계에서 head_tail_v1
 ```
 
-길이 제한, `head_tail_v1`, model revision, dimensions, normalization,
-document instruction은 embedding-space identity를 결정한다. Batch size와
-timeout은 결과 의미를 바꾸지 않는 operational knob다. Email quoted history,
+길이 제한(기본 4000, ADR-065), `head_tail_v1`, model revision, dimensions,
+normalization, document instruction은 embedding-space identity를 결정한다.
+Batch size(기본 32), 요청당 문자 상한 `max_batch_chars`(기본 16000), timeout과
+query timeout(기본 10초)은 결과 의미를 바꾸지 않는 operational knob다. Email quoted history,
 Slack block, 표 구조, verified alias를 별도로 조합하는 source-aware builder는
 목표 설계이며 현재 구현이라고 주장하지 않는다.
 
@@ -2662,8 +2680,13 @@ space-v1 active
 Approved assertions와 content units는 바뀌지 않는다.
 
 Current rebuild는 stable space에 대해 missing/source-hash-stale rows만 다시
-만들고, verify와 activation은 같은 current active ACL-fresh denominator를
-사용한다. 자세한 결정은 ADR-035를 따른다.
+만들고(pending unit을 `models.embedding.page_size`, 기본 1000개씩), verify와
+activation은 같은 current active ACL-fresh denominator를 사용한다. 자세한
+결정은 ADR-035를 따른다. ADR-065 이후 모든 sync(CLI, REST, worker)와 활성화된
+re-extraction이 같은 incremental 경로로 새·변경 unit을 embedding하고
+`SyncSummary`/`ReextractionSummary.semantic_projection`에 결과를 남긴다. Model
+runtime이 없으면 sync는 실패하지 않고 `unavailable`을 기록하며 다음 sync가
+이어서 처리한다.
 
 ### 23.7 Hybrid retrieval
 
@@ -2684,6 +2707,29 @@ Sources:
 
 최종 reranking은 optional adapter다. 각 variant는 독립적으로 평가하며,
 2026-08-13 private report에서는 vector-only가 hybrid와 reranked보다 우수했다.
+3.12.0의 기본 mode는 `hybrid`(lexical+vector RRF)이며 release 평가는
+`IMPLEMENTATION_STATUS.md`에 기록한다(ADR-065). 검토된 private 19-case에서
+fused 결과를 BM25로 rerank하면 품질이 lexical보다 낮아졌고(Recall@10/MRR
+78.9%/59.8%), BGE cross-encoder는 recall은 올렸지만 순위 품질은 올리지 못하고
+지연이 3-4배였다. `reranked`는 명시적 mode이자 cross-encoder를 켠 배포의
+설정값으로 남는다. BM25 reranker(`search.lexical_rerank_enabled = true`,
+`models.reranker.backend = "bm25"`)는 lexical mode와 lexical fallback에서 계속
+동작한다. `models.reranker.backend`가 model backend(`http`/`huggingface`)여도
+cross-encoder는 fused `reranked` pool만 채점하고, lexical mode와
+`semantic_degraded` fallback은 선택적 `[models.lexical_reranker]` table의 local
+reranker를 쓰므로 model runtime을 기다리거나 그 장애로 실패하지 않는다. Key와
+기본값은 shipped BM25 설정과 같다: `backend`(`bm25` 기본, 또는 `rapidfuzz`),
+`max_document_chars`(8000), `bm25_k1`/`bm25_b`(1.2/0.75), RapidFuzz 전용
+`baseline_weight`(0.15). `[models.reranker]`가 `bm25`/`rapidfuzz`이면 두 path가
+그 reranker를 공유하고 이 table은 무시된다. Rerank된 hit의 diagnostic
+`metadata.rerank_model`은 실제로 채점한 reranker model을 기록하며 trace의
+reranker revision도 그 기준으로 남는다.
+
+Lexical channel은 lexical unit의 `search.lexical_common_term_fraction`(기본
+0.02) 이상에 나타나는 query n-gram을 candidate matching에서 제외한다. 파일·폴더
+이름이 모든 unit의 lexical text에 들어가므로 공통 폴더 이름이 corpus 절반과
+일치하던 문제를 막기 위한 것이며, BM25 reranker는 전체 질문을 계속 채점한다.
+Abstention gate는 문서 수를 세지 않고 존재 여부(`any_term_visible`)만 확인한다.
 
 ### 23.8 Vector ACL
 
@@ -2692,7 +2738,32 @@ scope, ACL-snapshot freshness, source kind, document type, project ID를 SQL
 안에서 제한한다. Date range는 아직 public `SearchRequest`에 없다. HNSW
 filtered-query 후보 부족은 transaction-local strict iterative scan과 bounded
 scan tuple 설정으로 보완하며, private corpus의 exact comparison에서 별도
-측정한다.
+측정한다. Projection query는 ACL freshness와 source policy를 unit마다가 아니라
+artifact/snapshot마다 한 번 평가한다.
+
+### 23.9 Model runtime and degradation
+
+기본 model runtime은 hash-locked `requirements/semantic.txt`의 Infinity 0.0.77을
+격리된 `var/semantic-venv`에 설치하고 pinned embedding snapshot을 loopback에서
+제공한다. BGE reranker-v2-m3는 `models.reranker.backend = "http"`와
+`KIP_SEMANTIC_RERANKER=on`일 때만 load한다(메모리 약 2GB 추가). 이때도 lexical
+mode와 lexical fallback은 BM25(`[models.lexical_reranker]`)로 rerank한다. Snapshot이
+cache되면 offline으로 실행한다. Compose는 digest-pinned `models` service
+(`compose.yaml`에서는 profile `semantic`)를 쓰며, `app-up.sh`는 machine당 model
+runtime을 하나만 띄운다. API/worker는
+`security.model_service_hosts`에 명시된 bare host name으로만 연결한다.
+`allow_remote_model_egress`는 false로 유지된다.
+
+- Model runtime이나 active projection이 없으면 기본 mode 검색은 lexical path로
+  degrade하고 `semantic_degraded`를 envelope `meta.warnings`에 남긴다.
+- 기본 mode가 `reranked`인 배포에서 reranker만 실패하면 fused lexical+vector
+  순위를 유지하고 `rerank_degraded`를 남긴다. `lexical_rerank_degraded`는 기존 의미를 유지한다.
+- 명시적 `vector`/`hybrid`/`reranked` mode 요청은 degrade하지 않고 실패한다.
+- Adapter별 circuit이 실패한 runtime을 `models.circuit_cooldown_seconds`(기본
+  30초) 동안 건너뛰고, query embedding은 별도 10초 timeout(connect 3초)을 쓴다.
+- Projection 문장(pending page, 진행 count, scope 목록, embedding upsert)은
+  interactive `database.statement_timeout_ms`(15초) 대신
+  `database.projection_statement_timeout_ms`(기본 300000)를 쓴다.
 
 ---
 
@@ -3369,8 +3440,11 @@ qtrace_  redacted query trace
 ```
 
 Skill은 사용 가능 여부를 추측하지 말고 capability를 먼저 확인해야 한다.
-`semantic_search`는 configuration뿐 아니라 matching active space가 compatible,
-complete, active 상태이며 verification을 통과한 경우에만 true다. 설정 의도와
+`semantic_search`는 configuration뿐 아니라 active space가 설정된 embedding
+identity와 일치할 때만 true다(`semantic_projection_status`
+`active`/`incompatible`/`shadow`/`missing`). MCP client가 첫 data call 전에
+부르므로 capability는 가볍게 유지하고, 완성도 count와 `stale` 판정은
+`kip doctor`와 `kip projection verify`가 보고한다. 설정 의도와
 projection 상태는 각각 `semantic_search_configured`와
 `semantic_projection_status`로 분리해 진단한다.
 
@@ -4616,7 +4690,8 @@ metrics:
 
 ### 36.11 Vector A/B gate
 
-Semantic search remains disabled by default until:
+ADR-065 enables semantic search by default with the release-reviewed embedding
+identity. Any other embedding space stays inactive until:
 
 1. lexical baseline is fixed and measured.
 2. one or more embedding spaces are generated in shadow mode.
@@ -5213,6 +5288,7 @@ stand for implicit accepted decisions.
 | ADR-057 | Approved setup controls the effective runtime | Accepted |
 | ADR-058 | Use complete evidence and discoverable MCP contracts | Accepted |
 | ADR-064 | Upgrade pdf-inspector to 1.19.0 and Kordoc to 4.13.1 with PDF re-extraction | Accepted |
+| ADR-065 | Semantic search on by default | Accepted |
 
 ---
 

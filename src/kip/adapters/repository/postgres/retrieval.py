@@ -59,14 +59,22 @@ class PostgresRetrievalStore:
     ) -> list[EmbeddableUnit]:
         return self.database.list_embeddable_units(context)
 
+    def workspace_acl_scopes(self, context: RequestContext) -> list[str]:
+        return self.semantic_projection.workspace_acl_scopes(context)
+
     def list_pending_embeddable_units(
         self,
         context: RequestContext,
         space_id: str,
+        *,
+        after_unit_id: str | None = None,
+        limit: int | None = None,
     ) -> list[EmbeddableUnit]:
         return self.semantic_projection.list_pending_embeddable_units(
             context,
             space_id,
+            after_unit_id=after_unit_id,
+            limit=limit,
         )
 
     def embedding_projection_progress(
@@ -91,6 +99,9 @@ class PostgresRetrievalStore:
         context: RequestContext,
     ) -> EmbeddingSpace | None:
         return self.database.active_embedding_space(context)
+
+    def embedding_space_exists(self, context: RequestContext, space_id: str) -> bool:
+        return self.semantic_projection.embedding_space_exists(context, space_id)
 
     def activate_embedding_space(
         self,
@@ -141,6 +152,13 @@ class PostgresRetrievalStore:
         terms: list[str],
     ) -> dict[str, int]:
         return self.database.term_document_frequencies(context, terms)
+
+    def any_term_visible(
+        self,
+        context: RequestContext,
+        terms: list[str],
+    ) -> bool:
+        return self.database.any_term_visible(context, terms)
 
     def get_content_units(
         self,

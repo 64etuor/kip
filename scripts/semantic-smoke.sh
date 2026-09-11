@@ -8,12 +8,12 @@ EMBED_SERVED="${KIP_EMBEDDING_SERVED_MODEL:-kip-qwen3-embedding-0.6b}"
 RERANK_SERVED="${KIP_RERANKER_SERVED_MODEL:-kip-bge-reranker-v2-m3}"
 EMBED_DIMENSIONS="${KIP_EMBEDDING_DIMENSIONS:-1024}"
 
-"$(python_cmd)" - "$BASE_URL" "$EMBED_SERVED" "$RERANK_SERVED" "$EMBED_DIMENSIONS" <<'PY'
+"$(python_cmd)" - "$BASE_URL" "$EMBED_SERVED" "$RERANK_SERVED" "$EMBED_DIMENSIONS" "${KIP_SEMANTIC_RERANKER:-off}" <<'PY'
 import sys
 
 import httpx
 
-base_url, embedding_model, reranker_model, raw_dimensions = sys.argv[1:]
+base_url, embedding_model, reranker_model, raw_dimensions, reranker_mode = sys.argv[1:]
 expected_dimensions = int(raw_dimensions)
 with httpx.Client(timeout=120) as client:
     models = client.get(f"{base_url}/models")
@@ -31,6 +31,9 @@ with httpx.Client(timeout=120) as client:
         raise SystemExit(
             f"expected {expected_dimensions} embedding dimensions, got {len(vector)}"
         )
+    if reranker_mode != "on":
+        print(f"semantic smoke passed: embedding={expected_dimensions} (reranker not loaded)")
+        raise SystemExit(0)
     rerank = client.post(
         f"{base_url}/rerank",
         json={

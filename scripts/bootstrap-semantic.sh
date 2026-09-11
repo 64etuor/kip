@@ -16,10 +16,13 @@ if [[ ! -x "$SEMANTIC_VENV/bin/python" ]]; then
   uv venv "$SEMANTIC_VENV" --python 3.13
 fi
 
-uv pip install \
+# Exact, hash-verified dependency graph (requirements/semantic.txt, compiled
+# from requirements/semantic.in); `uv pip sync` also removes anything the lock
+# no longer lists, so an upgrade converges on the reviewed runtime.
+uv pip sync \
   --python "$SEMANTIC_VENV/bin/python" \
-  'infinity-emb[server,torch]==0.0.77' \
-  'click==8.1.8'
+  --require-hashes \
+  "$PROJECT_ROOT/requirements/semantic.txt"
 
 "$SEMANTIC_VENV/bin/python" -c 'import infinity_emb, torch; print("infinity-emb ready; torch", torch.__version__)'
 printf 'Semantic environment ready: %s\n' "$SEMANTIC_VENV"

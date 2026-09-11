@@ -1,0 +1,7 @@
+# Isolated model runtime for default semantic search (ADR-065). Infinity
+# 0.0.77 is the latest release; it bounds transformers below 5 through
+# sentence-transformers 3.x. Known advisories are reviewed in
+# scripts/audit-semantic.sh and docs/SECURITY.md.
+infinity-emb[server,torch]==0.0.77
+# typer<0.13 (infinity server CLI) needs click below 8.2.
+click==8.1.8

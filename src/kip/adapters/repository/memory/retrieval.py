@@ -59,21 +59,39 @@ class MemoryRetrievalStore:
     ) -> list[EmbeddableUnit]:
         return self.lexical.list_embeddable_units(context)
 
+    def workspace_acl_scopes(self, context: RequestContext) -> list[str]:
+        scopes: set[str] = set()
+        for packet in self.state.packets_by_revision.values():
+            if packet.workspace_id != context.workspace:
+                continue
+            snapshot = packet.source_object.acl_snapshot
+            if snapshot is not None:
+                scopes.update(snapshot.scopes)
+            scopes.update(packet.source_object.acl_scopes)
+            for unit in packet.units:
+                scopes.update(unit.acl_scopes)
+        return sorted(scopes)
+
     def list_pending_embeddable_units(
         self,
         context: RequestContext,
         space_id: str,
+        *,
+        after_unit_id: str | None = None,
+        limit: int | None = None,
     ) -> list[EmbeddableUnit]:
-        units = self.list_embeddable_units(context)
-        return [
+        units = sorted(self.list_embeddable_units(context), key=lambda unit: unit.unit_id)
+        pending = [
             unit
             for unit in units
-            if (
+            if (after_unit_id is None or unit.unit_id > after_unit_id)
+            and (
                 (record := self.state.embeddings.get((space_id, unit.unit_id)))
                 is None
                 or record.source_hash != unit.source_hash
             )
         ]
+        return pending if limit is None else pending[:limit]
 
     def embedding_projection_progress(
         self,
@@ -107,6 +125,9 @@ class MemoryRetrievalStore:
         context: RequestContext,
     ) -> EmbeddingSpace | None:
         return self.semantic.active_embedding_space(context)
+
+    def embedding_space_exists(self, context: RequestContext, space_id: str) -> bool:
+        return self.semantic.embedding_space_exists(context, space_id)
 
     def activate_embedding_space(
         self,
@@ -157,6 +178,13 @@ class MemoryRetrievalStore:
         terms: list[str],
     ) -> dict[str, int]:
         return self.lexical.term_document_frequencies(context, terms)
+
+    def any_term_visible(
+        self,
+        context: RequestContext,
+        terms: list[str],
+    ) -> bool:
+        return self.lexical.any_term_visible(context, terms)
 
     def get_content_units(
         self,

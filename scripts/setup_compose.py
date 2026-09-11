@@ -116,8 +116,12 @@ def main() -> int:
             return subprocess.run(
                 [str(root / "scripts/migrate.sh")], cwd=root, env=environment, check=False,
             ).returncode
+        profiles = ["--profile", "app"]
+        if environment.get("KIP_EXTRA_PROFILE") == "semantic" and "models" in compose["services"]:
+            # app-up.sh selected the compose model runtime for this machine.
+            profiles += ["--profile", "semantic"]
         return subprocess.run(
-            ["docker", "compose", "-f", "compose.generated.yaml", "--profile", "app", *sys.argv[1:]],
+            ["docker", "compose", "-f", "compose.generated.yaml", *profiles, *sys.argv[1:]],
             cwd=root, env=environment, check=False,
         ).returncode
     except (ConfigurationError, OSError, ValueError, KeyError, TypeError, yaml.YAMLError) as exc:

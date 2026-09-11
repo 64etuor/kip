@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+import httpx
 import typer
 from pydantic import BaseModel
 from pydantic import ValidationError as PydanticValidationError
@@ -18,6 +19,7 @@ from kip.adapters.ocr.kordoc import (
     probe_kordoc_version,
     resolve_kordoc_expected_version,
 )
+from kip.application.projection_maintenance import after_reextraction, after_sync, stderr_progress
 from kip.container import Container, build_container
 from kip.domain.interactions import (
     ClarificationAnswer,
@@ -31,6 +33,7 @@ from kip.domain.knowledge import CandidateEvidence, KnowledgeEntity
 from kip.domain.models import (
     AnswerRequest,
     AssertionCandidate,
+    Capabilities,
     ContextRequest,
     Envelope,
     EnvelopeMeta,
@@ -126,9 +129,10 @@ class Runtime:
 
 
 def command_loads_models(subcommand: str | None) -> bool:
+    # `parser reextract --activate` embeds the activated units (ADR-065),
+    # so the parser group needs the embedding adapter.
     return subcommand not in {
         "migrate",
-        "parser",
         "quality",
         "telemetry",
         "interaction",
@@ -440,18 +444,25 @@ def _sync_one(
                 runtime.context, selected
             ),
         }
+    application = runtime.container.application
     if selected in _enabled_filesystem_sources(runtime):
-        return runtime.container.application.ingestion.sync_filesystem(
+        summary = application.ingestion.sync_filesystem(
             runtime.context, selected, dry_run=dry_run
         )
+        if dry_run:
+            return summary
+        return after_sync(application.retrieval, runtime.context, summary, stderr_progress())
     if dry_run:
         raise ValidationError("--dry-run is currently supported only for filesystem sources")
     # `_resolve_sync_source` only ever returns a filesystem source name, "all"
     # (handled above), or one of the known remote source names; anything else
     # already raised ValidationError there. Dispatch generically so adding a
     # remote connector requires no edit here.
-    return runtime.container.application.ingestion.sync_remote(
-        runtime.context, selected, since=since
+    return after_sync(
+        application.retrieval,
+        runtime.context,
+        application.ingestion.sync_remote(runtime.context, selected, since=since),
+        stderr_progress(),
     )
 
 
@@ -518,6 +529,76 @@ def status(
 # A doctor-only timeout: this check must stay fast even when
 # parsers.ocr.timeout_seconds is configured generously for real OCR runs.
 _KORDOC_DOCTOR_PROBE_TIMEOUT_SECONDS = 5
+
+
+def _semantic_doctor_check(
+    settings: Settings,
+    capabilities: Capabilities,
+    verification: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Report whether default search really uses the vector channel (ADR-065).
+
+    Not required: search still answers through the lexical path when the
+    model runtime is down or the projection is not active yet, so this is a
+    WARN-level signal with the exact command that finishes the setup.
+    """
+    if not capabilities.semantic_search_configured:
+        return {
+            "name": "semantic_search",
+            "ok": True,
+            "required": False,
+            "details": {"enabled": False, "model_runtime": None, "projection": "disabled", "reason": None},
+        }
+    embedding = settings.get("models.embedding", {}) or {}
+    base_url = str(embedding.get("base_url", "http://127.0.0.1:7997")).rstrip("/")
+    runtime_ok = False
+    if isinstance(embedding, dict) and embedding.get("enabled", False):
+        try:
+            with httpx.Client(timeout=httpx.Timeout(3.0), trust_env=False) as client:
+                runtime_ok = client.get(f"{base_url}/models").status_code == 200
+        except httpx.HTTPError:
+            runtime_ok = False
+    projection = capabilities.semantic_projection_status
+    reason: str | None = None
+    if not isinstance(embedding, dict) or not embedding.get("enabled", False):
+        reason = "search.semantic_enabled is on but models.embedding is disabled; enable it or turn semantic search off"
+    elif not runtime_ok:
+        reason = (
+            f"model runtime not reachable at {base_url}; start it with ./scripts/semantic-server.sh start "
+            "(or install it with ./scripts/bootstrap-semantic.sh && ./scripts/semantic-server.sh prefetch). "
+            "Search falls back to lexical until then"
+        )
+    elif projection == "incompatible":
+        reason = (
+            "another embedding space is active. When both spaces are release-reviewed and "
+            "search.semantic_auto_activate is on, a complete ./scripts/kip projection rebuild --name semantic "
+            "switches automatically; a space outside the release-reviewed identities is never replaced "
+            "automatically, so rebuild, evaluate, then run ./scripts/kip projection activate "
+            "--report REPORT --candidate VARIANT"
+        )
+    elif not capabilities.semantic_search:
+        reason = (
+            f"semantic projection is {projection}; run ./scripts/kip sync run --source SOURCE "
+            "or ./scripts/kip projection rebuild --name semantic to embed and activate it"
+        )
+    elif verification is not None and verification.get("ok") is not True:
+        projection = "stale"
+        reason = (
+            f"the active projection holds {verification.get('indexed_units')} of "
+            f"{verification.get('content_units')} visible units; run ./scripts/kip sync run "
+            "--source SOURCE or ./scripts/kip projection rebuild --name semantic"
+        )
+    return {
+        "name": "semantic_search",
+        "ok": reason is None,
+        "required": False,
+        "details": {
+            "enabled": True,
+            "model_runtime": runtime_ok,
+            "projection": projection,
+            "reason": reason,
+        },
+    }
 
 
 def _kordoc_ocr_doctor_check(settings: Settings) -> dict[str, Any]:
@@ -682,6 +763,15 @@ def doctor(ctx: typer.Context) -> None:
             }
         )
         checks.append(_kordoc_ocr_doctor_check(settings))
+        verification = None
+        if capabilities.semantic_search:
+            try:
+                verification = runtime.container.application.retrieval.verify_semantic_projection(
+                    runtime.context
+                )
+            except KipError:
+                verification = None
+        checks.append(_semantic_doctor_check(settings, capabilities, verification))
         for source in settings.get("sources.filesystem", []) or []:
             if not isinstance(source, dict) or not source.get("enabled", True):
                 continue
@@ -1073,15 +1163,14 @@ def parser_reextract(
         selected = _resolve_sync_source(runtime, source)
         if selected not in _enabled_filesystem_sources(runtime):
             raise ValidationError("parser re-extraction requires one filesystem source")
-        ingestion = runtime.container.application.ingestion
-        if extension:
-            return ingestion.reextract_filesystem(
-                runtime.context,
-                selected,
-                activate=activate,
-                extensions=frozenset(extension),
-            )
-        return ingestion.reextract_filesystem(runtime.context, selected, activate=activate)
+        application = runtime.container.application
+        summary = application.ingestion.reextract_filesystem(
+            runtime.context,
+            selected,
+            activate=activate,
+            extensions=frozenset(extension) if extension else None,
+        )
+        return after_reextraction(application.retrieval, runtime.context, summary, stderr_progress())
 
     _run(ctx, action)
 

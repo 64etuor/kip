@@ -6,6 +6,8 @@ log_level = "INFO"
 [database]
 url_env = "KIP_DATABASE_URL"
 statement_timeout_ms = 15000
+# Background vector projection builds scan and insert far more rows.
+projection_statement_timeout_ms = 300000
 pool_max_size = 10
 
 [storage]
@@ -44,6 +46,9 @@ clock_skew_seconds = 30
 
 [security]
 allow_remote_model_egress = false
+# Bare host names of model services on the deployment's private network that
+# count as local while remote model egress stays off (containers: "models").
+model_service_hosts = []
 follow_symlinks = false
 max_file_bytes = 524288000
 
@@ -57,8 +62,17 @@ service_name = "kip"
 endpoint = "http://127.0.0.1:4318"
 
 [search]
-semantic_enabled = false
-default_mode = "reranked"
+# Hybrid lexical+vector retrieval is the default (ADR-065). Search falls back
+# to the lexical path, with a `semantic_degraded` warning, while the model
+# runtime is down or the projection is still being built. For the BGE
+# cross-encoder set `default_mode = "reranked"`, `[models.reranker] backend =
+# "http"` and start the runtime with KIP_SEMANTIC_RERANKER=on.
+semantic_enabled = true
+default_mode = "hybrid"
+# Activate a complete projection automatically when its embedding identity is
+# one the KIP release measured; any other identity waits for
+# `kip projection activate` after evaluation.
+semantic_auto_activate = true
 # Overall answer context size is set per request via --max-chars (default 120000), not a config key.
 context_item_max_chars = 16000
 alias_expansion_enabled = true
@@ -75,29 +89,40 @@ lexical_rerank_candidate_limit = 40
 rrf_rank_constant = 60
 hnsw_ef_search = 200
 hnsw_max_scan_tuples = 100000
+# Query n-grams found in at least this share of lexical units (often from a
+# shared folder path) are left out of candidate matching; 0 disables.
+lexical_common_term_fraction = 0.02
+
+[models]
+# After a model runtime failure, skip it for this many seconds so every query
+# does not wait for a timeout.
+circuit_cooldown_seconds = 30
 
 [models.embedding]
-enabled = false
+enabled = true
 base_url = "http://127.0.0.1:7997"
 model = "kip-qwen3-embedding-0.6b"
 revision = "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
 dimensions = 1024
-batch_size = 4
-# Qwen3 embedding sidecar accepts up to 32k tokens; 12000 chars (~6-8k Korean
-# tokens after head/tail truncation) stays comfortably inside that budget
-# while covering long NAS documents that were previously cut to 4000 chars.
-# Any change to this value changes the embedding space identity (see
-# SemanticProjectionUseCases.embedding_space / ADR-035) so it always lands
-# in a fresh shadow space instead of mixing truncation lengths in one space.
-max_document_chars = 12000
+batch_size = 32
+# Upper bound on characters per embedding request so a rebuild never holds
+# the shared runtime long enough to time out interactive query embeddings.
+max_batch_chars = 16000
+# Head/tail projection: units longer than this keep their first and last
+# halves. 4000 characters covers almost every unit (Office paragraphs, sheets,
+# HWP chunks and PDF pages average 800-2500) and bounds attention memory; at
+# 12000 the runtime reached a 15 GB footprint on a 24 GB Mac (ADR-065). Any
+# change creates a new embedding space identity (ADR-035).
+max_document_chars = 4000
 timeout_seconds = 120
+query_timeout_seconds = 10
 query_instruction = "Retrieve relevant Korean evidence for this query: "
 space_name = "qwen3-embedding-0.6b-1024"
 
 [models.reranker]
 enabled = true
 backend = "bm25"
-max_document_chars = 8000
+max_document_chars = 8000  # BM25 cap; set 2048 when backend = "http" (the HTTP reranker's default cap)
 baseline_weight = 0.15
 # bm25_k1 = 1.2
 # bm25_b = 0.75
@@ -109,6 +134,12 @@ revision = "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
 # max_length = 1024
 # device = "mps"
 timeout_seconds = 120
+# The lexical path keeps BM25 via [models.lexical_reranker] (defaults shown) when backend = "http".
+# [models.lexical_reranker]
+# backend = "bm25"
+# max_document_chars = 8000
+# bm25_k1 = 1.2
+# bm25_b = 0.75
 
 [models.generation]
 enabled = false

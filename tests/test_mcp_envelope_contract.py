@@ -276,3 +276,59 @@ def test_empty_search_explains_missing_index_identically_across_edges(test_conta
     # An outsider sees no units; the warning must not imply hidden ones exist.
     outsider = test_container.application.operations.request_context(acl_scopes=[])
     assert test_container.application.retrieval.result_warnings(outsider, []) == ["no_visible_indexed_units"]
+
+
+def test_degraded_default_search_is_reported_identically_across_edges(test_container, monkeypatch):
+    # Given semantic search on by default while the model runtime is down.
+    from fastapi.testclient import TestClient
+    from mcp.client import Client
+    from typer.testing import CliRunner
+
+    from kip.api import create_app
+    from kip.cli import app
+    from kip.container import build_container
+    from kip.errors import DependencyUnavailableError
+
+    class DownEmbedding:
+        name = "http"
+        provider = "infinity"
+        model = "kip-qwen3-embedding-0.6b"
+        revision = "fixture"
+        dimensions = 4
+        normalized = True
+
+        def embed_query(self, text):
+            raise DependencyUnavailableError("model runtime down")
+
+        def embed_documents(self, texts):
+            raise DependencyUnavailableError("model runtime down")
+
+    (test_container.settings.project_root / "source" / "정산.txt").write_text("정산 안내 문서")
+    test_container.settings.raw["search"].update({"semantic_enabled": True, "default_mode": "reranked"})
+    degraded = build_container(test_container.settings, repository=test_container.repository, embedding=DownEmbedding())
+    context = degraded.application.operations.request_context()
+    degraded.application.ingestion.sync_filesystem(context, "fixture")
+    monkeypatch.setattr("kip.cli.build_container", lambda settings, load_models=True: degraded)
+    monkeypatch.setenv("KIP_WORKSPACE", "default")
+    monkeypatch.setenv("KIP_ACL_SCOPES", "workspace:default")
+
+    # When every edge searches and builds context.
+    cli_search = json.loads(CliRunner().invoke(app, ["search", "정산", "--limit", "3"]).output)
+    cli_context = json.loads(CliRunner().invoke(app, ["context", "정산", "--limit", "2"]).output)
+    with TestClient(create_app(degraded)) as client:
+        headers = {"X-KIP-API-Key": "test-key"}
+        rest_search = client.post("/v1/search", json={"query": "정산", "limit": 3}, headers=headers).json()
+        rest_context = client.post("/v1/context", json={"query": "정산", "limit": 2}, headers=headers).json()
+
+    async def invoke(tool, arguments):
+        async with Client(create_server(degraded)) as client:
+            result = await client.call_tool(tool, arguments)
+            return json.loads(result.content[0].text)
+
+    mcp_search = anyio.run(invoke, "kip_search", {"query": "정산", "limit": 3})
+    mcp_context = anyio.run(invoke, "kip_context", {"query": "정산", "limit": 2})
+
+    # Then results still arrive and every envelope says the ranking fell back.
+    for envelope in (cli_search, cli_context, rest_search, rest_context, mcp_search, mcp_context):
+        assert envelope["ok"] and envelope["data"]
+        assert envelope["meta"]["warnings"] == ["semantic_degraded"]

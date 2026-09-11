@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from kip.adapters.ocr.kordoc import KORDOC_VERSION
+from kip.application.semantic import EMBEDDING_DEFAULTS, SEMANTIC_DEFAULT_MODE
 from kip.domain.json_types import JsonObject, JsonValue
 from kip.setup.models import SetupPlan
 
@@ -12,6 +13,7 @@ def _json_strings(values: Iterable[str]) -> list[JsonValue]:
 
 
 def build_config_payload(plan: SetupPlan, *, container: bool) -> JsonObject:
+    semantic = bool(plan.semantic_search)
     database: JsonObject = {
         "statement_timeout_ms": 15000,
         "secret_ref": plan.database_secret_ref.display(),
@@ -105,6 +107,9 @@ def build_config_payload(plan: SetupPlan, *, container: bool) -> JsonObject:
         "security": {
             "allow_remote_model_egress": plan.model_provider != "disabled",
             "follow_symlinks": False,
+            # The compose `models` service is on the deployment's private
+            # network; naming it keeps remote model egress disabled.
+            "model_service_hosts": _json_strings(["models"] if container and semantic else []),
         },
         "telemetry": {
             "query_traces_enabled": True,
@@ -116,11 +121,20 @@ def build_config_payload(plan: SetupPlan, *, container: bool) -> JsonObject:
             },
         },
         "search": {
-            "semantic_enabled": False,
-            "default_mode": "reranked",
+            "semantic_enabled": semantic,
+            "default_mode": SEMANTIC_DEFAULT_MODE,
             "context_max_chars": 120000,
+            "hybrid_candidate_limit": 40,
+            "rerank_candidate_limit": 40,
+            "lexical_rerank_enabled": True,
+            "lexical_rerank_candidate_limit": 40,
         },
         "models": {
+            "embedding": {
+                "enabled": semantic,
+                "base_url": "http://models:7997" if container else "http://127.0.0.1:7997",
+                **EMBEDDING_DEFAULTS,
+            },
             "generation": model,
             "relation_mining": {
                 "enabled": plan.relation_mining_mode == "enabled",

@@ -20,7 +20,9 @@ owner; they are not a sandbox against a concurrent filesystem attacker.
 - API binds to loopback by default.
 - Remote model egress is disabled unless explicitly approved.
 - The local model sidecar binds only to loopback and disables Infinity and
-  Hugging Face telemetry in the provided launcher.
+  Hugging Face telemetry in the provided launcher. It loads only the two
+  commit-pinned model revisions and runs offline (`HF_HUB_OFFLINE`) once they
+  are cached.
 
 ## Filesystem access boundary
 
@@ -83,7 +85,17 @@ against a concurrent filesystem attacker. See ADR-056.
   only as untrusted payload data; unknown ontology values or evidence IDs make
   the complete mining result invalid.
 - A loopback-only embedding/reranker sidecar is a local model boundary, not
-  remote model egress. When `models.generation.enabled=false`, `kip answer`
+  remote model egress. `security.model_service_hosts` is an allowlist of bare
+  host names (never a wildcard) for model services on the deployment's own
+  private network; the container config sets `["models"]` so API and worker
+  reach the compose `models` service at `http://models:7997` while
+  `allow_remote_model_egress` stays false, and host configs set `[]`. Model
+  base URLs must not carry credentials. The local `compose.yaml` `models`
+  service (profile `semantic`) publishes only on
+  `127.0.0.1:${KIP_SEMANTIC_PORT:-7997}` so host CLI/MCP can share it.
+  Production compose runs `models` read-only and offline on an internal
+  network; only the one-shot `models-fetch` profile has download egress
+  (ADR-065). When `models.generation.enabled=false`, `kip answer`
   returns the local extractive path and does not call a generator. Security
   review must inspect the resolved configuration, adapter destination, and
   trace/egress decision; the command name `answer` alone is not evidence that
@@ -208,6 +220,16 @@ against a concurrent filesystem attacker. See ADR-056.
 - Apply ACL before lexical, vector, and graph retrieval. An assertion cannot be
   more visible than its exact evidence, and inaccessible paths must not reveal
   their existence.
+- Semantic projection maintenance (ADR-065) runs as the system over every ACL
+  scope recorded in the workspace's source snapshots, so the vector index holds
+  all units; `vector_search` still applies the caller's scopes and snapshot
+  freshness to every hit, and the abstention existence check uses the caller's
+  scopes. The lexical common-term probe
+  (`search.lexical_common_term_fraction`) counts matching units workspace-wide
+  without ACL: it only decides which query terms drive candidate matching and
+  never returns units, but a term's share of hidden units can shift which
+  visible units a caller's query reaches. Set the fraction to 0 where that
+  inference is unacceptable.
 - Ontology answer context is built only from active assertions whose valid-time
   interval contains the database/application statement time. Every graph edge
   is discarded if any exact evidence unit is inaccessible, freshness-stale, or
@@ -309,9 +331,26 @@ membership. Administrator credentials are entered only in the native terminal/UI
   A contract test requires every core project dependency to appear in that
   lock, preventing a wheel-only dependency from being absent at runtime.
 - Audit the production lock directly and audit the installed optional-extra
-  environment separately. The opt-in semantic extra requires Transformers
-  `>=5.5.4,<6` and is currently locked at 5.15.0; semantic activation still
-  requires its independent shadow quality and compatibility gates.
+  environment separately. The in-process `semantic` extra requires Transformers
+  `>=5.5.4,<6` and is currently locked at 5.15.0. The default semantic search
+  path does not use that extra; it calls the isolated model runtime below.
+- 3.12.0 installs the model runtime (`var/semantic-venv`) from the hash-locked
+  `requirements/semantic.txt`, compiled from `requirements/semantic.in` and
+  installed with `uv pip sync --require-hashes`. `scripts/audit-semantic.sh`
+  audits that lock in `./scripts/verify.sh` and, like the Kordoc audit, needs
+  network access. Six reviewed advisories are ignored with reasons; any new
+  advisory fails:
+  - PYSEC-2026-2132 (`click.edit` command injection): the runtime never calls
+    `click.edit`.
+  - transformers 4.57.6 PYSEC-2025-217, PYSEC-2026-2288, PYSEC-2026-2289,
+    PYSEC-2026-2290, and PYSEC-2026-3929: each needs an attacker-controlled
+    model repository or checkpoint, Trainer RNG state, or `save_pretrained`
+    target. The runtime loads only two commit-pinned revisions, runs offline
+    once they are cached, binds to loopback, and never trains or saves.
+  Infinity 0.0.77 (August 2025) is the latest release and bounds transformers
+  below 5 through sentence-transformers 3.x. Replacing the runtime is a
+  tracked limitation. The compose `models` image is pinned by digest
+  (`michaelf34/infinity:0.0.77-cpu@sha256:94db836145f609c508f3f296f3b9bd0e78ae088025e879664d073dfd9f929e96`).
 - Optional extractor imports must not make the base CLI fail at module import
   time. The clean-wheel smoke blocks that regression; parser execution still
   fails explicitly when its declared extra is unavailable.

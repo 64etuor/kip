@@ -149,6 +149,27 @@ high 이상 advisory이거나 registry/네트워크 오류이며, 두 경우 모
 경로에서는 사용하지 않으므로, 사내망에서는 npm registry 접근을 열어 준 뒤 다시
 실행하세요. `--ignore-scripts`나 audit 생략으로 우회하지 않습니다.
 
+### `audit-semantic.sh` 실패
+`./scripts/audit-semantic.sh`는 `verify.sh`에서 model runtime lock
+(`requirements/semantic.txt`)을 감사합니다. Kordoc 감사처럼 네트워크가 필요하며,
+검토된 advisory 여섯 건만 이유와 함께 제외하고 새 advisory는 실패로 처리합니다
+([SECURITY.md](SECURITY.md#dependency-safety)). 네트워크 오류면 접근을 열고 다시
+실행하고, 새 advisory면 제외 목록에 추가하지 말고 검토를 요청하세요.
+
+### `Semantic search: skipped` 또는 `the model runtime could not be installed`
+Bootstrap이 semantic search용 model runtime을 준비하지 않았다는 뜻이며 설치 자체는
+성공입니다. 검색은 lexical로 동작합니다. `KIP_SEMANTIC=off`로 실행했거나(`.env`에
+기록됨) RAM이 8GiB 미만이면 건너뜁니다. 다운로드·디스크 문제로 실패했다면 원인을
+해결한 뒤 다시 실행하세요.
+
+```bash
+./scripts/bootstrap-semantic.sh && ./scripts/semantic-server.sh prefetch
+```
+
+Runtime 없이 새로 만든 `config/kip.toml`은 `semantic_enabled = false`입니다.
+나중에 runtime을 설치했다면 `search.semantic_enabled = true`,
+`search.default_mode = "hybrid"`, `[models.embedding] enabled = true`로 바꾸세요([OPERATIONS.md](OPERATIONS.md#semantic-search-default)).
+
 ### `docker: command not found` / `Cannot connect to the Docker daemon`
 Docker Desktop이 설치되지 않았거나 실행 중이 아닙니다. Docker Desktop을 실행한
 뒤(고래 아이콘이 "Running"이 될 때까지 기다린 후) 다시 시도하세요.
@@ -200,7 +221,11 @@ PowerShell/cmd에서는 동작하지 않습니다. WSL2(Ubuntu)를 설치하고 
 
 ### 디스크 공간 부족
 최소 10GB가 필요합니다(`df -h .`로 확인). 런타임 이미지 약 2GB, OCR 모델 약
-0.8GB, Python 환경 약 1GB, 나머지는 데이터베이스와 색인입니다.
+0.8GB, Python 환경 약 1GB, 나머지는 데이터베이스와 색인입니다. 기본 semantic
+search를 쓰면 embedding model snapshot 약 1.2GB(`var/model-cache`, reranker를
+켜면(`KIP_SEMANTIC_RERANKER=on`) 약 2.3GB 추가)와 격리 model runtime
+(`var/semantic-venv`)이 추가됩니다. 공간이 부족하면 `KIP_SEMANTIC=off`로 lexical
+전용 설치를 선택할 수 있습니다.
 
 ---
 
@@ -235,6 +260,50 @@ PowerShell/cmd에서는 동작하지 않습니다. WSL2(Ubuntu)를 설치하고 
    있습니다. 실제 선택된 config와 서비스 재시작 여부를 확인하세요. 의도한
    범위를 승인한 뒤 그 source만 명시적으로 sync합니다. 알려진 ID나 넓은
    request ACL로 이 경계를 우회할 수 없습니다.
+
+### 결과에 `semantic_degraded` 또는 `rerank_degraded` 경고가 붙을 때
+
+검색·context envelope의 `meta.warnings`에 나오는 경고이며 검색은 실패하지
+않습니다.
+
+- `semantic_degraded`: model runtime이 응답하지 않거나 semantic projection이 아직
+  완성·활성화되지 않아 lexical 결과를 돌려줬습니다. `./scripts/kip doctor`의
+  `semantic_search` 항목 `reason`이 할 일을 알려줍니다. Runtime이 멈췄다면
+  `./scripts/semantic-server.sh start`, 설치되지 않았다면
+  `./scripts/bootstrap-semantic.sh && ./scripts/semantic-server.sh prefetch`,
+  projection이 `missing`/`shadow`/`stale`이면
+  `./scripts/kip sync run --source 소스이름` 또는
+  `./scripts/kip projection rebuild --name semantic`을 실행합니다. 큰 corpus의
+  첫 projection은 몇 시간이 걸리며, 그동안 이 경고가 계속 붙는 것은 정상입니다.
+  Sync 중 runtime이 멈춰 있으면 `semantic_projection.status`가 `unavailable`이
+  되고 다음 sync가 이어서 처리합니다.
+- `rerank_degraded`: 기본 mode를 `reranked`로 바꾼 배포에서 reranker만 실패해
+  lexical+vector fusion 순위를 그대로 돌려줬습니다. BGE reranker
+  (`models.reranker.backend = "http"`)는 runtime을 `KIP_SEMANTIC_RERANKER=on`으로
+  시작해야 load됩니다. Runtime 로그(`start`로 띄웠다면 `var/log/semantic-server.log`, launchd면
+`var/log/launchd-semantic.err.log`)를 확인하세요.
+
+Runtime이 한 번 실패하면 `models.circuit_cooldown_seconds`(기본 30초) 동안 호출을
+건너뛰므로 복구 직후 잠시 경고가 남을 수 있습니다. Runtime이 메모리를 많이 써서
+시스템이 느려진다면 `max_document_chars`가 기본값 4000인지 확인하세요. 12000을
+유지한 이전 config는 24GB Mac에서 runtime을 15GB까지 키웠고, 검토되지 않은
+embedding identity라 자동 활성화도 되지 않습니다. 기준 Apple Silicon(24GB,
+float16)에서 embedding model만 load한 runtime은 약 2.7GB를 씁니다. Reranker를
+켜면 약 2GB가 더 필요합니다. `./scripts/semantic-server.sh stop`은 최대 20초
+(`KIP_SEMANTIC_STOP_SECONDS`) 기다린 뒤 강제 종료하므로 바쁜 runtime이 남지
+않습니다. `start`는 launchd/systemd나 다른 instance가 이미 실행 중이거나 응답하면
+새로 띄우지 않습니다.
+
+`kip capabilities`의 `semantic_projection_status`는 active space가 설정된
+identity와 일치하는지만 빠르게 봅니다(`active`/`incompatible`/`shadow`/`missing`).
+빠진 unit이 있는지(`stale`)는 `./scripts/kip doctor`의 `semantic_search` 항목이나
+`./scripts/kip projection verify --name semantic`으로 확인하고,
+`./scripts/kip projection rebuild --name semantic`으로 채웁니다.
+
+전체 `./scripts/app-up.sh`는 machine당 model runtime을 하나만 띄웁니다. ARM
+machine이나 host runtime이 이미 떠 있는 경우 API/worker container의 검색 결과에
+`semantic_degraded`가 붙는 것은 정상입니다(host CLI/MCP는 host runtime을
+씁니다).
 
 ---
 
@@ -275,6 +344,7 @@ Reference 설정에서는 모든 filesystem parser가 파일 하나당 fresh chi
 | `canonical_repository` | 데이터베이스에 연결하지 못했습니다. `./scripts/app-up.sh --database-only`로 PostgreSQL이 떠 있는지, `KIP_DATABASE_URL`이 맞는지 확인하세요. |
 | `content_addressed_store` | 원본 사본 저장 폴더(CAS)에 접근할 수 없습니다. 경로 권한을 확인하세요. |
 | `filesystem_source:이름` | 그 소스 폴더가 없거나 읽을 수 없습니다. 경로와 접근 권한을 확인하세요. |
+| `semantic_search` | Semantic search가 켜져 있는데 model runtime에 연결할 수 없거나 projection이 active가 아니거나 완성되지 않았습니다(`stale`). 필수 항목은 아니며 그동안 검색은 lexical로 동작합니다. `details.reason`의 명령(`./scripts/semantic-server.sh start`, `./scripts/bootstrap-semantic.sh && ./scripts/semantic-server.sh prefetch`, `./scripts/kip sync run --source 소스이름` 또는 `./scripts/kip projection rebuild --name semantic`)을 실행하세요. |
 | `kordoc_ocr_resolvable` | OCR이 켜져 있는데 `kordoc` 실행 파일을 찾지 못했습니다. `./scripts/install-kordoc.sh`를 실행하거나, 스캔 문서가 없다면 설정에서 `parsers.ocr.kordoc.enabled = false`로 끄세요. 끄지 않으면 이미지가 든 PDF/PPTX가 `partial`로 처리됩니다. |
 | `ontology_adaptive_discovery_writable` | 새 용어 제안 기능이 켜져 있는데 `ontology/` 폴더에 쓸 수 없습니다. 컨테이너라면 그 폴더가 쓰기 가능하게 연결(마운트)되어야 합니다. |
 | `ontology_pending_release_journal` | 이전 작업이 중단된 흔적이 남아 있습니다. 다음 실행 때 자동 복구되며, 계속 남아 있으면 파일 권한을 확인하세요. |
@@ -291,7 +361,7 @@ Reference 설정에서는 모든 filesystem parser가 파일 하나당 fresh chi
 | `not_found` | 해당 ID가 없음 | ID 오타이거나, 내 권한으로는 보이지 않는 자료입니다. |
 | `forbidden` | 권한 부족 | 온톨로지 승인·철회·채굴 등은 **관리자 역할**이 필요합니다. `--role admin`을 붙이거나 `KIP_ROLES=admin`을 설정하세요. |
 | `conflict` | 이미 처리됨/충돌 | 같은 작업이 이미 반영되었거나 원본이 중간에 바뀐 경우입니다. 다시 조회 후 재시도하세요. |
-| `dependency_unavailable` | 외부 구성요소 없음 | 임베딩 서버나 선택 기능이 꺼져 있습니다. 그 기능을 켜거나 다른 검색 모드를 쓰세요. |
+| `dependency_unavailable` | 외부 구성요소 없음 | 임베딩 서버나 선택 기능이 꺼져 있습니다. `--mode`로 `vector`, `hybrid`, `reranked`를 명시한 요청은 lexical로 대체되지 않고 실패하므로, runtime을 켜거나(`./scripts/semantic-server.sh start`) mode를 생략해 기본 fallback을 쓰세요. |
 | `configuration_error` | 설정값 오류 | 메시지가 어떤 설정 키가 잘못됐는지 알려줍니다. |
 | `parser_error` | 파일을 읽지 못함 | 3장 표를 보세요. |
 

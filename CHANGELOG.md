@@ -1,5 +1,95 @@
 # Changelog
 
+## 3.12.0 - 2026-09-12
+
+- Semantic search is on by default (ADR-065). New configs and
+  setup-generated configs enable `search.semantic_enabled`, the pinned
+  Qwen3-Embedding-0.6B space (1024 dimensions, 4000-character head/tail
+  projection) and the default mode `hybrid` (lexical and vector candidates
+  fused by reciprocal rank). The BM25 reranker stays on for lexical mode and
+  the lexical fallback; the BGE reranker-v2-m3 cross-encoder is opt-in
+  (`models.reranker.backend = "http"`, `KIP_SEMANTIC_RERANKER=on`), because on
+  the reviewed private set it did not improve ranking and tripled latency.
+  Enabling it no longer moves lexical mode and the lexical fallback onto the
+  cross-encoder: they keep BM25 through the new optional
+  `[models.lexical_reranker]` table (defaults equal the shipped BM25 settings),
+  and reranked hits record `metadata.rerank_model`.
+  Bootstrap installs the isolated model runtime from the hash-locked
+  `requirements/semantic.txt`, prefetches the embedding model (about 1.2 GB;
+  about 2.3 GB more with the reranker) and never fails on it;
+  `KIP_SEMANTIC=off` keeps a lexical-only install, and machines below 8 GiB
+  of RAM skip it. `app-up.sh` starts exactly one runtime per machine,
+  `install-launchd.sh` supervises it (`com.kip.semantic`),
+  `deploy/systemd/kip-semantic.service` covers Linux hosts, and compose adds a
+  digest-pinned, embedding-only `models` service (profile `semantic`) that API
+  and worker reach through the new `security.model_service_hosts` allowlist
+  without enabling remote model egress (production: offline on an internal
+  network, both models fetched once with the `models-fetch` profile).
+- Every sync and activated re-extraction embeds new or changed units and
+  reports `semantic_projection` in its summary; a complete projection whose
+  identity the release reviewed activates automatically
+  (`search.semantic_auto_activate`), while other models still need
+  evaluation and `kip projection activate`. `kip projection rebuild` pages
+  through pending units, bounds each request by characters as well as count,
+  and auto-activates the reviewed space. CLI syncs print embedding progress.
+- Search degrades instead of failing: `semantic_degraded` when the runtime or
+  projection is unavailable, and the fused lexical+vector ranking with
+  `rerank_degraded` when only the reranker fails; both now appear in envelope
+  `meta.warnings`. A circuit breaker skips a failed runtime for
+  `models.circuit_cooldown_seconds`, and query embeddings have their own short
+  timeout.
+- Lexical search on large corpora: query n-grams found in at least
+  `search.lexical_common_term_fraction` of units (file and folder names are
+  indexed into every unit) no longer drive candidate matching, and the
+  abstention check stops at the first visible match. On the reviewed private
+  set this raised lexical recall@10 from 78.9% to 89.5% and MRR from 58.3% to
+  63.8% while P95 fell from 11.1 s to 2.2 s. Projection queries evaluate ACL
+  and source policy once per file instead of once per unit, and projection
+  statements use `database.projection_statement_timeout_ms` (default 5
+  minutes) instead of the interactive statement timeout.
+- Model runtime memory: GPU inference runs in float16 (embedding cosine to
+  float32 ≥ 0.99998), the Metal allocator cache is capped, and the default
+  document cap is 4000 characters; at 12000 the runtime reached a 15 GB
+  footprint on a 24 GB Mac; the default embedding-only runtime uses about
+  2.7 GB. `semantic-server.sh stop` waits for the process and then
+  force-stops it instead of leaving a busy server running. One runtime runs
+  per machine: `start` skips and `run` (launchd/systemd) waits without
+  loading models while any runtime runs, answers or holds the port, and
+  `app-up.sh` does not start the compose `models` service while this
+  checkout's runtime runs or loads or another runtime answers. `start` and
+  `wait` with `KIP_SEMANTIC_RERANKER=on` refuse an instance that lacks the
+  reranker, model probes time out after 5 s, and `uninstall-launchd.sh` also
+  removes `com.kip.semantic`. Compose PostgreSQL gets tunable memory
+  settings (`shared_buffers` 1GB by default instead of 128MB).
+- `kip capabilities` reports semantic readiness from the active space's
+  identity without counting the corpus; `kip doctor` and
+  `kip projection verify` run the full completeness check and report a stale
+  active space.
+- Upgrading: `kip update` keeps each deployment's config, so an existing
+  lexical config stays lexical. To adopt the default, install the runtime
+  (`./scripts/bootstrap-semantic.sh && ./scripts/semantic-server.sh prefetch`),
+  then run `kip setup plan` and apply it again (a plan from an earlier release
+  re-applies as lexical-only), or edit `search.semantic_enabled` and
+  `[models.embedding]` by hand; the next sync embeds and activates the
+  reviewed space. A semantic config without `search.default_mode` now uses
+  `hybrid`; configs from earlier releases that set
+  `default_mode = "reranked"` keep it until changed. An inline REST sync
+  (`enqueue=false`) now includes that embedding, so prefer the queued sync
+  for large sources.
+- Quality gates: `./scripts/golden-gate.sh` replaces the documented Python
+  invocations, which did not run. The portable gate also runs the shipped
+  default mode with a deterministic embedding, and the private gate checks
+  per-variant floors for the default mode and the lexical fallback; it fails
+  when the deployment's configured default mode has no floor or the floor
+  file is malformed or non-numeric. On the reviewed private set (19 cases,
+  176,545 units) recall@10 / MRR / P95 were:
+  lexical 89.5% / 63.8% / 2.2 s, vector 89.5% / 83.3% / 0.08 s, hybrid
+  89.5% / 89.5% / 2.4 s, BM25-reranked 78.9% / 59.8% / 2.3 s and
+  BGE-reranked (20 candidates) 94.7% / 85.3% / 7.2 s, with no unauthorized
+  results.
+  `scripts/audit-semantic.sh` audits the runtime lock in `verify.sh`, with
+  reviewed advisories documented in `docs/SECURITY.md`.
+
 ## 3.11.0 - 2026-09-11
 
 - Upgrade `pdf-inspector` 1.14.2 -> 1.19.0 (ADR-064). On the six public PDFs

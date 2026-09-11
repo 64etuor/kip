@@ -117,7 +117,11 @@ a known unit/artifact ID or a broader request ACL (ADR-056).
 fields are `query`, `limit`, optional `mode`, `source_kinds`,
 `document_types`, `project_ids`, and `include_candidate_assertions`.
 `mode` accepts `lexical`, `vector`, `hybrid`, or `reranked`; omitting it selects
-the deployment default. CLI, REST, MCP, and the Python SDK expose the same
+the deployment default (`search.default_mode`, shipped as `hybrid` with
+semantic search on since ADR-065; `reranked` is the value for deployments that
+enable a cross-encoder). A request that omits `mode` degrades to the
+lexical path when the model runtime or active projection is unavailable, while
+an explicit vector-family `mode` fails instead of degrading. CLI, REST, MCP, and the Python SDK expose the same
 fields and call the same application service. Omitted optional filters retain
 the canonical model defaults, and SDK payloads omit those defaults rather than
 inventing a second wire contract.
@@ -155,7 +159,15 @@ body in the application layer, so `extraction.max_chars_per_unit` also bounds
 the per-hit transfer from PostgreSQL. When a search or context request
 returns nothing and no indexed unit is visible to the caller, `meta.warnings`
 carries `no_visible_indexed_units` on every edge; it describes the caller's
-own scope and never asserts that hidden units exist.
+own scope and never asserts that hidden units exist. When results are
+returned and any hit or context item carries a degradation marker, the
+search and context envelopes' `meta.warnings` also list it on every edge:
+`semantic_degraded` (default-mode search fell back to lexical because the
+model runtime or active projection was unavailable), `rerank_degraded` (only
+in a deployment whose default mode is `reranked`: only the reranker failed; the
+fused lexical+vector ranking was kept), or
+`lexical_rerank_degraded` (the lexical reranker failed or, in the semantic
+fallback, is not configured; lexical order was kept). The same markers remain in hit metadata and redacted traces.
 
 Verification fields report how the source was checked when the unit was
 reopened. `EvidenceRead.source_verification`,
@@ -316,6 +328,26 @@ counters and bounded `warnings` strings:
 (ADR-039); event connectors report `0` for both because deletions arrive as
 explicit tombstone events. Counters are additive per run and are operational
 telemetry, not evidence.
+
+`SyncSummary` and `ReextractionSummary` (from `parser reextract --activate`)
+carry an optional `semantic_projection` object (`SemanticProjectionUpdate`,
+ADR-065) describing what the run did to the semantic projection. It is `null`
+when semantic search is off or a re-extraction was not activated. Fields:
+
+- `status`: `disabled` (semantic search or the embedding adapter is off),
+  `current` (nothing new to embed), `updated` (new or changed units were
+  embedded), `incomplete` (eligible units are still missing), or
+  `unavailable` (the model runtime could not be reached; the sync itself does
+  not fail and the next sync resumes).
+- `space_id`, `newly_indexed_units`, `indexed_units`, `content_units`.
+- `active` and `activated`: whether the space is active, and whether this run
+  activated it. Only a complete space whose embedding identity the release
+  reviewed activates automatically (`search.semantic_auto_activate`).
+- `reason`: an optional explanation, also appended to `warnings` as
+  `semantic projection: <reason>`.
+
+CLI syncs additionally print `semantic projection: embedded N/M new or changed
+units` progress on stderr; stdout stays the JSON envelope.
 
 ## Generated answer boundary
 

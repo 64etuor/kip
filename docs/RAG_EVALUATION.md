@@ -2,13 +2,21 @@
 
 ## Current decision
 
-Keep semantic search disabled by default. The reason is no longer “semantic
-quality did not improve” for every corpus. On the reviewed 19-case private
-OneDrive set, the historical `c4000` vector-only run materially beat the active
-lexical path and its HNSW P95 passed, but the current reference cap is 12,000
-characters and has not been rebuilt/evaluated. Its stale-warning gate also
-fails closed. On the six-document public pilot, lexical remains equal or
-better. These are separate corpus decisions.
+Since 3.12.0 semantic search is the shipped default (ADR-065):
+`search.semantic_enabled = true` and the configured default mode `hybrid`
+(lexical and vector candidates fused by reciprocal rank), with the pinned
+Qwen3-Embedding-0.6B identity at a 4,000-character `head_tail_v1` cap.
+`reranked` remains an explicit mode and the setting value for deployments that
+enable the BGE cross-encoder; BM25 still reranks lexical mode and the lexical
+fallback. A complete projection of that release-reviewed identity activates
+automatically; any other identity still needs evaluation and
+`kip projection activate`. When the model runtime or active projection is not
+available, default-mode search degrades to lexical with a `semantic_degraded`
+warning. On the reviewed 19-case private OneDrive set, the historical `c4000`
+vector-only run had already materially beaten the lexical path, and in the
+3.12.0 run hybrid ranked best; on the six-document public pilot, lexical
+remained equal or better. These are separate
+corpus decisions, and the 3.12.0 measurements below are the release evidence.
 
 Public v1 `SearchRequest.mode` exposes `lexical`, `vector`, `hybrid`, and
 `reranked` consistently across the four edges. `kip evaluate run` remains the
@@ -19,6 +27,64 @@ The historical loaded-corpus audit, including the corrected unmeasured-metric
 semantics and all four retrieval variants, is
 [`2026-08-06 audit`](https://github.com/64etuor/kip/blob/1b04bad685762fe3002d9c4ec6a75f267df9fb94/docs/RAG_QUALITY_AUDIT_2026-08-06.md).
 
+## 3.12.0 default: hybrid semantic search
+
+The release evidence measures the shipped default mode and its lexical fallback
+on the full reviewed private corpus (19 cases, 1,912-file OneDrive corpus,
+about 176,500 units), plus the portable gate. The portable gate (hosted CI, no
+models) runs lexical and the default mode with a deterministic character-bigram
+hashing embedding; both must reach recall and MRR 1.0 with zero ACL leaks and
+P95 at most 100 ms. The private floor file holds per-variant floors for the
+default mode and the lexical fallback, and the private gate fails when the
+reviewed corpus is indexed but the configured semantic path is not ready, or
+when the deployment's configured default mode has no floor. Run
+both through `./scripts/golden-gate.sh [--portable|--private]`.
+
+Private reviewed set (19 cases, `onedrive-personal` 1,912 files / 176,545
+units, space `qwen3-embedding-0.6b-1024-c4000-ht1`, float16 runtime on the
+reference Mac, one warmup pass):
+
+| Variant | Recall@10 | MRR | nDCG@10 | P50 | P95 |
+|---|---:|---:|---:|---:|---:|
+| lexical (BM25 rerank, common-term pruning) | 89.5% | 63.8% | 70.2% | 1.45 s | 2.22 s |
+| vector | 89.5% | 83.3% | 84.9% | 0.06 s | 0.08 s |
+| hybrid (default) | 89.5% | 89.5% | 89.5% | 1.64 s | 2.42 s |
+| reranked, BM25 | 78.9% | 59.8% | 64.5% | 1.49 s | 2.33 s |
+| reranked, BGE, 40 candidates | 89.5% | 83.3% | 84.9% | 6.87 s | 16.18 s |
+| reranked, BGE, 20 candidates | 94.7% | 85.3% | 87.6% | 5.32 s | 7.20 s |
+
+All variants had 0 failed cases and 0 unauthorized results. `hybrid` became
+the default because BM25 reranking on top of the fused list fell below
+lexical, while the BGE cross-encoder raised recall but not ranking quality at
+3-4x the latency, so it stays opt-in.
+
+Public government set (36 cases, six PDFs): lexical 100% / 98.6% / 99.0%, P95
+0.04 s; vector 100% / 97.2% / 97.9%, P95 0.10 s; hybrid 100% / 98.6% / 99.0%,
+P95 0.09 s; reranked BM25 100% / 98.6% / 99.0%, P95 0.10 s; reranked BGE 100% /
+98.6% / 99.0%, P95 6.6 s. The set is saturated, so it cannot separate modes.
+
+The private gate (`./scripts/golden-gate.sh --private`) records floors for
+`hybrid` (recall 0.84, MRR 0.84, P95 at most 8000 ms) and the `lexical`
+fallback (recall 0.84, MRR 0.60, P95 at most 8000 ms). On the local deployment
+it passed with hybrid 0.8947/0.8947 (P95 1.8 s) and lexical 0.8947/0.6377. The
+first full projection of that corpus took roughly three hours of wall time on
+the reference Mac (about 100 short units/s and roughly 2,800-5,000
+characters/s for longer units); search stayed lexical until it was complete
+and then the reviewed space activated itself.
+
+Limits: 19 private cases is a small set (one case is 5.3 points). The semantic
+paraphrase gains are real, but the set also contains exact questions. BGE
+reranking could win on recall for a deployment that accepts its latency.
+Infinity 0.0.77 is unmaintained and pinned below transformers 5.
+
+The lexical channel, which the hybrid and reranked modes also run, changed in
+this release: query n-grams present in at least
+`search.lexical_common_term_fraction` (0.02) of lexical units are left out of
+candidate matching, while the BM25 reranker still scores the full question. In
+lexical mode on the same 19 cases this moved recall@10 from 78.9% to 89.5%,
+MRR from 58.3% to 63.8%, nDCG from 63.6% to 70.2%, P50 from 4.40 s to 1.45 s,
+and P95 from 11.11 s to 2.22 s (the warmed release run above).
+
 ## Reviewed private shadow: 2026-08-13 historical `c4000` run
 
 The evaluated Qwen3 space
@@ -26,11 +92,11 @@ The evaluated Qwen3 space
 active ACL-fresh units. It used the pinned local Infinity sidecar and versioned
 `head_tail_v1` input policy from ADR-035.
 
-The current code and reference configuration use a 12,000-character cap, which
-creates a distinct `c12000` space identity. Therefore this table is historical
-quality evidence, not a current compatible projection or activation report. A
-fresh `c12000` rebuild, verification, fingerprint-matched evaluation, and stale
-source cases are required before promotion can be reconsidered.
+Releases between this run and 3.12.0 used a 12,000-character cap (a distinct
+`c12000` identity) that was not evaluated. 3.12.0 returns the default to
+4,000 characters, but this table predates the 3.12.0 lexical and fusion
+changes, so it is historical quality evidence rather than the release
+evaluation above.
 
 | Variant | Recall@10 | MRR | nDCG@10 | P95 ms | ACL leaks |
 |---|---:|---:|---:|---:|---:|
@@ -130,9 +196,8 @@ expected numeric expansion target. The report and decision artifact are
 `evaluation/reports/jina-reranker-v2/decision.json`; the direct adapter smoke
 is recorded in `evaluation/reports/jina-reranker-v2/huggingface-smoke.json`.
 
-The result is a useful improvement in experimentability, not a quality
-promotion: lexical remains the active default for this corpus until a larger,
-harder internal golden set produces a gate-passing candidate.
+The result was a useful improvement in experimentability, not a quality
+promotion for this corpus: the Jina reranker remains an opt-in adapter.
 
 ## Commands
 
@@ -151,9 +216,12 @@ make evaluate
 ```
 
 Use `./scripts/kip`, not a bare `python -m kip.cli`, so `.env` and the
-PostgreSQL URL are loaded. Keep `public-government` and both model adapters
-disabled in distributed example configuration until the operator explicitly
-opts into this evaluation.
+PostgreSQL URL are loaded. The distributed example configuration keeps
+`public-government` disabled until the operator explicitly opts into this
+evaluation; the embedding adapter and the BM25 lexical reranker are on by
+default since 3.12.0. Measuring the BGE `reranked` variant needs
+`models.reranker.backend = "http"` and a runtime started with
+`KIP_SEMANTIC_RERANKER=on`.
 
 ## Remaining evidence gaps
 

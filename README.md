@@ -7,10 +7,13 @@ KIP은 NAS 파일, HWP/HWPX, PDF, PPTX, XLSX, Slack, 이메일에 흩어진 회�
 - **에이전트/터미널 경로:** 버전이 지정된 JSON을 출력하는 안정적인 CLI 명령
 - **애플리케이션 경로:** 동일한 서비스를 사용하는 REST/OpenAPI 및 선택형 MCP 어댑터
 
-기준 런타임은 PostgreSQL 18과 PostgreSQL 기본 lexical search입니다.
-`pgvector`는 기준 이미지에 설치되지만, 평가로 효용을 입증하기 전까지 semantic
-search는 비활성 상태입니다. Neo4j는 canonical store가 아니며 향후 선택형 read
-projection으로만 취급합니다.
+기준 런타임은 PostgreSQL 18(pgvector 포함)과 격리된 로컬 model runtime입니다.
+3.12.0부터 기본 검색은 lexical과 vector 결과를 reciprocal-rank fusion으로 합치는
+semantic search(`hybrid`)입니다(ADR-065). BGE cross-encoder reranker는 선택
+사항입니다. Model runtime이 멈췄거나 projection이
+아직 만들어지는 중이면 `semantic_degraded` 경고와 함께 PostgreSQL lexical search로
+동작합니다. `KIP_SEMANTIC=off`로 lexical 전용 설치를 선택할 수 있습니다. Neo4j는
+canonical store가 아니며 향후 선택형 read projection으로만 취급합니다.
 
 승인된 목표, 현재 구현, 측정 근거, 남은 운영 격차는
 [`docs/PRODUCTION_DESIGN_ALIGNMENT.md`](docs/PRODUCTION_DESIGN_ALIGNMENT.md)에
@@ -139,7 +142,7 @@ shasum, unzip 또는 python3만 있으면 됩니다. 버전이 지정된 배포 
 ```bash
 # 설치 위치와 버전을 고정
 curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh \
-  | bash -s -- ~/kip --version 3.9.0
+  | bash -s -- ~/kip --version 3.12.0
 ```
 
 `--check`, `--install-docker`, `--without-docker`는 bootstrap에 그대로
@@ -208,6 +211,10 @@ rollback 대상이 아니므로 마이그레이션을 지나는 업그레이드 
 `STARTER-KIT-MANIFEST.json`을 읽어 `KIP-MANIFEST.json`으로 교체합니다). 자세한
 절차는 [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md) 11장에 있습니다.
 
+`kip update`는 배포의 config를 유지하므로 `semantic_enabled = false`인 기존 배포는
+3.12.0 이후에도 lexical로 남습니다. 기본 semantic search를 채택하는 절차는
+[`docs/OPERATIONS.md`](docs/OPERATIONS.md)의 semantic search 절에 있습니다.
+
 ### 준비물
 
 Python·Node를 먼저 설치할 필요 없이 아래 명령부터 실행할 수 있습니다.
@@ -245,6 +252,16 @@ Python 3.12+, Node 20.9+/npm 9+, Compose 2.20+를 검사하며 엔진 연결도
 credential을 생성하며 기존 `.env`와 config는 보존합니다.
 정상 색인 중에는 parser package나 model을 내려받지 않습니다.
 
+Semantic search용 격리 model runtime(`var/semantic-venv`, hash-locked
+`requirements/semantic.txt`의 Infinity 0.0.77)과 고정된 embedding model
+snapshot(`var/model-cache`, 약 1.2GB)도 bootstrap이 준비합니다. Reranker는
+`KIP_SEMANTIC_RERANKER=on`일 때만 약 2.3GB를 더 내려받습니다. `KIP_SEMANTIC=off`로
+실행하면 건너뛰고 그 값을 `.env`에 기록하며, RAM이 8GiB 미만이면 자동으로
+건너뜁니다. 이 단계가 실패해도 bootstrap은 실패하지 않습니다. 검색은 lexical로
+동작하고 재시도 명령(`./scripts/bootstrap-semantic.sh && ./scripts/semantic-server.sh prefetch`)을
+출력합니다. Runtime이 설치되지 않은 상태에서 새로 만든 `config/kip.toml`은
+`semantic_enabled = false`로 시작합니다.
+
 ```bash
 ./scripts/bootstrap.sh
 ./scripts/app-up.sh --database-only
@@ -275,7 +292,11 @@ credential을 생성하며 기존 `.env`와 config는 보존합니다.
 ```
 
 `content_units`가 0이면 `./scripts/kip sync run --source sample`을 먼저 실행했는지
-확인하세요. 계속 막히면 [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)를
+확인하세요. `app-up.sh --database-only`는 설치된 model runtime도 시작하고 준비될
+때까지 기다립니다. Sync는 새 unit을 embedding하고 projection이 완성되면 자동으로
+활성화하며, 그 전까지 검색 결과의 `meta.warnings`에 `semantic_degraded`가 붙습니다.
+`kip doctor`의 `semantic_search` 항목이 runtime과 projection 상태(완성도 포함),
+고칠 명령을 알려줍니다. 계속 막히면 [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)를
 참조하세요.
 
 이 문서의 CLI 예제는 저장소 체크아웃 기준이라 `./scripts/kip`를 씁니다. 한 줄
@@ -473,7 +494,9 @@ exact evidence와 함께 `kip answer`/`kip context`에 들어갑니다. Source�
   `KIP_OPS_WEBHOOK`을 지원합니다.
 - `./scripts/backup.sh --retain N`은 seal과 checksum이 있는 backup을 만들고
   retention을 적용합니다. `./scripts/install-launchd.sh`는 macOS에서 daily backup,
-  periodic sync, 선택형 ops report, newsyslog rotation policy를 설정합니다.
+  periodic sync, 선택형 ops report, newsyslog rotation policy를 설정하고 model
+  runtime이 설치돼 있으면 `com.kip.semantic` 상시 실행 항목도 추가합니다. Linux
+  host는 `deploy/systemd/kip-semantic.service` user unit template을 사용합니다.
 - Filesystem source에서 삭제된 파일은 `[sync] deletion_grace_scans`번의 연속된
   complete scan에서 계속 없을 때만 tombstone됩니다. 기본값은 2입니다. Failed/empty
   scan은 삭제 근거가 아니며 다시 나타난 파일은 자동 재색인됩니다. Directory walk
@@ -486,21 +509,25 @@ exact evidence와 함께 `kip answer`/`kip context`에 들어갑니다. Source�
 
 | Profile | 구성 |
 |---|---|
-| 최소 | PostgreSQL, filesystem source, lexical search, CLI |
-| 표준 | 최소 profile + API, worker, HWP broker, 선택형 Slack/Mail connector |
-| 확장 | 표준 + opt-in semantic/관계 추출/Neo4j. 검토는 CLI/API로 제공 |
+| 최소 | PostgreSQL, filesystem source, lexical search(`KIP_SEMANTIC=off`), CLI |
+| 표준 | 최소 profile + 로컬 semantic search(model runtime), API, worker, HWP broker, 선택형 Slack/Mail connector |
+| 확장 | 표준 + opt-in 관계 추출/Neo4j. 검토는 CLI/API로 제공 |
 
 ## 10. 현재 제한 사항
 
 이 저장소는 바로 배포할 수 있는 패키지이지 모든 production adapter가 완성됐다는
 주장이 아닙니다. Filesystem, text, PDF, XLSX shallow/deep, memory repository, CLI/API
-contract, PostgreSQL migration, pgvector shadow path는 구현돼 있습니다. 로컬 semantic
-path는 문서화된 Apple Silicon pilot에서 검증됐지만 private corpus에서는 계속
-shadow-only입니다. Slack, Apple Mail, IMAP, Neo4j는 환경별 reference adapter입니다.
-stdio MCP adapter는 동일 application service를 사용하도록 구현돼 있습니다.
+contract, PostgreSQL migration, pgvector projection은 구현돼 있습니다. 로컬 semantic
+path는 3.12.0부터 기본 경로이며, release가 검토한 embedding identity의 projection은
+완성되면 자동 활성화됩니다. 대형 corpus의 첫 projection은 오래 걸립니다. 기준
+Apple Silicon(24GB)에서 약 176,500 unit의 1,912-file OneDrive corpus는 약 3시간이
+필요했고, 그동안 검색은 lexical로 동작합니다. Slack, Apple Mail, IMAP, Neo4j는
+환경별 reference adapter입니다. stdio MCP adapter는 동일 application service를
+사용하도록 구현돼 있습니다.
 
-지원하는 PostgreSQL profile은 semantic search가 꺼져 있어도 pgvector와 1024d HNSW
-index를 포함합니다. 설치는 활성화가 아닙니다. 변경되지 않은 HWP/HWPX revision은
+지원하는 PostgreSQL profile은 semantic search를 끈 배포에서도 pgvector와 1024d HNSW
+index를 포함합니다. 검토되지 않은 custom embedding identity는 자동 활성화되지 않고
+평가 뒤 `kip projection activate`가 필요합니다. 변경되지 않은 HWP/HWPX revision은
 parser version이 바뀔 때 명시적 shadow/activate re-extraction을 사용하며, PDF 등
 다른 확장자는 `--extension`으로 지정합니다. 모든 format을 한 번에 강제로 다시
 색인하는 일반 명령은 제공하지 않습니다.
@@ -509,7 +536,11 @@ Starter lexical path는 ACL-filtered candidate 최대 40개를 candidate-local B
 rerank하며 RapidFuzz 3.14.6을 fallback으로 사용합니다. 검토된 private 19-case에서
 최종 BM25는 Recall@10/MRR `0.789/0.646`, RapidFuzz는 `0.737/0.576`이었습니다.
 이는 retrieval 근거이지 answer 또는 ontology 품질 근거가 아닙니다. Lexical candidate
-set에 없는 문서는 reranking으로 복구할 수 없습니다.
+set에 없는 문서는 reranking으로 복구할 수 없습니다. 3.12.0은 lexical unit의
+`search.lexical_common_term_fraction`(기본 0.02) 이상에 나타나는 query n-gram을
+candidate matching에서 제외합니다(BM25 reranker는 전체 질문을 계속 채점). 전체
+1,912-file corpus의 lexical mode에서 같은 19-case의 Recall@10은 78.9%→89.5%,
+MRR은 58.3%→63.8%, P95는 11.11 s→2.22 s였습니다.
 
 수정이나 배포 전에 `./scripts/verify.sh`를 실행하세요. 필수 검사 도구가 없으면
 실패하므로 `./scripts/bootstrap.sh`로 환경을 복구한 뒤 다시 실행합니다.
@@ -539,13 +570,20 @@ make fetch-corpus
 make evaluate
 ```
 
-현재 공개 결과에서는 semantic search를 비활성 상태로 유지합니다. 수정된 lexical
-retrieval은 ACL 누출 없이 Recall@10과 MRR 1.000을 기록했으며 semantic variant는
-품질을 개선하지 못했습니다. 역사적으로 검토된 private `c4000` 결과는 다릅니다.
-Vector-only Recall@10/MRR은 `0.947/0.822`, lexical은 `0.789/0.646`, HNSW P95는
-`133.75 ms`, ACL 누출은 0이었습니다. 현재 12,000-character `c12000` identity는
-아직 rebuild/evaluate되지 않았고 stale-warning coverage도 없으므로 fail-closed
-gate에 따라 semantic search는 비활성 상태입니다.
+기본 설치에서는 bootstrap이 runtime을 이미 준비하고 sync가 projection을 채우므로
+`projection rebuild`는 중단된 projection을 재개하거나 다시 만들 때만 필요합니다.
+
+이전 공개 pilot 결과에서는 수정된 lexical retrieval이 ACL 누출 없이 Recall@10과
+MRR 1.000을 기록했고 semantic variant는 품질을 개선하지 못했습니다. 역사적으로
+검토된 private `c4000` 결과는 다릅니다. Vector-only Recall@10/MRR은
+`0.947/0.822`, lexical은 `0.789/0.646`, HNSW P95는 `133.75 ms`, ACL 누출은
+0이었습니다. 3.12.0은 4,000-character head/tail identity를 release 검토 기본값으로
+삼고 semantic search(`hybrid`)를 기본으로 켭니다(ADR-065). 3.12.0 private
+19-case 평가에서 hybrid는 Recall@10/MRR 89.5%/89.5%(P95 2.42 s)로 lexical
+89.5%/63.8%보다 순위 품질이 높았고, fused 결과를 BM25로 rerank하면 78.9%/59.8%로
+떨어졌으며, BGE cross-encoder는 recall은 올렸지만 순위 품질은 올리지 못하고 지연이
+3-4배(P95 7.2-16.2 s)라 선택 사항으로 남았습니다. 전체 측정 결과는
+`docs/IMPLEMENTATION_STATUS.md`와 `docs/RAG_EVALUATION.md`에 있습니다.
 
 정확한 결과, latency, fingerprint, target gap, 개선 이력은
 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`, `docs/RAG_EVALUATION.md`,

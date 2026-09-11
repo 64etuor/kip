@@ -104,8 +104,12 @@ its parser changes; an extension without a registered parser is rejected, and
 the JSON summary lists the scanned `extensions`. Activation inherits
 and rechecks the current canonical source ACL snapshot and classification,
 retains extraction history, replaces only the rebuildable active lexical
-projection, and commits each document atomically. It never writes to the source
-file or changes source access policy.
+projection, and commits each document atomically. When semantic search is
+enabled, the activated run then embeds the new or changed units into the
+semantic projection and reports it in the summary's optional
+`semantic_projection` object, as every sync does (ADR-065); a model runtime
+that is down leaves `status = "unavailable"` without failing the run. It never
+writes to the source file or changes source access policy.
 
 Keep production parser versions pinned. Upgrade a pin only after the parser conformance corpus and shadow-extraction comparison pass; do not use `@latest` in scheduled indexing.
 

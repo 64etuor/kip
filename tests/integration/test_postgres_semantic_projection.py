@@ -280,7 +280,11 @@ def test_postgres_vector_search_round_trips_a_1536_dimensional_space(
             normalized=True,
             status="shadow",
         )
+        assert repository.retrieval.embedding_space_exists(context, space.id) is False
         repository.retrieval.save_embedding_space(context, space)
+        # The single-row lookup `capabilities` uses instead of counting vectors.
+        assert repository.retrieval.embedding_space_exists(context, space.id) is True
+        assert repository.retrieval.embedding_space_exists(context, "espace_missing") is False
         indexed = repository.retrieval.upsert_embeddings(
             context,
             space.id,
@@ -351,3 +355,93 @@ def test_postgres_save_embedding_space_rejects_an_unprovisioned_dimension() -> N
     assert "768" in str(excinfo.value)
     assert "1024" in str(excinfo.value)
     assert "1536" in str(excinfo.value)
+
+
+def test_postgres_projection_maintenance_covers_every_scope_and_pages(tmp_path: Path) -> None:
+    # Given two sources with different ACL scopes and a caller who sees only one.
+    pytest.importorskip("psycopg")
+    workspace = "test_" + uuid.uuid4().hex[:12]
+    roots = {name: tmp_path / name for name in ("open", "finance")}
+    for name, root in roots.items():
+        root.mkdir()
+        for index in range(3):
+            (root / f"{name}-{index}.txt").write_text(f"{name} 문서 {index} 예산 승인 근거", encoding="utf-8")
+    settings = Settings(
+        project_root=Path(__file__).resolve().parents[2],
+        config_path=tmp_path / "kip.toml",
+        raw={
+            "search": {"semantic_enabled": True, "semantic_auto_activate": True},
+            "models": {"embedding": {"page_size": 2}},
+            "graph": {"backend": "memory"},
+            "sources": {
+                "filesystem": [
+                    {
+                        "name": name,
+                        "root": str(root),
+                        "enabled": True,
+                        "read_only": True,
+                        "settle_seconds": 0,
+                        "include_extensions": [".txt"],
+                        "exclude_globs": [],
+                        "acl_scope": f"workspace:{workspace}" if name == "open" else "team:finance",
+                    }
+                    for name, root in roots.items()
+                ]
+            },
+        },
+        environment="test",
+        workspace=workspace,
+        database_url=str(URL),
+        cas_path=tmp_path / "cas",
+    )
+    repository = PostgresRepository(str(URL))
+    container = build_container(settings, repository=repository, embedding=FixtureEmbedding())
+    repository.operations.migrate(settings.project_root / "migrations")
+    caller = container.application.operations.request_context(
+        workspace=workspace, principal_id="principal_open", acl_scopes=[f"workspace:{workspace}"]
+    )
+    try:
+        for name in roots:
+            container.application.ingestion.sync_filesystem(caller, name)
+
+        # When maintenance runs from the ordinary caller context.
+        update = container.application.retrieval.maintain_semantic_projection(caller)
+
+        # Then units of every scope are embedded, in pages, and counted.
+        assert update.status == "updated"
+        assert (update.indexed_units, update.content_units, update.newly_indexed_units) == (6, 6, 6)
+        assert update.active is False and update.reason and "not reviewed" in update.reason
+        system = container.application.retrieval._semantic.projection_context(caller)
+        assert "team:finance" in system.acl_scopes
+        space_id = container.application.retrieval.embedding_space(caller).id
+        assert repository.retrieval.list_pending_embeddable_units(system, space_id) == []
+
+        # And the caller-scoped view and the existence probe still honour ACLs.
+        assert repository.retrieval.embedding_projection_progress(caller, space_id).content_units == 3
+        assert repository.retrieval.any_term_visible(caller, ["open"]) is True
+        assert repository.retrieval.any_term_visible(caller, ["finance"]) is False
+        assert repository.retrieval.any_term_visible(system, ["finance"]) is True
+
+        # And pending pages are ordered, bounded and resumable by unit id.
+        other_space = EmbeddingSpace(
+            id=f"espace_{uuid.uuid4().hex[:12]}",
+            name="paging-probe",
+            provider="fixture",
+            model="fixture-embedding",
+            revision="v2",
+            dimensions=1024,
+            normalized=True,
+            status="shadow",
+        )
+        repository.retrieval.save_embedding_space(system, other_space)
+        first = repository.retrieval.list_pending_embeddable_units(system, other_space.id, limit=4)
+        rest = repository.retrieval.list_pending_embeddable_units(
+            system, other_space.id, after_unit_id=first[-1].unit_id, limit=4
+        )
+        ids = [unit.unit_id for unit in [*first, *rest]]
+        assert len(first) == 4 and len(rest) == 2 and ids == sorted(ids) and len(set(ids)) == 6
+    finally:
+        import psycopg
+
+        with psycopg.connect(str(URL), autocommit=True) as connection, connection.cursor() as cursor:
+            cursor.execute("DELETE FROM kip.workspaces WHERE slug=%s", (workspace,))

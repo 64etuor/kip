@@ -33,6 +33,6 @@ fi
 "${CHECK_RUNNER[@]}" ruff check src tests scripts
 "${CHECK_RUNNER[@]}" mypy src/kip
 "${CHECK_RUNNER[@]}" pip_audit --requirement requirements/runtime.txt --no-deps --disable-pip
-"$PY" scripts/portable_golden_gate.py
-"$PY" scripts/golden_gate.py
+"$PROJECT_ROOT/scripts/audit-semantic.sh"
+"$PROJECT_ROOT/scripts/golden-gate.sh"
 printf 'Verification passed.\n'

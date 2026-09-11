@@ -26,6 +26,15 @@ CLI/MCP installation. Explicit `KIP_PYTHON` remains authoritative; a broken or
 old existing `.venv` is preserved for the user to move aside. Resume interrupted
 configuration from inspect.
 
+Semantic search (`hybrid`) is the default and the BGE reranker is opt-in
+(ADR-065): bootstrap also installs an isolated model runtime and the pinned
+embedding model (about 1.2 GB) unless
+`KIP_SEMANTIC=off` is set or the host has less than 8 GiB of RAM. A failure
+there leaves bootstrap successful and search lexical. The plan's
+`semantic_search` records whether the runtime is installed; a lexical-only plan
+drops the compose `models` service and warns why. Report that choice with the
+plan rather than changing it silently.
+
 1. Run `./scripts/kip setup inspect`. If incomplete, ask exactly one question:
    the returned `data.questions` item, with its reason and answer format.
 2. Record that response using `./scripts/kip setup answer --question ID --value VALUE`.
@@ -44,8 +53,14 @@ configuration from inspect.
 Setup is configuration-only. Follow the receipt's `next_steps` within the
 authorized setup: `./scripts/app-up.sh --database-only` (database readiness and
 migration for CLI/MCP; only the database credential is required and no
-API/worker image is built), source sync, then search and exact-read smoke. Run
-`./scripts/app-up.sh` only when the API and worker are needed. Both select the
+API/worker image is built; it also starts an installed model runtime), source
+sync, then search and exact-read smoke. The first sync embeds the corpus; until
+that projection is active, which can take hours on a large corpus, search
+returns lexical results with a `semantic_degraded` warning, and `kip doctor`'s
+`semantic_search` check gives the fix command. Run
+`./scripts/app-up.sh` only when the API and worker are needed; it runs one
+model runtime per machine, so on ARM or beside a running host runtime the
+containers search lexically (`semantic_degraded`). Both select the
 standalone generated Compose. All-cloud sources need user-selected local
 downloads; a local generation choice still needs a separately verified service.
 `sync_schedule` is declarative metadata; a scheduler must be installed separately.

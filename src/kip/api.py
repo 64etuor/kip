@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from kip import __version__ as kip_version
+from kip.application.projection_maintenance import after_sync
 from kip.container import Container, build_container
 from kip.domain.identity import IdentityCredential
 from kip.domain.interactions import (
@@ -401,14 +402,17 @@ def create_app(container: Container | None = None) -> FastAPI:
         dry_run: bool = False,
         context: RequestContext = Depends(admin_context),
     ) -> Envelope:
-        data = (
-            {"job_id": selected.application.ingestion.enqueue_sync(context, source_name)}
-            if enqueue
-            else selected.application.ingestion.sync_filesystem(
-                context, source_name, dry_run=dry_run
+        if enqueue:
+            return ok(
+                {"job_id": selected.application.ingestion.enqueue_sync(context, source_name)},
+                context,
             )
+        summary = selected.application.ingestion.sync_filesystem(
+            context, source_name, dry_run=dry_run
         )
-        return ok(data, context)
+        if not dry_run:
+            summary = after_sync(selected.application.retrieval, context, summary)
+        return ok(summary, context)
 
     @app.post("/v1/sync/{source_name}", response_model=Envelope)
     def enqueue_source_sync(

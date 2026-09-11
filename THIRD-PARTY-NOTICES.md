@@ -83,6 +83,9 @@ their type stubs) are not distributed in the runtime image.
 | Kordoc | 4.13.1 | MIT | Pinned offline OCR/document runtime installed under `var/` by `./scripts/install-kordoc.sh`; never vendored into this repository (ADR-053, ADR-064) |
 | PostgreSQL | 18 | PostgreSQL License | Database engine, via the container image |
 | pgvector | 0.8.2 | PostgreSQL License | Vector index extension, via `pgvector/pgvector:0.8.2-pg18-trixie` |
+| Infinity (`infinity-emb`) | 0.0.77 | MIT | Isolated embedding/reranker model runtime installed into `var/semantic-venv` from the hash-locked `requirements/semantic.txt` by `./scripts/bootstrap-semantic.sh`; compose uses the digest-pinned `michaelf34/infinity:0.0.77-cpu` image. Its locked transitive packages (for example transformers 4.57.6, sentence-transformers 3.4.1, torch 2.14.0) carry their own licenses (ADR-065) |
+| Qwen/Qwen3-Embedding-0.6B | revision `97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3` | Apache-2.0 | Default embedding model, served as `kip-qwen3-embedding-0.6b`; snapshot fetched into `var/model-cache` (or the `kip_models` volume), never vendored (ADR-065) |
+| BAAI/bge-reranker-v2-m3 | revision `953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e` | Apache-2.0 | Cross-encoder reranker served as `kip-bge-reranker-v2-m3` by the same runtime when `models.reranker.backend = "http"` and the runtime starts with `KIP_SEMANTIC_RERANKER=on` (opt-in); snapshot fetched only then (production `models-fetch` always fetches it), never vendored |
 
 Container base images carry the licenses of their own contents; the image
 digest recorded in `deploy/production.env` identifies exactly what was shipped.

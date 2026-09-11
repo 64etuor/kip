@@ -154,6 +154,12 @@ def build_compose_payload(plan: SetupPlan, *, project_root: Path) -> JsonObject:
             service.get("depends_on", {}).pop("postgres", None)
     if not managed_database:
         services.pop("postgres")
+    if not plan.semantic_search:
+        # Lexical-only plan: no model runtime container (ADR-065).
+        services.pop("models", None)
+        volumes = base.get("volumes")
+        if isinstance(volumes, dict):
+            volumes.pop("kip_models", None)
     base["x-kip-setup"] = {"mode": "standalone", "plan_fingerprint": plan.plan_fingerprint}
     # This is a complete Compose project, not an override: merging source
     # mounts would retain the sample NAS mount outside the approved plan.

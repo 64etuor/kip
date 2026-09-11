@@ -4,12 +4,14 @@ import json
 import sys
 from pathlib import Path
 
+import httpx
 import pytest
 from typer.testing import CliRunner
 
 from kip.adapters.repository.memory import MemoryRepository
-from kip.cli import _kordoc_ocr_doctor_check, app
+from kip.cli import _kordoc_ocr_doctor_check, _semantic_doctor_check, app
 from kip.container import build_container
+from kip.domain.models import Capabilities
 from kip.settings import Settings
 
 
@@ -232,3 +234,94 @@ def test_kordoc_doctor_check_accepts_a_superseded_pin_left_in_a_preserved_config
     # Then the superseded pin means "the pinned runtime" and no config edit is needed.
     assert check["ok"] is True
     assert check["details"]["version"] == "4.13.1"
+
+
+def _capabilities(*, configured: bool, ready: bool, status: str) -> Capabilities:
+    return Capabilities(
+        repository="memory",
+        lexical_search=True,
+        semantic_search=ready,
+        semantic_search_configured=configured,
+        semantic_projection_status=status,
+        graph_backend="memory",
+        api=True,
+        mcp=True,
+        parsers={},
+        connectors={},
+        warnings=[],
+    )
+
+
+def test_semantic_doctor_check_explains_each_missing_piece(tmp_path: Path) -> None:
+    lexical_only = _semantic_doctor_check(_settings(tmp_path, None), _capabilities(configured=False, ready=False, status="disabled"))
+    assert lexical_only["ok"] is True and lexical_only["details"]["enabled"] is False
+
+    no_embedding = _semantic_doctor_check(_settings(tmp_path, None), _capabilities(configured=True, ready=False, status="disabled"))
+    assert no_embedding["ok"] is False and "models.embedding is disabled" in no_embedding["details"]["reason"]
+
+    settings = Settings(
+        project_root=tmp_path,
+        config_path=tmp_path / "kip.toml",
+        raw={"models": {"embedding": {"enabled": True, "base_url": "http://127.0.0.1:9"}}},
+        environment="test",
+        database_url="memory://",
+        cas_path=tmp_path / "cas",
+    )
+    unreachable = _semantic_doctor_check(settings, _capabilities(configured=True, ready=False, status="missing"))
+    assert unreachable["ok"] is False and unreachable["required"] is False
+    assert unreachable["details"]["model_runtime"] is False
+    assert "semantic-server.sh start" in unreachable["details"]["reason"]
+
+
+def _reachable_runtime(monkeypatch, tmp_path: Path) -> tuple[Settings, list[str]]:
+    """Embedding enabled, with the model runtime answering its `/models` probe."""
+    probed: list[str] = []
+    real_client = httpx.Client
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        probed.append(str(request.url))
+        return httpx.Response(200, json={"data": []})
+
+    monkeypatch.setattr(
+        httpx,
+        "Client",
+        lambda **kwargs: real_client(transport=httpx.MockTransport(answer), **kwargs),
+    )
+    settings = Settings(
+        project_root=tmp_path,
+        config_path=tmp_path / "kip.toml",
+        raw={"models": {"embedding": {"enabled": True, "base_url": "http://127.0.0.1:9"}}},
+        environment="test",
+        database_url="memory://",
+        cas_path=tmp_path / "cas",
+    )
+    return settings, probed
+
+
+def test_semantic_doctor_check_reports_a_stale_active_projection(tmp_path: Path, monkeypatch) -> None:
+    settings, probed = _reachable_runtime(monkeypatch, tmp_path)
+    ready = _capabilities(configured=True, ready=True, status="active")
+
+    check = _semantic_doctor_check(settings, ready, {"ok": False, "indexed_units": 5, "content_units": 7})
+    current = _semantic_doctor_check(settings, ready, {"ok": True, "indexed_units": 7, "content_units": 7})
+
+    assert probed == ["http://127.0.0.1:9/models", "http://127.0.0.1:9/models"]
+    assert check["ok"] is False and check["required"] is False
+    assert check["details"]["model_runtime"] is True
+    assert check["details"]["projection"] == "stale"
+    assert "holds 5 of 7 visible units" in check["details"]["reason"]
+    assert current["ok"] is True and current["details"]["projection"] == "active"
+
+
+def test_semantic_doctor_check_never_promises_auto_activation_over_an_explicit_space(
+    tmp_path: Path, monkeypatch
+) -> None:
+    settings, _probed = _reachable_runtime(monkeypatch, tmp_path)
+
+    check = _semantic_doctor_check(settings, _capabilities(configured=True, ready=False, status="incompatible"))
+
+    reason = check["details"]["reason"]
+    assert check["ok"] is False and check["details"]["projection"] == "incompatible"
+    assert "outside the release-reviewed identities is never replaced automatically" in reason
+    assert "projection activate --report REPORT --candidate VARIANT" in reason
+    assert "to embed and activate it" not in reason

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-for label in com.kip.knowledge-fabric.worker com.kip.knowledge-fabric.sync com.kip.backup com.kip.ops-report; do
+for label in com.kip.knowledge-fabric.worker com.kip.knowledge-fabric.sync com.kip.backup com.kip.semantic com.kip.ops-report; do
   plist="$HOME/Library/LaunchAgents/$label.plist"
   launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
   rm -f "$plist"

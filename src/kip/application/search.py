@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from time import perf_counter
 
@@ -16,6 +16,7 @@ from kip.domain.models import (
     RequestContext,
     SearchHit,
     SearchRequest,
+    SemanticProjectionUpdate,
     VocabularyItem,
 )
 from kip.domain.telemetry import (
@@ -36,6 +37,21 @@ from kip.ports.retrieval import RetrievalStore
 from kip.ports.text_analyzer import TextAnalyzerPort
 from kip.settings import Settings
 
+_DEGRADED_FLAGS: tuple[str, ...] = (
+    "semantic_degraded",
+    "rerank_degraded",
+    "lexical_rerank_degraded",
+)
+
+
+def _result_metadata(result: object) -> dict[str, object]:
+    """Search hits carry metadata directly; context items carry it on `.hit`."""
+    for candidate in (result, getattr(result, "hit", None)):
+        metadata = getattr(candidate, "metadata", None)
+        if isinstance(metadata, dict):
+            return metadata
+    return {}
+
 
 class RetrievalUseCases:
     def __init__(
@@ -48,6 +64,8 @@ class RetrievalUseCases:
         reranker: RerankerPort | None = None,
         telemetry: TelemetryUseCases | None = None,
         knowledge: KnowledgeStore | None = None,
+        *,
+        lexical_reranker: RerankerPort | None = None,
     ) -> None:
         self._settings = settings
         self._store = store
@@ -65,16 +83,30 @@ class RetrievalUseCases:
             self._semantic,
             reranker,
             knowledge,
+            lexical_reranker=lexical_reranker,
         )
         self._embedding = embedding
         self._reranker = reranker
+        self._lexical_reranker = lexical_reranker
         self._telemetry = telemetry
 
     def embedding_space(self, context: RequestContext) -> EmbeddingSpace:
         return self._semantic.embedding_space(context)
 
     def rebuild_semantic_projection(self, context: RequestContext) -> JsonObject:
-        return self._semantic.rebuild(context)
+        system = self._semantic.projection_context(context)
+        result = self._semantic.rebuild(system)
+        space = self._semantic.embedding_space(system)
+        if result.get("in_sync") is True and self._semantic.activate_if_reviewed(system, space):
+            result = {**result, "status": "active", "activated": True}
+        return result
+
+    def maintain_semantic_projection(
+        self,
+        context: RequestContext,
+        progress: Callable[[int, int], None] | None = None,
+    ) -> SemanticProjectionUpdate:
+        return self._semantic.maintain(context, progress)
 
     def activate_semantic_projection(
         self,
@@ -120,16 +152,11 @@ class RetrievalUseCases:
         semantic_degraded = any(
             bool(hit.metadata.get("semantic_degraded")) for hit in hits
         )
-        lexical_rerank_degraded = any(
-            bool(hit.metadata.get("lexical_rerank_degraded")) for hit in hits
-        )
         warnings = [
-            warning
-            for warning, active in (
-                ("semantic_degraded", semantic_degraded),
-                ("lexical_rerank_degraded", lexical_rerank_degraded),
-            )
-            if active
+            flag
+            for flag in _DEGRADED_FLAGS
+            if (flag == "semantic_degraded" and semantic_degraded)
+            or (flag != "semantic_degraded" and any(bool(hit.metadata.get(flag)) for hit in hits))
         ]
         self._record_search_trace(
             context,
@@ -161,7 +188,15 @@ class RetrievalUseCases:
         Applies to search hits and context items alike.
         """
         if results:
-            return []
+            # A default-mode search that fell back (model runtime down, space
+            # not active yet) still answers; say so instead of implying the
+            # configured semantic ranking was used.
+            metadatas = [_result_metadata(result) for result in results]
+            return [
+                flag
+                for flag in _DEGRADED_FLAGS
+                if any(bool(metadata.get(flag)) for metadata in metadatas)
+            ]
         try:
             visible = self._store.has_visible_units(context)
         except KipError:
@@ -299,15 +334,23 @@ class RetrievalUseCases:
                     revision=self._embedding.revision,
                 )
             )
-        if self._reranker is not None and any(
-            "rerank_rank" in hit.metadata for hit in hits
-        ):
+        # Lexical mode and the semantic fallback may use a different reranker
+        # than `reranked` mode; report the one that actually scored the hits.
+        reranked_by = {
+            str(hit.metadata["rerank_model"])
+            for hit in hits
+            if "rerank_rank" in hit.metadata and "rerank_model" in hit.metadata
+        }
+        for reranker in (self._reranker, self._lexical_reranker):
+            if reranker is None or reranker.model not in reranked_by:
+                continue
+            reranked_by.discard(reranker.model)
             models.append(
                 QueryTraceModelRevision(
                     role="reranker",
-                    provider=self._reranker.provider,
-                    model=self._reranker.model,
-                    revision=self._reranker.revision,
+                    provider=reranker.provider,
+                    model=reranker.model,
+                    revision=reranker.revision,
                 )
             )
         return models

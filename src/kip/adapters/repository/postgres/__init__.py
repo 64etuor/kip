@@ -25,6 +25,8 @@ class PostgresRepository:
         pool_max_size: int = 10,
         hnsw_ef_search: int = 200,
         hnsw_max_scan_tuples: int = 100_000,
+        lexical_common_term_fraction: float = 0.02,
+        projection_statement_timeout_ms: int = 300_000,
         source_policy: FilesystemAccessPolicy | None = None,
     ) -> None:
         self.database = PostgresDatabase(
@@ -33,6 +35,8 @@ class PostgresRepository:
             pool_max_size=pool_max_size,
             hnsw_ef_search=hnsw_ef_search,
             hnsw_max_scan_tuples=hnsw_max_scan_tuples,
+            lexical_common_term_fraction=lexical_common_term_fraction,
+            projection_statement_timeout_ms=projection_statement_timeout_ms,
             source_policy=source_policy,
         )
         self.ingestion = PostgresIngestionStore(self.database)

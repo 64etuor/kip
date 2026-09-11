@@ -42,12 +42,88 @@ services:
     networks: [database]
     security_opt: ["no-new-privileges:true"]
     shm_size: 1gb
+    command:
+      - postgres
+      - -c
+      - shared_buffers=${KIP_POSTGRES_SHARED_BUFFERS:-1GB}
+      - -c
+      - effective_cache_size=${KIP_POSTGRES_EFFECTIVE_CACHE_SIZE:-3GB}
+      - -c
+      - work_mem=${KIP_POSTGRES_WORK_MEM:-16MB}
+      - -c
+      - maintenance_work_mem=${KIP_POSTGRES_MAINTENANCE_WORK_MEM:-512MB}
     deploy:
       resources:
         limits:
           cpus: "2.0"
           memory: 4g
           pids: 256
+
+  # Embedding and reranker runtime for default semantic search (ADR-065).
+  # It serves offline on the internal `models` network; populate kip_models
+  # once with `docker compose -f compose.production.yaml --profile models-fetch
+  # run --rm models-fetch`, the only service with model-download egress.
+  models:
+    image: ${KIP_MODELS_IMAGE:-michaelf34/infinity:0.0.77-cpu@sha256:94db836145f609c508f3f296f3b9bd0e78ae088025e879664d073dfd9f929e96}
+    restart: unless-stopped
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      HF_HOME: /models
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      DO_NOT_TRACK: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+    # Embedding model only: the default hybrid mode does not call a
+    # cross-encoder. For `models.reranker.backend = "http"`, append the
+    # BAAI/bge-reranker-v2-m3 revision 953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e
+    # as a second --model-id/--revision/--served-model-name/--batch-size/--dtype.
+    command: ["v2", "--host", "0.0.0.0", "--port", "7997",
+              "--engine", "torch", "--device", "cpu", "--no-bettertransformer",
+              "--model-id", "Qwen/Qwen3-Embedding-0.6B",
+              "--revision", "97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3",
+              "--served-model-name", "kip-qwen3-embedding-0.6b",
+              "--batch-size", "4", "--dtype", "float32"]
+    volumes:
+      - type: volume
+        source: kip_models
+        target: /models
+    tmpfs:
+      - /tmp:size=1g,mode=1777,nosuid,nodev
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7997/models', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 120s
+    networks: [models]
+    deploy:
+      resources:
+        limits:
+          cpus: "4.0"
+          memory: 6g
+          pids: 256
+
+  models-fetch:
+    image: ${KIP_MODELS_IMAGE:-michaelf34/infinity:0.0.77-cpu@sha256:94db836145f609c508f3f296f3b9bd0e78ae088025e879664d073dfd9f929e96}
+    profiles: ["models-fetch"]
+    restart: "no"
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      HF_HOME: /models
+      DO_NOT_TRACK: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+    entrypoint: ["python", "-c", "from huggingface_hub import snapshot_download as fetch; fetch('Qwen/Qwen3-Embedding-0.6B', revision='97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3'); fetch('BAAI/bge-reranker-v2-m3', revision='953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e')"]
+    volumes:
+      - type: volume
+        source: kip_models
+        target: /models
+    tmpfs:
+      - /tmp:size=1g,mode=1777,nosuid,nodev
+    networks: [model-egress]
 
   migrate:
     <<: *app-security
@@ -127,7 +203,7 @@ services:
         target: /app/ontology
         bind:
           create_host_path: false
-    networks: [edge, database]
+    networks: [edge, database, models]
     deploy:
       resources:
         limits:
@@ -168,7 +244,7 @@ services:
         read_only: true
         bind:
           create_host_path: false
-    networks: [database]
+    networks: [database, models]
     tmpfs:
       - /tmp:size=1g,mode=1777,noexec,nosuid,nodev
     healthcheck:
@@ -191,10 +267,14 @@ networks:
   edge:
   database:
     internal: true
+  models:
+    internal: true
+  model-egress:
 
 volumes:
   kip_pgdata:
   kip_cas:
+  kip_models:
 
 secrets:
   postgres_password:

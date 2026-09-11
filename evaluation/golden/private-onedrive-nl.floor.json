@@ -1,12 +1,26 @@
 {
   "dataset": "private-onedrive-nl",
-  "variant": "lexical",
-  "note": "Retrieval regression floor. A change dropping below these on the reviewed set fails scripts/golden_gate.py. Update deliberately, with an ADR, when an intended trade-off moves them.",
-  "recorded_at": "2026-08-11",
-  "recorded_recall_at_k": 0.7895,
-  "recorded_mrr": 0.6462,
-  "floor_recall_at_k": 0.76,
-  "floor_mrr": 0.62,
-  "max_failed_cases": 0,
-  "max_p95_ms": 15000
+  "note": "Retrieval regression floors per variant: the shipped default mode and the lexical path it falls back to (ADR-065). A change dropping below any floor on the reviewed set fails scripts/golden-gate.sh --private. Floors sit one case (1/19) below the recorded value. Update deliberately, with an ADR, when an intended trade-off moves them.",
+  "recorded_at": "2026-09-12",
+  "corpus": "onedrive-personal, 1,912 files, 176,545 units, space qwen3-embedding-0.6b-1024-c4000-ht1",
+  "variants": {
+    "hybrid": {
+      "recorded_recall_at_k": 0.8947,
+      "recorded_mrr": 0.8947,
+      "recorded_p95_ms": 2415,
+      "floor_recall_at_k": 0.84,
+      "floor_mrr": 0.84,
+      "max_failed_cases": 0,
+      "max_p95_ms": 8000
+    },
+    "lexical": {
+      "recorded_recall_at_k": 0.8947,
+      "recorded_mrr": 0.6377,
+      "recorded_p95_ms": 2221,
+      "floor_recall_at_k": 0.84,
+      "floor_mrr": 0.6,
+      "max_failed_cases": 0,
+      "max_p95_ms": 8000
+    }
+  }
 }

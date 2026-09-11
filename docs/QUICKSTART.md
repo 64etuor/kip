@@ -17,7 +17,7 @@ agent는 `kip-setup` Skill에 따라 매번 하나의 누락된 결정만 질문
 
 ```bash
 curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh | bash
-# 위치와 버전 고정: | bash -s -- ~/kip --version 3.9.0
+# 위치와 버전 고정: | bash -s -- ~/kip --version 3.12.0
 ```
 
 bash, curl 또는 wget, sha256sum 또는 shasum, unzip 또는 python3만 있으면 되고
@@ -81,14 +81,31 @@ kip update --dry-run   # --version X.Y.Z / --archive ZIP / --rollback / --no-boo
 뒤 `config/kip.host.generated.toml`이 같은 plan과 database secret ref를
 가리키는지 확인하고 host migration을 실행한다. DB credential만 필요하고
 API/worker/identity credential은 읽지 않는다. external DB면 Docker 없이
-migration만 한다. API/worker 이미지는 빌드하지 않는다.
+migration만 한다. API/worker 이미지는 빌드하지 않는다. Host model runtime
+(`var/semantic-venv`)이 설치돼 있고 `KIP_SEMANTIC=off`가 아니면 이 명령이
+`./scripts/semantic-server.sh start`로 runtime을 띄우고 준비될 때까지 기다린다.
+시작하지 못해도 실패하지 않고 경고만 남기며 검색은 lexical로 동작한다.
+
+Setup plan은 이 runtime이 있는지를 `semantic_search`로 기록하고 그에 맞는
+host/container config를 생성한다. Lexical 전용 plan은 compose의 `models` 서비스를
+빼고 그 이유를 경고한다. 첫 sync는 새 unit을 embedding하며, 검토된 기본 embedding
+identity의 projection이 완성되면 자동으로 활성화한다. 그 전까지 검색 envelope의
+`meta.warnings`에 `semantic_degraded`가 붙고 결과는 lexical이다. 큰 corpus의 첫
+projection은 몇 시간이 걸릴 수 있다. `./scripts/kip doctor`의 `semantic_search`
+항목이 runtime 연결과 projection 완성도(`stale` 포함), 고칠 명령을 알려준다.
+기본 검색 mode는 `hybrid`(lexical+vector reciprocal-rank fusion)이고 runtime은
+embedding model만 load한다. BGE reranker는 선택 사항이다
+(`models.reranker.backend = "http"`, `KIP_SEMANTIC_RERANKER=on`).
 
 REST API나 worker가 필요하면 전체 `./scripts/app-up.sh`를 실행한다.
 `compose.generated.yaml`과 `config/kip.generated.toml`이 있으면 standalone
 generated Compose만 선택하여 승인된 read-only source mount, CAS 경로, 생성
 config를 적용한다. DB 준비와 migration 후 서비스가 시작된다. 둘 다 없으면
 안내와 함께 기본 app profile로 동작하고 하나만 있으면 불완전한 설정으로
-실패한다. `./scripts/app-up.sh --down`으로 종료한다.
+실패한다. `./scripts/app-up.sh --down`으로 종료한다. Model runtime은 machine당
+하나만 뜬다. amd64에서는 compose `models` 서비스가 loopback에 publish되어 host
+CLI/MCP도 쓰고, ARM이거나 host runtime이 이미 응답하면 host runtime을 쓰며 이때
+API/worker container는 lexical 검색(`semantic_degraded`)으로 동작한다.
 
 실제 credential 대신 `env:KIP_DATABASE_URL` 같은 secret reference만 답한다.
 런타임은 `env:`와 (모델 credential에 한해) `file:` reference만 해석하며,
@@ -140,7 +157,7 @@ For a real read-only OneDrive audit, use [`docs/AI_OPERATOR_RUNBOOK.md`](AI_OPER
 | `source_objects` (`status`) | 수집된 원본 파일 수 |
 | `assertion_candidates` (`status`) | 사람 검토를 기다리는 관계 후보 수(0이면 할 일 없음) |
 | `lexical_search` (`capabilities`) | 키워드 검색 사용 가능 여부 |
-| `semantic_projection_status` (`capabilities`) | 의미 기반 검색 상태. `disabled`가 기본이며 정상입니다 |
+| `semantic_projection_status` (`capabilities`) | 의미 기반 검색 상태. 첫 sync가 embedding을 마치면 `active`가 됩니다. 그 전(`missing`/`shadow`)에는 검색이 lexical로 동작하고, lexical 전용 설치(`KIP_SEMANTIC=off`)는 `disabled`입니다. 빠른 identity 확인이라 빠진 unit(`stale`)은 `kip doctor`나 `kip projection verify`로 확인합니다 |
 | `ok` / `reason` (`doctor`) | 각 점검의 통과 여부와, 실패 시 해야 할 일 |
 | `failed` / `warnings` (`sync run`) | 읽지 못한 파일 수와 파일별 이유 |
 
@@ -179,10 +196,13 @@ and fresh ACL-snapshot claims.
 
 ## Licensed public RAG evaluation
 
-The distributed configuration keeps the public corpus and semantic models
-disabled. To reproduce the checked-in pilot, set `enabled = true` for
-`public-government`, `models.embedding`, and `models.reranker` in
-`config/kip.toml`, while leaving `search.semantic_enabled = false`.
+The distributed configuration keeps the public corpus disabled; semantic
+search (`hybrid`) and the pinned embedding model are on by default (ADR-065);
+the BGE reranker is opt-in. To
+reproduce the checked-in pilot, set `enabled = true` for `public-government`
+in `config/kip.toml`. Bootstrap already installed the model runtime unless
+`KIP_SEMANTIC=off` was set; `./scripts/bootstrap-semantic.sh` installs or
+repairs it.
 
 ```bash
 make fetch-corpus
@@ -201,5 +221,7 @@ In another terminal:
 make evaluate
 ```
 
-The semantic projection stays in shadow mode. See `docs/RAG_EVALUATION.md`
+With the pinned default embedding identity, sync embeds the corpus and a
+complete projection activates itself (`search.semantic_auto_activate`). A
+custom embedding identity stays in shadow mode; see `docs/RAG_EVALUATION.md`
 before considering `projection activate --report REPORT --candidate VARIANT`.

@@ -49,7 +49,7 @@ recorded in implementation status.
 - Never promote model, parser, Graphify, or relation-miner output to an approved fact.
 - Never use a search snippet as final evidence. Call `read` for the exact unit; call `xlsx-read` for numbers, dates, formulas, or totals.
 - Record `scanned`, `inserted`, `unchanged`, `replaced`, `failed`, and warnings from the sync envelope. Exit code 0 does not prove `failed=0`.
-- Keep `semantic` projection in `shadow` status during evaluation. Do not run `projection activate` in an audit cycle.
+- Do not run `projection activate` in an audit cycle. Since 3.12.0 (ADR-065) a sync auto-activates only a complete projection of the release-reviewed default embedding identity; a custom identity stays in `shadow` during evaluation. Record the sync's `semantic_projection` object (`status`, `activated`, `reason`). For a fully manual cycle, run with `search.semantic_auto_activate = false`.
 - Separate these verdicts: source coverage, extraction quality, lexical retrieval, semantic retrieval, evidence freshness, and final-answer quality. A retrieval hit is not an end-to-end answer-quality result.
 - Before fixes, stop after the first complete cycle and report reproducible evidence. Once the operator authorizes repair, keep the pre-fix evidence immutable and link every change to a measured finding.
 
@@ -131,12 +131,21 @@ tests passed, and synthetic timeout/RSS/result/diagnostic/cleanup probes passed.
 Treat this as a reproducible isolation and extraction-contract baseline, not as
 OCR semantic, deep spreadsheet, placeholder, or full-corpus acceptance.
 
-## Semantic setup (optional but required for semantic RAG claims)
+## Semantic setup (required for semantic RAG claims)
 
-Lexical retrieval is usable without the model sidecar. Do not claim vector, hybrid, or reranked behavior until the sidecar passes its smoke check.
+Semantic search (`hybrid`) is the default since 3.12.0, and the BGE
+cross-encoder reranker is opt-in: bootstrap installs the model runtime unless `KIP_SEMANTIC=off` (or the host has less than 8 GiB of
+RAM), `./scripts/app-up.sh --database-only` starts it, and sync embeds new or
+changed units. Lexical retrieval still works without the model sidecar. Do not
+claim vector, hybrid, or reranked behavior until the sidecar passes its smoke
+check and `capabilities.semantic_search` is true; `./scripts/kip doctor`
+reports the `semantic_search` state with the full completeness count. A
+`reranked` variant with the BGE cross-encoder also needs
+`models.reranker.backend = "http"` and a runtime started with
+`KIP_SEMANTIC_RERANKER=on`.
 
 ```bash
-./scripts/bootstrap-semantic.sh       # only if var/semantic-venv is absent
+./scripts/bootstrap-semantic.sh && ./scripts/semantic-server.sh prefetch   # only if var/semantic-venv is absent
 ./scripts/semantic-server.sh start
 ./scripts/semantic-server.sh status
 ./scripts/semantic-smoke.sh
@@ -148,9 +157,11 @@ Treat the smoke check and the actual listening socket as authoritative. If `star
 timeout 3600 ./scripts/semantic-server.sh run
 ```
 
-After smoke passes, enable the embedding adapter but keep
-`search.semantic_enabled = false` while building and evaluating the disposable
-shadow projection:
+With the default configuration, the first sync builds the projection and a
+complete release-reviewed space activates itself; the first full projection of
+a large corpus takes hours. To evaluate a different embedding identity, set
+`search.semantic_auto_activate = false` or rely on its non-reviewed identity
+staying in shadow, then build and evaluate:
 
 ```bash
 ./scripts/kip capabilities
@@ -166,15 +177,18 @@ shadow projection:
 Public v1 `SearchRequest.mode` accepts `lexical`, `vector`, `hybrid`, and
 `reranked` through CLI, REST, MCP, and SDK. `evaluate run` remains the
 reproducible multi-variant comparison surface. An explicit one-off vector mode
-is diagnostic evidence, not activation: set `search.semantic_enabled=true` or
-change the default mode only after a fingerprint-matched report passes every
-gate, the space is explicitly activated, and the configuration change is
-separately approved.
+is diagnostic evidence, not activation: activate a custom space or change the
+default mode only after a fingerprint-matched report passes every gate, the
+space is explicitly activated, and the configuration change is separately
+approved. Explicit vector-family modes fail instead of degrading.
 
 If the sidecar is unavailable, run lexical retrieval as a valid partial cycle
-and record that semantic behavior is unverified. If a prematurely enabled
-normal search returns `metadata.semantic_degraded=true`, report degradation;
-do not call that a successful semantic run.
+and record that semantic behavior is unverified. If a default-mode search
+returns a `semantic_degraded` (runtime or active projection unavailable) or
+`rerank_degraded` (default mode `reranked` only: reranker failed, fused
+ranking kept) warning in
+`meta.warnings`, report degradation; do not call that a successful semantic
+run.
 
 ## HWP/HWPX parser comparison
 
@@ -260,7 +274,7 @@ Use at least one exact identifier/file-name query and one natural Korean content
 ./scripts/kip search "확인된 한국어 내용 질의" --limit 10
 ```
 
-For every useful hit, preserve `unit_id`, `artifact_id`, `title`, `snippet`, `score`, `locator`, `source_uri`, `source_sha256`, and any `semantic_degraded` marker.
+For every useful hit, preserve `unit_id`, `artifact_id`, `title`, `snippet`, `score`, `locator`, `source_uri`, `source_sha256`, and any `semantic_degraded` or `rerank_degraded` warning.
 
 ### 3. Context bundle
 

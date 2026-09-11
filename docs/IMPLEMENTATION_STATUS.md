@@ -4,6 +4,150 @@ This is the current readiness inventory, not the target architecture. The
 target-to-current matrix and ordered gap register live in
 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`.
 
+## 2026-09-11 hybrid semantic search on by default (3.12.0)
+
+Semantic search is the shipped default (ADR-065). Example, container and
+setup-generated configs set `search.semantic_enabled = true`, the configured
+default mode `hybrid` (lexical and vector candidates fused by reciprocal
+rank; `reranked` stays an explicit mode), `search.semantic_auto_activate =
+true`, and `[models.embedding] enabled = true` with Qwen/Qwen3-Embedding-0.6B served as
+`kip-qwen3-embedding-0.6b` at revision
+`97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3`, 1024 dimensions,
+`max_document_chars = 4000` (was 12000, which drove the runtime to a 15 GB
+footprint on a 24 GB Mac with heavy swap), `batch_size = 32` bounded by
+`max_batch_chars = 16000`, `timeout_seconds = 120` and
+`query_timeout_seconds = 10`. The reranker section is unchanged: BM25
+(`models.reranker.backend = "bm25"`, `search.lexical_rerank_enabled = true`)
+reranks lexical mode and the lexical fallback; the BGE reranker-v2-m3
+cross-encoder is opt-in (`backend = "http"`, optionally `default_mode =
+"reranked"`, runtime started with `KIP_SEMANTIC_RERANKER=on`, about 2 GB more
+memory). New keys: `models.circuit_cooldown_seconds = 30`,
+`search.lexical_common_term_fraction = 0.02`,
+`database.projection_statement_timeout_ms = 300000` (projection statements
+no longer use the 15 s interactive timeout, which a multi-hour first build had
+hit), and `security.model_service_hosts` (container `["models"]`, host
+`[]`).
+
+Install and runtime: `./scripts/bootstrap.sh` installs the isolated model
+runtime (`var/semantic-venv`, Infinity 0.0.77 from the hash-locked
+`requirements/semantic.txt` via `uv pip sync --require-hashes`) and prefetches
+the pinned embedding snapshot into `var/model-cache` (about 1.2 GB; about 2.3 GB
+more for the reranker with `KIP_SEMANTIC_RERANKER=on`), unless
+`KIP_SEMANTIC=off` or the host has less than 8 GiB of RAM; a failure never
+fails bootstrap and a freshly created config then starts lexical. Setup records
+`semantic_search` in the plan and a lexical-only plan drops the compose
+`models` service. `semantic-server.sh` detects mps/cuda/cpu, uses float16 on a
+GPU and float32 on CPU (float16/float32 embedding cosine at least 0.99998),
+caps the Metal allocator cache on mps, loads only the embedding model unless
+`KIP_SEMANTIC_RERANKER=on`, and runs offline once cached. On the reference
+Apple Silicon (24 GB, float16, embedding only) it holds about 2.7 GB; with both
+models and long inputs it had reached 10-15 GB. `stop` waits up to 20 s
+(`KIP_SEMANTIC_STOP_SECONDS`) and then force-stops; `start` skips when a
+supervised or other instance already runs or answers.
+`app-up.sh --database-only` starts it, `install-launchd.sh` supervises it as
+`com.kip.semantic`, and `deploy/systemd/kip-semantic.service` covers Linux.
+Compose adds a digest-pinned `michaelf34/infinity:0.0.77-cpu` `models` service
+in the `semantic` profile, serving the embedding model only (production:
+read-only, offline, internal network, populated once by the `models-fetch`
+profile, which downloads both models). `app-up.sh` runs exactly one model
+runtime per machine: on amd64 the compose `models` service, published on
+`127.0.0.1:${KIP_SEMANTIC_PORT:-7997}` for host CLI/MCP; on ARM or when a host
+runtime already runs (even while loading) or another runtime answers, the
+native host runtime, while the API/worker containers use lexical search
+(`semantic_degraded`); none below 8 GiB RAM or with `KIP_SEMANTIC=off`.
+A supervised `semantic-server.sh run` waits instead of loading a second copy
+while another runtime serves the port. Compose also passes PostgreSQL memory settings
+(`shared_buffers` 1GB, `effective_cache_size` 3GB, `work_mem` 16MB,
+`maintenance_work_mem` 512MB by default). `capabilities` stays cheap:
+`semantic_search`/`semantic_projection_status` follow whether the active space
+matches the configured identity (`active`/`incompatible`/`shadow`/`missing`).
+`kip doctor` adds a non-required `semantic_search` check that counts
+completeness (a `stale` verdict when the active space is missing units) with
+the exact fix command, as does `kip projection verify`; operator hints say
+`kip projection rebuild --name semantic`.
+
+Projection maintenance: every sync (CLI, REST `enqueue=false`, worker
+`sync.source`) and every activated `parser reextract` embeds new or changed
+units and activates a complete projection whose identity is in
+`RELEASE_REVIEWED_EMBEDDING_IDENTITIES`; `projection rebuild` does the same.
+Other identities wait for evaluation and `kip projection activate`.
+`SyncSummary` and `ReextractionSummary` gain an optional
+`semantic_projection` object; a runtime that is down yields `unavailable`,
+not a sync failure. On the reference Apple Silicon (24 GB), embedding ran at
+about 100 short units/s and roughly 2,800-5,000 characters/s for longer units;
+a 1,912-file OneDrive corpus with about 176,500 units (about 44 M characters at
+the 4000 cap) needs on the order of three hours, during which search stays
+lexical with `semantic_degraded`.
+
+Degradation: default-mode search falls back to lexical (BM25-reranked) with
+`semantic_degraded`; a deployment whose default mode is `reranked` keeps the
+fused ranking with `rerank_degraded` when only the reranker fails. These
+warnings are reported in search/context `meta.warnings` on every edge.
+Explicit vector-family modes still fail. A per-adapter circuit skips a failed runtime for 30 s; query embeddings use a
+10 s timeout with a 3 s connect timeout.
+
+Lexical performance: query n-grams present in at least 2% of lexical units
+(a shared folder name such as `절차` had matched 55k of 104k units) are left
+out of candidate matching while BM25 still scores the full question; the
+abstention gate uses an existence check (`any_term_visible`, about 2 ms);
+projection queries evaluate ACL freshness and source policy once per
+artifact/snapshot instead of per unit (they had exceeded the 15 s statement
+timeout at about 176k units). On the private reviewed set (19 cases, full
+1,912-file corpus, lexical mode): recall@10 78.9% to 89.5%, MRR 58.3% to
+63.8%, nDCG 63.6% to 70.2%, P50 4.40 s to 1.45 s, P95 11.11 s to 2.22 s
+(warmed release evaluation).
+
+Gates and supply chain: `./scripts/golden-gate.sh [--portable|--private]`
+replaces the documented `golden_gate.py`/`portable_golden_gate.py` invocations,
+which were not executable and ran outside the project interpreter. The
+portable gate runs lexical and the default mode (deterministic
+character-bigram hashing embedding) at recall and MRR 1.0, zero ACL leaks,
+P95 at most 100 ms. The private floor file supports per-variant floors, and
+the private gate fails when the reviewed corpus is indexed but the configured
+semantic path is not ready. `scripts/audit-semantic.sh` audits the runtime
+lock in `verify.sh` with six reviewed advisories (see `docs/SECURITY.md`).
+
+Release evaluation of the default mode and the lexical fallback:
+
+Private reviewed set (19 cases, `onedrive-personal` 1,912 files / 176,545
+units, space `qwen3-embedding-0.6b-1024-c4000-ht1`, float16 runtime on the
+reference Mac, one warmup pass):
+
+| Variant | Recall@10 | MRR | nDCG@10 | P50 | P95 |
+|---|---:|---:|---:|---:|---:|
+| lexical (BM25 rerank, common-term pruning) | 89.5% | 63.8% | 70.2% | 1.45 s | 2.22 s |
+| vector | 89.5% | 83.3% | 84.9% | 0.06 s | 0.08 s |
+| hybrid (default) | 89.5% | 89.5% | 89.5% | 1.64 s | 2.42 s |
+| reranked, BM25 | 78.9% | 59.8% | 64.5% | 1.49 s | 2.33 s |
+| reranked, BGE, 40 candidates | 89.5% | 83.3% | 84.9% | 6.87 s | 16.18 s |
+| reranked, BGE, 20 candidates | 94.7% | 85.3% | 87.6% | 5.32 s | 7.20 s |
+
+All variants had 0 failed cases and 0 unauthorized results. `hybrid` became
+the default because BM25 reranking on top of the fused list fell below
+lexical, while the BGE cross-encoder raised recall but not ranking quality at
+3-4x the latency, so it stays opt-in.
+
+The private gate (`./scripts/golden-gate.sh --private`) records floors for
+`hybrid` (recall 0.84, MRR 0.84, P95 at most 8000 ms) and the `lexical`
+fallback (recall 0.84, MRR 0.60, P95 at most 8000 ms); on the local deployment
+it passed with hybrid 0.8947/0.8947 (P95 1.8 s) and lexical 0.8947/0.6377. On
+the six-document public government set (36 cases) every mode reached Recall@10
+100% and MRR 97.2-98.6% (BGE P95 6.6 s, the others at most 0.10 s); that set is
+saturated and cannot separate modes. The first full projection of the private
+corpus took roughly three hours; search stayed lexical until it was complete
+and then the reviewed space activated itself.
+
+Limits: 19 private cases is a small set (one case is 5.3 points), and it
+mixes paraphrase questions, where the semantic gains are real, with exact
+ones. BGE reranking could win on recall for a deployment that accepts its
+latency. Infinity 0.0.77 is unmaintained and bounds transformers below 5;
+replacing the runtime is tracked. The compose `models` image is linux/amd64
+CPU only; Apple Silicon uses the host runtime. `kip update` keeps existing
+configs, so a deployment with `semantic_enabled = false` stays lexical until
+it adopts the default (`docs/OPERATIONS.md`), and a config that keeps
+`max_document_chars = 12000` is an unreviewed identity that needs manual
+activation.
+
 ## 2026-09-11 pdf-inspector 1.19.0, Kordoc 4.13.1 and PDF re-extraction (3.11.0)
 
 `pdf-inspector` moves from 1.14.2 to 1.19.0 (ADR-064). `pdf_inspector` stays the
@@ -367,7 +511,7 @@ substitutes for that full-corpus benchmark.
 | Backup and recovery | Ready for operational adoption | Sealed PostgreSQL/CAS/config backup, `row_security=off` manifest, explicit empty-target restore, row/migration/extension/RLS/CAS comparison, projection rebuild, fingerprinted evaluation comparison, and checksummed drill receipt. `--retain N` pruning (default 7), a redacted configuration snapshot with a seal-and-verify secret rescan, and a launchd daily schedule (`com.kip.backup`; the installer supports `--dry-run`) are included; a real sealed set was produced and checksum-verified on this host on 2026-08-13 (`var/backups/20260813T070625Z`) |
 | Host operations reporting | Ready for pilot | `scripts/ops-report.sh` summarizes failed jobs, oldest queue age, last sync progress age, disk free, newest backup age, and API health (`/readyz` with `/healthz` fallback) with tunable thresholds, `--json`, an optional `KIP_OPS_WEBHOOK` failure POST, and an optional launchd item; `install-launchd.sh` also guards against a double worker and renders a newsyslog rotation policy |
 | Memory repository | Ready | Used for tests and offline smoke checks |
-| PostgreSQL migrations | Ready as the production reference profile | Workspace, required-scope, ACL-snapshot freshness, and owner-bound `FORCE ROW LEVEL SECURITY` are included. Normal migration installs pgvector, the 1024d projection, and migration 0018's cosine HNSW index; semantic activation remains separate |
+| PostgreSQL migrations | Ready as the production reference profile | Workspace, required-scope, ACL-snapshot freshness, and owner-bound `FORCE ROW LEVEL SECURITY` are included. Normal migration installs pgvector, the 1024d projection, and migration 0018's cosine HNSW index; since 3.12.0 a complete release-reviewed semantic space activates automatically, other identities need explicit activation |
 | PostgreSQL repository | Pilot reference | Core ingest, search, exact read, ACL, job, assertion, export, and rebuild methods implemented; evidence and graph reads are ACL- and freshness-prefiltered; repository calls share a bounded connection pool (`database.pool_max_size`). Re-syncing unchanged files no longer fails: configuration-owned ACL-snapshot timestamps refresh while snapshot identity fields stay strictly verified (previously every second `kip sync run` raised a per-file ConflictError) |
 | CLI | Ready for pilot | JSON-first commands; source-neutral `sync run`, top-level `xlsx-read`, projection and canonical export aliases; operator roles come only from explicit `--role`/`--roles`/`KIP_ROLES` and admin commands fail closed. Search exposes the full canonical request including mode and filters; explicit ACL options replace ambient scopes |
 | REST API | Ready for pilot | Read, exact evidence, assertion explain, connector event, sync, and review endpoints, including the versioned candidate listing, assertion revocation, and a `/readyz` readiness endpoint that round-trips the database (`/healthz` stays liveness-only); trusted API-key or verified JWT identity; blocking handlers run synchronously in the server threadpool instead of on the event loop |
@@ -389,17 +533,17 @@ substitutes for that full-corpus benchmark.
 | IMAP connector | Reference adapter | Validate provider-specific UID behavior |
 | Public evaluation corpus | Ready | Six checksum-pinned KOGL Type 1 PDFs; 30 relevance and 6 ACL cases |
 | Evaluation reports | Ready with coverage gaps | Retrieval, answer, and ontology metrics; immutable dataset/review binding; full-case coverage gates; ACL/integrity checks; fingerprints; Markdown scorecards; append-only ledger; search hits now carry `is_latest` and the runner reopens evidence for stale-warning measurement, so both dimensions are measurable; judge-proposed dataset growth (ADR-045: `kip evaluate draft validate/review/promote` with fingerprint-bound human sample-audit and fail-closed promotion) unblocks growing reviewed sets past the current 19 cases; public locator/recovery and end-to-end reviews remain incomplete |
-| Retrieval regression gate | Active in hosted CI and private runners | The checked-in portable manifest expands to 100 positive and 20 ACL-negative cases and always runs in CI/verify. `scripts/golden_gate.py` checks the reviewed private floor; protected runners set `KIP_REQUIRE_PRIVATE_GOLDEN=1` so missing corpus evidence fails closed |
+| Retrieval regression gate | Active in hosted CI and private runners | The checked-in portable manifest expands to 100 positive and 20 ACL-negative cases and always runs in CI/verify for lexical and the shipped default mode (deterministic hashing embedding). `./scripts/golden-gate.sh --private` checks the reviewed private per-variant floors (default mode and lexical fallback) and fails when the corpus is indexed but configured semantic search is not ready; protected runners set `KIP_REQUIRE_PRIVATE_GOLDEN=1` so missing corpus evidence fails closed |
 | Quality control plane | Ready for pilot | Version-pinned parser/embedding/reranker/retrieval experiment manifests and fail-closed, read-only promotion recommendations; manifest-driven orchestration is not yet a scheduler |
 | End-to-end RAG rubric | Ready for pilot | Deterministic claim/citation/refusal and entity/relation/evidence/contradiction/path/temporal/integrity metrics; missing reviews fail closed and the bundled ontology case is synthetic contract evidence only |
 | Query tracing and metrics | Ready for pilot | PostgreSQL/RLS canonical redacted traces, admin-only CLI/REST inspection, bounded retention pruning, non-fatal delivery, and optional OTLP/HTTP spans and metrics without content attributes |
 | Adaptive ontology and interaction memory | Ready for pilot | Empty starter profile, one-question setup selection (including an explicit, generation-provider-gated `relation_mining_mode` decision), TTL owner-scoped clarifications, confirmed preferences, structured non-trace feedback, per-principal discovery candidates, PostgreSQL RLS, and CLI/REST/MCP parity. Generated host/container configs carry the selected bounded relation-mining table. Low-risk `review: not_required` mined relations gain a measured auto-approve lane (ADR-047, opt-in/default-off after ADR-048: precision >= 0.95 over >= 20 human decisions, confidence >= 0.8, fail-closed, tamper-resistant via a dedicated `auto_approved` column and revocation-aware, reported and revocable); conditional/required predicates stay fully human, and ontology mutation requires the admin role on every surface. Admin approval of an entity-type or predicate discovery candidate materializes an additive ontology release automatically (ADR-044): shadow-validated, comment-preserving, idempotent targeted YAML edits with a minor version bump and review-policy sync; auto-released predicates default to `review: required`/`risk: high`. Long-running API/worker/MCP processes report `catalog_refresh: "restart_required"` and pick up the release on restart; each CLI invocation sees it immediately. The shipped configurations enable `interaction.enabled` and `ontology.adaptive_discovery` by default |
 | Evidence-bounded answer | Ready for bounded pilot; broad quality gate pending | CLI/API/MCP/SDK share search, exact reopen, freshness, XLSX, egress, generation validation, citations, extractive fallback, and approved-graph context. Identifier, numeric, focused-fact, and short multi-document adequacy gates return typed `answer_not_present` or `clarification_required`; broader reviewed answer/citation/refusal coverage remains required |
-| Local embedding sidecar | Runtime validated; current shadow rebuild required | Infinity 0.0.77, Qwen3 0.6B 1024d, pinned revisions, and MPS smoke passed; resumable projection uses current active ACL-fresh units and versioned bounded input. The 2026-08-13 `c4000` private space completed 30,565/30,565 with vector Recall@10/MRR 0.947/0.822, P95 133.75 ms, and zero ACL leaks. Current code/reference config uses a distinct 12,000-character `c12000` identity, which has not been rebuilt or evaluated, and stale-warning evidence is absent. The historical report cannot activate the current configuration (`evaluation/reports/semantic-qwen3-all-modes-final-20260813/decision.md`) |
+| Local embedding sidecar | Default since 3.12.0 | Infinity 0.0.77 from the hash-locked `requirements/semantic.txt`, Qwen3 0.6B 1024d at a 4000-character `head_tail_v1` cap, pinned revisions; installed by bootstrap, started by `app-up.sh`, supervised by launchd/systemd, and served in compose by the digest-pinned `models` service. Sync and activated re-extraction keep the projection current and auto-activate the release-reviewed identity; a per-adapter circuit and a 10 s query timeout bound failures. The 2026-08-13 `c4000` private space (30,565/30,565, vector Recall@10/MRR 0.947/0.822, P95 133.75 ms, zero ACL leaks) is historical; 3.12.0 evidence is in the 3.12.0 section above |
 | Local reranker | BM25 active; RapidFuzz fallback; model adapters shadow | RapidFuzz (pinned 3.14.6; the gate ran on 3.14.5) reranks bounded ACL-filtered lexical candidates locally and passed the private OneDrive retrieval gate; BGE/Jina model adapters remain opt-in shadow candidates. A candidate-local Okapi BM25 backend (`models.reranker.backend = "bm25"`, word+bigram Korean tokens, no model or extension dependency) beat RapidFuzz on the 19-case grounded draft set (Recall@10 0.842 vs 0.684, MRR 0.639 vs 0.566, lower P95; see `evaluation/reports/reranker-ab-20260811/decision.md`) and was promoted on 2026-08-11 after the dataset was adversarially re-verified and versioned (`reviewed 1.0.0`, ADR-034); RapidFuzz remains the fallback backend |
 | Search result diversity | Active | Per-document cap (`search.max_hits_per_document`, default 3) with tail backfill across every search path, so one file cannot occupy all result slots |
-| pgvector and HNSW | Production-profile ready; current semantic shadow absent | PostgreSQL 18/pgvector 0.8.2, RLS/source-hash filtering, and migration 0018 HNSW with bounded strict iterative scan are implemented; EXPLAIN confirmed the index path. The complete 30,565/30,565 private Qwen3 space used the former `c4000` identity. Current `c12000` configuration requires a new rebuild and evaluation before activation |
-| Hybrid retrieval | Implementation complete; current shadow unverified | ACL-prefiltered exact vector search, RRF, bounded reranking that preserves the un-reranked fused tail up to the request limit, and explicit activation are implemented. On the historical reviewed 19-case `c4000` run, vector-only Recall@10/MRR was 0.947/0.822, ahead of hybrid at 0.895/0.702 and reranked at 0.842/0.656; the current `c12000` identity has no matching report |
+| pgvector and HNSW | Production-profile ready; default semantic path | PostgreSQL 18/pgvector 0.8.2, RLS/source-hash filtering, and migration 0018 HNSW with bounded strict iterative scan are implemented; EXPLAIN confirmed the index path. Projection queries evaluate ACL freshness and source policy once per artifact/snapshot, which keeps them inside the statement timeout at about 176k units. Compose passes PostgreSQL memory settings sized for HNSW inserts |
+| Hybrid retrieval | Default mode `hybrid` since 3.12.0 | ACL-prefiltered vector search and RRF; the explicit `reranked` mode adds bounded reranking that preserves the un-reranked fused tail up to the request limit. Default-mode search degrades to lexical (`semantic_degraded`), or, when a deployment sets default mode `reranked`, to the fused ranking (`rerank_degraded`), and reports it in `meta.warnings`; explicit modes fail instead. In the 3.12.0 private run hybrid reached Recall@10/MRR 0.895/0.895 against 0.789/0.598 for BM25-reranked fusion. On the historical reviewed 19-case `c4000` run, vector-only Recall@10/MRR was 0.947/0.822, ahead of hybrid at 0.895/0.702 and reranked at 0.842/0.656; 3.12.0 evidence is in the 3.12.0 section above |
 | Alias query expansion | Active for the lexical path | Human-approved entity aliases (ACL-prefiltered `resolve_entities`) expand candidate retrieval only; reranking keeps the user's original wording. It lifted RapidFuzz on the grounded draft set and is aggregate-neutral-to-positive under the now-active BM25 backend; re-evaluate if candidate generation changes (`evaluation/reports/alias-expansion-20260811/decision.md`) |
 | Ontology contract | Ready for pilot | YAML entity inheritance and predicate contracts; collision-safe validation (ADR-043: a domain profile redefining a core entity type or predicate, or a `sources/*.yaml` object type with an unknown parent, fails `kip ontology validate` and container startup); ACL-bound mining jobs; strict structured-output validation; reviewed entities/relations; exact evidence; deterministic fingerprints; current approved-graph answers; and idempotent predicate migration materialization with source-assertion lineage. The curation loop is reviewable end to end (ADR-038): approved-entity-aware mining digests make the two-pass mine -> approve entities -> re-mine loop run, invalid/duplicate/stale proposals are skipped with per-proposal reasons on a durable `kip.ontology-mining-result.v1` job payload, evidence/review enforcement is derived from the catalog and pinned to `predicates.yaml` by a contract test, candidate listings ship as triage-ordered `kip.assertion-candidate-listing.v1` with Korean labels and ACL-gated snippets, audited revocation and supersede-on-approve exist (migration 0019), and `include_candidate_assertions` populates clearly-marked proposed candidates on ontology-context surfaces only |
 | Agent-guided setup | Handoff implemented; recipient acceptance required | Folder shorthand, metadata-only local/cloud preview, resolved secret/key readiness, owner-bound plans, standalone generated Compose, generated host-config selection, and app-up-first receipts are implemented (ADR-057). Missing readiness does not become `verified`. Local generation provisioning, external controls, and real recipient evidence remain separate |
@@ -498,14 +642,18 @@ substitutes for that full-corpus benchmark.
   shows a material vector gain, including semantic-paraphrase Recall@10
   `0.429 -> 0.857`, with zero exact-recall regression and zero ACL leaks.
   The historical `c4000` HNSW run preserved those metrics at P95 `133.75 ms`,
-  below the `2000 ms` gate. Current code uses the distinct `c12000` identity,
-  so that projection must be rebuilt and re-evaluated. Semantic projection
-  also remains disabled because stale-warning coverage is absent and fails
-  closed.
+  below the `2000 ms` gate. 3.12.0 makes semantic search (hybrid) the default
+  at the 4000-character identity, with the BGE reranker opt-in (ADR-065); its release evaluation is
+  recorded in the 3.12.0 section.
   Separately, the 2026-08-10 native-HWP OneDrive A/B first promoted local
   RapidFuzz on a 253-query source-derived set; ADR-034 superseded that default
   with candidate-local BM25 after the reviewed 19-case comparison.
-- The 2026-08-06 loaded-corpus audit is recorded in `docs/RAG_QUALITY_AUDIT_2026-08-06.md`; lexical remains active and all semantic candidates remain shadow-only.
+- The 2026-08-06 loaded-corpus audit is recorded in `docs/RAG_QUALITY_AUDIT_2026-08-06.md`; at that time lexical was active and all semantic candidates were shadow-only.
+- The default semantic path depends on Infinity 0.0.77, the latest release,
+  which bounds transformers below 5; its reviewed advisories are recorded in
+  `docs/SECURITY.md` and replacing the runtime is a tracked limitation. The
+  compose `models` image is linux/amd64 CPU only. The first full projection of
+  a large corpus takes hours, and search stays lexical until it is active.
 - Quality recommendations do not discover, install, or activate libraries. Candidate dependencies remain opt-in adapters; a scheduler may automate shadow runs only after reproducible manifest execution is added.
 - Retrieval-only reports cannot claim end-to-end RAG quality. Promotion requires
   immutable reviewed claim/citation/refusal and ontology observations for every

@@ -188,8 +188,24 @@ def _embeddings_union_sql(columns: str) -> str:
     )
 
 
-def _websearch_or_query(lexemes: str, *, max_terms: int = 64) -> str:
+def _websearch_or_query(
+    lexemes: str,
+    *,
+    max_terms: int = 64,
+    exclude: frozenset[str] = frozenset(),
+    min_terms: int = 3,
+) -> str:
     terms = list(dict.fromkeys(term.replace('"', "") for term in lexemes.split() if term))
+    if exclude:
+        # Drop corpus-common terms from the match predicate: an n-gram found in
+        # a large share of units (often from a shared folder path) would pull
+        # half the corpus into scoring. Keep the longest common terms when too
+        # few specific ones remain so a short query still matches something.
+        specific = [term for term in terms if term not in exclude]
+        if len(specific) < min_terms:
+            common = sorted((term for term in terms if term in exclude), key=len, reverse=True)
+            specific = [*specific, *common[: min_terms - len(specific)]]
+        terms = specific
     if len(terms) > max_terms:
         # Long natural-language questions expand into hundreds of n-grams;
         # ORing them all pushed queries past the statement timeout. Keep the
@@ -213,10 +229,18 @@ class PostgresDatabase:
         pool_max_size: int = 10,
         hnsw_ef_search: int = 200,
         hnsw_max_scan_tuples: int = 100_000,
+        lexical_common_term_fraction: float = 0.02,
+        projection_statement_timeout_ms: int = 300_000,
         source_policy: FilesystemAccessPolicy | None = None,
     ) -> None:
+        if projection_statement_timeout_ms <= 0:
+            raise ValidationError("database.projection_statement_timeout_ms must be positive")
+        self.projection_statement_timeout_ms = projection_statement_timeout_ms
         if hnsw_ef_search <= 0 or hnsw_max_scan_tuples <= 0:
             raise ValidationError("HNSW scan bounds must be positive")
+        if not 0.0 <= lexical_common_term_fraction < 1.0:
+            raise ValidationError("search.lexical_common_term_fraction must be in [0, 1)")
+        self.lexical_common_term_fraction = lexical_common_term_fraction
         self.database_url = database_url
         self.source_policy = source_policy
         self.statement_timeout_ms = statement_timeout_ms
@@ -1437,10 +1461,52 @@ class PostgresDatabase:
             row = cursor.fetchone()
             return int(row["matched"]) if row else 0
 
+    def _common_terms(self, context: RequestContext, lexemes: str) -> frozenset[str]:
+        """Query terms present in at least the configured share of lexical units.
+
+        One capped count per term against the GIN index: a term is common as
+        soon as the cap is reached, so the probe costs milliseconds even for
+        terms in most of the corpus. Visibility is not needed here; the result
+        only narrows which terms drive candidate matching, never what a
+        caller may see.
+        """
+        if self.lexical_common_term_fraction <= 0:
+            return frozenset()
+        terms = [
+            term.replace("'", "").replace("\\", "")
+            for term in dict.fromkeys(lexemes.split())
+            if term.replace("'", "").replace("\\", "")
+        ]
+        if not terms:
+            return frozenset()
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT greatest(reltuples, 0)::bigint AS units FROM pg_class WHERE oid = 'search.lexical_units'::regclass"
+            )
+            row = cursor.fetchone()
+            total = int(row["units"]) if row else 0
+            cap = max(200, int(total * self.lexical_common_term_fraction))
+            if total < cap * 2:
+                # Small corpora have no meaningfully common terms.
+                return frozenset()
+            cursor.execute(
+                """
+                SELECT t.term,
+                       (SELECT count(*) FROM (
+                            SELECT 1 FROM search.lexical_units l
+                            WHERE l.workspace_id=%s AND l.tsv @@ to_tsquery('simple', t.query)
+                            LIMIT %s
+                        ) capped) AS units
+                FROM unnest(%s::text[], %s::text[]) AS t(term, query)
+                """,
+                (context.workspace, cap, terms, [f"'{term}'" for term in terms]),
+            )
+            return frozenset(str(row["term"]) for row in cursor.fetchall() if int(row["units"]) >= cap)
+
     def search(
         self, context: RequestContext, request: SearchRequest, lexemes: str
     ) -> list[SearchHit]:
-        websearch_query = _websearch_or_query(lexemes)
+        websearch_query = _websearch_or_query(lexemes, exclude=self._common_terms(context, lexemes))
         identifier_patterns = [
             _literal_like_pattern(normalize(form, request.query)) for form in ("NFC", "NFD")
         ]
@@ -1726,6 +1792,19 @@ class PostgresDatabase:
             )
         return self._embedding_space(row)
 
+    def projection_timeout(self, cursor: Any) -> None:
+        """Give background projection statements their own, longer budget.
+
+        Interactive requests keep `statement_timeout_ms`; building a vector
+        projection over a large corpus scans and inserts far more rows, and a
+        single slow HNSW insert must not abort a multi-hour rebuild. SET LOCAL
+        ends with the transaction.
+        """
+        cursor.execute(
+            "SELECT set_config('statement_timeout', %s, true)",
+            (str(self.projection_statement_timeout_ms),),
+        )
+
     def upsert_embeddings(
         self,
         context: RequestContext,
@@ -1735,6 +1814,7 @@ class PostgresDatabase:
         if not records:
             return 0
         with self._connection(context) as connection, connection.cursor() as cursor:
+            self.projection_timeout(cursor)
             cursor.execute(
                 """
                 SELECT dimensions
@@ -1970,6 +2050,41 @@ class PostgresDatabase:
             )
             rows = cursor.fetchall()
         return [VocabularyItem(**dict(row)) for row in rows]
+
+    def any_term_visible(
+        self,
+        context: RequestContext,
+        terms: list[str],
+    ) -> bool:
+        # One OR tsquery with EXISTS: a common term returns on its first
+        # visible unit instead of counting every matching document (which
+        # cost seconds per query on a large corpus). ACL and freshness stay
+        # in the same predicate, so hidden units never make a term "known".
+        cleaned = [
+            term.strip().replace("'", "").replace("\\", "")
+            for term in dict.fromkeys(terms)
+            if term and term.strip().replace("'", "").replace("\\", "")
+        ]
+        if not cleaned:
+            return False
+        tsquery = " | ".join(f"'{term}'" for term in cleaned)
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM search.lexical_units l
+                    JOIN content.units u ON u.id=l.unit_id
+                    WHERE l.workspace_id=%s
+                      AND l.tsv @@ to_tsquery('simple', %s)
+                      AND (cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])
+                      AND (kip.acl_snapshot_is_fresh(u.acl_snapshot_id) AND kip.source_artifact_is_allowed(u.artifact_id))
+                ) AS present
+                """,
+                (context.workspace, tsquery, context.acl_scopes),
+            )
+            row = cursor.fetchone()
+        return bool(row and row["present"])
 
     def term_document_frequencies(
         self,

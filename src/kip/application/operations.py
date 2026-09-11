@@ -84,28 +84,25 @@ class OperationsUseCases:
         ] = "disabled"
         semantic_ready = False
         if semantic_configured and self._embedding.name != "disabled":
-            verification = SemanticProjectionUseCases(
+            # Cheap by design: MCP clients call capabilities before their first
+            # data call. Identity of the active space decides readiness; the
+            # full completeness count lives in `kip doctor` and
+            # `kip projection verify`, and sync maintenance keeps it current.
+            expected = SemanticProjectionUseCases(
                 self._settings,
                 self._retrieval_store,
                 self._embedding,
-            ).verify(selected_context)
-            raw_status = str(verification.get("status", "missing"))
-            status_map: dict[
-                str,
-                Literal["missing", "shadow", "active", "incompatible"],
-            ] = {
-                "missing": "missing",
-                "shadow": "shadow",
-                "active": "active",
-            }
-            projection_status = status_map.get(raw_status, "incompatible")
-            if projection_status == "active" and verification.get("ok") is not True:
-                projection_status = "stale"
-            semantic_ready = (
-                projection_status == "active"
-                and verification.get("ok") is True
-                and verification.get("active") is True
-            )
+            ).embedding_space(selected_context)
+            active = self._retrieval_store.active_embedding_space(selected_context)
+            if active is not None and active.id == expected.id:
+                projection_status = "active"
+                semantic_ready = True
+            elif active is not None:
+                projection_status = "incompatible"
+            elif self._retrieval_store.embedding_space_exists(selected_context, expected.id):
+                projection_status = "shadow"
+            else:
+                projection_status = "missing"
         if semantic_configured and self._embedding.name == "disabled":
             warnings.append(
                 "semantic search is enabled but no embedding adapter is configured"

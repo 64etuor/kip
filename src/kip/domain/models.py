@@ -627,6 +627,26 @@ class SourceObjectAbsence(StrictModel):
     absent_scan_count: int
 
 
+class SemanticProjectionUpdate(StrictModel):
+    """What a sync or activation did to the semantic (vector) projection.
+
+    ``disabled``: semantic search or the embedding adapter is off.
+    ``current``: nothing new to embed. ``updated``: new or changed units
+    were embedded. ``incomplete``: some eligible units are still missing.
+    ``unavailable``: the model runtime could not be reached; search keeps
+    working through the lexical path and the next sync resumes.
+    """
+
+    status: Literal["disabled", "current", "updated", "incomplete", "unavailable"]
+    space_id: str | None = None
+    newly_indexed_units: int = 0
+    indexed_units: int = 0
+    content_units: int = 0
+    active: bool = False
+    activated: bool = False
+    reason: str | None = None
+
+
 class SyncSummary(StrictModel):
     source: str
     scanned: int = 0
@@ -638,6 +658,7 @@ class SyncSummary(StrictModel):
     absent: int = 0
     tombstoned: int = 0
     warnings: list[str] = Field(default_factory=list)
+    semantic_projection: SemanticProjectionUpdate | None = None
 
 
 class ReextractionSummary(StrictModel):
@@ -654,6 +675,7 @@ class ReextractionSummary(StrictModel):
     unit_count: int = 0
     parser_counts: dict[str, int] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
+    semantic_projection: SemanticProjectionUpdate | None = None
 
 
 class EvidenceRead(StrictModel):

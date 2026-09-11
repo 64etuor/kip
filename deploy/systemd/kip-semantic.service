@@ -1,0 +1,23 @@
+# KIP semantic model runtime for Linux hosts (ADR-065): the embedding model by
+# default, plus the BGE reranker with KIP_SEMANTIC_RERANKER=on in the
+# deployment's .env. User unit: copy to ~/.config/systemd/user/; if the
+# deployment is not ~/kip, edit the WorkingDirectory= and ExecStart= paths
+# (systemd does not expand variables there). Then `systemctl --user
+# daemon-reload && systemctl --user enable --now kip-semantic`. The server
+# binds to loopback only; search falls back to lexical while it starts or
+# restarts, and it waits instead of loading a second copy while another
+# runtime serves the port.
+[Unit]
+Description=KIP semantic model runtime
+
+[Service]
+Type=simple
+WorkingDirectory=%h/kip
+ExecStart=/bin/bash %h/kip/scripts/semantic-server.sh run
+Restart=on-failure
+RestartSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

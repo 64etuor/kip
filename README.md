@@ -97,9 +97,10 @@ read-only mount를 승인한 뒤 다음 파일을 원자적으로 생성·검증
 설치는 가능하지만 production-promoted 상태가 아니라는 제한을 receipt에 남깁니다.
 
 `setup apply`는 설정을 생성하고 `setup verify`는 파일과 runtime 준비 항목을
-검증합니다. 실제 배포는 `./scripts/app-up.sh`부터 실행한 뒤 source sync,
-search와 exact-read smoke까지 확인합니다. 승인한 Compose만 사용하며 DB 준비와
-migration 순서는 자동 처리합니다. 폴더 경로만 답해도 보수적 분류와 workspace
+검증합니다. 실제 배포는 CLI/MCP만 쓴다면 `./scripts/app-up.sh --database-only`부터
+실행하고, REST API나 worker가 필요할 때만 전체 `./scripts/app-up.sh`를 실행한 뒤
+source sync, search와 exact-read smoke까지 확인합니다. 승인한 Compose만 사용하며
+DB 준비와 migration 순서는 자동 처리합니다. 폴더 경로만 답해도 보수적 분류와 workspace
 ACL을 제안하고, preview가 local/cloud-only 파일을 구분합니다. 다운로드가 필요한
 파일은 OneDrive 앱에서 먼저 선택합니다. 전체 인수 절차는
 [`docs/STARTER_KIT_GUIDE.md`](docs/STARTER_KIT_GUIDE.md)를 따릅니다.
@@ -155,8 +156,11 @@ credential을 생성하며 기존 `.env`와 config는 보존합니다.
 ./scripts/bootstrap.sh
 ./scripts/app-up.sh --database-only
 ./scripts/doctor.sh
-./scripts/test.sh
+./scripts/kip doctor
 ```
+
+`./scripts/verify.sh`(테스트·lint·typecheck·audit)는 개발자와 릴리스용 gate이며
+온보딩 단계가 아닙니다.
 
 포함된 sample data를 색인합니다.
 
@@ -169,7 +173,7 @@ credential을 생성하며 기존 `.env`와 config는 보존합니다.
 
 ### 정상 동작 확인
 
-성공하면 `search` 결과 JSON에 `"ok": true`가 있고 `data.results` 배열에 항목이
+성공하면 `search` 결과 JSON에 `"ok": true`가 있고 `data` 배열에 항목이
 하나 이상 있습니다. 결과가 비어 있다면 다음 순서로 확인합니다.
 
 ```bash
@@ -230,12 +234,8 @@ Claude Code는 루트 `CLAUDE.md`를 읽고, 이 파일은 `AGENTS.md`를 import
 루트 `.mcp.json`은 secret을 넣지 않고 선택형 stdio MCP adapter를 시작합니다.
 AI 기반 setup은 이 파일을 원자적으로 갱신해 host 경로용
 `config/kip.host.generated.toml`을 선택하고 이전 파일을 보존합니다. Container 경로용
-`config/kip.generated.toml`과 혼동하지 마세요. 저장소 checkout에서는 MCP extra를
-명시적으로 선택할 수 있습니다.
-
-```bash
-uv sync --extra mcp
-```
+`config/kip.generated.toml`과 혼동하지 마세요. MCP extra는 `./scripts/bootstrap.sh`가
+다른 extra와 함께 이미 설치하므로 따로 실행할 필요가 없습니다.
 
 Adapter는 안정화된 MCP 2.x SDK를 사용하고 KIP package version을 보고하며, 현재
 protocol과 SDK가 지원하는 legacy client를 협상합니다. Tool 결과는 계속

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from time import perf_counter
 
@@ -26,6 +27,7 @@ from kip.domain.telemetry import (
     TraceStage,
     safe_request_id,
 )
+from kip.errors import KipError
 from kip.ports.embedding import EmbeddingPort
 from kip.ports.evidence import EvidenceReaderPort
 from kip.ports.knowledge import KnowledgeStore
@@ -150,6 +152,23 @@ class RetrievalUseCases:
 
     def has_ambiguous_filename(self, context: RequestContext, request: SearchRequest) -> bool:
         return self._store.has_ambiguous_filename(context, request)
+
+    def result_warnings(self, context: RequestContext, results: Sequence[object]) -> list[str]:
+        """Envelope warnings explaining an empty result without leaking scope.
+
+        `no_visible_indexed_units` means nothing is indexed for this caller's
+        workspace and access scopes; it never states that hidden units exist.
+        Applies to search hits and context items alike.
+        """
+        if results:
+            return []
+        try:
+            visible = self._store.has_visible_units(context)
+        except KipError:
+            # A completed empty result must not turn into an error because
+            # the explanatory probe failed afterwards.
+            return []
+        return [] if visible else ["no_visible_indexed_units"]
 
     def filename_candidates(self, context: RequestContext, request: SearchRequest) -> list[str]:
         return self._store.filename_candidates(context, request)

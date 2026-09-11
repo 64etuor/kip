@@ -305,7 +305,11 @@ def main() -> int:
             link_program(ROOT, "node", package / "bin/node")
             link_program(ROOT, "npm", package / "bin/npm")
             node = run(["node", "--version"])
-        if node.returncode or run(["npm", "--version"]).returncode:
+            npm = run(["npm", "--version"])
+        if (
+            node.returncode or not version_ok(node.stdout, (20, 9, 0))
+            or npm.returncode or not version_ok(npm.stdout, (9, 0, 0))
+        ):
             raise RuntimeError("Node/npm readiness probe failed after installation")
         print(f"Node + npm: ready ({node.stdout.strip()})")
         if args.without_docker:

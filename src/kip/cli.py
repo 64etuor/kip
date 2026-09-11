@@ -726,7 +726,11 @@ def search(
         )
         return runtime.container.application.retrieval.search(runtime.context, request)
 
-    _run(ctx, action)
+    def warnings(hits: Any) -> list[str]:
+        runtime = _runtime(ctx)
+        return runtime.container.application.retrieval.result_warnings(runtime.context, hits)
+
+    _run(ctx, action, warnings=warnings)
 
 
 @app.command()
@@ -781,7 +785,11 @@ def context_command(
         )
         return runtime.container.application.retrieval.context_bundle(runtime.context, request)
 
-    _run(ctx, action)
+    def warnings(bundle: Any) -> list[str]:
+        runtime = _runtime(ctx)
+        return runtime.container.application.retrieval.result_warnings(runtime.context, bundle.items)
+
+    _run(ctx, action, warnings=warnings)
 
 
 @app.command()

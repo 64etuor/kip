@@ -92,13 +92,22 @@ docker image inspect docker/dockerfile:1.18 --format '{{index .RepoDigests 0}}'
 # Dockerfile의 # syntax= 줄과 같은 sha256이어야 합니다
 ```
 
+### `dependency_unavailable: PostgreSQL is not reachable at …`
+데이터베이스가 떠 있지 않거나 `KIP_DATABASE_URL`이 다른 곳을 가리킵니다. 몇 초
+안에 이 오류로 끝나며 접속 재시도 로그는 출력하지 않습니다.
+
+```bash
+./scripts/app-up.sh --database-only   # 번들 DB를 띄우고 migration까지 수행
+./scripts/kip doctor                  # canonical_repository 항목으로 재확인
+```
+
 ### `port is already allocated` / `address already in use` (5432)
 이미 다른 PostgreSQL이 5432 포트를 쓰고 있습니다. 기존 것을 끄거나, `.env`에서
 포트를 바꾸세요.
 
 ```bash
 echo "KIP_POSTGRES_PORT=5433" >> .env
-./scripts/dev-up.sh
+./scripts/app-up.sh --database-only
 ```
 
 ### Windows에서 스크립트가 실행되지 않음
@@ -179,7 +188,7 @@ Reference 설정에서는 모든 filesystem parser가 파일 하나당 fresh chi
 | 검사 이름 | 뜻과 해결 |
 |---|---|
 | `configuration` | 설정 파일을 찾지 못했습니다. `KIP_CONFIG` 환경변수나 `config/kip.toml` 존재를 확인하세요. |
-| `canonical_repository` | 데이터베이스에 연결하지 못했습니다. `./scripts/dev-up.sh`로 PostgreSQL이 떠 있는지, `KIP_DATABASE_URL`이 맞는지 확인하세요. |
+| `canonical_repository` | 데이터베이스에 연결하지 못했습니다. `./scripts/app-up.sh --database-only`로 PostgreSQL이 떠 있는지, `KIP_DATABASE_URL`이 맞는지 확인하세요. |
 | `content_addressed_store` | 원본 사본 저장 폴더(CAS)에 접근할 수 없습니다. 경로 권한을 확인하세요. |
 | `filesystem_source:이름` | 그 소스 폴더가 없거나 읽을 수 없습니다. 경로와 접근 권한을 확인하세요. |
 | `kordoc_ocr_resolvable` | OCR이 켜져 있는데 `kordoc` 실행 파일을 찾지 못했습니다. `./scripts/install-kordoc.sh`를 실행하거나, 스캔 문서가 없다면 설정에서 `parsers.ocr.kordoc.enabled = false`로 끄세요. 끄지 않으면 이미지가 든 PDF/PPTX가 `partial`로 처리됩니다. |

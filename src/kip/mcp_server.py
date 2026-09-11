@@ -42,6 +42,10 @@ if TYPE_CHECKING:
     from mcp.server.mcpserver import MCPServer
 
 
+# A tool returns its JSON payload, optionally with envelope warnings.
+ToolResult = str | tuple[str, list[str]]
+
+
 def _json(value: Any) -> str:
     if hasattr(value, "model_dump"):
         value = value.model_dump(mode="json")
@@ -106,7 +110,7 @@ def create_server(container: Container | None = None) -> MCPServer:
         ]
         return base.model_copy(update={"roles": list(dict.fromkeys(roles))})
 
-    def _enveloped(func: Callable[..., str]) -> Callable[..., str]:
+    def _enveloped(func: Callable[..., ToolResult]) -> Callable[..., str]:
         """Wrap a tool's `_json(...)` result in the same `kip.envelope.v1`
         contract the CLI and REST edges return, and translate a `KipError`
         into an enveloped `ok=false` result instead of an opaque ToolError.
@@ -124,6 +128,10 @@ def create_server(container: Container | None = None) -> MCPServer:
                 request_id = selected_context.request_id or request_id
                 workspace = selected_context.workspace
                 raw = func(*args, **kwargs)
+                warnings: list[str] = []
+                if isinstance(raw, tuple):
+                    raw, warnings = raw
+                data = json.loads(raw) if isinstance(raw, str) else raw
             except (KipError, PydanticValidationError) as exc:
                 if isinstance(exc, PydanticValidationError):
                     message = "; ".join(
@@ -144,11 +152,10 @@ def create_server(container: Container | None = None) -> MCPServer:
                     error=ErrorInfo(code="internal_error", message="An internal error occurred"),
                     meta=EnvelopeMeta(request_id=request_id, workspace=workspace),
                 ).model_dump_json()
-            data = json.loads(raw) if isinstance(raw, str) else raw
             envelope = Envelope(
                 ok=True,
                 data=data,
-                meta=EnvelopeMeta(request_id=request_id, workspace=workspace),
+                meta=EnvelopeMeta(request_id=request_id, workspace=workspace, warnings=warnings),
             )
             return envelope.model_dump_json()
 
@@ -186,7 +193,7 @@ def create_server(container: Container | None = None) -> MCPServer:
         document_types: list[str] | None = None,
         project_ids: list[str] | None = None,
         include_candidate_assertions: bool = False,
-    ) -> str:
+    ) -> ToolResult:
         """Find candidate locations, not verified facts or proof of absence.
 
         Search previews have source_verification=not_checked. Reopen only the
@@ -202,7 +209,9 @@ def create_server(container: Container | None = None) -> MCPServer:
             project_ids=project_ids or [],
             include_candidate_assertions=include_candidate_assertions,
         )
-        return _json(application.retrieval.search(context(), request))
+        selected_context = context()
+        hits = application.retrieval.search(selected_context, request)
+        return _json(hits), application.retrieval.result_warnings(selected_context, hits)
 
     @tool(read_only=True)
     @_enveloped
@@ -215,7 +224,7 @@ def create_server(container: Container | None = None) -> MCPServer:
         document_types: list[str] | None = None,
         project_ids: list[str] | None = None,
         include_candidate_assertions: bool = False,
-    ) -> str:
+    ) -> ToolResult:
         """Build a bounded pack with locators and per-item verification/truncation.
 
         stat means size/mtime reuse, not a new hash check. A truncated body
@@ -231,7 +240,9 @@ def create_server(container: Container | None = None) -> MCPServer:
             project_ids=project_ids or [],
             include_candidate_assertions=include_candidate_assertions,
         )
-        return _json(application.retrieval.context_bundle(context(), request))
+        selected_context = context()
+        bundle = application.retrieval.context_bundle(selected_context, request)
+        return _json(bundle), application.retrieval.result_warnings(selected_context, bundle.items)
 
     @tool(read_only=True)
     @_enveloped

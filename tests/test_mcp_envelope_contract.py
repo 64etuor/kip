@@ -221,3 +221,58 @@ def test_mcp_kip_error_is_wrapped_in_the_envelope_not_a_bare_tool_error(
     assert envelope["ok"] is False
     assert envelope["data"] is None
     assert envelope["error"]["code"] == "not_found"
+
+
+def test_empty_search_explains_missing_index_identically_across_edges(test_container, monkeypatch):
+    from fastapi.testclient import TestClient
+    from mcp.client import Client
+    from typer.testing import CliRunner
+
+    from kip.api import create_app
+    from kip.cli import app
+
+    monkeypatch.setattr("kip.cli.build_container", lambda settings, load_models=True: test_container)
+    monkeypatch.setenv("KIP_WORKSPACE", "default")
+    monkeypatch.setenv("KIP_ACL_SCOPES", "workspace:default")
+
+    def envelopes():
+        cli = CliRunner().invoke(app, ["search", "정산", "--limit", "3"])
+        assert cli.exit_code == 0, cli.output
+        with TestClient(create_app(test_container)) as client:
+            rest = client.post("/v1/search", json={"query": "정산", "limit": 3}, headers={"X-KIP-API-Key": "test-key"})
+            assert rest.status_code == 200
+
+        async def invoke():
+            async with Client(create_server(test_container)) as client:
+                result = await client.call_tool("kip_search", {"query": "정산", "limit": 3})
+                return json.loads(result.content[0].text)
+
+        return [json.loads(cli.output), rest.json(), anyio.run(invoke)]
+
+    for envelope in envelopes():
+        assert envelope["ok"] and envelope["data"] == []
+        assert envelope["meta"]["warnings"] == ["no_visible_indexed_units"]
+    cli_context = CliRunner().invoke(app, ["context", "정산", "--limit", "2"])
+    assert cli_context.exit_code == 0, cli_context.output
+    assert json.loads(cli_context.output)["meta"]["warnings"] == ["no_visible_indexed_units"]
+    with TestClient(create_app(test_container)) as client:
+        rest_context = client.post("/v1/context", json={"query": "정산", "limit": 2}, headers={"X-KIP-API-Key": "test-key"})
+        assert rest_context.json()["meta"]["warnings"] == ["no_visible_indexed_units"]
+
+    async def invoke_context():
+        async with Client(create_server(test_container)) as client:
+            result = await client.call_tool("kip_context", {"query": "정산", "limit": 2})
+            return json.loads(result.content[0].text)
+
+    assert anyio.run(invoke_context)["meta"]["warnings"] == ["no_visible_indexed_units"]
+
+    source = test_container.settings.project_root / "source" / "정산.txt"
+    source.write_text("정산 안내 문서")
+    context = test_container.application.operations.request_context()
+    test_container.application.ingestion.sync_filesystem(context, "fixture")
+    for envelope in envelopes():
+        assert envelope["ok"] and envelope["data"]
+        assert envelope["meta"]["warnings"] == []
+    # An outsider sees no units; the warning must not imply hidden ones exist.
+    outsider = test_container.application.operations.request_context(acl_scopes=[])
+    assert test_container.application.retrieval.result_warnings(outsider, []) == ["no_visible_indexed_units"]

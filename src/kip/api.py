@@ -248,12 +248,14 @@ def create_app(container: Container | None = None) -> FastAPI:
             raise HTTPException(status_code=403, detail="invalid admin key")
         return context
 
-    def ok(data: Any, context: RequestContext) -> Envelope:
+    def ok(data: Any, context: RequestContext, warnings: list[str] | None = None) -> Envelope:
         return Envelope(
             ok=True,
             data=data.model_dump(mode="json") if hasattr(data, "model_dump") else data,
             meta=EnvelopeMeta(
-                request_id=context.request_id or new_id("req"), workspace=context.workspace
+                request_id=context.request_id or new_id("req"),
+                workspace=context.workspace,
+                warnings=warnings or [],
             ),
         )
 
@@ -298,14 +300,16 @@ def create_app(container: Container | None = None) -> FastAPI:
         payload: SearchRequest,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
-        return ok(selected.application.retrieval.search(context, payload), context)
+        hits = selected.application.retrieval.search(context, payload)
+        return ok(hits, context, selected.application.retrieval.result_warnings(context, hits))
 
     @app.post("/v1/context", response_model=Envelope)
     def context_bundle(
         payload: ContextRequest,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
-        return ok(selected.application.retrieval.context_bundle(context, payload), context)
+        bundle = selected.application.retrieval.context_bundle(context, payload)
+        return ok(bundle, context, selected.application.retrieval.result_warnings(context, bundle.items))
 
     @app.post("/v1/answer", response_model=Envelope)
     def answer(

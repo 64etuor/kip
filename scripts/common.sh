@@ -4,9 +4,15 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PROJECT_ROOT
 export KIP_PROJECT_ROOT="${KIP_PROJECT_ROOT:-$PROJECT_ROOT}"
-export PATH="$PROJECT_ROOT/scripts:$PATH"
+# runtime-path.sh puts scripts/ (and managed runtimes) on PATH exactly once.
+# Test fixtures copy common.sh alone; keep the plain fallback for them.
 if [[ -f "$PROJECT_ROOT/scripts/runtime-path.sh" ]]; then
   source "$PROJECT_ROOT/scripts/runtime-path.sh"
+else
+  case ":$PATH:" in
+    *":$PROJECT_ROOT/scripts:"*) ;;
+    *) export PATH="$PROJECT_ROOT/scripts:$PATH" ;;
+  esac
 fi
 
 if [[ -f "$PROJECT_ROOT/.env" && "${KIP_SKIP_DOTENV:-0}" != "1" ]]; then

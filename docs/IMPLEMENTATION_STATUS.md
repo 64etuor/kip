@@ -4,6 +4,23 @@ This is the current readiness inventory, not the target architecture. The
 target-to-current matrix and ordered gap register live in
 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`.
 
+## 2026-09-11 review corrections (3.8.2)
+
+An independent review of 3.7.1–3.8.1 found that the named-file fail-closed
+guarantee only covered a built-in extension list, so an operator-indexed
+extension such as `.png` could still borrow another document's fact; that the
+basename resolver scanned every unit name per answer; that URLs were refused
+as inaccessible files; and that the Memory and PostgreSQL resolvers differed
+on superseded revisions and non-filesystem sources. 3.8.2 corrects each with
+regression tests on both backends. First-run experience also changed: an
+unreachable database now fails within seconds with a typed
+`dependency_unavailable` error and remedy, and an empty search reports
+`no_visible_indexed_units` on CLI, REST and MCP. Local probes on this host
+confirmed the error path (about nine seconds, no retry noise), the
+empty-workspace warning, a pasted-URL question answering normally, and the
+full gate. These are correctness and onboarding fixes, not new
+retrieval-quality evidence.
+
 ## 2026-09-11 prerequisite bootstrap (3.8.1)
 
 Bootstrap can prepare Python and Node/npm locally before loading dotenv; the

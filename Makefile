@@ -6,7 +6,7 @@ bootstrap:
 	./scripts/bootstrap.sh
 
 up:
-	./scripts/dev-up.sh
+	./scripts/app-up.sh --database-only
 
 down:
 	./scripts/dev-down.sh

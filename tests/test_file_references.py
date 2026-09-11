@@ -53,3 +53,47 @@ def test_a_filename_prefix_is_not_the_requested_backup_file():
 
 def test_long_non_filename_token_does_not_need_substring_retries():
     assert not has_unresolved_file_reference("x" * 50000, ())
+
+
+def test_unresolved_detection_covers_operator_configured_extensions():
+    from kip.domain.file_references import unresolved_file_tokens
+
+    query = '"대상.png" 최종 승인일은 언제야?'
+    assert unresolved_file_tokens(query, ()) == []
+    assert unresolved_file_tokens(query, (), extensions=[".PNG"]) == ["대상.png"]
+
+
+@pytest.mark.parametrize("query", [
+    "https://intranet.example.com/guide.pdf 에 따르면 제출기한은 언제야?",
+    "file://nas/team/report.json 참고, 제출기한은?",
+])
+def test_urls_are_context_not_file_requests(query):
+    from kip.domain.file_references import candidate_basenames, unresolved_file_tokens
+
+    assert unresolved_file_tokens(query, ()) == []
+    assert not any(name.endswith((".pdf", ".json")) for name in candidate_basenames(query))
+
+
+def test_candidate_basenames_cover_quotes_particles_and_preceding_words():
+    from kip.domain.file_references import candidate_basenames
+
+    names = candidate_basenames('2분기 범위 안내.txt의 담당자와 "최종 보고서.pdf"는?')
+    assert "안내.txt" in names
+    assert "범위 안내.txt" in names
+    assert "2분기 범위 안내.txt" in names
+    assert "최종 보고서.pdf" in names
+    assert not any(name.startswith(('"', "'")) for name in names)
+
+
+@pytest.mark.parametrize("query", ["3.8.1 릴리즈 노트", "평점 3.5 는?", '"승인" 관련 문서 찾아줘', "www.example.com/보고서.pdf 요약"])
+def test_versions_decimals_quotes_and_urls_are_not_file_requests(query):
+    from kip.domain.file_references import looks_like_file_request
+
+    assert not looks_like_file_request(query)
+
+
+def test_extension_tokens_are_file_requests():
+    from kip.domain.file_references import looks_like_file_request
+
+    assert looks_like_file_request("회의록(최종).txt 담당자는?")
+    assert looks_like_file_request("REPORT.PDF 요약")

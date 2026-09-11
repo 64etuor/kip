@@ -6,7 +6,12 @@ from unicodedata import normalize
 
 from kip.adapters.repository.memory.acl import unit_is_visible
 from kip.adapters.repository.memory.state import MemoryState
-from kip.domain.file_references import FilenameSearchRequest, filename_key
+from kip.domain.file_references import (
+    FilenameSearchRequest,
+    candidate_basenames,
+    filename_key,
+    looks_like_file_request,
+)
 from kip.domain.models import (
     ArtifactView,
     ContentUnit,
@@ -74,6 +79,8 @@ class MemoryLexicalStore:
         needle = normalize("NFC", request.query.strip()).casefold()
         contents: set[str] = set()
         for _unit, view in self._visible_units(context, request):
+            if view.source_object is None or view.source_object.system_kind != "filesystem":
+                continue
             if normalize("NFC", view.artifact.file_name).casefold() == needle:
                 contents.add(view.artifact.sha256)
                 if len(contents) > 1:
@@ -81,13 +88,34 @@ class MemoryLexicalStore:
         return False
 
     def filename_candidates(self, context: RequestContext, request: SearchRequest) -> list[str]:
+        # Same contract as PostgreSQL: exact casefolded basenames spelled in
+        # the question, current revision only, filesystem sources only.
+        spellings = set(candidate_basenames(request.query))
         query = filename_key(request.query)
-        return sorted({
-            view.artifact.file_name
+        views = [
+            view
             for _, view in self._visible_units(context, request)
             if view.source_object and view.source_object.system_kind == "filesystem"
-            and filename_key(view.artifact.file_name) in query
-        })
+            and revision_is_latest(self.state, view)
+        ]
+        names = {view.artifact.file_name for view in views if filename_key(view.artifact.file_name) in spellings}
+        if not names and looks_like_file_request(request.query):
+            # Names outside the spelling window (very long or unusually
+            # punctuated) still bind through containment.
+            names = {view.artifact.file_name for view in views if filename_key(view.artifact.file_name) in query}
+        return sorted(names)
+
+    def has_visible_units(self, context: RequestContext) -> bool:
+        for unit in self.state.units.values():
+            if not unit_is_visible(self.state, unit, context):
+                continue
+            view = self.state.artifacts.get(unit.artifact_id)
+            if not view or not view.revision:
+                continue
+            packet = self.state.packets_by_revision.get(view.revision.id)
+            if packet and packet.workspace_id == context.workspace:
+                return True
+        return False
 
     def _visible_units(
         self, context: RequestContext, request: SearchRequest

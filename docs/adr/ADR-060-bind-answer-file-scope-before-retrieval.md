@@ -14,8 +14,15 @@ and backticks also prevented filename recognition.
 Resolve candidate basenames from the ACL/current-root/request-filtered index
 before ranking or live reads. One parser recognizes literal names, balanced
 quotes/backticks, particles and exclusions; longest overlapping references win.
-Unresolved references to supported document filename extensions refuse without
-disclosing whether the file exists outside the caller's scope.
+Unresolved references to indexed filename extensions (the deployment's
+`include_extensions` plus the built-in document list) refuse without
+disclosing whether the file exists outside the caller's scope; URLs are
+context, not references. Candidate basenames are resolved by exact casefolded
+equality on spellings extracted from the question (quoted spans, or an
+extension token with up to nine preceding words, stopping at `,;/|`), backed
+by expression and join indexes (migrations 0026/0027). When no spelling
+matches but the question still carries a file-looking token, the repository
+falls back to containment matching, so names outside that shape still bind.
 
 The answer service passes an internal `FilenameSearchRequest` to the existing
 retrieval pipeline. Positive and negative filename predicates apply before

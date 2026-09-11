@@ -26,3 +26,9 @@ def configure_logging(level: str = "INFO") -> None:
     handler.setFormatter(JsonFormatter())
     root.addHandler(handler)
     root.setLevel(level.upper())
+    # The connection pool retries in the background and logs every failed
+    # attempt at WARNING; the typed dependency_unavailable error already tells
+    # the operator what to do, so keep the driver chatter out of CLI output.
+    pool_logger = logging.getLogger("psycopg.pool")
+    if pool_logger.level == logging.NOTSET:
+        pool_logger.setLevel(logging.ERROR)

@@ -99,7 +99,10 @@ if [[ -z "$selected" ]]; then
     mkdir "$stage/package"
     tar -xzf "$stage/archive.tar.gz" -C "$stage/package" --strip-components=1
     found_version="$("$stage/package/uv" --version)"
-    [[ "$found_version" == "uv $version" || "$found_version" == "uv $version "* ]] || exit 1
+    if [[ "$found_version" != "uv $version" && "$found_version" != "uv $version "* ]]; then
+      printf 'Downloaded uv reports "%s", expected uv %s; it was not installed.\n' "$found_version" "$version" >&2
+      exit 1
+    fi
     if [[ -e "$uv_dir" ]]; then printf 'Incomplete runtime directory: %s. Preserve it elsewhere and retry.\n' "$uv_dir" >&2; exit 1; fi
     mv "$stage/package" "$uv_dir"
     printf '%s\n' "$checksum" > "$uv_dir/.verified-sha256"
@@ -109,7 +112,10 @@ if [[ -z "$selected" ]]; then
   export UV_PYTHON_INSTALL_DIR="$runtime/python"
   "$uv_dir/uv" python install "$python_version" --no-bin --no-config
   selected="$("$uv_dir/uv" python find "$python_version" --system --managed-python --no-config)"
-  compatible_python "$selected"
+  if ! compatible_python "$selected"; then
+    printf 'Managed Python %s at %s failed the compatibility probe (need 3.12+ on macOS/Linux).\n' "$python_version" "$selected" >&2
+    exit 1
+  fi
   ln -sfn "$selected" "$runtime/bin/python3"
 fi
 if [[ -n "${stage:-}" ]]; then rm -rf "$stage"; trap - EXIT; fi

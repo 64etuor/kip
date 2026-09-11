@@ -187,3 +187,127 @@ def test_multi_file_request_cannot_silently_drop_one_named_file(test_container, 
     )
     assert response.refused and response.citations == []
     assert response.refusal_reason == ("no_fresh_evidence" if stale else "no_admissible_evidence")
+
+
+def _container_with_extensions(test_container, extensions):
+    from kip.adapters.repository.memory import MemoryRepository
+
+    raw = deepcopy(test_container.settings.raw)
+    raw["sources"]["filesystem"][0]["include_extensions"] = extensions
+    settings = replace(test_container.settings, raw=raw)
+    return build_container(settings, repository=MemoryRepository())
+
+
+def test_operator_configured_extension_fails_closed_like_builtin_ones(test_container):
+    container = _container_with_extensions(test_container, [".txt", ".png"])
+    source = container.settings.project_root / "source"
+    (source / "다른문서.txt").write_text("최종 승인일은 2026년 9월 3일이다. 최종 승인일에 사업을 승인했다.")
+    context = container.application.operations.request_context()
+    container.application.ingestion.sync_filesystem(context, "fixture")
+
+    response = container.application.answering.answer(
+        context, AnswerRequest(query='"기밀도면.png" 최종 승인일은 언제야?')
+    )
+
+    assert response.refused
+    assert response.refusal_reason == "no_admissible_evidence"
+    assert "기밀도면.png" in response.answer
+    assert response.citations == []
+
+
+def test_pasted_url_is_not_treated_as_an_inaccessible_file(test_container):
+    source = test_container.settings.project_root / "source"
+    (source / "안내.txt").write_text("사내 가이드에 따르면 제출기한은 2026년 9월 30일이다.")
+    context = test_container.application.operations.request_context()
+    test_container.application.ingestion.sync_filesystem(context, "fixture")
+
+    response = test_container.application.answering.answer(
+        context, AnswerRequest(query="https://intranet.example.com/guide.pdf 가이드에 따르면 제출기한은 언제야?")
+    )
+
+    assert "질문에 언급된 파일" not in response.answer
+    assert not response.refused
+    assert "9월 30일" in response.answer
+
+
+def test_exclusion_only_question_asks_for_the_actual_question(test_container):
+    source = test_container.settings.project_root / "source"
+    (source / "제외.txt").write_text("정산 기한은 2026년 10월 10일이다.")
+    (source / "대상.txt").write_text("정산 기한은 2026년 11월 11일이다.")
+    context = test_container.application.operations.request_context()
+    test_container.application.ingestion.sync_filesystem(context, "fixture")
+
+    response = test_container.application.answering.answer(context, AnswerRequest(query='"제외.txt" 말고'))
+
+    assert response.refused
+    assert response.refusal_reason == "clarification_required"
+    assert response.citations == []
+
+
+@pytest.mark.parametrize("backend", ["test_container", "postgres_container"])
+def test_filename_candidates_resolve_unquoted_multiword_names_on_both_backends(backend, request):
+    container = request.getfixturevalue(backend)
+    source = container.settings.project_root / "source"
+    (source / "범위 안내.txt").write_text("범위 담당자는 기획팀이다.")
+    context = container.application.operations.request_context()
+    container.application.ingestion.sync_filesystem(context, "fixture")
+
+    candidates = container.application.retrieval.filename_candidates(
+        context, SearchRequest(query="2분기 범위 안내.txt의 담당자는?")
+    )
+
+    assert candidates == ["범위 안내.txt"]
+    assert container.application.retrieval.filename_candidates(
+        context.model_copy(update={"acl_scopes": []}), SearchRequest(query="범위 안내.txt의 담당자는?")
+    ) == []
+
+
+@pytest.mark.parametrize("backend", ["test_container", "postgres_container"])
+@pytest.mark.parametrize("file_name", ["2025 상반기 영업 실적 요약.txt", "회의록(최종).txt", "[공지] 안내.txt"])
+def test_long_and_punctuated_names_still_bind_on_both_backends(backend, file_name, request):
+    container = request.getfixturevalue(backend)
+    source = container.settings.project_root / "source"
+    (source / file_name).write_text("담당자는 김하늘이다.")
+    (source / "다른문서.txt").write_text("담당자는 박서준이다.")
+    context = container.application.operations.request_context()
+    container.application.ingestion.sync_filesystem(context, "fixture")
+
+    candidates = container.application.retrieval.filename_candidates(
+        context, SearchRequest(query=f"{file_name} 담당자는 누구야?")
+    )
+    response = container.application.answering.answer(
+        context, AnswerRequest(query=f"{file_name} 담당자는 누구야?", limit=1)
+    )
+
+    assert candidates == [file_name]
+    assert not response.refused, response.answer
+    assert "김하늘" in response.answer and "박서준" not in response.answer
+
+
+def test_scheme_less_url_is_context(test_container):
+    source = test_container.settings.project_root / "source"
+    (source / "안내.txt").write_text("사내 가이드에 따르면 제출기한은 2026년 9월 30일이다.")
+    context = test_container.application.operations.request_context()
+    test_container.application.ingestion.sync_filesystem(context, "fixture")
+
+    response = test_container.application.answering.answer(
+        context, AnswerRequest(query="www.example.com/guide.pdf 가이드에 따르면 제출기한은 언제야?")
+    )
+
+    assert not response.refused, response.answer
+
+
+@pytest.mark.parametrize("backend", ["test_container", "postgres_container"])
+def test_versions_and_decimals_do_not_open_the_containment_lookup(backend, request):
+    container = request.getfixturevalue(backend)
+    source = container.settings.project_root / "source"
+    (source / "3.8.1 릴리즈 노트.txt").write_text("릴리즈 노트 본문")
+    context = container.application.operations.request_context()
+    container.application.ingestion.sync_filesystem(context, "fixture")
+
+    assert container.application.retrieval.filename_candidates(
+        context, SearchRequest(query="3.8.1 릴리즈 노트")
+    ) == []
+    assert container.application.retrieval.filename_candidates(
+        context, SearchRequest(query="평점 3.5 는?")
+    ) == []

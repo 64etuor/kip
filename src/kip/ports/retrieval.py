@@ -19,7 +19,11 @@ from kip.domain.models import (
 
 class RetrievalStore(Protocol):
     def filename_candidates(self, context: RequestContext, request: SearchRequest) -> list[str]:
-        """Allowed indexed basenames present in the query, independent of limit/live freshness."""
+        """Allowed current filesystem basenames the query spells, independent of limit/live freshness."""
+        ...
+
+    def has_visible_units(self, context: RequestContext) -> bool:
+        """Whether any indexed evidence unit is visible to this caller at all."""
         ...
 
     def has_ambiguous_filename(self, context: RequestContext, request: SearchRequest) -> bool:

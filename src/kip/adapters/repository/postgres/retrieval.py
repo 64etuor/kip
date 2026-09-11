@@ -50,6 +50,9 @@ class PostgresRetrievalStore:
     def filename_candidates(self, context: RequestContext, request: SearchRequest) -> list[str]:
         return self.database.filename_candidates(context, request)
 
+    def has_visible_units(self, context: RequestContext) -> bool:
+        return self.database.has_visible_units(context)
+
     def list_embeddable_units(
         self,
         context: RequestContext,

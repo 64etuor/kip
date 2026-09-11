@@ -3,15 +3,18 @@ from __future__ import annotations
 import atexit
 import hashlib
 import json
+import logging
 import math
+import sys
 import threading
 from collections.abc import Sequence
 from collections.abc import Set as AbstractSet
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 from unicodedata import normalize
+from urllib.parse import urlsplit
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -20,7 +23,12 @@ if TYPE_CHECKING:
     from psycopg.rows import DictRow
 
 from kip.domain.egress import DataClassification
-from kip.domain.file_references import FilenameSearchRequest, filename_key
+from kip.domain.file_references import (
+    FilenameSearchRequest,
+    candidate_basenames,
+    filename_key,
+    looks_like_file_request,
+)
 from kip.domain.identity import AclSnapshot
 from kip.domain.knowledge import (
     AUTO_APPROVE_POLICY_PRINCIPAL,
@@ -74,6 +82,18 @@ from kip.ontology import FALLBACK_EVIDENCE_REQUIRED_PREDICATES
 _REVIEW_RISK_ORDER_SQL = (
     "CASE review_risk WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END"
 )
+
+
+@contextmanager
+def _pooled_release(pooled: Any, connection: Any) -> Generator[Any, None, None]:
+    """Finish a pool checkout whose __enter__ already succeeded."""
+    try:
+        yield connection
+    except BaseException:
+        pooled.__exit__(*sys.exc_info())
+        raise
+    else:
+        pooled.__exit__(None, None, None)
 
 
 def _filename_key_sql(value: str) -> str:
@@ -220,13 +240,25 @@ class PostgresDatabase:
 
             with self._pool_lock:
                 if self._pool is None:
+                    pool_logger = logging.getLogger("psycopg.pool")
+                    if pool_logger.level == logging.NOTSET:
+                        # Background reconnect attempts are reported once, as
+                        # the typed dependency_unavailable error; keep the
+                        # per-attempt driver warnings out of operator output
+                        # unless a deployment configured that logger itself.
+                        pool_logger.setLevel(logging.ERROR)
+                    # An unreachable database must fail within seconds with a
+                    # typed, actionable error instead of a 30-second silent wait
+                    # and driver retry noise on the first CLI/MCP call.
                     pool = ConnectionPool(
                         self.database_url,
                         min_size=0,
                         max_size=self.pool_max_size,
-                        kwargs={"row_factory": dict_row},
+                        kwargs={"row_factory": dict_row, "connect_timeout": 5},
                         open=True,
                         name="kip-postgres",
+                        timeout=8.0,
+                        reconnect_failed=lambda _pool: None,
                     )
                     atexit.register(pool.close)
                     self._pool = pool
@@ -245,7 +277,15 @@ class PostgresDatabase:
         *,
         enforce_source_policy: bool = True,
     ) -> Generator[Connection[DictRow], None, None]:
-        with self._connection_pool().connection() as connection:
+        from psycopg import OperationalError
+        from psycopg_pool import PoolTimeout
+
+        try:
+            pooled = self._connection_pool().connection()
+            connection = pooled.__enter__()
+        except (PoolTimeout, OperationalError) as exc:
+            raise DependencyUnavailableError(self._unreachable_message()) from exc
+        with _pooled_release(pooled, connection):
             with connection.cursor() as cursor:
                 cursor.execute(
                     "SELECT set_config('kip.filesystem_sources', %s, true)",
@@ -272,6 +312,14 @@ class PostgresDatabase:
                         (str(self.statement_timeout_ms),),
                     )
             yield connection
+
+    def _unreachable_message(self) -> str:
+        parts = urlsplit(self.database_url)
+        target = f"{parts.hostname or 'localhost'}:{parts.port or 5432}{parts.path or ''}"
+        return (
+            f"PostgreSQL is not reachable at {target}. Start the database with "
+            "./scripts/app-up.sh --database-only, or check KIP_DATABASE_URL and run ./scripts/kip doctor."
+        )
 
     def ping(self) -> None:
         """Readiness probe: a real round-trip using the pooled connection."""
@@ -1265,14 +1313,37 @@ class PostgresDatabase:
         return self._identifier_document_count(context, request, exact_filename=False) > 0
 
     def filename_candidates(self, context: RequestContext, request: SearchRequest) -> list[str]:
+        # Exact casefolded basename equality against spellings extracted from
+        # the question (see candidate_basenames), so the artifact name index
+        # applies instead of matching every unit's name against the query.
+        spellings = candidate_basenames(request.query)
+        if not spellings:
+            return []
+        names = self._filename_candidates(context, request, "exact", spellings)
+        if not names and looks_like_file_request(request.query):
+            # Names outside the spelling window (very long or unusually
+            # punctuated) still bind through containment; this branch only
+            # runs when the question carries a file-looking token.
+            names = self._filename_candidates(context, request, "contains", request.query)
+        return names
+
+    def _filename_candidates(
+        self, context: RequestContext, request: SearchRequest, match: Literal["exact", "contains"], value: Any,
+    ) -> list[str]:
+        name_condition = (
+            f"{_filename_key_sql('a.file_name')} = ANY(%s::text[])"
+            if match == "exact"
+            else f"strpos({_filename_key_sql('%s')},{_filename_key_sql('a.file_name')}) > 0"
+        )
+        name_param = value
         conditions = [
             "l.workspace_id=%s", "l.source_kind='filesystem'",
             "(cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])",
             "kip.acl_snapshot_is_fresh(u.acl_snapshot_id)",
             "kip.source_artifact_is_allowed(u.artifact_id)",
-            f"strpos({_filename_key_sql('%s')},{_filename_key_sql('a.file_name')}) > 0",
+            name_condition,
         ]
-        params: list[Any] = [context.workspace, context.acl_scopes, request.query]
+        params: list[Any] = [context.workspace, context.acl_scopes, name_param]
         for values, condition in (
             (request.source_kinds, "l.source_kind = ANY(%s::text[])"),
             (request.document_types, "d.document_type = ANY(%s::text[])"),
@@ -1297,6 +1368,24 @@ class PostgresDatabase:
         # Counts distinct allowed file contents with this exact name before
         # limit; identical copies in several roots are not ambiguous.
         return self._identifier_document_count(context, request, exact_filename=True) > 1
+
+    def has_visible_units(self, context: RequestContext) -> bool:
+        with self._connection(context) as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT EXISTS (
+                    SELECT 1 FROM search.lexical_units l
+                    JOIN content.units u ON u.id=l.unit_id
+                    WHERE l.workspace_id=%s
+                      AND (cardinality(u.acl_scopes)=0 OR u.acl_scopes <@ %s::text[])
+                      AND kip.acl_snapshot_is_fresh(u.acl_snapshot_id)
+                      AND kip.source_artifact_is_allowed(u.artifact_id)
+                ) AS visible
+                """,
+                (context.workspace, context.acl_scopes),
+            )
+            row = cursor.fetchone()
+            return bool(row and row["visible"])
 
     def _identifier_document_count(
         self, context: RequestContext, request: SearchRequest, *, exact_filename: bool,

@@ -59,8 +59,7 @@ Run from the repository root. `scripts/common.sh` loads `.env`; prefer `./script
 
 ```bash
 ./scripts/doctor.sh
-./scripts/dev-up.sh
-./scripts/migrate.sh
+./scripts/app-up.sh --database-only
 ./scripts/kip capabilities
 ./scripts/kip status
 ```

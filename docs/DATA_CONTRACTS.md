@@ -149,7 +149,10 @@ preview is presentation only. It is neither content filtering nor an exact
 quote, so a fact must still be reopened with `read` (or `xlsx-read` for
 workbook values) before it is cited. Previews are computed from the full unit
 body in the application layer, so `extraction.max_chars_per_unit` also bounds
-the per-hit transfer from PostgreSQL.
+the per-hit transfer from PostgreSQL. When a search or context request
+returns nothing and no indexed unit is visible to the caller, `meta.warnings`
+carries `no_visible_indexed_units` on every edge; it describes the caller's
+own scope and never asserts that hidden units exist.
 
 Verification fields report how the source was checked when the unit was
 reopened. `EvidenceRead.source_verification`,
@@ -358,6 +361,16 @@ the primary local behavior when structured generation is disabled. When
 generation is enabled, a generator failure falls back only when
 `models.generation.fallback_on_error=true`; otherwise it returns a typed
 refusal. With generation disabled, `kip answer` makes no remote generator call.
+
+A question that names a file with an extension the deployment indexes
+(`include_extensions` plus the built-in document list) refuses with
+`no_admissible_evidence`, naming that file, when no allowed evidence matches;
+URLs (`scheme://` or `www.`) in the question are context rather than file
+requests. A question that only excludes a file refuses with
+`clarification_required`. Basenames are recognized from quoted spans or an
+extension token with up to nine preceding words; names outside that shape
+still bind through a containment fallback, and parentheses or brackets inside
+or after a name are allowed.
 
 ## Knowledge sequence
 

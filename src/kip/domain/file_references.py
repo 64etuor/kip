@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from unicodedata import normalize
 
@@ -20,12 +21,56 @@ _EXCLUSIONS = re.compile(
 )
 _QUOTES = (("\"", "\""), ("'", "'"), ("`", "`"), ("\u201c", "\u201d"), ("\u2018", "\u2019"))
 _QUOTED = re.compile(r'"[^"\n]+"|\x27[^\x27\n]+\x27|`[^`\n]+`|\u201c[^\u201d\n]+\u201d|\u2018[^\u2019\n]+\u2019')
-_FILE_TOKEN = re.compile(
-    r"(?<![^\s/\\\"'`\u201c\u201d\u2018\u2019()])"
-    r"[^\s/\\\"'`\u201c\u201d\u2018\u2019()]+\.(?:txt|md|pdf|hwp|hwpx|doc|docx|ppt|pptx|xls|xlsx|xlsm|csv|tsv|rtf|eml|msg|json|html|htm)(?:\.[\w-]+)*"
-    rf"(?=$|\s|[?!,:;)\"'`\u201d\u2019]|\.(?=$|\s)|(?:{_PARTICLES})(?=$|\s|[?!.,:;])|말고|빼고|제외|외에|이외)",
-    re.IGNORECASE,
+DEFAULT_DOCUMENT_EXTENSIONS: frozenset[str] = frozenset({
+    "txt", "md", "pdf", "hwp", "hwpx", "doc", "docx", "ppt", "pptx", "xls", "xlsx",
+    "xlsm", "csv", "tsv", "rtf", "eml", "msg", "json", "html", "htm",
+})
+_URL = re.compile(r"(?:\S+://|www\.)\S+", re.IGNORECASE)
+# Parentheses and brackets are ordinary Korean office naming ("회의록(최종).txt",
+# "[공지] 안내.txt"), so they belong inside a basename token and may follow it.
+_TOKEN_BOUNDARY = r"(?<![^\s/\\\"'`\u201c\u201d\u2018\u2019(\[])"
+_TOKEN_TAIL = (
+    rf"(?=$|\s|[?!,:;()\[\]\"'`\u201d\u2019]|\.(?=$|\s)|(?:{_PARTICLES})(?=$|\s|[?!.,:;()\[\]])|말고|빼고|제외|외에|이외)"
 )
+_ANY_EXTENSION_TOKEN = re.compile(
+    _TOKEN_BOUNDARY + r"[^\s/\\\"'`\u201c\u201d\u2018\u2019]+\.[a-z0-9]{1,10}" + _TOKEN_TAIL, re.IGNORECASE,
+)
+_SPELLING_STOP = re.compile(r"[,;/|]")
+
+
+def normalized_extensions(extensions: Iterable[str] | None) -> frozenset[str]:
+    """Extension names without the dot, lowercased, plus the built-in defaults.
+
+    Deployments index operator-chosen extensions; a question naming a file
+    with one of them must fail closed exactly like the built-in list.
+    """
+    cleaned = {
+        value.strip().lstrip(".").casefold()
+        for value in (extensions or ())
+        if value and value.strip().lstrip(".")
+    }
+    return DEFAULT_DOCUMENT_EXTENSIONS | frozenset(cleaned)
+
+
+def _file_token_pattern(extensions: Iterable[str] | None = None) -> re.Pattern[str]:
+    alternatives = "|".join(sorted((re.escape(ext) for ext in normalized_extensions(extensions)), key=len, reverse=True))
+    return re.compile(
+        _TOKEN_BOUNDARY
+        + r"[^\s/\\\"'`\u201c\u201d\u2018\u2019]+\.(?:" + alternatives + r")(?:\.[\w-]+)*"
+        + _TOKEN_TAIL,
+        re.IGNORECASE,
+    )
+
+
+_FILE_TOKEN = _file_token_pattern()
+
+
+def _url_spans(text: str) -> list[tuple[int, int]]:
+    return [(match.start(), match.end()) for match in _URL.finditer(text)]
+
+
+def _inside(spans: list[tuple[int, int]], start: int, end: int) -> bool:
+    return any(left <= start and end <= right for left, right in spans)
 
 
 def filename_key(value: str) -> str:
@@ -50,8 +95,8 @@ def file_references(query: str, filenames: list[str]) -> tuple[FileReference, ..
         escaped = re.escape(filename_key(name))
         forms = "|".join(re.escape(left) + escaped + re.escape(right) for left, right in _QUOTES)
         pattern = re.compile(
-            rf"(?<![^\s(])(?:{forms}|{escaped})(?:{_PARTICLES})?"
-            r"(?=$|\s|[?!,:;)\"'`\u201d\u2019]|\.(?=$|\s)|말고|빼고|제외|외에|이외|아닌)"
+            rf"(?<![^\s(\[])(?:{forms}|{escaped})(?:{_PARTICLES})?"
+            r"(?=$|\s|[?!,:;()\[\]\"'`\u201d\u2019]|\.(?=$|\s)|말고|빼고|제외|외에|이외|아닌)"
         )
         for match in pattern.finditer(text):
             # A shorter basename inside a quoted longer name is not a match.
@@ -68,10 +113,82 @@ def file_references(query: str, filenames: list[str]) -> tuple[FileReference, ..
     return tuple(sorted(selected, key=lambda item: item.start))
 
 
-def has_unresolved_file_reference(query: str, references: tuple[FileReference, ...]) -> bool:
+def unresolved_file_tokens(
+    query: str, references: tuple[FileReference, ...], extensions: Iterable[str] | None = None,
+) -> list[str]:
+    """Document-looking names in the question that no allowed file matched.
+
+    URLs are context, not file requests: a pasted link ending in .pdf must
+    not be reported as an inaccessible file.
+    """
+    text = filename_key(query)
+    urls = _url_spans(text)
+    pattern = _FILE_TOKEN if extensions is None else _file_token_pattern(extensions)
+    tokens: list[str] = []
+    for match in pattern.finditer(text):
+        if _inside(urls, match.start(), match.end()):
+            continue
+        if any(ref.start <= match.start() and match.end() <= ref.end for ref in references):
+            continue
+        tokens.append(match.group(0))
+    return list(dict.fromkeys(tokens))
+
+
+def has_unresolved_file_reference(
+    query: str, references: tuple[FileReference, ...], extensions: Iterable[str] | None = None,
+) -> bool:
+    return bool(unresolved_file_tokens(query, references, extensions))
+
+
+MAX_SPELLING_WORDS = 10
+
+
+def candidate_basenames(query: str, max_words: int = MAX_SPELLING_WORDS) -> list[str]:
+    """Basename spellings a question could contain, for an exact index lookup.
+
+    Quoted spans, extension-bearing tokens and up to `max_words` preceding
+    words (stopping at `,;/|` punctuation) joined by single spaces cover
+    unquoted names such as `2025 상반기 영업 실적 요약.txt`. The lookup stays
+    an equality on the casefolded basename, so the repository can use an
+    index; repositories fall back to containment when no spelling matches a
+    name that still looks like a file (see `looks_like_file_request`).
+    """
+    text = filename_key(query)
+    urls = _url_spans(text)
+    names: list[str] = []
+    for match in _QUOTED.finditer(text):
+        inner = match.group(0)[1:-1].strip()
+        if inner:
+            names.append(inner)
+    for match in _ANY_EXTENSION_TOKEN.finditer(text):
+        if _inside(urls, match.start(), match.end()):
+            continue
+        token = match.group(0)
+        head = _SPELLING_STOP.split(text[: match.start()])[-1]
+        preceding = [word.strip("\"'`\u201c\u201d\u2018\u2019") for word in head.split()]
+        preceding = [word for word in preceding if word]
+        names.append(token)
+        for count in range(1, max_words):
+            if len(preceding) < count:
+                break
+            names.append(" ".join([*preceding[-count:], token]))
+    return list(dict.fromkeys(name for name in names if name))
+
+
+_LETTER_EXTENSION = re.compile(r"\.[a-z][a-z0-9]{0,9}$", re.IGNORECASE)
+
+
+def looks_like_file_request(query: str) -> bool:
+    """Whether the question contains a file-looking token outside a URL.
+
+    A version or decimal (`3.8.1`, `3.5`) is not a file: the suffix after the
+    final dot must start with a letter. This gates the containment fallback.
+    """
+    text = filename_key(query)
+    urls = _url_spans(text)
     return any(
-        not any(ref.start <= match.start() and match.end() <= ref.end for ref in references)
-        for match in _FILE_TOKEN.finditer(filename_key(query))
+        not _inside(urls, match.start(), match.end()) and _LETTER_EXTENSION.search(match.group(0)) is not None
+        for match in _ANY_EXTENSION_TOKEN.finditer(text)
     )
 
 

@@ -103,3 +103,13 @@ def test_verify_runs_every_gate_with_the_selected_environment(tmp_path: Path, us
     assert "scripts/portable_golden_gate.py" in commands
     assert "scripts/golden_gate.py" in commands
     assert "Verification passed" in result.stdout
+
+
+def test_sourcing_common_twice_does_not_duplicate_path_entries() -> None:
+    result = subprocess.run(
+        ["/bin/bash", "-c", 'source scripts/common.sh; source scripts/common.sh; source scripts/runtime-path.sh; printf "%s" "$PATH"'],
+        cwd=ROOT, capture_output=True, text=True, check=True,
+        env={**os.environ, "KIP_SKIP_DOTENV": "1"},
+    )
+    entries = result.stdout.split(":")
+    assert entries.count(str(ROOT / "scripts")) == 1

@@ -65,8 +65,7 @@ cloud-only 파일은 provider 앱에서 선택하여 다운로드한 뒤 수집�
 
 ```bash
 ./scripts/bootstrap.sh
-./scripts/dev-up.sh
-./scripts/migrate.sh
+./scripts/app-up.sh --database-only
 ./scripts/kip sync run --source sample
 ./scripts/kip search "참여율 변경" --limit 10
 ./scripts/kip xlsx-read --artifact-id ARTIFACT_ID --sheet "정산" --range "A1:F40"

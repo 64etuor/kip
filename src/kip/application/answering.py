@@ -18,7 +18,8 @@ from kip.domain.file_references import (
     FilenameSearchRequest,
     file_references,
     filename_key,
-    has_unresolved_file_reference,
+    normalized_extensions,
+    unresolved_file_tokens,
     without_references,
 )
 from kip.domain.generation import (
@@ -69,6 +70,15 @@ class AnsweringUseCases:
             raise ConfigurationError("models.generation.fallback_on_error must be boolean")
         self._enabled = bool(raw.get("enabled", False))
         self._fallback_on_error = fallback
+        # Operator-indexed extensions must fail closed like the built-in ones
+        # when a question names a file that is not among allowed evidence.
+        sources = settings.get("sources.filesystem", []) or []
+        self._document_extensions = normalized_extensions(
+            extension
+            for source in sources if isinstance(source, dict)
+            for extension in (source.get("include_extensions") or [])
+            if isinstance(extension, str)
+        )
         try:
             self._max_claims = int(str(raw.get("max_claims", 16)))
             self._max_output_tokens = int(str(raw.get("max_output_tokens", 4096)))
@@ -132,13 +142,23 @@ class AnsweringUseCases:
             if "." in request.query or len(request.query.split()) == 1 else []
         )
         references = file_references(request.query, candidates)
-        if has_unresolved_file_reference(request.query, references):
+        unresolved = unresolved_file_tokens(request.query, references, self._document_extensions)
+        if unresolved:
+            named = ", ".join(unresolved[:3])
             return AnswerResponse(
                 query=request.query, refused=True, refusal_reason="no_admissible_evidence",
-                answer="지정한 파일의 접근 가능한 근거를 찾지 못했습니다. 파일명과 허용된 검색 범위를 확인해 주세요.",
+                answer=(
+                    f"질문에 언급된 파일({named})의 접근 가능한 색인 근거를 찾지 못했습니다. "
+                    "파일명과 허용된 검색 범위를 확인하거나, 파일을 지정하지 않고 다시 질문해 주세요."
+                ),
             )
         included = sorted({ref.name for ref in references if not ref.excluded})
         excluded = sorted({ref.name for ref in references if ref.excluded})
+        if excluded and not included and not without_references(request.query, references).strip():
+            return AnswerResponse(
+                query=request.query, refused=True, refusal_reason="clarification_required",
+                answer="제외할 파일만 지정되었습니다. 나머지 자료에서 무엇을 찾을지 질문을 적어 주세요.",
+            )
         if any(
             self._retrieval.has_ambiguous_filename(context, request.model_copy(update={"query": name}))
             for name in included

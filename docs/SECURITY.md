@@ -247,7 +247,10 @@ against a concurrent filesystem attacker. See ADR-056.
 
 Bootstrap prerequisite assets are version/checksum-pinned in
 `requirements/bootstrap.tsv`; verification precedes execution, and the Python
-stage uses bounded downloads and safe tar extraction. Managed host runtimes
+stage uses bounded downloads and safe tar extraction. The managed Python is the
+exception: it is recorded as `python any 3.13.x managed-by-uv` and carries no
+repository checksum, so its integrity is delegated to the checksum-pinned uv,
+which verifies its own python-build-standalone downloads. Managed host runtimes
 live under `var/runtime`; production images disable that writable PATH entry
 with `KIP_USE_MANAGED_RUNTIMES=0` and use their baked binaries. System Docker
 installation requires authorization, never silently removes conflicting
@@ -297,7 +300,7 @@ Answer source selection is an additional constraint, never a grant. The
 filename resolver sees only ACL/current-root/request-filtered indexed names;
 scoped lexical/vector retrieval retains those same checks. Unavailable named
 evidence does not fall back to another document, and approved ontology evidence
-cannot bypass the caller's explicit file inclusion/exclusion (ADR-060).
+cannot bypass the caller's explicit file inclusion/exclusion (ADR-060). This covers every extension the deployment indexes (`include_extensions` plus the built-in document list); a name with an unindexed extension is ordinary question text, and URLs are context.
 
 The built-in API key mechanism is a single configured principal for bootstrap,
 local operation, and controlled service-to-service use. It does not accept

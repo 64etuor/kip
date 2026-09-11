@@ -50,6 +50,9 @@ class MemoryRetrievalStore:
     def filename_candidates(self, context: RequestContext, request: SearchRequest) -> list[str]:
         return self.lexical.filename_candidates(context, request)
 
+    def has_visible_units(self, context: RequestContext) -> bool:
+        return self.lexical.has_visible_units(context)
+
     def list_embeddable_units(
         self,
         context: RequestContext,

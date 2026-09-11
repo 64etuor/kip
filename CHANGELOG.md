@@ -1,5 +1,35 @@
 # Changelog
 
+## 3.8.2 - 2026-09-11
+
+- Fail closed for every indexed extension: a question naming a file whose
+  extension is in the deployment's `include_extensions` refuses when no
+  allowed evidence matches, not only for the built-in document list. URLs in
+  a question are context, not file requests, and the refusal names the file it
+  could not resolve. A question that only excludes a file asks for the actual
+  question instead of searching the excluded text.
+- Resolve named files with an exact casefolded basename lookup on spellings
+  extracted from the question (quoted spans, or an extension token with up
+  to nine preceding words) backed by migration 0026's expression index and
+  0027's artifact join index, falling back to containment only when a
+  file-looking token matched nothing. Parentheses and brackets inside or
+  after a name (`회의록(최종).txt`, `[공지] 안내.txt`) are recognized. The
+  Memory adapter now mirrors PostgreSQL: current revisions and filesystem
+  sources only.
+- Report an unreachable PostgreSQL within seconds as a typed
+  `dependency_unavailable` error that names the target and the
+  `./scripts/app-up.sh --database-only` remedy, without connection retry noise.
+- Return `no_visible_indexed_units` in `meta.warnings` when a search or
+  context request finds nothing and no indexed unit is visible to the caller,
+  identically on CLI, REST and MCP; it never implies that hidden units exist.
+- Bootstrap: apply the managed runtime PATH once across nested wrappers,
+  explain a failed uv or managed-Python probe instead of exiting silently,
+  and re-check the npm version after installing the Node bundle.
+- Documentation: current bootstrap description in OPERATIONS, one
+  `app-up.sh --database-only` path in the guides and `make up`, corrected
+  search envelope shape and onboarding steps in README, and the managed Python
+  integrity delegation noted in SECURITY.
+
 ## 3.8.1 - 2026-09-11
 
 - Include GNU tar's gzip dependency in the cold-runtime test environment and

@@ -1,17 +1,5 @@
 # Operations
 
-For a named-document answer, use a literal quoted filename, for example:
-
-```bash
-./scripts/kip answer '"보고서.pdf" 제출기한은 언제인가?' --limit 5
-```
-
-As of 3.7.1, that file scope is fixed before ranking and live source checks.
-Unknown/inaccessible or stale evidence returns a typed refusal; another file
-is not substituted. If several files are named, all must yield usable evidence
-within the requested limit. Inspect the source and narrow the request or raise
-the limit as appropriate; ordinary retrieval still never starts a sync.
-
 > 용어가 낯설면 [`GLOSSARY.md`](GLOSSARY.md), 문제가 생기면
 > [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)를 보세요.
 
@@ -93,6 +81,31 @@ proposed`가 비어 있으면 할 일이 없습니다. 관계 채굴을 켜지 �
 계속 비어 있는 것이 정상이며, 온톨로지 명령을 배우지 않아도 검색·답변은 그대로
 동작합니다.
 
+### Database readiness errors
+
+`kip` commands that need PostgreSQL fail within seconds with
+`dependency_unavailable` naming the host, port and database when the server
+is unreachable; the message points at `./scripts/app-up.sh --database-only`
+and `./scripts/kip doctor`. Driver reconnect warnings are suppressed unless a
+deployment configures the `psycopg.pool` logger itself. Migrations 0026 and
+0027 add the casefolded basename index and the lexical-unit artifact index
+used by named-file answers; apply them with the usual `./scripts/migrate.sh`
+(or `app-up.sh --database-only`).
+
+### Named-document answers
+
+For a named-document answer, use a literal quoted filename, for example:
+
+```bash
+./scripts/kip answer '"보고서.pdf" 제출기한은 언제인가?' --limit 5
+```
+
+As of 3.7.1, that file scope is fixed before ranking and live source checks.
+Unknown/inaccessible or stale evidence returns a typed refusal; another file
+is not substituted. If several files are named, all must yield usable evidence
+within the requested limit. Inspect the source and narrow the request or raise
+the limit as appropriate; ordinary retrieval still never starts a sync.
+
 ## Daily
 
 `verify.sh` checks local Markdown links against the online starter's document
@@ -101,13 +114,20 @@ ADRs; historical designs/audits remain in Git history through pinned links.
 Live model-behavior checks are recorded in `docs/AGENT_QUALITY.md` and are not
 part of the deterministic CI gate.
 
-`./scripts/bootstrap.sh` synchronizes the project environment from `uv.lock`
-with `uv sync --frozen` and the postgres, api, identity, extractors, mcp,
-telemetry, and dev extras. If uv is absent, it installs pinned uv 0.8.22 into
-`var/bootstrap-uv-0.8.22`, outside the project environment. Existing `.env` and
-config files are preserved; a fresh `.env` receives random credentials rather
-than sample placeholders. Bootstrap does not perform an unbounded dependency
-upgrade.
+`./scripts/bootstrap.sh` runs `scripts/prerequisites.sh` first: pure Bash, before
+dotenv parsing. That stage reuses a compatible Python 3.12+, or downloads the
+checksum-pinned uv recorded in `requirements/bootstrap.tsv` (version and
+SHA-256; currently uv 0.12.12) into `var/runtime/uv-<version>` and installs a
+managed Python 3.13.x under `var/runtime/python`. A stdlib-only Python stage
+then prepares Node/npm from the pinned Node 22 bundle when missing and checks
+Docker/Compose. Afterwards `.venv` is created with `uv venv` and synchronized
+from `uv.lock` with `uv sync --frozen` and the postgres, api, identity,
+extractors, mcp, telemetry, and dev extras. Wrappers select the managed runtimes
+through `scripts/runtime-path.sh` (`var/runtime/bin`), and `./scripts/uv.sh`
+runs the resolved uv. `--check` is read-only; `--install-docker` and
+`--without-docker` are documented in ADR-061. Existing `.env` and config files
+are preserved; a fresh `.env` receives random credentials rather than sample
+placeholders. Bootstrap does not perform an unbounded dependency upgrade.
 
 For code or release validation, run `./scripts/verify.sh`. It preflights pytest,
 Ruff, mypy, and pip-audit and fails with a bootstrap remediation if any tool is

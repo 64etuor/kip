@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from kip.documentation import documentation_link_errors
-from kip.starter_archive_policy import selected_source_files
+from kip.package_archive_policy import selected_source_files
 
 
 def test_link_check_uses_recipient_files_not_the_checkout():

@@ -18,7 +18,7 @@ from email.parser import BytesParser
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from kip.starter_archive_policy import DOCUMENT_FILES, ROOT_FILES
+from kip.package_archive_policy import DOCUMENT_FILES, ROOT_FILES
 
 IMAGE_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/:+-]*@sha256:[0-9a-f]{64}$")
 FORBIDDEN_PARTS = frozenset(
@@ -88,13 +88,13 @@ EVALUATION_PATHS = (
 # Policy: exclude by CONTENT, not filename prefix. `private-onedrive-nl.yaml`
 # and its `.floor.json` companion hold the real private OneDrive corpus
 # (verbatim internal question text, real document IDs, a reviewer name) and
-# must never leave this repository (docs/STARTER_KIT_GUIDE.md#8). By
+# must never leave this repository (docs/DEPLOYMENT_GUIDE.md#8). By
 # contrast `private-starter.yaml` is a deliberately redacted synthetic
 # sample -- its own description says so, and `evaluation/README.md` and
 # `docs/AI_OPERATOR_RUNBOOK.md` both instruct operators to run it as the
-# starter-kit acceptance template -- so it is intentionally NOT excluded and
-# ships with the starter bundle.
-STARTER_EXCLUDED_PATHS = (
+# package acceptance template -- so it is intentionally NOT excluded and
+# ships with the package bundle.
+PACKAGE_EXCLUDED_PATHS = (
     "evaluation/golden/private-onedrive-nl.yaml",
     "evaluation/golden/private-onedrive-nl.floor.json",
 )
@@ -114,18 +114,18 @@ REQUIRED_BUNDLE_FILES = (
     "artifacts/images.lock.json",
     "artifacts/provenance.intoto.json",
     "artifacts/sbom.spdx.json",
-    "starter/AGENTS.md",
-    "starter/CLAUDE.md",
-    "starter/compose.production.yaml",
-    "starter/contracts/evaluation-review-bundle.schema.json",
-    "starter/contracts/golden-draft-review.schema.json",
-    "starter/contracts/golden-draft.schema.json",
-    "starter/contracts/setup-plan.schema.json",
-    "starter/docs/STARTER_KIT_GUIDE.md",
-    "starter/migrations/0012_query_traces.sql",
-    "starter/migrations/0021_discovery_candidate_spec.sql",
-    "starter/ontology/core/predicates.yaml",
-    "starter/skills/kip-setup/SKILL.md",
+    "package/AGENTS.md",
+    "package/CLAUDE.md",
+    "package/compose.production.yaml",
+    "package/contracts/evaluation-review-bundle.schema.json",
+    "package/contracts/golden-draft-review.schema.json",
+    "package/contracts/golden-draft.schema.json",
+    "package/contracts/setup-plan.schema.json",
+    "package/docs/DEPLOYMENT_GUIDE.md",
+    "package/migrations/0012_query_traces.sql",
+    "package/migrations/0021_discovery_candidate_spec.sql",
+    "package/ontology/core/predicates.yaml",
+    "package/skills/kip-setup/SKILL.md",
 )
 
 
@@ -172,17 +172,17 @@ def _copy_tree(source: Path, destination: Path) -> None:
     )
 
 
-def _copy_starter(root: Path, destination: Path) -> None:
+def _copy_package(root: Path, destination: Path) -> None:
     destination.mkdir(parents=True)
     for relative in ROOT_FILES:
         source = root / relative
         if not source.is_file():
-            raise ReleaseError(f"required starter file is missing: {relative}")
+            raise ReleaseError(f"required package file is missing: {relative}")
         shutil.copy2(source, destination / relative)
     for relative in ROOT_DIRECTORIES:
         source = root / relative
         if not source.is_dir():
-            raise ReleaseError(f"required starter directory is missing: {relative}")
+            raise ReleaseError(f"required package directory is missing: {relative}")
         _copy_tree(source, destination / relative)
     for relative in DOCUMENT_FILES:
         target = destination / relative
@@ -202,7 +202,7 @@ def _copy_starter(root: Path, destination: Path) -> None:
             _copy_tree(source, target)
         elif source.is_file():
             shutil.copy2(source, target)
-    for excluded in STARTER_EXCLUDED_PATHS:
+    for excluded in PACKAGE_EXCLUDED_PATHS:
         excluded_path = destination / excluded
         if excluded_path.is_symlink() or excluded_path.is_file():
             excluded_path.unlink()
@@ -333,7 +333,7 @@ def _provenance(
         "_type": "https://in-toto.io/Statement/v1",
         "predicate": {
             "buildDefinition": {
-                "buildType": "https://kip.local/buildtypes/starter-kit/v1",
+                "buildType": "https://kip.local/buildtypes/package/v1",
                 "externalParameters": {"images": images},
                 "internalParameters": {"source_tree_dirty": dirty},
                 "resolvedDependencies": materials,
@@ -460,8 +460,8 @@ def verify_bundle(bundle: Path) -> dict[str, Any]:
     wheels = sorted((bundle / "artifacts/wheels").glob("*.whl"))
     if len(wheels) != 1:
         raise ReleaseError("release bundle must contain exactly one wheel")
-    for excluded in STARTER_EXCLUDED_PATHS:
-        excluded_relative = f"starter/{excluded}"
+    for excluded in PACKAGE_EXCLUDED_PATHS:
+        excluded_relative = f"package/{excluded}"
         if excluded_relative in actual_files:
             raise ReleaseError(
                 f"forbidden private golden corpus in release bundle: {excluded_relative}"
@@ -512,7 +512,7 @@ def verify_bundle(bundle: Path) -> dict[str, Any]:
     expected_subject = {"sha256": _sha256(wheels[0])}
     if len(subjects) != 1 or subjects[0].get("digest") != expected_subject:
         raise ReleaseError("provenance does not bind the wheel")
-    claude = (bundle / "starter/CLAUDE.md").read_text(encoding="utf-8")
+    claude = (bundle / "package/CLAUDE.md").read_text(encoding="utf-8")
     if "AGENTS.md" not in claude:
         raise ReleaseError("CLAUDE.md no longer imports AGENTS.md")
     return {
@@ -572,7 +572,7 @@ def build_bundle(
     version = (root / "VERSION").read_text(encoding="utf-8").strip()
     commit = _git_value(root, "rev-parse", "HEAD")
     output.mkdir(parents=True)
-    _copy_starter(root, output / "starter")
+    _copy_package(root, output / "package")
     wheel_target = output / "artifacts/wheels" / wheel.name
     wheel_target.parent.mkdir(parents=True)
     shutil.copy2(wheel, wheel_target)

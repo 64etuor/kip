@@ -30,7 +30,7 @@ def test_rapidfuzz_reranker_recovers_a_korean_typo_locally() -> None:
 def test_container_composes_rapidfuzz_behind_the_reranker_port(
     tmp_path: Path,
 ) -> None:
-    # Given a starter configuration selecting the local reranker backend.
+    # Given a package configuration selecting the local reranker backend.
     settings = Settings(
         project_root=tmp_path,
         config_path=tmp_path / "kip.toml",

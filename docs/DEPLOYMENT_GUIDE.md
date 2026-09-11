@@ -1,6 +1,11 @@
-# KIP Starter Kit Adoption Guide
+# KIP 배포 가이드
 
-이 문서는 KIP를 다른 조직이나 저장소에 전달할 때 사용하는 기준 진입점이다. 목표는 코드를 복사하는 것이 아니라, 원본 불변성·ACL·근거 locator·후보 검토·품질 승격 규칙을 그대로 유지한 독립 배포를 만드는 것이다.
+이 문서는 KIP 배포를 설치하고, 다른 조직이나 저장소에 도입하고, 새 버전으로
+올릴 때 사용하는 기준 진입점이다. 목표는 코드를 복사하는 것이 아니라, 원본
+불변성·ACL·근거 locator·후보 검토·품질 승격 규칙을 그대로 유지한 독립 배포를
+만드는 것이다. 1~8절은 도입 전 결정과 설치·인수 절차, 9~10절은 전달용 소스
+ZIP과 검증된 배포 패키지 생성, 11절은 이미 설치된 배포의 업그레이드와
+rollback을 다룬다.
 
 ## 1. 먼저 결정할 것
 
@@ -30,13 +35,29 @@
    필요는 없다. 최소 Linux에는 curl/wget, CA 인증서, tar/gzip, SHA-256 도구가
    있어야 한다. 의존성은 `uv.lock` frozen sync로 설치한다. 기존 `.env`,
    config, 호환되는 `.venv`, Docker context와 셸 프로필은 보존한다.
-   저장소 없이 kit만 받는 수신자는 릴리스에 게시된 한 줄 설치기로 이 단계까지
+   저장소 없이 패키지만 받는 수신자는 릴리스에 게시된 한 줄 설치기로 이 단계까지
    한 번에 수행할 수 있다. `curl -fsSL
    https://github.com/64etuor/kip/releases/latest/download/install.sh | bash`은
    버전이 지정된 ZIP과 `.sha256`을 내려받아 압축 전에 digest를 검증하고, 비어
-   있는 대상 디렉터리에 풀고 bootstrap을 실행한 뒤 `verify-starter-kit.sh`로
+   있는 대상 디렉터리에 풀고 bootstrap을 실행한 뒤 `verify-package.sh`로
    아카이브를 다시 검증한다. `--version X.Y.Z`로 릴리스를 고정하고
    `--check`/`--install-docker`/`--without-docker`는 bootstrap으로 전달된다.
+   설치기는 이어서 전역 `kip` 런처를 `~/.local/bin/kip`에 쓰고(`--bin-dir DIR`
+   또는 `KIP_BIN_DIR`로 위치를 바꾼다), 로그인 셸 프로필(zsh는 `~/.zshrc`,
+   bash는 Linux에서 `~/.bashrc`·macOS에서 `~/.bash_profile`, 그 외에는
+   `~/.profile`)에 `# >>> KIP >>>` … `# <<< KIP <<<`로 표시된 블록 하나를
+   추가해 `KIP_HOME`을 내보내고 런처 디렉터리를 `PATH`에 넣는다. 이 블록은
+   매번 통째로 교체되므로 중복되지 않고, 프로필의 다른 내용은 건드리지
+   않는다. 프로필이 심볼릭 링크면 링크가 가리키는 파일을 같은 권한으로 고쳐
+   쓰고, macOS bash에서 `~/.bash_profile`을 새로 만들 때는 기존 `~/.profile`을
+   먼저 읽도록 한 줄을 넣는다. `~/.local/bin/kip`이 이미 있고 KIP 런처가
+   아니면 `kip.bak`으로 백업한 뒤 덮어쓴다. 경로는 모두 셸 인용을 거치므로
+   공백이나 특수문자가 든 디렉터리도 안전하다. `--dry-run`은 런처와 프로필도
+   건드리지 않는다. `--no-shell-profile`은 프로필을 바꾸지 않으며 이때는
+   `PATH`와 `KIP_HOME`을 직접 설정한다. 셸을 다시 시작하거나 프로필을 `source`한 뒤에는
+   어느 디렉터리에서나 `kip --help`, `kip doctor`, `kip setup inspect`,
+   `kip version`, `kip update`를 실행할 수 있다. 저장소를 복제해 쓰는 개발
+   트리에서는 지금까지처럼 `./scripts/kip`를 쓴다.
 2. AI agent에게 “KIP을 셋업해줘”라고 요청해 `kip-setup` Skill을 시작한다.
 3. `setup inspect`가 반환한 질문에 매번 하나씩 답한다. Agent가 먼저
    identity mode를 묻고, `proxy_jwt`이면 issuer/audience/JWKS/admin group을,
@@ -239,7 +260,7 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 - `ontology validate -> ontology diff -> migration coverage -> candidate materialization -> review` 순서를 따른다.
 - 승인 assertion만 기본 graph에 투영하고 evidence ACL 교집합을 적용한다.
 - 변경 전후 real query의 path relevance, orphan, duplicate entity, contradiction을 측정한다.
-- 새 starter는 `empty` domain profile로 시작한다. 사용 패턴에서 발견한 단어는
+- 새 배포는 `empty` domain profile로 시작한다. 사용 패턴에서 발견한 단어는
   명시적 동의가 있는 `OntologyDiscoveryCandidate`일 뿐, YAML/graph/answer를
   자동으로 바꾸지 않는다.
 - agent의 follow-up은 짧은 TTL과 최대 네 개 선택지로 제한한다. 사용자 응답은
@@ -313,7 +334,7 @@ identity, origin, request-size, 배포 경계를 별도 설계한다.
 - migrations, ontology releases/migrations, contracts, Skill, example connector payload
 - CI, Dependabot, upstream watch, verification scripts, 비식별 평가 결정 기록
 
-비밀, 실제 사내 경로, private golden corpus, DB dump, CAS는 starter repository에 포함하지 않는다. 별도 승인된 안전한 채널과 환경별 bootstrap 절차로 전달한다.
+비밀, 실제 사내 경로, private golden corpus, DB dump, CAS는 배포 패키지에 포함하지 않는다. 별도 승인된 안전한 채널과 환경별 bootstrap 절차로 전달한다.
 
 ## 9. 온라인 소스 ZIP 생성과 인수
 
@@ -321,12 +342,12 @@ identity, origin, request-size, 배포 경계를 별도 설계한다.
 그대로 압축하지 말고 allowlist 기반 소스 ZIP을 만든다.
 
 ```bash
-./scripts/build-starter-kit.sh
-./scripts/verify-starter-kit.sh dist/kip-starter-kit-$(cat VERSION).zip
+./scripts/build-package.sh
+./scripts/verify-package.sh dist/kip-$(cat VERSION).zip
 ```
 
 릴리스용 ZIP은 clean tree에서 만든다. 검토 중인 변경을 전달해야 할 때만
-`./scripts/build-starter-kit.sh --allow-dirty`를 사용하며, 그 상태는 내부
+`./scripts/build-package.sh --allow-dirty`를 사용하며, 그 상태는 내부
 manifest에 기록된다. ZIP에는 소스, `uv.lock`, 테스트, migration, ontology,
 contract, 예제, 자동화, canonical 운영 문서가 들어간다. 실제 config와 비밀,
 사내 절대 경로, private 평가 자료, DB/CAS/output, 내부 plan/report, `.git`,
@@ -359,9 +380,10 @@ make verify-release BUNDLE="dist/kip-$(tr -d '[:space:]' < VERSION).tar.gz"
 ```
 
 패키지는 설치 가능한 wheel, digest image lock, SPDX SBOM, SLSA provenance,
-release manifest와 SHA-256 checksums, 독립 starter tree를 포함한다. tag 릴리스에는
-스타터 ZIP과 `.zip.sha256`, wheel, release archive와 함께 `scripts/install.sh`가
-`install.sh` 자산으로 게시된다. verifier는
+release manifest와 SHA-256 checksums, 독립 실행 가능한 패키지 tree를 포함한다.
+tag 릴리스에는 배포 패키지 ZIP(`kip-<version>.zip`)과 `.zip.sha256`, wheel,
+release archive와 함께 `scripts/install.sh`가 `install.sh` 자산으로 게시되고,
+3.9.x 설치기를 위한 레거시 이름 사본도 함께 올라간다(11.6). verifier는
 비밀·사내 절대 경로·DB dump·CAS·개인 평가 자료가 섞이면 실패한다.
 배포 전 clean venv에서 base wheel만 설치한 `kip capabilities`와, pinned
 runtime requirements를 설치한 hardened image의 동일 명령을 각각 실행한다.
@@ -375,32 +397,32 @@ secret file, 배포, backup, restore drill 명령은 `docs/OPERATIONS.md`를 따
 
 ## 11. 기존 배포를 새 버전으로 올리기
 
-새 kit을 기존 배포 위에 그대로 풀면 안 된다. kit이 소유한 경로와 배포가
+새 패키지를 기존 배포 위에 그대로 풀면 안 된다. 패키지가 소유한 경로와 배포가
 소유한 경로가 겹치고, 겹치는 지점에서 오류 없이 설정이 되돌아간다.
 
 ### 11.1 경계
 
-세 분류는 `STARTER-KIT-MANIFEST.json`의 `files` 목록에서 기계적으로 도출된다.
-매니페스트에 있으면 kit 소유, 없으면 배포 소유다.
+세 분류는 `KIP-MANIFEST.json`의 `files` 목록에서 기계적으로 도출된다.
+매니페스트에 있으면 패키지 소유, 없으면 배포 소유다.
 
 | 분류 | 경로 | 처리 |
 |---|---|---|
-| kit 소유 | `src/` `tests/` `contracts/` `docs/` `scripts/` `migrations/` `evaluation/` `.claude/` `skills/` `examples/` `.github/` `deploy/` `requirements/` `sample-data/` `sdk/`, `config/kip.example.toml`, `config/kip.container.toml`, `config/logging.yaml`, 루트 파일 전체 | 교체 |
+| 패키지 소유 | `src/` `tests/` `contracts/` `docs/` `scripts/` `migrations/` `evaluation/` `.claude/` `skills/` `examples/` `.github/` `deploy/` `requirements/` `sample-data/` `sdk/`, `config/kip.example.toml`, `config/kip.container.toml`, `config/logging.yaml`, 루트 파일 전체 | 교체 |
 | 배포 소유 | `config/kip.toml`, `config/kip.generated.toml`, `config/kip.host.generated.toml`, `compose.generated.yaml`, `.kip/setup-state.json`, `.env`, `secrets/`, `var/`, `exports/`, `ontology/.release.lock`, `ontology/.pending-release.json`, `.venv/`, PostgreSQL 볼륨 | 보존 |
 | 양쪽 | `.mcp.json` | 11.2 참조 |
 | 기준선 + 확장 | `ontology/domains/`, `ontology/migrations/`, `evaluation/golden/` | 병합 |
 
 ### 11.2 `.mcp.json`은 교체하지 않는다
 
-`.mcp.json`은 kit에 포함되지만 guided setup도 같은 경로를 생성한다. 두 값이
+`.mcp.json`은 패키지에 포함되지만 guided setup도 같은 경로를 생성한다. 두 값이
 다르다.
 
 | 출처 | `KIP_CONFIG` |
 |---|---|
-| kit 기본값 | `config/kip.toml` |
+| 패키지 기본값 | `config/kip.toml` |
 | `setup apply` 산출물 | `config/kip.host.generated.toml` + `KIP_WORKSPACE` |
 
-kit 버전으로 덮으면 MCP 서버가 배포의 생성 config 대신 kit 기본값을 읽는다.
+패키지 버전으로 덮으면 MCP 서버가 배포의 생성 config 대신 패키지 기본값을 읽는다.
 실패하지 않고 다른 설정으로 동작하므로 증상이 늦게 드러난다. 업그레이드는
 배포의 `.mcp.json`을 보존하고, MCP 계약이 바뀐 릴리스에서만 `setup apply`를
 다시 실행해 재생성한다. 어느 경우에도 손으로 편집하지 않는다.
@@ -416,6 +438,20 @@ kit 버전으로 덮으면 MCP 서버가 배포의 생성 config 대신 kit 기�
 ./scripts/upgrade.sh --latest             # 또는 --version X.Y.Z / --archive ZIP
 ```
 
+설치기로 만든 배포에서는 전역 `kip` 명령이 같은 일을 한다. `kip update`는
+`./scripts/upgrade.sh --latest`와 동일하며 `--version X.Y.Z`, `--archive ZIP`,
+`--dry-run`, `--rollback`(특정 기록은 `--rollback-id ID`), `--no-bootstrap`을
+그대로 받아 스크립트의 출력을 그대로 흘려보낸다. rollback에는 미리보기가
+없으므로 `--rollback`을 `--dry-run`·`--archive`·`--version`과 함께 주면
+실행 전에 거부된다. 데이터베이스 없이도 실행되고, git 체크아웃에서는 같은
+이유로 거부되므로 `git pull`을 쓴다.
+
+```bash
+kip update --dry-run
+./scripts/backup.sh
+kip update
+```
+
 1. `--dry-run`으로 교체·삭제·보존되는 파일 수와 설치된 버전 이후의 CHANGELOG
    항목을 확인한다. 그 범위에 `reextract`가 언급되면 함께 표시되므로 migrate
    뒤의 `./scripts/kip parser reextract --source SOURCE`를 계획한다. `--dry-run`은
@@ -423,10 +459,10 @@ kit 버전으로 덮으면 MCP 서버가 배포의 생성 config 대신 kit 기�
    계획만 출력한다.
 2. `./scripts/backup.sh`로 데이터베이스와 배포 소유 경로를 백업한다.
 3. `--latest`, `--version X.Y.Z`, 또는 이미 받아 둔 `--archive
-   kip-starter-kit-X.Y.Z.zip`으로 적용한다. 설치된 manifest나 새 manifest에 있는
-   kit 소유 파일만 교체·삭제되고 나머지 경로는 건드리지 않으며 `.mcp.json`은
+   kip-X.Y.Z.zip`으로 적용한다. 설치된 manifest나 새 manifest에 있는
+   패키지 소유 파일만 교체·삭제되고 나머지 경로는 건드리지 않으며 `.mcp.json`은
    보존된다(11.2). 교체·삭제된 파일과 계획은
-   `var/upgrades/<id>/`(`previous-kit-files.tar.gz`, `plan.json`)에 남는다.
+   `var/upgrades/<id>/`(`previous-package-files.tar.gz`, `plan.json`)에 남는다.
 4. 적용 후 `./scripts/bootstrap.sh`, `./scripts/migrate.sh`,
    `./scripts/kip doctor`가 이어서 실행된다. 데이터베이스에 연결할 수 없으면
    `Action required`와 함께 exit 75로 끝나므로 DB를 올린 뒤
@@ -434,23 +470,23 @@ kit 버전으로 덮으면 MCP 서버가 배포의 생성 config 대신 kit 기�
    `--no-bootstrap`은 파일만 적용한다.
 5. `sync -> search -> read` 한 사이클로 실제 corpus 응답을 확인한다.
 6. 문제가 있으면 `./scripts/upgrade.sh --rollback [ID]`로 직전(또는 지정한)
-   업그레이드의 kit 파일을 되돌리고 `./scripts/bootstrap.sh`를 다시 실행한다.
+   업그레이드의 패키지 파일을 되돌리고 `./scripts/bootstrap.sh`를 다시 실행한다.
    설치된 버전이 그 업그레이드의 대상 버전이 아니면 rollback을 거부한다.
 
 버전을 낮추는 아카이브, git 체크아웃(`git pull`로 갱신한다), digest나 manifest가
 맞지 않는 아카이브는 거부된다.
 
-### 11.4 받은 kit의 출처 확인
+### 11.4 받은 패키지의 출처 확인
 
-`STARTER-KIT-MANIFEST.json`의 `source`가 출처를 기록한다.
+`KIP-MANIFEST.json`의 `source`가 출처를 기록한다.
 
 ```bash
-python3 -c "import json;print(json.load(open('STARTER-KIT-MANIFEST.json'))['source'])"
+python3 -c "import json;print(json.load(open('KIP-MANIFEST.json'))['source'])"
 ```
 
 `repository`는 빌드에 사용된 https origin이고, `git_commit`은 그 시점의 커밋이다.
 `tracked_changes`가 `true`이면 커밋되지 않은 변경이 있는 트리에서 빌드된
-것이므로 `git_commit`만으로 내용을 재현할 수 없다. 배포용 kit은
+것이므로 `git_commit`만으로 내용을 재현할 수 없다. 배포용 패키지는
 `tracked_changes: false`여야 한다. `repository`가 `null`이면 공유 가능한
 http(s) origin이 없는 환경에서 빌드된 것이므로, 전달자에게 출처를 확인한다.
 
@@ -460,8 +496,8 @@ http(s) origin이 없는 환경에서 빌드된 것이므로, 전달자에게 �
 감지해 거부하므로 다음 수동 절차를 한 번만 수행하고, 그 뒤부터는 11.3을 쓴다.
 
 1. 배포 소유 경로와 데이터베이스를 백업한다(`./scripts/backup.sh`).
-2. 새 kit을 기존 배포가 아닌 **별도 디렉터리**에 푼다.
-3. 새 kit의 `VERSION`과 `CHANGELOG.md`에서 계약·설정·마이그레이션 변경과
+2. 새 패키지를 기존 배포가 아닌 **별도 디렉터리**에 푼다.
+3. 새 패키지의 `VERSION`과 `CHANGELOG.md`에서 계약·설정·마이그레이션 변경과
    알려진 한계를 확인한다.
 4. 11.1의 배포 소유 경로를 새 디렉터리로 옮긴다. `.mcp.json`도 함께 옮긴다.
 5. `./scripts/bootstrap.sh`와 `./scripts/migrate.sh`를 실행한다. 마이그레이션은
@@ -469,6 +505,27 @@ http(s) origin이 없는 환경에서 빌드된 것이므로, 전달자에게 �
 6. `./scripts/verify.sh`와 `./scripts/doctor.sh`로 검증하고 `sync -> search ->
    read` 한 사이클을 확인한 뒤 이전 디렉터리를 폐기한다.
 
-`--rollback`은 kit 파일만 되돌린다. 적용된 마이그레이션과 데이터베이스 내용은
+`--rollback`은 패키지 파일만 되돌린다. 적용된 마이그레이션과 데이터베이스 내용은
 되돌리지 않으므로, 마이그레이션을 지나는 업그레이드는 미리 받아 둔
 `./scripts/backup.sh` 덤프로만 복구할 수 있다.
+
+### 11.6 3.10.0 이전에 설치한 배포
+
+3.10.0에서 배포물 이름이 "starter kit"에서 "패키지"로 바뀌었지만, 그 이전에
+설치한 배포도 11.3의 같은 절차로 올린다.
+
+- 설치된 `STARTER-KIT-MANIFEST.json`(schema `kip.starter-archive.v1`)은 그대로
+  읽힌다. 업그레이드가 성공하면 그 파일은 제거되고 `KIP-MANIFEST.json`이
+  자리를 대신하며, `--rollback`은 이전 패키지 파일과 함께 레거시 매니페스트도
+  복원한다.
+- 릴리스는 `kip-<version>.zip`과 함께 레거시 형식 사본
+  (`kip-starter-kit-<version>.zip`과 각자의 `.sha256`)도 게시한다. 내용은 같고
+  매니페스트만 예전 이름과 schema 식별자로 들어 있어 3.9.x의 업그레이더가
+  그대로 적용할 수 있으므로, 3.9.x 배포에서도 `kip update`가 명령 하나로
+  계속 동작한다. 최신 설치기를 기존 배포에 다시 실행하면 내려받은 아카이브
+  안의 업그레이더로 파일을 적용한 뒤 새 트리의 `upgrade.sh --finish`로
+  bootstrap·migrate·doctor를 이어간다. 반대로 3.10.0 이전
+  릴리스를 `--version`으로 고정하면 최신 설치기가 예전 자산 이름으로 되돌아가
+  내려받는다.
+- 3.9.0 이전(3.8.2 이하) 배포에는 `scripts/upgrade.sh`가 없다. 11.5의 수동
+  절차를 한 번 수행한 뒤부터 11.3과 `kip update`를 쓴다.

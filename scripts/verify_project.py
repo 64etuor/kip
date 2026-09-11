@@ -9,7 +9,7 @@ from pathlib import Path
 from kip.architecture_rules import application_adapter_imports
 from kip.documentation import documentation_link_errors
 from kip.ontology import validate_ontology
-from kip.starter_archive_policy import selected_source_files
+from kip.package_archive_policy import selected_source_files
 
 ROOT = Path(__file__).resolve().parents[1]
 

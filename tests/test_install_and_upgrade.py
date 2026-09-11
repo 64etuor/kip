@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shlex
 import stat
 import subprocess
 import sys
@@ -15,17 +16,17 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _make_kit(directory: Path, version: str, files: dict[str, bytes], executable: set[str] = frozenset()) -> Path:
-    """Write kip-starter-kit-<version>.zip plus its .sha256 sidecar the way the builder does."""
-    root = f"kip-starter-kit-{version}"
+    """Write kip-<version>.zip plus its .sha256 sidecar the way the builder does."""
+    root = f"kip-{version}"
     files = {**files, "VERSION": f"{version}\n".encode()}
     manifest = {
-        "schema_version": "kip.starter-archive.v1", "version": version,
+        "schema_version": "kip.package-archive.v1", "version": version,
         "created_at": "2026-09-11T00:00:00Z", "root": root,
         "files": {name: "sha256:" + hashlib.sha256(content).hexdigest() for name, content in files.items()},
         "source": {"git_commit": "a" * 40, "tracked_changes": False, "repository": "https://example.invalid/kip"},
     }
     manifest_bytes = json.dumps(manifest, indent=2).encode()
-    payload = {**files, "STARTER-KIT-MANIFEST.json": manifest_bytes}
+    payload = {**files, "KIP-MANIFEST.json": manifest_bytes}
     checksums = "".join(f"{hashlib.sha256(c).hexdigest()}  {n}\n" for n, c in sorted(payload.items())).encode()
     payload["SHA256SUMS"] = checksums
     directory.mkdir(parents=True, exist_ok=True)
@@ -56,7 +57,7 @@ def _release_files(tmp_path: Path, version: str, files: dict[str, bytes], **kwar
 def _kit_scripts() -> dict[str, bytes]:
     return {
         "scripts/upgrade.sh": (ROOT / "scripts/upgrade.sh").read_bytes(),
-        "scripts/upgrade_kit.py": (ROOT / "scripts/upgrade_kit.py").read_bytes(),
+        "scripts/upgrade_package.py": (ROOT / "scripts/upgrade_package.py").read_bytes(),
         "scripts/runtime-path.sh": (ROOT / "scripts/runtime-path.sh").read_bytes(),
         "scripts/install.sh": (ROOT / "scripts/install.sh").read_bytes(),
         "scripts/bootstrap.sh": b"#!/bin/sh\necho bootstrap-stub\n",
@@ -64,7 +65,7 @@ def _kit_scripts() -> dict[str, bytes]:
 
 
 def test_installer_verifies_the_sidecar_before_extracting(tmp_path: Path) -> None:
-    files = {"README.md": b"# kit\n", "scripts/kip": b"#!/bin/sh\necho kip\n", **_kit_scripts()}
+    files = {"README.md": b"# package\n", "scripts/kip": b"#!/bin/sh\necho kip\n", **_kit_scripts()}
     _, env = _release_files(tmp_path, "9.9.9", files, executable={"scripts/kip"})
     target = tmp_path / "install"
 
@@ -75,13 +76,13 @@ def test_installer_verifies_the_sidecar_before_extracting(tmp_path: Path) -> Non
 
     assert result.returncode == 0, result.stderr
     assert (target / "VERSION").read_text().strip() == "9.9.9"
-    assert (target / "README.md").read_bytes() == b"# kit\n"
+    assert (target / "README.md").read_bytes() == b"# package\n"
     assert os.access(target / "scripts/kip", os.X_OK)
-    assert "Verified kip-starter-kit-9.9.9.zip" in result.stderr
+    assert "Verified kip-9.9.9.zip" in result.stderr
 
 
 def test_installer_refuses_a_tampered_archive_without_extracting(tmp_path: Path) -> None:
-    archive, env = _release_files(tmp_path, "9.9.9", {"README.md": b"# kit\n", **_kit_scripts()})
+    archive, env = _release_files(tmp_path, "9.9.9", {"README.md": b"# package\n", **_kit_scripts()})
     archive.write_bytes(archive.read_bytes() + b"tamper")
     target = tmp_path / "install"
 
@@ -96,7 +97,7 @@ def test_installer_refuses_a_tampered_archive_without_extracting(tmp_path: Path)
 
 
 def test_installer_resolves_latest_release_and_refuses_non_empty_targets(tmp_path: Path) -> None:
-    _, env = _release_files(tmp_path, "9.9.9", {"README.md": b"# kit\n", **_kit_scripts()})
+    _, env = _release_files(tmp_path, "9.9.9", {"README.md": b"# package\n", **_kit_scripts()})
     env.pop("KIP_VERSION")
     latest = tmp_path / "latest.json"
     latest.write_text(json.dumps({"tag_name": "v9.9.9", "name": "KIP 9.9.9"}))
@@ -121,7 +122,7 @@ def test_installer_resolves_latest_release_and_refuses_non_empty_targets(tmp_pat
 
 
 def _deploy(tmp_path: Path, version: str, kit_files: dict[str, bytes]) -> Path:
-    archive = _make_kit(tmp_path / "kits", version, kit_files)
+    archive = _make_kit(tmp_path / "packages", version, kit_files)
     deployment = tmp_path / "deployment"
     with zipfile.ZipFile(archive) as zipped:
         for info in zipped.infolist():
@@ -158,10 +159,10 @@ NEW_KIT = {
 
 def test_upgrade_replaces_kit_files_and_preserves_deployment_state(tmp_path: Path) -> None:
     deployment = _deploy(tmp_path, "1.0.0", OLD_KIT)
-    new_archive = _make_kit(tmp_path / "kits", "1.1.0", NEW_KIT)
+    new_archive = _make_kit(tmp_path / "packages", "1.1.0", NEW_KIT)
 
     dry = subprocess.run(
-        [sys.executable, str(ROOT / "scripts/upgrade_kit.py"), "--deployment", str(deployment), "--archive", str(new_archive), "--dry-run"],
+        [sys.executable, str(ROOT / "scripts/upgrade_package.py"), "--deployment", str(deployment), "--archive", str(new_archive), "--dry-run"],
         capture_output=True, text=True, check=False,
     )
     assert dry.returncode == 0, dry.stderr
@@ -170,7 +171,7 @@ def test_upgrade_replaces_kit_files_and_preserves_deployment_state(tmp_path: Pat
     assert (deployment / "README.md").read_bytes() == b"old readme\n"
 
     result = subprocess.run(
-        [sys.executable, str(ROOT / "scripts/upgrade_kit.py"), "--deployment", str(deployment), "--archive", str(new_archive)],
+        [sys.executable, str(ROOT / "scripts/upgrade_package.py"), "--deployment", str(deployment), "--archive", str(new_archive)],
         capture_output=True, text=True, check=False,
     )
 
@@ -186,14 +187,14 @@ def test_upgrade_replaces_kit_files_and_preserves_deployment_state(tmp_path: Pat
     assert "test-password" in (deployment / ".env").read_text()
     assert "kip.host.generated.toml" in (deployment / ".mcp.json").read_text()
     assert (deployment / "var/cas/blob").read_bytes() == b"blob"
-    manifest = json.loads((deployment / "STARTER-KIT-MANIFEST.json").read_text())
+    manifest = json.loads((deployment / "KIP-MANIFEST.json").read_text())
     assert manifest["version"] == "1.1.0"
     backups = list((deployment / "var/upgrades").glob("*-1.0.0-to-1.1.0"))
-    assert len(backups) == 1 and (backups[0] / "previous-kit-files.tar.gz").exists()
+    assert len(backups) == 1 and (backups[0] / "previous-package-files.tar.gz").exists()
     assert not list(deployment.rglob(".kip-upgrade-*"))
 
     rollback = subprocess.run(
-        [sys.executable, str(ROOT / "scripts/upgrade_kit.py"), "--deployment", str(deployment), "--rollback"],
+        [sys.executable, str(ROOT / "scripts/upgrade_package.py"), "--deployment", str(deployment), "--rollback"],
         capture_output=True, text=True, check=False,
     )
     assert rollback.returncode == 0, rollback.stderr
@@ -206,16 +207,16 @@ def test_upgrade_replaces_kit_files_and_preserves_deployment_state(tmp_path: Pat
 
 def test_upgrade_refuses_git_checkouts_downgrades_and_bad_archives(tmp_path: Path) -> None:
     deployment = _deploy(tmp_path, "1.1.0", NEW_KIT)
-    older = _make_kit(tmp_path / "kits", "1.0.0", OLD_KIT)
+    older = _make_kit(tmp_path / "packages", "1.0.0", OLD_KIT)
     downgrade = subprocess.run(
-        [sys.executable, str(ROOT / "scripts/upgrade_kit.py"), "--deployment", str(deployment), "--archive", str(older)],
+        [sys.executable, str(ROOT / "scripts/upgrade_package.py"), "--deployment", str(deployment), "--archive", str(older)],
         capture_output=True, text=True, check=False,
     )
     assert downgrade.returncode == 1 and "older than the installed" in downgrade.stderr
 
     (deployment / ".git").mkdir()
     git = subprocess.run(
-        [sys.executable, str(ROOT / "scripts/upgrade_kit.py"), "--deployment", str(deployment), "--archive", str(older)],
+        [sys.executable, str(ROOT / "scripts/upgrade_package.py"), "--deployment", str(deployment), "--archive", str(older)],
         capture_output=True, text=True, check=False,
     )
     assert git.returncode == 1 and "git pull" in git.stderr
@@ -223,8 +224,8 @@ def test_upgrade_refuses_git_checkouts_downgrades_and_bad_archives(tmp_path: Pat
 
 def test_upgrade_rejects_archives_whose_digests_do_not_match(tmp_path: Path) -> None:
     deployment = _deploy(tmp_path, "1.0.0", OLD_KIT)
-    archive = _make_kit(tmp_path / "kits", "1.1.0", NEW_KIT)
-    forged = tmp_path / "kits" / "forged.zip"
+    archive = _make_kit(tmp_path / "packages", "1.1.0", NEW_KIT)
+    forged = tmp_path / "packages" / "forged.zip"
     with zipfile.ZipFile(archive) as source, zipfile.ZipFile(forged, "w") as target:
         for info in source.infolist():
             content = source.read(info)
@@ -233,7 +234,7 @@ def test_upgrade_rejects_archives_whose_digests_do_not_match(tmp_path: Path) -> 
             target.writestr(info, content)
 
     result = subprocess.run(
-        [sys.executable, str(ROOT / "scripts/upgrade_kit.py"), "--deployment", str(deployment), "--archive", str(forged)],
+        [sys.executable, str(ROOT / "scripts/upgrade_package.py"), "--deployment", str(deployment), "--archive", str(forged)],
         capture_output=True, text=True, check=False,
     )
 
@@ -294,28 +295,28 @@ def test_upgrade_treats_nfd_and_nfc_kit_paths_as_the_same_file(tmp_path: Path) -
     nfc_name = normalize("NFC", "sample-data/정산_안내.txt")
     nfd_name = normalize("NFD", nfc_name)
     deployment = _deploy(tmp_path, "1.0.0", {**OLD_KIT, nfc_name: b"old sample\n"})
-    new_archive = _make_kit(tmp_path / "kits", "1.1.0", {**NEW_KIT, nfd_name: b"new sample\n"})
+    new_archive = _make_kit(tmp_path / "packages", "1.1.0", {**NEW_KIT, nfd_name: b"new sample\n"})
 
     result = subprocess.run(
-        [sys.executable, str(ROOT / "scripts/upgrade_kit.py"), "--deployment", str(deployment), "--archive", str(new_archive), "--dry-run"],
+        [sys.executable, str(ROOT / "scripts/upgrade_package.py"), "--deployment", str(deployment), "--archive", str(new_archive), "--dry-run"],
         capture_output=True, text=True, check=False,
     )
 
     assert result.returncode == 0, result.stderr
     # Only the genuinely dropped legacy module is removed; the sample file is
-    # recognised as the same path despite the NFD spelling in the new kit.
+    # recognised as the same path despite the NFD spelling in the new package.
     assert "remove 1," in result.stdout
-    assert "Removed kit files: src/kip/legacy.py" in result.stdout
+    assert "Removed package files: src/kip/legacy.py" in result.stdout
 
 
 def _rewrite_kit(archive: Path, mutate) -> Path:
-    """Rebuild a kit zip with a mutated manifest and consistent SHA256SUMS (payload digests untouched)."""
+    """Rebuild a package zip with a mutated manifest and consistent SHA256SUMS (payload digests untouched)."""
     with zipfile.ZipFile(archive) as source:
         root = source.infolist()[0].filename.split("/")[0]
         entries = {info.filename.split("/", 1)[1]: (info, source.read(info)) for info in source.infolist() if not info.is_dir()}
-    manifest = json.loads(entries["STARTER-KIT-MANIFEST.json"][1])
+    manifest = json.loads(entries["KIP-MANIFEST.json"][1])
     mutate(manifest)
-    entries["STARTER-KIT-MANIFEST.json"] = (entries["STARTER-KIT-MANIFEST.json"][0], json.dumps(manifest, indent=2).encode())
+    entries["KIP-MANIFEST.json"] = (entries["KIP-MANIFEST.json"][0], json.dumps(manifest, indent=2).encode())
     checksums = "".join(
         f"{hashlib.sha256(content).hexdigest()}  {name}\n"
         for name, (_, content) in sorted(entries.items()) if name != "SHA256SUMS"
@@ -332,7 +333,7 @@ def _rewrite_kit(archive: Path, mutate) -> Path:
 
 def _run_upgrade(deployment: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, str(ROOT / "scripts/upgrade_kit.py"), "--deployment", str(deployment), *args],
+        [sys.executable, str(ROOT / "scripts/upgrade_package.py"), "--deployment", str(deployment), *args],
         capture_output=True, text=True, check=False,
     )
 
@@ -342,12 +343,12 @@ def test_upgrade_rejects_manifest_paths_that_escape_the_deployment(tmp_path: Pat
     outside = tmp_path / "outside"
     outside.mkdir()
     (outside / "victim.txt").write_text("keep me")
-    installed = deployment / "STARTER-KIT-MANIFEST.json"
+    installed = deployment / "KIP-MANIFEST.json"
     manifest = json.loads(installed.read_text())
     manifest["files"]["../outside/victim.txt"] = "sha256:" + "0" * 64
     manifest["files"][str(outside / "victim.txt")] = "sha256:" + "0" * 64
     installed.write_text(json.dumps(manifest))
-    new_archive = _make_kit(tmp_path / "kits", "1.1.0", NEW_KIT)
+    new_archive = _make_kit(tmp_path / "packages", "1.1.0", NEW_KIT)
 
     result = _run_upgrade(deployment, "--archive", str(new_archive))
 
@@ -358,7 +359,7 @@ def test_upgrade_rejects_manifest_paths_that_escape_the_deployment(tmp_path: Pat
 
 def test_upgrade_rejects_a_manifest_that_lists_files_absent_from_the_archive(tmp_path: Path) -> None:
     deployment = _deploy(tmp_path, "1.0.0", OLD_KIT)
-    archive = _make_kit(tmp_path / "kits", "1.1.0", NEW_KIT)
+    archive = _make_kit(tmp_path / "packages", "1.1.0", NEW_KIT)
 
     def add_ghost(manifest):
         manifest["files"]["scripts/ghost.sh"] = "sha256:" + "0" * 64
@@ -373,7 +374,7 @@ def test_upgrade_rejects_a_manifest_that_lists_files_absent_from_the_archive(tmp
 
 def test_upgrade_reports_malformed_versions_and_unsafe_rollback_ids(tmp_path: Path) -> None:
     deployment = _deploy(tmp_path, "1.0.0", OLD_KIT)
-    archive = _make_kit(tmp_path / "kits", "1.1.0", NEW_KIT)
+    archive = _make_kit(tmp_path / "packages", "1.1.0", NEW_KIT)
     (deployment / "VERSION").write_text("3.7.0-dev\n")
 
     malformed = _run_upgrade(deployment, "--archive", str(archive))
@@ -389,7 +390,7 @@ def test_upgrade_reports_malformed_versions_and_unsafe_rollback_ids(tmp_path: Pa
 def test_upgrade_keeps_executable_bits_and_writes_mcp_when_absent(tmp_path: Path) -> None:
     deployment = _deploy(tmp_path, "1.0.0", OLD_KIT)
     (deployment / ".mcp.json").unlink()
-    archive = _make_kit(tmp_path / "kits", "1.1.0", NEW_KIT)
+    archive = _make_kit(tmp_path / "packages", "1.1.0", NEW_KIT)
 
     assert _run_upgrade(deployment, "--archive", str(archive)).returncode == 0
     assert os.access(deployment / "scripts/upgrade.sh", os.X_OK)
@@ -397,7 +398,7 @@ def test_upgrade_keeps_executable_bits_and_writes_mcp_when_absent(tmp_path: Path
 
 
 def test_installer_handles_spaces_keep_archive_and_interrupted_targets(tmp_path: Path) -> None:
-    _, env = _release_files(tmp_path, "9.9.9", {"README.md": b"# kit\n", **_kit_scripts()})
+    _, env = _release_files(tmp_path, "9.9.9", {"README.md": b"# package\n", **_kit_scripts()})
     target = tmp_path / "my kip dir"
 
     result = subprocess.run(
@@ -406,12 +407,12 @@ def test_installer_handles_spaces_keep_archive_and_interrupted_targets(tmp_path:
     )
     assert result.returncode == 0, result.stderr
     assert (target / "README.md").exists()
-    assert (tmp_path / "kip-starter-kit-9.9.9.zip").exists() and (tmp_path / "kip-starter-kit-9.9.9.zip.sha256").exists()
+    assert (tmp_path / "kip-9.9.9.zip").exists() and (tmp_path / "kip-9.9.9.zip.sha256").exists()
 
     interrupted = tmp_path / "interrupted"
     interrupted.mkdir()
     (interrupted / "VERSION").write_text("9.9.9\n")
-    (interrupted / "STARTER-KIT-MANIFEST.json").write_text("{}")
+    (interrupted / "KIP-MANIFEST.json").write_text("{}")
     broken = subprocess.run(
         ["/bin/bash", str(ROOT / "scripts/install.sh"), str(interrupted), "--no-bootstrap"],
         env=env, capture_output=True, text=True, check=False,
@@ -421,7 +422,7 @@ def test_installer_handles_spaces_keep_archive_and_interrupted_targets(tmp_path:
 
 def test_rollback_accepts_a_partially_applied_upgrade(tmp_path: Path) -> None:
     deployment = _deploy(tmp_path, "1.0.0", OLD_KIT)
-    archive = _make_kit(tmp_path / "kits", "1.1.0", NEW_KIT)
+    archive = _make_kit(tmp_path / "packages", "1.1.0", NEW_KIT)
     assert _run_upgrade(deployment, "--archive", str(archive)).returncode == 0
     # Simulate a commit that stopped before VERSION was replaced.
     (deployment / "VERSION").write_text("1.0.0\n")
@@ -435,7 +436,7 @@ def test_rollback_accepts_a_partially_applied_upgrade(tmp_path: Path) -> None:
 
 
 def test_installer_keeps_a_user_created_empty_directory_on_failure(tmp_path: Path) -> None:
-    files = {"README.md": b"# kit\n", **_kit_scripts()}
+    files = {"README.md": b"# package\n", **_kit_scripts()}
     del files["scripts/bootstrap.sh"]  # layout check fails after verification
     _, env = _release_files(tmp_path, "9.9.9", files)
     target = tmp_path / "prepared"
@@ -446,5 +447,202 @@ def test_installer_keeps_a_user_created_empty_directory_on_failure(tmp_path: Pat
         env=env, capture_output=True, text=True, check=False,
     )
 
-    assert result.returncode == 1 and "single kit directory" in result.stderr
+    assert result.returncode == 1 and "single package directory" in result.stderr
     assert target.is_dir() and not list(target.iterdir())
+
+
+def test_installer_writes_a_global_launcher_and_an_idempotent_shell_profile_block(tmp_path: Path) -> None:
+    _, env = _release_files(tmp_path, "9.9.9", {"README.md": b"# kit\n", **_kit_scripts()})
+    home = Path(env["HOME"])
+    home.mkdir(parents=True, exist_ok=True)
+    (home / ".zshrc").write_text("# existing rc\nexport FOO=1\n")
+    env["SHELL"] = "/bin/zsh"
+    target = tmp_path / "install"
+
+    for _ in range(2):  # second run hits the already-installed path and must not duplicate the block
+        result = subprocess.run(
+            ["/bin/bash", str(ROOT / "scripts/install.sh"), str(target), "--no-bootstrap"],
+            env=env, capture_output=True, text=True, check=False,
+        )
+        assert result.returncode == 0, result.stderr
+
+    launcher = home / ".local/bin/kip"
+    assert os.access(launcher, os.X_OK)
+    assert str(target) in launcher.read_text()
+    rc = (home / ".zshrc").read_text()
+    assert rc.startswith("# existing rc\nexport FOO=1\n")
+    assert rc.count("# >>> KIP >>>") == 1 and rc.count("# <<< KIP <<<") == 1
+    assert f"export KIP_HOME='{target}'" in rc and ".local/bin" in rc
+    assert "kip --help" in result.stderr or "kip --help" in result.stdout
+
+    quiet = subprocess.run(
+        ["/bin/bash", str(ROOT / "scripts/install.sh"), str(tmp_path / "second"), "--no-bootstrap", "--no-shell-profile", "--bin-dir", str(tmp_path / "bin")],
+        env=env, capture_output=True, text=True, check=False,
+    )
+    assert quiet.returncode == 0, quiet.stderr
+    assert (tmp_path / "bin/kip").exists()
+    assert (home / ".zshrc").read_text() == rc
+
+
+def test_upgrade_reads_legacy_manifest_name_and_installer_falls_back_to_legacy_asset(tmp_path: Path) -> None:
+    deployment = _deploy(tmp_path, "1.0.0", OLD_KIT)
+    legacy = deployment / "STARTER-KIT-MANIFEST.json"
+    (deployment / "KIP-MANIFEST.json").rename(legacy)
+    text = legacy.read_text().replace("kip.package-archive.v1", "kip.starter-archive.v1")
+    legacy.write_text(text)
+    releases = tmp_path / "releases" / "v1.1.0"
+    archive = _make_kit(releases, "1.1.0", NEW_KIT)
+    # Publish only under the pre-3.10.0 asset name, as older releases did.
+    archive.rename(releases / "kip-starter-kit-1.1.0.zip")
+    digest = hashlib.sha256((releases / "kip-starter-kit-1.1.0.zip").read_bytes()).hexdigest()
+    (releases / "kip-starter-kit-1.1.0.zip.sha256").write_text(f"{digest}  kip-starter-kit-1.1.0.zip\n")
+    (releases / "kip-1.1.0.zip.sha256").unlink()
+    env = {**os.environ, "KIP_RELEASE_BASE_URL": (tmp_path / "releases").as_uri(), "KIP_VERSION": "1.1.0", "HOME": str(tmp_path / "home")}
+
+    result = subprocess.run(
+        ["/bin/bash", str(ROOT / "scripts/install.sh"), str(deployment), "--no-bootstrap", "--no-shell-profile"],
+        env=env, capture_output=True, text=True, check=False,
+    )
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "Verified kip-starter-kit-1.1.0.zip" in result.stderr
+    assert (deployment / "VERSION").read_text().strip() == "1.1.0"
+    assert (deployment / "KIP-MANIFEST.json").exists() and not legacy.exists()
+    rollback = _run_upgrade(deployment, "--rollback")
+    assert rollback.returncode == 0, rollback.stderr
+    assert legacy.exists() and (deployment / "VERSION").read_text().strip() == "1.0.0"
+    assert not (deployment / "KIP-MANIFEST.json").exists()
+
+
+def test_launcher_and_profile_quote_hostile_paths_and_preserve_profile_identity(tmp_path: Path) -> None:
+    _, env = _release_files(tmp_path, "9.9.9", {"README.md": b"# kit\n", **_kit_scripts()})
+    home = Path(env["HOME"])
+    (home / "dotfiles").mkdir(parents=True)
+    real_rc = home / "dotfiles/zshrc"
+    real_rc.write_text("export FOO=1\n")
+    real_rc.chmod(0o600)
+    (home / ".zshrc").symlink_to(real_rc)
+    env["SHELL"] = "/bin/zsh"
+    marker = tmp_path / "PWNED"
+    target = tmp_path / f"kip 지식's $(touch {marker})dir"  # Korean, quote and command substitution
+    bin_dir = tmp_path / 'bin "q'
+
+    result = subprocess.run(
+        ["/bin/bash", str(ROOT / "scripts/install.sh"), str(target), "--no-bootstrap", "--bin-dir", str(bin_dir)],
+        env=env, capture_output=True, text=True, check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    launcher = bin_dir / "kip"
+    # Running the launcher must resolve the literal directory, never execute it.
+    subprocess.run(["/bin/bash", str(launcher)], env={**env, "PATH": os.environ["PATH"]}, capture_output=True, text=True, check=False)
+    assert not marker.exists()
+    assert (home / ".zshrc").is_symlink() and real_rc.read_text().startswith("export FOO=1\n")
+    assert oct(real_rc.stat().st_mode & 0o777) == "0o600"
+    for shell in ("/bin/zsh", "/bin/bash", "/bin/sh", *(["/bin/dash"] if Path("/bin/dash").exists() else [])):
+        # The profile block must be plain POSIX quoting so every login shell can read it.
+        parsed = subprocess.run([shell, "-c", f". {shlex.quote(str(real_rc))}; printf %s \"$KIP_HOME\""], capture_output=True, text=True, check=False)
+        assert parsed.returncode == 0 and parsed.stdout == str(target), (shell, parsed.stderr)
+    assert subprocess.run(["/bin/bash", "-n", str(launcher)], capture_output=True).returncode == 0
+
+    dry = subprocess.run(
+        ["/bin/bash", str(ROOT / "scripts/install.sh"), str(target), "--dry-run"],
+        env=env, capture_output=True, text=True, check=False,
+    )
+    assert dry.returncode == 0 and "already installed" in dry.stderr
+    assert real_rc.read_text().count("# >>> KIP >>>") == 1
+
+
+def test_installer_upgrades_with_the_upgrader_shipped_in_the_archive(tmp_path: Path) -> None:
+    # A 3.9.x deployment carries an upgrader that only understands the former
+    # manifest name; the installer must apply the archive with the archive's
+    # own upgrader and then let the new tree finish (bootstrap, migrate, doctor).
+    old_scripts = {
+        **_kit_scripts(),
+        "scripts/upgrade.sh": b"#!/bin/sh\necho OLD-UPGRADER-USED >&2\nexit 97\n",
+        "scripts/upgrade_kit.py": b"# legacy upgrader\n",
+    }
+    del old_scripts["scripts/upgrade_package.py"]
+    deployment = _deploy(tmp_path, "1.0.0", {"README.md": b"old\n", "config/kip.example.toml": b"[app]\n", **old_scripts})
+    (deployment / "STARTER-KIT-MANIFEST.json").write_bytes((deployment / "KIP-MANIFEST.json").read_bytes())
+    (deployment / "KIP-MANIFEST.json").unlink()
+    new_kit = {
+        "README.md": b"new\n", **_kit_scripts(),
+        "scripts/migrate.sh": b"#!/bin/sh\necho migrate-stub\n",
+        "scripts/kip": b"#!/bin/sh\nexit 0\n",
+    }
+    _, env = _release_files(tmp_path, "2.0.0", new_kit, executable={"scripts/migrate.sh", "scripts/kip", "scripts/bootstrap.sh", "scripts/upgrade.sh"})
+
+    result = subprocess.run(
+        ["/bin/bash", str(ROOT / "scripts/install.sh"), str(deployment), "--no-shell-profile", "--bin-dir", str(tmp_path / "bin")],
+        env=env, capture_output=True, text=True, check=False,
+    )
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "OLD-UPGRADER-USED" not in result.stderr
+    assert "Upgrade complete" in result.stdout
+    assert (deployment / "VERSION").read_text().strip() == "2.0.0"
+    assert (deployment / "README.md").read_bytes() == b"new\n"
+    assert (deployment / "KIP-MANIFEST.json").exists() and not (deployment / "STARTER-KIT-MANIFEST.json").exists()
+    assert not (deployment / "scripts/upgrade_kit.py").exists()
+
+
+def test_legacy_archive_copy_matches_the_3_9_upgrader_contract(tmp_path: Path) -> None:
+    archive = _make_kit(tmp_path / "packages", "2.0.0", {"README.md": b"# package\n", **_kit_scripts()})
+    legacy = tmp_path / "kip-starter-kit-2.0.0.zip"
+    for _ in range(2):  # deterministic
+        run = subprocess.run([sys.executable, str(ROOT / "scripts/legacy_archive.py"), str(archive), str(legacy)], capture_output=True, text=True, check=False)
+        assert run.returncode == 0, run.stderr
+    first = legacy.read_bytes()
+    subprocess.run([sys.executable, str(ROOT / "scripts/legacy_archive.py"), str(archive), str(legacy)], check=True, capture_output=True)
+    assert legacy.read_bytes() == first
+
+    with zipfile.ZipFile(legacy) as zipped, zipfile.ZipFile(archive) as original:
+        root = zipped.namelist()[0].split("/")[0]
+        names = {name.split("/", 1)[1]: zipped.read(name) for name in zipped.namelist()}
+        assert "STARTER-KIT-MANIFEST.json" in names and "KIP-MANIFEST.json" not in names
+        manifest = json.loads(names["STARTER-KIT-MANIFEST.json"])
+        assert manifest["schema_version"] == "kip.starter-archive.v1" and manifest["root"] == root
+        checksums = dict(line.split("  ", 1)[::-1] for line in names["SHA256SUMS"].decode().splitlines())
+        payload = {name: data for name, data in names.items() if name != "SHA256SUMS"}
+        # The exact predicates scripts/upgrade_kit.py (3.9.x) enforces before applying.
+        assert set(checksums) == set(payload)
+        assert set(manifest["files"]) == set(payload) - {"STARTER-KIT-MANIFEST.json"}
+        for name, data in payload.items():
+            assert checksums[name] == hashlib.sha256(data).hexdigest(), name
+            if name != "STARTER-KIT-MANIFEST.json":
+                assert manifest["files"][name] == f"sha256:{checksums[name]}"
+        original_modes = {info.filename.split("/", 1)[1]: info.external_attr for info in original.infolist()}
+        for info in zipped.infolist():
+            relative = info.filename.split("/", 1)[1]
+            if relative not in {"STARTER-KIT-MANIFEST.json", "SHA256SUMS"}:
+                assert info.external_attr == original_modes[relative]
+    # The current upgrader also applies the legacy-format copy and converges on the canonical manifest name.
+    deployment = _deploy(tmp_path, "1.0.0", {"README.md": b"old\n", "config/kip.example.toml": b"[app]\n", **_kit_scripts()})
+    applied = subprocess.run([sys.executable, str(ROOT / "scripts/upgrade_package.py"), "--deployment", str(deployment), "--archive", str(legacy)], capture_output=True, text=True, check=False)
+    assert applied.returncode == 0, applied.stderr
+    assert (deployment / "VERSION").read_text().strip() == "2.0.0"
+    assert (deployment / "KIP-MANIFEST.json").is_file() and not (deployment / "STARTER-KIT-MANIFEST.json").exists()
+    assert json.loads((deployment / "KIP-MANIFEST.json").read_text())["version"] == "2.0.0"
+
+
+def test_installer_follows_a_relative_profile_symlink_under_zdotdir(tmp_path: Path) -> None:
+    _, env = _release_files(tmp_path, "9.9.9", {"README.md": b"# kit\n", **_kit_scripts()})
+    home = Path(env["HOME"])
+    zdot = home / "zdot"
+    (zdot / "dotfiles").mkdir(parents=True)
+    real_rc = zdot / "dotfiles/zshrc"
+    real_rc.write_text("# managed\n")
+    os.symlink("dotfiles/zshrc", zdot / ".zshrc")  # relative link, as stow/chezmoi create
+    (home / ".zshenv").write_text(f"ZDOTDIR={zdot}\n")  # set but not exported, the common form
+    env["SHELL"] = "/bin/zsh"
+
+    result = subprocess.run(
+        ["/bin/bash", str(ROOT / "scripts/install.sh"), str(tmp_path / "install"), "--no-bootstrap", "--bin-dir", str(tmp_path / "bin")],
+        env=env, capture_output=True, text=True, check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (zdot / ".zshrc").is_symlink()
+    assert real_rc.read_text().startswith("# managed\n# >>> KIP >>>")
+    assert not (home / "dotfiles").exists() and not (home / ".zshrc").exists()

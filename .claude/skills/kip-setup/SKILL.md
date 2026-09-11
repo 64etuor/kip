@@ -12,8 +12,11 @@ without the repository can instead run the published installer
 (`curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh
 | bash`), which verifies the release archive before extracting into an empty
 directory and then runs bootstrap; `./scripts/upgrade.sh --latest` updates an
-existing kit deployment in place. Use
-`--check` for read-only prerequisite status. System Docker installation uses
+existing package deployment in place. That installer also writes a global `kip`
+launcher and a marked block in the login shell profile, so an installed
+deployment runs `kip setup inspect` and `kip update` (the same upgrade) from any
+directory after the shell is restarted; a repository checkout keeps using
+`./scripts/kip`. Use `--check` for read-only prerequisite status. System Docker installation uses
 `--install-docker`; explain that action and obtain authorization if the request
 has not already provided it. Native administrator authentication and Desktop
 license/first-run choices belong to the user's terminal/UI, never chat secrets.

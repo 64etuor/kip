@@ -393,3 +393,46 @@ def test_review_propose_still_accepts_an_explicit_ontology_version() -> None:
 
     assert result.exit_code == 0, result.stdout
     assert json.loads(result.stdout)["data"]["ontology_version"] == "core/1.0.0"
+
+
+def test_update_and_version_commands_work_without_a_database(tmp_path, monkeypatch) -> None:
+    import subprocess
+
+    from typer.testing import CliRunner
+
+    from kip import __version__
+    from kip.cli import app
+
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts/upgrade.sh").write_text("#!/bin/sh\n")
+    monkeypatch.setenv("KIP_PROJECT_ROOT", str(tmp_path))
+    calls: list[list[str]] = []
+
+    def fake_run(arguments, check=False):
+        calls.append(list(arguments))
+        return subprocess.CompletedProcess(arguments, 75)
+
+    monkeypatch.setattr("kip.cli.subprocess.run", fake_run)
+    runner = CliRunner()
+    result = runner.invoke(app, ["update", "--version", "9.9.9", "--dry-run"])
+    assert result.exit_code == 75
+    assert calls[-1][1:] == ["--version", "9.9.9", "--dry-run"]
+    assert calls[-1][0].endswith("scripts/upgrade.sh")
+    assert runner.invoke(app, ["update", "--rollback"]).exit_code == 75
+    assert calls[-1][1:] == ["--rollback"]
+    assert runner.invoke(app, ["update"]).exit_code == 75
+    assert calls[-1][1:] == ["--latest"]
+
+    rejected = runner.invoke(app, ["update", "--rollback", "--dry-run"])
+    assert rejected.exit_code != 0 and "cannot be combined" in rejected.output
+    assert calls[-1][1:] == ["--latest"]  # nothing was executed for the rejected combination
+    orphan = runner.invoke(app, ["update", "--rollback-id", "20260101T000000Z-1.0.0-to-2.0.0"])
+    assert orphan.exit_code != 0 and "requires --rollback" in orphan.output
+    assert runner.invoke(app, ["update", "--rollback", "--rollback-id", "abc"]).exit_code == 75
+    assert calls[-1][1:] == ["--rollback", "abc"]
+    assert runner.invoke(app, ["update", "--archive", "x.zip", "--no-bootstrap"]).exit_code == 75
+    assert calls[-1][1:] == ["--archive", "x.zip", "--no-bootstrap"]
+
+    version = runner.invoke(app, ["version"])
+    assert version.exit_code == 0
+    assert json.loads(version.output)["data"]["version"] == __version__

@@ -68,7 +68,7 @@ DOCUMENT_FILES: Final = tuple(
         "QUICKSTART.md",
         "RAG_EVALUATION.md",
         "SECURITY.md",
-        "STARTER_KIT_GUIDE.md",
+        "DEPLOYMENT_GUIDE.md",
         "TRD.md",
         "TROUBLESHOOTING.md",
     )
@@ -98,10 +98,10 @@ REQUIRED_FILES: Final = frozenset(
         "compose.production.yaml",
         "config/kip.example.toml",
         "contracts/envelope.schema.json",
-        "contracts/starter-archive-manifest.schema.json",
+        "contracts/package-manifest.schema.json",
         "docs/PRD.md",
         "docs/SECURITY.md",
-        "docs/STARTER_KIT_GUIDE.md",
+        "docs/DEPLOYMENT_GUIDE.md",
         "docs/TRD.md",
         "evaluation/golden/production-regression.yaml",
         "migrations/0001_extensions_and_schemas.sql",
@@ -168,7 +168,7 @@ def selected_source_files(root: Path) -> tuple[Path, ...]:
     for relative in FULL_TREES:
         tree = root / relative
         if not tree.is_dir():
-            raise ValidationError(f"required starter directory is missing: {relative}")
+            raise ValidationError(f"required package directory is missing: {relative}")
         selected.update(path for path in tree.rglob("*") if _is_selected_file(path, root))
     return tuple(sorted(selected, key=lambda path: normalize("NFC", path.relative_to(root).as_posix())))
 
@@ -176,13 +176,13 @@ def selected_source_files(root: Path) -> tuple[Path, ...]:
 def validate_relative_path(relative: PurePosixPath) -> None:
     lowered = tuple(part.lower() for part in relative.parts)
     if relative.is_absolute() or ".." in relative.parts:
-        raise ValidationError(f"unsafe starter path: {relative}")
+        raise ValidationError(f"unsafe package path: {relative}")
     if any(part in FORBIDDEN_PARTS for part in lowered):
-        raise ValidationError(f"forbidden starter path: {relative}")
+        raise ValidationError(f"forbidden package path: {relative}")
     if any(part.endswith(".egg-info") for part in lowered):
-        raise ValidationError(f"generated package metadata in starter path: {relative}")
+        raise ValidationError(f"generated package metadata in package path: {relative}")
     if relative.suffix.lower() in FORBIDDEN_SUFFIXES:
-        raise ValidationError(f"forbidden starter suffix: {relative}")
+        raise ValidationError(f"forbidden package suffix: {relative}")
 
 
 def validate_included_path(relative: PurePosixPath) -> None:
@@ -192,7 +192,7 @@ def validate_included_path(relative: PurePosixPath) -> None:
         return
     if any(name.startswith(f"{tree}/") for tree in FULL_TREES):
         return
-    raise ValidationError(f"nonessential starter path is not allowed: {relative}")
+    raise ValidationError(f"nonessential package path is not allowed: {relative}")
 
 
 def scan_content(content: bytes, relative: str) -> None:
@@ -204,17 +204,17 @@ def scan_content(content: bytes, relative: str) -> None:
         return
     for pattern in PRIVATE_PATTERNS:
         if pattern.search(text):
-            raise ValidationError(f"private or secret content in starter path: {relative}")
+            raise ValidationError(f"private or secret content in package path: {relative}")
     for match in DATABASE_URL_PATTERN.finditer(text):
         password = match.group(1)
         if "${" not in match.group(0) and password.lower() not in SAFE_EXAMPLE_PASSWORDS:
-            raise ValidationError(f"database credential in starter path: {relative}")
+            raise ValidationError(f"database credential in package path: {relative}")
 
 
 def _required_file(root: Path, relative: str) -> Path:
     path = root / relative
     if not path.is_file() or path.is_symlink():
-        raise ValidationError(f"required starter file is missing or unsafe: {relative}")
+        raise ValidationError(f"required package file is missing or unsafe: {relative}")
     validate_relative_path(PurePosixPath(relative))
     return path
 
@@ -227,7 +227,7 @@ def _is_selected_file(path: Path, root: Path) -> bool:
     ):
         return False
     if path.is_symlink():
-        raise ValidationError(f"starter source contains a symlink: {relative}")
+        raise ValidationError(f"package source contains a symlink: {relative}")
     if not path.is_file():
         return False
     validate_relative_path(PurePosixPath(relative.as_posix()))

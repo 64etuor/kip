@@ -48,23 +48,26 @@ See ADR-058.
 }
 ```
 
-## Starter archive manifest
+## Package archive manifest
 
-`STARTER-KIT-MANIFEST.json` validates against
-`contracts/starter-archive-manifest.schema.json` and uses
-`kip.starter-archive.v1`. It records the KIP version, UTC creation time, the
+`KIP-MANIFEST.json` validates against
+`contracts/package-manifest.schema.json` and uses
+`kip.package-archive.v1`. It records the KIP version, UTC creation time, the
 single versioned ZIP root, a `sha256:` digest for every source payload file,
 and source state (`git_commit`, `tracked_changes`, `repository`). Unknown
 fields are rejected. `repository` is the https origin the archive was built
 from, reduced to scheme, host, and path so that an access token in the
 remote's userinfo and a local clone path never reach an archive handed to
 another organization; it is `null` when no shareable http(s) remote exists.
-Older `kip.starter-archive.v1` manifests omit the field and stay valid.
+Older `kip.starter-archive.v1` manifests omit the field and stay valid. That
+legacy identifier (releases before 3.10.0) is still accepted by the schema and
+by `PackageArchiveManifest`; archives built today always carry
+`kip.package-archive.v1`.
 
 The manifest intentionally excludes itself and `SHA256SUMS` from `files`.
 `SHA256SUMS` covers every payload file and the manifest; the external
 `<archive>.zip.sha256` covers the exact ZIP bytes. The build and verify commands
-emit `kip.envelope.v1` containing a `kip.starter-archive-receipt.v1` receipt
+emit `kip.envelope.v1` containing a `kip.package-archive-receipt.v1` receipt
 with archive path, archive digest, file count, root, status, and version.
 
 ## Guided setup boundary

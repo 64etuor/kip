@@ -77,7 +77,7 @@ from kip.domain.models import (  # noqa: E402
     VocabularyItem,
     XlsxRangeRead,
 )
-from kip.domain.starter_archive import StarterArchiveManifest  # noqa: E402
+from kip.domain.package_archive import PackageArchiveManifest  # noqa: E402
 from kip.domain.telemetry import QueryTrace  # noqa: E402
 from kip.evaluation.answers import (  # noqa: E402
     AnswerMetrics,
@@ -171,7 +171,7 @@ MODELS = {
     "evaluation-review-bundle": EvaluationReviewBundle,
     "golden-draft": GoldenDraft,
     "golden-draft-review": GoldenDraftReview,
-    "starter-archive-manifest": StarterArchiveManifest,
+    "package-manifest": PackageArchiveManifest,
 }
 
 

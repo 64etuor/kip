@@ -4,7 +4,7 @@
 > ACL, 온톨로지, 프로젝션 같은 말이 한 줄씩 쉬운 말로 정리되어 있습니다.
 
 처음 복제하거나 제3자 환경에 적용한다면 명령을 실행하기 전에
-[`STARTER_KIT_GUIDE.md`](STARTER_KIT_GUIDE.md)의 데이터 경계, ACL, 외부
+[`DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md)의 데이터 경계, ACL, 외부
 전송, 품질 기준 결정을 먼저 완료한다.
 
 가장 안전한 진입점은 AI agent에게 “KIP을 셋업해줘”라고 요청하는 것이다.
@@ -12,7 +12,7 @@ agent는 `kip-setup` Skill에 따라 매번 하나의 누락된 결정만 질문
 수집 범위를 미리 계산한 뒤 승인된 plan만 원자적으로 적용한다.
 
 가장 빠른 설치 경로는 릴리스에 게시된 한 줄 설치기다. 저장소 복제 없이 최신
-스타터 kit을 내려받아 digest를 검증한 뒤 `$KIP_HOME` 또는 `~/kip`(비어 있거나
+배포 패키지를 내려받아 digest를 검증한 뒤 `$KIP_HOME` 또는 `~/kip`(비어 있거나
 아직 없는 디렉터리)에 풀고 bootstrap까지 실행한다.
 
 ```bash
@@ -23,9 +23,30 @@ curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh | 
 bash, curl 또는 wget, sha256sum 또는 shasum, unzip 또는 python3만 있으면 되고
 Python은 bootstrap이 준비한다. digest가 맞지 않으면 아무것도 풀지 않는다.
 `--check`/`--install-docker`/`--without-docker`는 bootstrap으로 전달되고
-`--no-bootstrap`은 압축만 푼다. 같은 명령을 기존 kit 배포 디렉터리에 실행하면
+`--no-bootstrap`은 압축만 푼다. 같은 명령을 기존 패키지 배포 디렉터리에 실행하면
 그 자리에서 업그레이드하며, 배포 안에서는 `./scripts/upgrade.sh --latest`가
 같은 일을 한다.
+
+설치기는 전역 `kip` 런처를 `~/.local/bin/kip`에 쓰고(`--bin-dir DIR` 또는
+`KIP_BIN_DIR`로 변경) 로그인 셸 프로필(zsh는 `~/.zshrc`, bash는 Linux
+`~/.bashrc`·macOS `~/.bash_profile`, 그 외 `~/.profile`)에
+`# >>> KIP >>>` … `# <<< KIP <<<` 블록 하나를 추가해 `KIP_HOME`을 내보내고
+런처 디렉터리를 `PATH`에 넣는다. 블록은 매번 교체되며 그 밖의 내용은 건드리지
+않고, `--no-shell-profile`로 끌 수 있다. 셸을 다시 시작하거나 프로필을
+`source`하면 어느 디렉터리에서나 아래 명령을 쓸 수 있다.
+
+```bash
+kip --help
+kip doctor
+kip setup inspect
+kip version
+kip update          # = ./scripts/upgrade.sh --latest
+kip update --dry-run   # --version X.Y.Z / --archive ZIP / --rollback / --no-bootstrap
+```
+
+`kip update`는 데이터베이스 없이도 동작하고, git 체크아웃은 거부하므로 개발
+트리는 `git pull`로 갱신한다. 아래 예제처럼 저장소에서 직접 작업할 때는 계속
+`./scripts/kip`를 쓴다.
 
 저장소를 복제해 개발하는 경우에는 `./scripts/kip`가 `.venv`를 요구하므로 먼저
 `./scripts/bootstrap.sh`를 실행한다. 필요한 Python·Node는 프로젝트 안에

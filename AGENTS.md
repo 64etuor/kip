@@ -10,7 +10,7 @@ Read the relevant section, not every document at startup.
 | Task | Starting point |
 | --- | --- |
 | Retrieve or cite knowledge | `skills/knowledge-fabric/SKILL.md` |
-| Set up a deployment | `skills/kip-setup/SKILL.md`, `docs/STARTER_KIT_GUIDE.md` |
+| Set up a deployment | `skills/kip-setup/SKILL.md`, `docs/DEPLOYMENT_GUIDE.md` |
 | Change behavior or architecture | Relevant `docs/PRD.md` / `docs/TRD.md` section and existing port/test |
 | Change CLI, REST, MCP, or SDK | `docs/DATA_CONTRACTS.md`, generated `contracts/`, `docs/APP_INTEGRATION.md` |
 | Change ingestion or permissions | `docs/CONNECTORS.md`, `docs/SECURITY.md` |

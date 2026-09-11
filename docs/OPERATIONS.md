@@ -83,7 +83,7 @@ proposed`가 비어 있으면 할 일이 없습니다. 관계 채굴을 켜지 �
 
 ### 업그레이드
 
-kit으로 설치한 배포는 `./scripts/upgrade.sh`로 제자리에서 올린다. 같은
+패키지로 설치한 배포는 `./scripts/upgrade.sh`로 제자리에서 올린다. 같은
 디렉터리에 릴리스 설치기를 다시 실행해도 이 스크립트가 실행된다.
 
 ```bash
@@ -92,21 +92,38 @@ kit으로 설치한 배포는 `./scripts/upgrade.sh`로 제자리에서 올린�
 ./scripts/upgrade.sh --latest    # 또는 --version X.Y.Z / --archive ZIP
 ```
 
-설치된 manifest나 새 manifest에 있는 kit 소유 파일만 교체·삭제되고 `.env`,
+한 줄 설치기로 만든 배포에는 전역 `kip` 명령이 있다. `kip update`는
+`./scripts/upgrade.sh --latest`와 같고 `--version X.Y.Z`, `--archive ZIP`,
+`--dry-run`, `--rollback`(특정 기록은 `--rollback-id ID`), `--no-bootstrap`을
+그대로 받으며 스크립트 출력을 그대로 흘려보낸다. `--rollback`은 미리보기가
+없어 `--dry-run`·`--archive`·`--version`과 함께 주면 실행 전에 거부된다. `kip update`와 `kip version`은 데이터베이스 없이도 실행되고,
+git 체크아웃은 `git pull`을 쓰라며 거부된다.
+
+설치된 manifest나 새 manifest에 있는 패키지 소유 파일만 교체·삭제되고 `.env`,
 `config/kip*.toml`, `compose.generated.yaml`, `var/`, `secrets/`, ontology·golden
 추가분은 건드리지 않으며 `.mcp.json`은 보존된다. 교체·삭제된 파일과 `plan.json`은
-`var/upgrades/<id>/`에 남고 `./scripts/upgrade.sh --rollback [ID]`가 그 kit 파일을
+`var/upgrades/<id>/`에 남고 `./scripts/upgrade.sh --rollback [ID]`가 그 패키지 파일을
 되돌린다(설치된 버전이 해당 업그레이드의 대상 버전이 아니면 거부한다). 적용 뒤에는
 `./scripts/bootstrap.sh`, `./scripts/migrate.sh`, `./scripts/kip doctor`가 이어지며,
 데이터베이스에 연결할 수 없으면 `Action required`와 함께 exit 75로 끝난다. 이때는
 `./scripts/app-up.sh --database-only`로 DB를 올린 뒤 `./scripts/migrate.sh`와
 `./scripts/kip doctor`를 실행한다. `--dry-run`은 `--latest`, `--version`, `--archive`
 모두에 적용되며 다운로드와 검증만 하고 파일은 바꾸지 않는다. 버전 하향, git 체크아웃(`git pull`로 갱신), digest나 manifest가 맞지 않는
-아카이브는 거부된다. rollback은 kit 파일만 되돌리고 데이터베이스는 복구하지
+아카이브는 거부된다. rollback은 패키지 파일만 되돌리고 데이터베이스는 복구하지
 않으므로, 마이그레이션을 지나는 업그레이드 전에는 반드시 `./scripts/backup.sh`를
 실행한다. 3.9.0 이전에 만든 배포에는 `scripts/upgrade.sh`가 없으므로
-[`STARTER_KIT_GUIDE.md`](STARTER_KIT_GUIDE.md) 11.5의 수동 절차를 한 번 거친 뒤
+[`DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md) 11.5의 수동 절차를 한 번 거친 뒤
 설치기를 쓴다.
+
+3.10.0 이전에 설치한 배포도 같은 절차로 올라간다. 업그레이드는 레거시
+`STARTER-KIT-MANIFEST.json`을 읽어 그대로 적용한 뒤 그 파일을 제거하고
+`KIP-MANIFEST.json`으로 대체하며, `--rollback`은 레거시 매니페스트까지
+복원한다. 릴리스는 `kip-<version>.zip` 외에 레거시 형식 사본
+(`kip-starter-kit-<version>.zip`과 sidecar: 같은 내용, 매니페스트만 예전 이름과
+schema 식별자)도 게시하므로 3.9.x의 업그레이더도 그대로 적용할 수 있다.
+최신 설치기는 기존 배포를 올릴 때 내려받은 아카이브 안의 업그레이더를 쓰고
+새 트리의 `upgrade.sh --finish`로 bootstrap·migrate·doctor를 이어간다. 또 3.10.0 이전 릴리스를 `--version`으로 고정하면 최신
+설치기가 예전 자산 이름으로 되돌아가 받는다.
 
 ### Database readiness errors
 
@@ -135,7 +152,7 @@ the limit as appropriate; ordinary retrieval still never starts a sync.
 
 ## Daily
 
-`verify.sh` checks local Markdown links against the online starter's document
+`verify.sh` checks local Markdown links against the online package's document
 payload. Both source and production bundles include canonical documents and
 ADRs; historical designs/audits remain in Git history through pinned links.
 Live model-behavior checks are recorded in `docs/AGENT_QUALITY.md` and are not
@@ -281,7 +298,7 @@ worker's own credentials), and the API healthcheck targets `/readyz`, which
 performs a real database round-trip and answers 503 when PostgreSQL is
 unreachable. `/healthz` remains a process-liveness probe only.
 
-## Online source starter ZIP
+## Online source package ZIP
 
 Use this path for a source handoff to an internet-connected developer or agent.
 It is deliberately smaller than the production release bundle and does not
@@ -289,9 +306,9 @@ contain wheels, images, SBOM, provenance, deployment secrets, local state, or
 private evaluation data.
 
 ```bash
-./scripts/build-starter-kit.sh
-./scripts/verify-starter-kit.sh dist/kip-starter-kit-$(cat VERSION).zip
-(cd dist && shasum -a 256 -c kip-starter-kit-$(cat ../VERSION).zip.sha256)
+./scripts/build-package.sh
+./scripts/verify-package.sh dist/kip-$(cat VERSION).zip
+(cd dist && shasum -a 256 -c kip-$(cat ../VERSION).zip.sha256)
 ```
 
 The builder refuses an existing output and a dirty source tree. Use
@@ -322,10 +339,10 @@ make verify-release BUNDLE="dist/kip-$(tr -d '[:space:]' < VERSION).tar.gz"
 ```
 
 The verifier checks the manifest, checksums, wheel, SPDX SBOM, SLSA provenance
-statement, image lock, required starter files, private-path patterns, and
+statement, image lock, required package files, private-path patterns, and
 forbidden secret/data artifacts. The private reviewed golden corpus
 (`evaluation/golden/private-onedrive-nl.yaml` and its floor file) is excluded
-from the starter copy and its presence in a bundle fails verification; the
+from the package copy and its presence in a bundle fails verification; the
 redacted `private-starter.yaml` sample ships intentionally. A branch or pull-request workflow produces a
 candidate only. A `v$(cat VERSION)` tag whose value exactly matches `VERSION`
 is the sole GitHub workflow that pushes the immutable GHCR image and creates
@@ -922,7 +939,7 @@ root. Both copy `requirements/kordoc/package.json` and its lock and run
 `npm ci --omit=dev --ignore-scripts --no-audit`, so the host and the image
 install the identical graph: kordoc 4.8.0 with transitive `adm-zip` overridden
 to 0.6.0 and `sharp` to 0.35.4. Kordoc binaries and model caches are never part
-of the source starter ZIP.
+of the source package ZIP.
 
 `./scripts/audit-kordoc.sh` gates that graph. It first rejects lock/manifest
 drift (lock root name, version, dependency and engine blocks, exact pins, and
@@ -989,5 +1006,5 @@ and reranker revisions with upstream. It creates or updates one GitHub issue
 when drift is detected and closes that issue after every watched pin matches
 again. Run `./scripts/check-upstream-updates.sh` for the same read-only check
 locally, or dispatch the workflow manually. Both are discovery surfaces only:
-follow `STARTER_KIT_GUIDE.md` and the quality experiment workflow before
+follow `DEPLOYMENT_GUIDE.md` and the quality experiment workflow before
 changing a production pin or activating a projection.

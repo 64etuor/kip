@@ -5195,7 +5195,7 @@ stand for implicit accepted decisions.
 | ADR-049 | Measure PDF tables and HWP section locators | Accepted |
 | ADR-050 | Bound filesystem parser processes | Accepted |
 | ADR-051 | Adopt the stable MCP 2 SDK without changing KIP tool contracts | Accepted |
-| ADR-052 | Verified online source ZIP starter kit | Accepted |
+| ADR-052 | Verified online source ZIP package | Accepted |
 | ADR-053 | Upgrade the pinned offline Kordoc runtime to 4.8.0 | Accepted |
 | ADR-054 | Use pdf-inspector with selective PyMuPDF table fallback | Accepted for starter and pilot |
 | ADR-055 | Focus agent instructions and harden local entry points | Accepted |

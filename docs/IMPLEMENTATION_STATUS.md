@@ -4,6 +4,38 @@ This is the current readiness inventory, not the target architecture. The
 target-to-current matrix and ordered gap register live in
 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`.
 
+## 2026-09-11 package naming, global launcher and `kip update` (3.10.0)
+
+The distributable is now simply the KIP package: `kip-<version>.zip` with its
+`.sha256` sidecar, `KIP-MANIFEST.json` (`kip.package-archive.v1`),
+`./scripts/build-package.sh` / `./scripts/verify-package.sh`, the `kip-package`
+console script, `scripts/upgrade_package.py`, the `package/` bundle directory
+and `docs/DEPLOYMENT_GUIDE.md` (ADR-063). Deployments installed before 3.10.0
+still upgrade with one command: the upgrader reads a legacy
+`STARTER-KIT-MANIFEST.json`, removes it once the new manifest is in place and
+restores it on `--rollback`, the installer falls back to the former asset name
+for releases before 3.10.0, the installer upgrades existing deployments with
+the upgrader shipped inside the downloaded archive, and every release also
+publishes a legacy-format archive (same payload, manifest under its former
+name and schema identifier) with its own sidecar for the upgrader shipped with
+3.9.x.
+The installer additionally writes a `kip` launcher to `~/.local/bin` (or
+`--bin-dir`/`KIP_BIN_DIR`) that execs the deployment's `scripts/kip`, and adds
+one idempotent `# >>> KIP >>>` … `# <<< KIP <<<` block to the login shell
+profile exporting `KIP_HOME` and the launcher directory on `PATH`;
+`--no-shell-profile` opts out and bootstrap still never edits a profile. `kip
+update` delegates to `scripts/upgrade.sh` (`--version`, `--archive`,
+`--dry-run`, `--rollback`, `--no-bootstrap`) and, with `kip version`, runs
+without a database. `tests/test_install_and_upgrade.py` covers the launcher and
+the idempotent profile block (rerunning replaces rather than duplicates it) and
+a legacy-named upgrade with its rollback; `tests/test_cli_surface.py` covers
+`update` and `version` without a database. Limits: the profile block is written
+only for zsh, bash and POSIX `sh` profiles, so fish and other shells need a
+manual `PATH`/`KIP_HOME` entry; the launcher records the deployment path at
+install time and follows `KIP_HOME` when the deployment moves or several exist;
+and the legacy-named asset copy is a transition aid that can be dropped once no
+3.9.x deployment is expected to upgrade directly.
+
 ## 2026-09-11 one-command install and in-place upgrade (3.9.0)
 
 An adopter can install a published release with a single command
@@ -14,10 +46,10 @@ command on the existing directory or with `./scripts/upgrade.sh
 needs only bash, curl or wget, a SHA-256 tool and unzip or python3, verifies the
 archive against its `.sha256` sidecar before extracting anything, requires an
 absent or empty directory for a fresh install, then runs `./scripts/bootstrap.sh`
-and the full `./scripts/verify-starter-kit.sh` check. Upgrades apply section 11's
-boundary mechanically from the manifest diff: kit-owned paths are replaced or
+and the full `./scripts/verify-package.sh` check. Upgrades apply section 11's
+boundary mechanically from the manifest diff: package-owned paths are replaced or
 removed, deployment-owned paths are untouched, `.mcp.json` is preserved, and the
-previous kit files plus `plan.json` are kept under `var/upgrades/<id>/` for
+previous package files plus `plan.json` are kept under `var/upgrades/<id>/` for
 `--rollback`; `--dry-run` prints the plan and the CHANGELOG entries between the
 two versions. `tests/test_install_and_upgrade.py` covers sidecar verification,
 refusal of a tampered archive with nothing extracted, latest-tag resolution and
@@ -27,8 +59,8 @@ internal digests disagree, and that both scripts are standalone and executable.
 Limits: `curl | bash` trusts GitHub's release hosting and TLS and the sidecar is
 served from that same origin, so it detects corruption rather than a compromised
 origin (SECURITY); deployments created before 3.9.0 have no `scripts/upgrade.sh`
-and take the manual STARTER_KIT_GUIDE 11.5 procedure once; `--rollback` restores
-kit files only and does not roll back the database, so a pre-upgrade
+and take the manual DEPLOYMENT_GUIDE 11.5 procedure once; `--rollback` restores
+package files only and does not roll back the database, so a pre-upgrade
 `./scripts/backup.sh` is required across a migration boundary; and the tests run
 against local file-URL release fixtures with bootstrap skipped, so a real
 cold-network install from a published release is not exercised in CI.
@@ -58,11 +90,11 @@ Docker installation assistance, bounded readiness and a Docker-free external
 database path are available. Compatible existing programs, virtual environments,
 profiles and Docker contexts are preserved. A real macOS arm64 cold probe with
 Python/Node/uv hidden from PATH installed Python 3.13.15 and Node 22.23.2; a
-separate fresh source-kit bootstrap completed the locked environment and OCR
+separate fresh source package bootstrap completed the locked environment and OCR
 model checks. Docker native privileged installers are covered by simulated
 action-boundary tests, not by removing/reinstalling the user's working Docker.
 Windows/WSL Desktop integration, OS authentication, license choices and Linux
-daemon permissions can still require user action. See ADR-061 and the starter
+daemon permissions can still require user action. See ADR-061 and the deployment
 guide; those boundaries are not reported as completed installation.
 The first Linux CI cold smoke was blocked because its restricted PATH omitted
 GNU tar's gzip helper. 3.8.1 corrects that fixture and checks gzip before Linux
@@ -187,7 +219,7 @@ An independent dispatched follow-up of published 3.6.1 found correct core
 results in five fresh MCP sessions without a supplied skill/system prompt,
 but two answers added claims without exact reads and four repeated irrelevant
 embedded-instruction commentary. OneDrive exact reads and scope denials passed
-for two sampled files; a direct answer request refused. A new starter kit
+for two sampled files; a direct answer request refused. A new package
 reached generated-config MCP retrieval after isolated database startup, while
 full app startup stalled at Dockerfile frontend resolution. Bootstrap exposed
 sharp/adm-zip npm advisories outside the Python audit gate. This was not a full
@@ -245,7 +277,7 @@ answers refused. Repeat sync reported 7 unchanged and 0 failed. These are
 sample retrieval/freshness/access results, not generated-answer or semantic
 quality acceptance.
 
-An isolated source-kit installation also completed frozen bootstrap and the
+An isolated source package installation also completed frozen bootstrap and the
 18-question guided path using a directory-only source answer, a distinct
 workspace, random local credentials, non-default loopback ports, and the
 installer's UID/GID/groups. The generated standalone stack built and started
@@ -267,7 +299,7 @@ substitutes for that full-corpus benchmark.
 |---|---|---|
 | Root agent files | Ready | Task-routed `AGENTS.md`, Claude import, generated MCP config, and compact portable skills with conditional references (ADR-055). Invalid explicit runtime paths fail closed; installation stages both bundles and rolls back handled failures |
 | Canonical contracts | Ready | Pydantic models and generated JSON Schema |
-| Online source starter ZIP | Ready | Deterministic single-root ZIP of allowlisted source, locked inputs, tests, contracts, migrations, ontology, examples, automation, and canonical operating documents. A strict versioned manifest, per-file checksums, external archive digest, path/size/symlink defenses, required-file checks, and private/secret scan are enforced by both build and verify commands. Local state, internal plans, private evaluation data, databases, CAS/output data, and release binaries are excluded; this source handoff does not replace signed production provenance |
+| Online source package ZIP | Ready | Deterministic single-root ZIP of allowlisted source, locked inputs, tests, contracts, migrations, ontology, examples, automation, and canonical operating documents. A strict versioned manifest, per-file checksums, external archive digest, path/size/symlink defenses, required-file checks, and private/secret scan are enforced by both build and verify commands. Local state, internal plans, private evaluation data, databases, CAS/output data, and release binaries are excluded; this source handoff does not replace signed production provenance |
 | Production distribution | Ready | Digest-pinned non-root image, read-only Compose profile (with the one deliberate exception of the `${KIP_ONTOLOGY_PATH}` bind mounted read-write into the API for discovery auto-release, ADR-044), locked runtime/build inputs with tested core/runtime parity, wheel, image lock, SPDX SBOM, SLSA provenance, deterministic archive, private-data scan, and directory/archive verifier. The parser supervisor's `psutil` dependency is present in the production runtime lock; both that lock and the installed all-extra environment pass `pip-audit`. A clean core-wheel install now starts `kip capabilities` without optional extractors because PPTX image transcoding loads Pillow only on demand |
 | CI supply-chain gates | Ready | Current-release SHA-pinned actions, Python 3.12/3.13 matrix, contracts, architecture, Ruff, mypy, dependency audit, migrations, tests, 75% coverage, clean-wheel smoke, hardened-image smoke, candidate bundle, and tag-only GHCR publish with attestations. A structural test rejects workflow extras that are not declared by `pyproject.toml`, preventing the removed Neo4j extra from breaking installs again. Local `verify.sh` preflights pytest, Ruff, mypy, and pip-audit and fails if any is absent; uv uses the frozen lock, while pip-only installations use project-interpreter modules |
 | Backup and recovery | Ready for operational adoption | Sealed PostgreSQL/CAS/config backup, `row_security=off` manifest, explicit empty-target restore, row/migration/extension/RLS/CAS comparison, projection rebuild, fingerprinted evaluation comparison, and checksummed drill receipt. `--retain N` pruning (default 7), a redacted configuration snapshot with a seal-and-verify secret rescan, and a launchd daily schedule (`com.kip.backup`; the installer supports `--dry-run`) are included; a real sealed set was produced and checksum-verified on this host on 2026-08-13 (`var/backups/20260813T070625Z`) |
@@ -311,7 +343,7 @@ substitutes for that full-corpus benchmark.
 | Agent-guided setup | Handoff implemented; recipient acceptance required | Folder shorthand, metadata-only local/cloud preview, resolved secret/key readiness, owner-bound plans, standalone generated Compose, generated host-config selection, and app-up-first receipts are implemented (ADR-057). Missing readiness does not become `verified`. Local generation provisioning, external controls, and real recipient evidence remain separate |
 | Neo4j | Not shipped | Graph traversal runs inside the active repository backend (`capabilities.graph_backend` reports it); a Neo4j read projection would introduce its own port at adoption time. Do not deploy before the adoption gate |
 | Review UI | Not included | CLI/API review workflow only |
-| Starter-kit adoption guide | Ready | Environment decisions, AI change contract, real-corpus acceptance evidence, upgrade and handoff rules |
+| package adoption guide | Ready | Environment decisions, AI change contract, real-corpus acceptance evidence, upgrade and handoff rules |
 | Upstream update watch | Ready for GitHub-hosted repositories | Dependabot covers Python/Actions/Docker; a behavior-tested daily workflow reads the OCR `expected_version`, reports Kordoc and Hugging Face revision drift in one GitHub issue, and closes it when pins match again without activating an update |
 
 ## Explicit pilot limitations

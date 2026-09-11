@@ -22,7 +22,7 @@ def _run_artifacts(*arguments: str) -> subprocess.CompletedProcess[str]:
 def test_dotenv_loader_preserves_explicit_environment_without_shell_evaluation(
     tmp_path: Path,
 ) -> None:
-    project = tmp_path / "starter"
+    project = tmp_path / "package"
     scripts = project / "scripts"
     scripts.mkdir(parents=True)
     shutil.copy2(ROOT / "scripts/common.sh", scripts / "common.sh")

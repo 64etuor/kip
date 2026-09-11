@@ -1,4 +1,4 @@
-# KIP 지식 패브릭 스타터킷 v3.6
+# KIP 지식 패브릭
 
 KIP은 NAS 파일, HWP/HWPX, PDF, PPTX, XLSX, Slack, 이메일에 흩어진 회사
 지식을 색인하고 근거와 함께 검색하기 위한 에이전트 우선·증거 우선 기반입니다.
@@ -23,17 +23,17 @@ projection으로만 취급합니다.
 ## 검증된 소스 ZIP
 
 인터넷 연결 환경에 소스와 필수 운영 문서만 전달하려면 작업 디렉터리를 직접
-압축하지 말고 결정적 스타터 ZIP을 만듭니다.
+압축하지 말고 결정적 배포 패키지 ZIP을 만듭니다.
 
 ```bash
-./scripts/build-starter-kit.sh
-./scripts/verify-starter-kit.sh dist/kip-starter-kit-$(cat VERSION).zip
+./scripts/build-package.sh
+./scripts/verify-package.sh dist/kip-$(cat VERSION).zip
 ```
 
 ZIP은 하나의 버전 디렉터리 아래에 구현 코드, 잠긴 의존성, 테스트, migration,
 contract, ontology, 예제, 자동화, canonical 운영 문서를 담습니다. 로컬 설정,
 credential, DB, CAS/output, private 평가 자료, 내부 plan, 생성형 package metadata,
-릴리스 바이너리는 제외합니다. `STARTER-KIT-MANIFEST.json`, 내부 `SHA256SUMS`,
+릴리스 바이너리는 제외합니다. `KIP-MANIFEST.json`, 내부 `SHA256SUMS`,
 외부 `.zip.sha256` 파일로 전달물을 독립적으로 검증할 수 있습니다. 정식 릴리스는
 clean tree에서 만들고, `--allow-dirty`는 이름이 명확한 로컬 candidate에만 씁니다.
 
@@ -108,7 +108,7 @@ source sync, search와 exact-read smoke까지 확인합니다. 승인한 Compose
 DB 준비와 migration 순서는 자동 처리합니다. 폴더 경로만 답해도 보수적 분류와 workspace
 ACL을 제안하고, preview가 local/cloud-only 파일을 구분합니다. 다운로드가 필요한
 파일은 OneDrive 앱에서 먼저 선택합니다. 전체 인수 절차는
-[`docs/STARTER_KIT_GUIDE.md`](docs/STARTER_KIT_GUIDE.md)를 따릅니다.
+[`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md)를 따릅니다.
 
 검색 범위는 활성 source에 지정한 디렉터리 하위로 제한됩니다. 제거·비활성화·
 범위 변경 후 서비스가 설정을 다시 읽으면 이전 색인과 알려진 ID에도 새 경계가
@@ -116,8 +116,8 @@ ACL을 제안하고, preview가 local/cloud-only 파일을 구분합니다. 다�
 
 ## 3. 로컬 개발 빠른 시작
 
-다른 조직이나 저장소에서 이 킷을 도입한다면 먼저
-[`docs/STARTER_KIT_GUIDE.md`](docs/STARTER_KIT_GUIDE.md)를 읽으세요. 환경별
+다른 조직이나 저장소에서 이 패키지를 도입한다면 먼저
+[`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md)를 읽으세요. 환경별
 결정, AI 변경 계약, 실제 corpus 인수 테스트, update notification, 승격/rollback
 기준이 한 경로에 정리돼 있습니다.
 
@@ -131,10 +131,10 @@ curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh | 
 ```
 
 이 스크립트는 Python보다 먼저 실행되므로 bash, curl 또는 wget, sha256sum 또는
-shasum, unzip 또는 python3만 있으면 됩니다. 버전이 지정된 스타터 ZIP과 그
+shasum, unzip 또는 python3만 있으면 됩니다. 버전이 지정된 배포 패키지 ZIP과 그
 `.sha256` sidecar를 내려받아 압축을 풀기 전에 digest를 검증하고, 값이 다르면
 아무것도 풀지 않고 중단합니다. 이후 `./scripts/bootstrap.sh`를 실행하고
-`./scripts/verify-starter-kit.sh`로 아카이브 전체를 다시 검증합니다.
+`./scripts/verify-package.sh`로 아카이브 전체를 다시 검증합니다.
 
 ```bash
 # 설치 위치와 버전을 고정
@@ -146,26 +146,75 @@ curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh \
 전달됩니다. `--no-bootstrap`은 압축만 풀고, `--keep-archive`는 내려받은 ZIP을
 남깁니다. Windows에서는 WSL2 Ubuntu 안에서 실행합니다.
 
+### 전역 `kip` 명령
+
+설치기는 `~/.local/bin/kip` 런처를 만들고(`--bin-dir DIR` 또는 `KIP_BIN_DIR`로
+위치를 바꿉니다) 로그인 셸 프로필에 표시된 블록 하나를 추가합니다. zsh는
+`~/.zshrc`, bash는 Linux에서 `~/.bashrc`·macOS에서 `~/.bash_profile`, 그 밖의
+셸은 `~/.profile`을 사용합니다.
+
+```sh
+# >>> KIP >>>
+export KIP_HOME='/home/kip/kip'
+KIP_BIN='/home/kip/.local/bin'
+case ":$PATH:" in *":$KIP_BIN:"*) ;; *) export PATH="$KIP_BIN:$PATH" ;; esac
+unset KIP_BIN
+# <<< KIP <<<
+```
+
+경로는 설치 시점의 절대 경로가 인용부호로 감싸여 들어갑니다.
+
+이 블록은 다시 설치하거나 업그레이드할 때마다 통째로 교체되므로 중복되지
+않고, 프로필의 다른 내용은 그대로 둡니다. 프로필을 바꾸고 싶지 않으면
+`--no-shell-profile`을 주고 `PATH`와 `KIP_HOME`을 직접 설정하세요.
+
+셸을 새로 시작하거나 프로필을 `source`하면 어느 디렉터리에서나 다음 명령이
+동작합니다.
+
+```bash
+kip --help
+kip doctor
+kip setup inspect
+kip version
+kip update
+```
+
+런처는 설치한 배포의 `scripts/kip`를 실행합니다. 배포가 여러 개라면
+`KIP_HOME`으로 어떤 배포를 쓸지 고릅니다. 저장소를 복제해 쓰는 개발
+트리에서는 이 문서의 나머지 예제처럼 `./scripts/kip`를 그대로 씁니다.
+
 ### 업데이트
 
-`VERSION`과 `STARTER-KIT-MANIFEST.json`이 있는 설치 디렉터리에 같은 명령을 다시
-실행하면 그 자리에서 업그레이드합니다. 배포 안에서
-`./scripts/upgrade.sh --latest`를 실행해도 같습니다. 교체되는 것은 manifest에 있는 kit 소유 파일뿐이며
-`.env`, 생성 config, `var/`, `secrets/`는 그대로 두고 `.mcp.json`도 보존합니다.
-`./scripts/upgrade.sh --latest --dry-run`(또는 `--archive ZIP --dry-run`)으로 계획과
-두 버전 사이의 CHANGELOG를 먼저 확인하고, 문제가 있으면
-`./scripts/upgrade.sh --rollback`으로 이전 kit 파일을 되돌립니다. 데이터베이스는
+설치한 배포는 어디서나 `kip update`로 올립니다.
+
+```bash
+kip update --dry-run   # 계획과 두 버전 사이의 CHANGELOG만 출력
+kip update             # --version X.Y.Z / --archive ZIP / --no-bootstrap
+kip update --rollback  # 직전 업그레이드의 패키지 파일로 되돌리기
+```
+
+`kip update`는 배포의 `./scripts/upgrade.sh --latest`를 그대로 실행하고 출력을
+흘려보냅니다. 데이터베이스 없이도 동작합니다.
+`VERSION`과 `KIP-MANIFEST.json`(3.10.0 이전 배포는 `STARTER-KIT-MANIFEST.json`)이
+있는 설치 디렉터리에 설치 명령을 다시
+실행하거나 배포 안에서 `./scripts/upgrade.sh --latest`를 실행해도 결과는
+같습니다. 교체되는 것은 manifest에 있는 패키지 소유 파일뿐이며 `.env`, 생성
+config, `var/`, `secrets/`는 그대로 두고 `.mcp.json`도 보존합니다. 먼저
+`--dry-run`으로 계획과 두 버전 사이의 CHANGELOG를 확인하고, 문제가 있으면
+`--rollback`으로 이전 패키지 파일을 되돌립니다. 데이터베이스는
 rollback 대상이 아니므로 마이그레이션을 지나는 업그레이드 전에는
 `./scripts/backup.sh`를 실행합니다. git 체크아웃은 설치기가 거부하며 `git pull`로
-갱신합니다. 자세한 절차는
-[`docs/STARTER_KIT_GUIDE.md`](docs/STARTER_KIT_GUIDE.md) 11장에 있습니다.
+갱신합니다. 3.10.0 이전에 설치한 배포도 그대로 올라갑니다(레거시
+`STARTER-KIT-MANIFEST.json`을 읽어 `KIP-MANIFEST.json`으로 교체합니다). 자세한
+절차는 [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md) 11장에 있습니다.
 
 ### 준비물
 
 Python·Node를 먼저 설치할 필요 없이 아래 명령부터 실행할 수 있습니다.
 호환되는 기존 프로그램은 재사용하고, 없으면 프로젝트의 `var/runtime`에
 Python 3.13과 Node 22를 준비합니다. 시스템 Python·Node와 셸 프로필은
-수정하지 않습니다. 다운로드 연결과 최소 10GB의 여유 공간이 필요합니다.
+수정하지 않습니다(셸 프로필에 표시된 KIP 블록을 넣는 것은 한 줄 설치기뿐이며
+`--no-shell-profile`로 끌 수 있습니다). 다운로드 연결과 최소 10GB의 여유 공간이 필요합니다.
 Python이 전혀 없는 환경의 첫 다운로드에는 curl 또는 wget, tar와 SHA-256
 도구가 필요합니다(macOS 기본 제공; Linux의 GNU tar에는 gzip도 필요).
 
@@ -228,6 +277,10 @@ credential을 생성하며 기존 `.env`와 config는 보존합니다.
 `content_units`가 0이면 `./scripts/kip sync run --source sample`을 먼저 실행했는지
 확인하세요. 계속 막히면 [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)를
 참조하세요.
+
+이 문서의 CLI 예제는 저장소 체크아웃 기준이라 `./scripts/kip`를 씁니다. 한 줄
+설치기로 만든 배포에서는 같은 명령을 어느 디렉터리에서나 `kip`으로 실행할 수
+있습니다(예: `kip doctor`, `kip search "참여율 변경 승인" --limit 10`).
 
 ## 4. 애플리케이션으로 실행
 
@@ -428,8 +481,8 @@ exact evidence와 함께 `kip answer`/`kip context`에 들어갑니다. Source�
 
 ## 10. 현재 제한 사항
 
-이 저장소는 구현 가능한 starter이지 모든 production adapter가 완성됐다는 주장이
-아닙니다. Filesystem, text, PDF, XLSX shallow/deep, memory repository, CLI/API
+이 저장소는 바로 배포할 수 있는 패키지이지 모든 production adapter가 완성됐다는
+주장이 아닙니다. Filesystem, text, PDF, XLSX shallow/deep, memory repository, CLI/API
 contract, PostgreSQL migration, pgvector shadow path는 구현돼 있습니다. 로컬 semantic
 path는 문서화된 Apple Silicon pilot에서 검증됐지만 private corpus에서는 계속
 shadow-only입니다. Slack, Apple Mail, IMAP, Neo4j는 환경별 reference adapter입니다.

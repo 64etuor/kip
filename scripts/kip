@@ -4,4 +4,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=common.sh
 source "$SCRIPT_DIR/common.sh"
 PY="$(python_cmd)"
+if [[ ! -x "$PROJECT_ROOT/.venv/bin/python" ]] && ! "$PY" -c 'import kip.cli' >/dev/null 2>&1; then
+  # A deployment installed with --no-bootstrap (or an interrupted bootstrap)
+  # has no runtime yet; say so instead of failing inside the system Python.
+  printf 'KIP runtime is not installed at %s. Run: %s/scripts/bootstrap.sh\n' "$PROJECT_ROOT" "$PROJECT_ROOT" >&2
+  exit 69
+fi
 exec "$PY" -m kip.cli "$@"

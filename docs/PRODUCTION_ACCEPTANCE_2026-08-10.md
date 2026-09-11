@@ -1,8 +1,8 @@
-# Production starter-kit acceptance: 2026-08-10
+# Production package acceptance: 2026-08-10
 
 ## Verdict
 
-KIP 3.2.0 passes repository and starter-kit acceptance for the canonical
+KIP 3.2.0 passes repository and package acceptance for the canonical
 filesystem/PostgreSQL lexical path, exact evidence reads, reviewed ontology
 graph context, CLI/REST/MCP parity, hardened distribution, and sealed recovery.
 This is not blanket certification of a recipient's private corpus, identity
@@ -75,7 +75,7 @@ against a real canonical store; it does not replace a recipient's reviewed
 
 The release gate builds a clean wheel and non-root image, runs the image with a
 read-only root, no capabilities, no-new-privileges, and UID/GID 10001, then
-verifies both the starter directory and deterministic archive. Every bundle
+verifies both the package directory and deterministic archive. Every bundle
 contains an image digest lock, SPDX SBOM, SLSA provenance, release manifest, and
 SHA-256 checksums; branch artifacts are candidates, while only a matching
 `v$(cat VERSION)` tag may publish and attest GHCR subjects.

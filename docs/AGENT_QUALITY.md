@@ -63,7 +63,7 @@ unnecessary background or lengthy citations; concision is not fully calibrated.
 
 Three independently dispatched agents tested the published 3.6.1 checkout
 (`56492e4`): live OneDrive retrieval, fresh natural-language MCP clients, and a
-new starter-kit installation. A fourth investigated the npm warnings found by
+new package installation. A fourth investigated the npm warnings found by
 the installer. The parent reviewed raw responses and traces against the source
 fixtures; successful process exit was not the answer-quality criterion.
 
@@ -102,7 +102,7 @@ were empty. A filename-based `answer` request refused with
 `no_admissible_evidence`, so it is not a successful generated-answer example.
 No source files, active configuration, or index were changed.
 
-The new starter kit completed bootstrap, guided setup/apply, and configuration
+The new package completed bootstrap, guided setup/apply, and configuration
 verification. Full application startup stalled resolving the pinned Dockerfile
 frontend image, so that path is not accepted by this run. Starting only the
 isolated database through the generated Compose configuration allowed migration

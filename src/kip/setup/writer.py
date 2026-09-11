@@ -116,7 +116,7 @@ def build_compose_payload(plan: SetupPlan, *, project_root: Path) -> JsonObject:
         if not all(isinstance(services[name], dict) for name in ("api", "worker", "migrate", "postgres")):
             raise ValueError("missing application services")
     except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError) as exc:
-        raise ValidationError("setup requires the starter compose.yaml application template") from exc
+        raise ValidationError("setup requires the package compose.yaml application template") from exc
     environment = {
         "KIP_CONFIG": "/app/config/kip.generated.toml",
         "KIP_ENV": "production",

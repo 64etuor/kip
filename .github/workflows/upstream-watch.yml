@@ -35,7 +35,7 @@ jobs:
           fi
 
           body="$(printf '%s\n\n%s\n\n%s\n' "$marker" 'Upstream versions differ from the reviewed KIP pins:' "$(cat "$report")")"
-          body+=$'\nThis is a notification, not an activation request. Follow `docs/STARTER_KIT_GUIDE.md` and run a shadow quality experiment before changing a pin.'
+          body+=$'\nThis is a notification, not an activation request. Follow `docs/DEPLOYMENT_GUIDE.md` and run a shadow quality experiment before changing a pin.'
           existing="$(gh issue list --state open --search "$marker in:body" --json number --jq ".[0].number // empty")"
           if [[ -n "$existing" ]]; then
             gh issue edit "$existing" --body "$body"

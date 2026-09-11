@@ -11,47 +11,47 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError as PydanticValidationError
 
-from kip.domain.starter_archive import StarterArchiveManifest
+from kip.domain.package_archive import PackageArchiveManifest
 from kip.errors import ValidationError
-from kip.starter_archive import (
-    StarterArchiveBuildOptions,
+from kip.package_archive import (
+    PackageArchiveBuildOptions,
     _normalize_repository,
-    build_starter_archive,
-    verify_starter_archive,
+    build_package_archive,
+    verify_package_archive,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_starter_archive_manifest_contract_is_generated() -> None:
-    contract = ROOT / "contracts/starter-archive-manifest.schema.json"
+def test_package_archive_manifest_contract_is_generated() -> None:
+    contract = ROOT / "contracts/package-manifest.schema.json"
 
     assert contract.is_file()
 
 
-def test_starter_archive_manifest_rejects_unknown_fields() -> None:
+def test_package_archive_manifest_rejects_unknown_fields() -> None:
     payload = {
-        "schema_version": "kip.starter-archive.v1",
+        "schema_version": "kip.package-archive.v1",
         "version": "3.4.0",
         "created_at": "2026-08-17T00:00:00Z",
-        "root": "kip-starter-kit-3.4.0",
+        "root": "kip-3.4.0",
         "files": {"README.md": "sha256:" + "1" * 64},
         "source": {"git_commit": "a" * 40, "tracked_changes": False},
         "unexpected": True,
     }
 
     with pytest.raises(PydanticValidationError):
-        StarterArchiveManifest.model_validate(payload)
+        PackageArchiveManifest.model_validate(payload)
 
 
-def test_starter_archive_cli_builds_a_versioned_zip(tmp_path: Path) -> None:
-    output = tmp_path / "kip-starter-kit.zip"
+def test_package_archive_cli_builds_a_versioned_zip(tmp_path: Path) -> None:
+    output = tmp_path / "kip-package.zip"
 
     result = subprocess.run(
         [
             sys.executable,
             "-m",
-            "kip.starter_archive_cli",
+            "kip.package_archive_cli",
             "build",
             "--root",
             str(ROOT),
@@ -71,16 +71,16 @@ def test_starter_archive_cli_builds_a_versioned_zip(tmp_path: Path) -> None:
     envelope = json.loads(result.stdout)
     assert envelope["schema_version"] == "kip.envelope.v1"
     assert envelope["ok"] is True
-    assert envelope["data"]["schema_version"] == "kip.starter-archive-receipt.v1"
+    assert envelope["data"]["schema_version"] == "kip.package-archive-receipt.v1"
     assert output.is_file()
 
 
-def test_starter_archive_verifier_rejects_a_mismatched_external_digest(
+def test_package_archive_verifier_rejects_a_mismatched_external_digest(
     tmp_path: Path,
 ) -> None:
-    output = tmp_path / "kip-starter-kit.zip"
-    build_starter_archive(
-        StarterArchiveBuildOptions(
+    output = tmp_path / "kip-package.zip"
+    build_package_archive(
+        PackageArchiveBuildOptions(
             root=ROOT,
             output=output,
             allow_dirty=True,
@@ -93,15 +93,15 @@ def test_starter_archive_verifier_rejects_a_mismatched_external_digest(
     )
 
     with pytest.raises(ValidationError, match="external digest"):
-        verify_starter_archive(output)
+        verify_package_archive(output)
 
 
-def test_starter_archive_verifier_rejects_a_manifested_nonessential_file(
+def test_package_archive_verifier_rejects_a_manifested_nonessential_file(
     tmp_path: Path,
 ) -> None:
-    output = tmp_path / "kip-starter-kit.zip"
-    build_starter_archive(
-        StarterArchiveBuildOptions(
+    output = tmp_path / "kip-package.zip"
+    build_package_archive(
+        PackageArchiveBuildOptions(
             root=ROOT,
             output=output,
             allow_dirty=True,
@@ -113,7 +113,7 @@ def test_starter_archive_verifier_rejects_a_manifested_nonessential_file(
     root = next(iter(entries)).split("/", maxsplit=1)[0]
     relative = "docs/plans/internal-only.md"
     entries[f"{root}/{relative}"] = b"internal plan\n"
-    manifest_name = f"{root}/STARTER-KIT-MANIFEST.json"
+    manifest_name = f"{root}/KIP-MANIFEST.json"
     manifest = json.loads(entries[manifest_name])
     manifest["files"][relative] = "sha256:" + hashlib.sha256(
         entries[f"{root}/{relative}"]
@@ -135,13 +135,13 @@ def test_starter_archive_verifier_rejects_a_manifested_nonessential_file(
             archive.writestr(name, content)
 
     with pytest.raises(ValidationError, match="nonessential"):
-        verify_starter_archive(output)
+        verify_package_archive(output)
 
 
-def test_starter_archive_preserves_executable_script_mode(tmp_path: Path) -> None:
-    output = tmp_path / "kip-starter-kit.zip"
-    receipt = build_starter_archive(
-        StarterArchiveBuildOptions(
+def test_package_archive_preserves_executable_script_mode(tmp_path: Path) -> None:
+    output = tmp_path / "kip-package.zip"
+    receipt = build_package_archive(
+        PackageArchiveBuildOptions(
             root=ROOT,
             output=output,
             allow_dirty=True,
@@ -156,9 +156,9 @@ def test_starter_archive_preserves_executable_script_mode(tmp_path: Path) -> Non
     assert mode & stat.S_IXUSR
 
 
-def test_starter_archive_console_entrypoint_is_installed() -> None:
+def test_package_archive_console_entrypoint_is_installed() -> None:
     result = subprocess.run(
-        ["uv", "run", "--frozen", "kip-starter-kit", "--help"],
+        ["uv", "run", "--frozen", "kip-package", "--help"],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -169,17 +169,17 @@ def test_starter_archive_console_entrypoint_is_installed() -> None:
     assert "Build and verify" in result.stdout
 
 
-def test_starter_archive_cli_wraps_invalid_source_errors(tmp_path: Path) -> None:
+def test_package_archive_cli_wraps_invalid_source_errors(tmp_path: Path) -> None:
     result = subprocess.run(
         [
             sys.executable,
             "-m",
-            "kip.starter_archive_cli",
+            "kip.package_archive_cli",
             "build",
             "--root",
             str(tmp_path),
             "--output",
-            str(tmp_path / "starter.zip"),
+            str(tmp_path / "package.zip"),
         ],
         cwd=ROOT,
         capture_output=True,
@@ -194,7 +194,7 @@ def test_starter_archive_cli_wraps_invalid_source_errors(tmp_path: Path) -> None
     assert envelope["error"]["code"] == "validation_error"
 
 
-def test_starter_archive_is_deterministic_and_excludes_local_material(
+def test_package_archive_is_deterministic_and_excludes_local_material(
     tmp_path: Path,
 ) -> None:
     first = tmp_path / "first.zip"
@@ -205,18 +205,18 @@ def test_starter_archive_is_deterministic_and_excludes_local_material(
         "source_date_epoch": 1786924800,
     }
 
-    build_starter_archive(StarterArchiveBuildOptions(output=first, **options))
-    build_starter_archive(StarterArchiveBuildOptions(output=second, **options))
+    build_package_archive(PackageArchiveBuildOptions(output=first, **options))
+    build_package_archive(PackageArchiveBuildOptions(output=second, **options))
 
     assert first.read_bytes() == second.read_bytes()
     with zipfile.ZipFile(first) as archive:
         relative_names = {
             name.split("/", maxsplit=1)[1] for name in archive.namelist()
         }
-    assert "src/kip/starter_archive.py" in relative_names
+    assert "src/kip/package_archive.py" in relative_names
     assert "docs/adr/ADR-052-verified-online-source-zip.md" in relative_names
     assert "config/kip.toml" not in relative_names
-    assert "docs/plans/2026-08-17-online-zip-starter-kit-design.md" not in relative_names
+    assert "docs/plans/2026-08-17-online-zip-package-design.md" not in relative_names
     assert "evaluation/golden/private-onedrive-nl.yaml" not in relative_names
     assert not any(".egg-info/" in name for name in relative_names)
 
@@ -234,14 +234,14 @@ def test_starter_archive_is_deterministic_and_excludes_local_material(
         ("", None),
     ],
 )
-def test_starter_archive_normalizes_a_remote_into_shareable_provenance(
+def test_package_archive_normalizes_a_remote_into_shareable_provenance(
     remote: str,
     expected: str | None,
 ) -> None:
     assert _normalize_repository(remote) == expected
 
 
-def test_starter_archive_repository_drops_remote_credentials() -> None:
+def test_package_archive_repository_drops_remote_credentials() -> None:
     """A remote can carry an access token; the manifest is handed to others."""
     normalized = _normalize_repository(
         "https://x-access-token:ghp_examplesecret@github.com/acme/kip.git"
@@ -252,13 +252,13 @@ def test_starter_archive_repository_drops_remote_credentials() -> None:
     assert "@" not in (normalized or "")
 
 
-def test_starter_archive_manifest_records_the_source_repository(
+def test_package_archive_manifest_records_the_source_repository(
     tmp_path: Path,
 ) -> None:
-    output = tmp_path / "kip-starter-kit.zip"
+    output = tmp_path / "kip-package.zip"
 
-    build_starter_archive(
-        StarterArchiveBuildOptions(
+    build_package_archive(
+        PackageArchiveBuildOptions(
             root=ROOT,
             output=output,
             allow_dirty=True,
@@ -268,7 +268,7 @@ def test_starter_archive_manifest_records_the_source_repository(
     )
 
     with zipfile.ZipFile(output) as archive:
-        name = next(n for n in archive.namelist() if n.endswith("STARTER-KIT-MANIFEST.json"))
+        name = next(n for n in archive.namelist() if n.endswith("KIP-MANIFEST.json"))
         manifest = json.loads(archive.read(name))
 
     assert manifest["source"]["repository"] == "https://github.com/acme/kip"

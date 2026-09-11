@@ -59,7 +59,7 @@ def test_redact_config_text_preserves_reference_convention() -> None:
 
 
 def test_snapshot_config_produces_redacted_archive(tmp_path: Path) -> None:
-    root = tmp_path / "starter"
+    root = tmp_path / "package"
     (root / "config").mkdir(parents=True)
     (root / "ontology").mkdir()
     (root / "VERSION").write_text("0.0.0\n", encoding="utf-8")

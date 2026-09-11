@@ -75,11 +75,11 @@ def _build_bundle(tmp_path: Path) -> Path:
 
 def test_release_bundle_contains_verified_starter_artifacts(tmp_path: Path) -> None:
     bundle = _build_bundle(tmp_path)
-    assert not (bundle / "starter/docs/plans").exists()
-    assert not (bundle / "starter/docs/RAG_QUALITY_AUDIT_2026-08-06.md").exists()
+    assert not (bundle / "package/docs/plans").exists()
+    assert not (bundle / "package/docs/RAG_QUALITY_AUDIT_2026-08-06.md").exists()
     assert documentation_link_errors({
-        path.relative_to(bundle / "starter").as_posix(): path.read_bytes()
-        for path in (bundle / "starter").rglob("*") if path.is_file()
+        path.relative_to(bundle / "package").as_posix(): path.read_bytes()
+        for path in (bundle / "package").rglob("*") if path.is_file()
     }) == []
 
     required = [
@@ -87,19 +87,19 @@ def test_release_bundle_contains_verified_starter_artifacts(tmp_path: Path) -> N
         "artifacts/images.lock.json",
         "artifacts/sbom.spdx.json",
         "artifacts/provenance.intoto.json",
-        "starter/compose.production.yaml",
-        "starter/.env.example",
-        "starter/.mcp.json",
-        "starter/.claude/skills/kip-setup/SKILL.md",
-        "starter/migrations/0012_query_traces.sql",
-        "starter/migrations/0021_discovery_candidate_spec.sql",
-        "starter/ontology/core/predicates.yaml",
-        "starter/contracts/setup-plan.schema.json",
-        "starter/contracts/evaluation-review-bundle.schema.json",
-        "starter/contracts/golden-draft.schema.json",
-        "starter/contracts/golden-draft-review.schema.json",
-        "starter/skills/kip-setup/SKILL.md",
-        "starter/docs/STARTER_KIT_GUIDE.md",
+        "package/compose.production.yaml",
+        "package/.env.example",
+        "package/.mcp.json",
+        "package/.claude/skills/kip-setup/SKILL.md",
+        "package/migrations/0012_query_traces.sql",
+        "package/migrations/0021_discovery_candidate_spec.sql",
+        "package/ontology/core/predicates.yaml",
+        "package/contracts/setup-plan.schema.json",
+        "package/contracts/evaluation-review-bundle.schema.json",
+        "package/contracts/golden-draft.schema.json",
+        "package/contracts/golden-draft-review.schema.json",
+        "package/skills/kip-setup/SKILL.md",
+        "package/docs/DEPLOYMENT_GUIDE.md",
         "RELEASE-MANIFEST.json",
         "SHA256SUMS",
     ]
@@ -136,16 +136,16 @@ def test_release_bundle_excludes_private_onedrive_golden_corpus(tmp_path: Path) 
     bundle = _build_bundle(tmp_path)
 
     excluded = [
-        "starter/evaluation/golden/private-onedrive-nl.yaml",
-        "starter/evaluation/golden/private-onedrive-nl.floor.json",
+        "package/evaluation/golden/private-onedrive-nl.yaml",
+        "package/evaluation/golden/private-onedrive-nl.floor.json",
     ]
     for relative in excluded:
         assert not (bundle / relative).exists(), relative
 
     # private-starter.yaml is a deliberately redacted synthetic sample that
     # docs/AI_OPERATOR_RUNBOOK.md and evaluation/README.md instruct operators
-    # to run as the starter-kit acceptance template, so it must still ship.
-    assert (bundle / "starter/evaluation/golden/private-starter.yaml").is_file()
+    # to run as the package acceptance template, so it must still ship.
+    assert (bundle / "package/evaluation/golden/private-starter.yaml").is_file()
 
     verified = subprocess.run(
         [str(ROOT / "scripts/verify-release.sh"), str(bundle)],
@@ -161,7 +161,7 @@ def test_release_verifier_rejects_bundle_containing_private_golden_corpus(
     tmp_path: Path,
 ) -> None:
     bundle = _build_bundle(tmp_path)
-    golden = bundle / "starter/evaluation/golden"
+    golden = bundle / "package/evaluation/golden"
     golden.mkdir(parents=True, exist_ok=True)
     (golden / "private-onedrive-nl.yaml").write_text(
         "schema_version: kip.golden-dataset.v1\nname: private-onedrive-nl\ncases: []\n",
@@ -184,7 +184,7 @@ def test_release_verifier_rejects_secrets_private_paths_and_state(
     tmp_path: Path,
 ) -> None:
     bundle = _build_bundle(tmp_path)
-    forbidden = bundle / "starter/config/kip.toml"
+    forbidden = bundle / "package/config/kip.toml"
     database_url = "postgresql://owner:" + "secret@db/kip"
     source_path = "/" + "Users/private/company"
     forbidden.write_text(

@@ -323,12 +323,19 @@ jobs:
             ./scripts/release-bundle.sh dist/release
           ./scripts/verify-release.sh dist/release.tar.gz
 
-      - name: Build and verify starter kit archive
+      - name: Build and verify package archive
         shell: bash
         run: |
           set -euo pipefail
-          ./scripts/build-starter-kit.sh
-          ./scripts/verify-starter-kit.sh "dist/kip-starter-kit-${{ steps.release.outputs.version }}.zip"
+          ./scripts/build-package.sh
+          ./scripts/verify-package.sh "dist/kip-${{ steps.release.outputs.version }}.zip"
+          # Installers shipped with 3.9.x request kip-starter-kit-<version>.zip;
+          # build the legacy-format copy (manifest under its former name and
+          # schema id, same payload) here so it is attested and archived with
+          # the other release subjects before publishing.
+          version="${{ steps.release.outputs.version }}"
+          python3 scripts/legacy_archive.py "dist/kip-$version.zip" "dist/kip-starter-kit-$version.zip"
+          (cd dist && sha256sum "kip-starter-kit-$version.zip" > "kip-starter-kit-$version.zip.sha256")
 
       - name: Attest release provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
@@ -336,6 +343,7 @@ jobs:
           subject-path: |
             dist/wheels/*.whl
             dist/release.tar.gz
+            dist/kip-${{ steps.release.outputs.version }}.zip
             dist/kip-starter-kit-${{ steps.release.outputs.version }}.zip
 
       - name: Attest release wheel SBOM
@@ -352,13 +360,15 @@ jobs:
             dist/wheels/*.whl
             dist/release.tar.gz
             dist/release/artifacts/*.json
+            dist/kip-${{ steps.release.outputs.version }}.zip
+            dist/kip-${{ steps.release.outputs.version }}.zip.sha256
             dist/kip-starter-kit-${{ steps.release.outputs.version }}.zip
             dist/kip-starter-kit-${{ steps.release.outputs.version }}.zip.sha256
           if-no-files-found: error
           retention-days: 90
 
       # A workflow artifact expires and needs a signed-in user who can find the
-      # run. The starter kit is the primary way an adopter installs KIP, so it
+      # run. The package is the primary way an adopter installs KIP, so it
       # is attached to a durable public release instead.
       - name: Publish GitHub release
         shell: bash
@@ -376,19 +386,19 @@ jobs:
           \`\`\`bash
           curl -fsSL https://github.com/${{ github.repository }}/releases/download/v$version/install.sh | bash -s -- ~/kip --version $version
           \`\`\`
-          The installer downloads \`kip-starter-kit-$version.zip\`, verifies it
-          against \`kip-starter-kit-$version.zip.sha256\` before extracting, then
+          The installer downloads \`kip-$version.zip\`, verifies it
+          against \`kip-$version.zip.sha256\` before extracting, then
           runs \`./scripts/bootstrap.sh\`. Review \`install.sh\` first if your
           policy requires it; the manual path (download, verify, unzip, follow
-          \`docs/STARTER_KIT_GUIDE.md\` section 2) is unchanged.
+          \`docs/DEPLOYMENT_GUIDE.md\` section 2) is unchanged.
 
           ### Upgrading an existing deployment
           Run the same command with the existing directory, or
-          \`./scripts/upgrade.sh --version $version\` inside it. Only kit-owned
+          \`./scripts/upgrade.sh --version $version\` inside it. Only package-owned
           files listed in the manifests are replaced; \`.env\`, \`config/kip*.toml\`,
-          \`.mcp.json\`, \`var/\` and ontology additions are preserved, previous kit
+          \`.mcp.json\`, \`var/\` and ontology additions are preserved, previous package
           files are kept under \`var/upgrades/\` for \`--rollback\`. See
-          \`docs/STARTER_KIT_GUIDE.md\` section 11.
+          \`docs/DEPLOYMENT_GUIDE.md\` section 11.
 
           ### Licensing
           KIP is MIT. It ships AGPL-3.0 PyMuPDF and LGPL-3.0 psycopg; see
@@ -398,6 +408,8 @@ jobs:
           Full changes are in \`CHANGELOG.md\`.
           NOTES
           assets=(
+            "dist/kip-$version.zip"
+            "dist/kip-$version.zip.sha256"
             "dist/kip-starter-kit-$version.zip"
             "dist/kip-starter-kit-$version.zip.sha256"
             "dist/release.tar.gz"

@@ -84,7 +84,7 @@ The default Compose profile is a local pilot profile. Before serving multiple us
 ## Operations
 
 - For an online source handoff, build and verify
-  `dist/kip-starter-kit-$(cat VERSION).zip`, retain its external SHA-256 file,
+  `dist/kip-$(cat VERSION).zip`, retain its external SHA-256 file,
   and confirm the recipient can bootstrap and run the verification suite after
   extraction. Do not treat that source ZIP as signed deployment provenance.
 - Require the current commit to pass Python 3.12 and 3.13 CI, generated-contract

@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# In-place upgrade of a kit-based KIP deployment.
+# In-place upgrade of a package-based KIP deployment.
 #
-#   ./scripts/upgrade.sh --archive kip-starter-kit-X.Y.Z.zip [--dry-run] [--no-bootstrap] [--check|--install-docker|--without-docker]
+#   ./scripts/upgrade.sh --archive kip-X.Y.Z.zip [--dry-run] [--no-bootstrap] [--check|--install-docker|--without-docker]
 #   ./scripts/upgrade.sh --latest | --version X.Y.Z      (downloads through scripts/install.sh)
 #   ./scripts/upgrade.sh --rollback [UPGRADE_ID]
+#   ./scripts/upgrade.sh --finish        (internal: bootstrap, migrate and doctor after install.sh applied files)
 #
-# Kit-owned files are replaced from the archive's manifest; deployment-owned
+# Package-owned files are replaced from the archive's manifest; deployment-owned
 # paths (.env, config/kip*.toml, .mcp.json, var/, secrets/, ontology
 # additions) are never touched. After applying, bootstrap resyncs the locked
 # environment and migrate applies append-only migrations.
@@ -21,7 +22,7 @@ python_for_upgrade() {
   else printf 'upgrade.sh: python3 is required (run ./scripts/bootstrap.sh first)\n' >&2; exit 69; fi
 }
 
-archive=""; dry_run=0; bootstrap=1; rollback=""; do_rollback=0; version=""; latest=0
+archive=""; dry_run=0; bootstrap=1; rollback=""; do_rollback=0; version=""; latest=0; finish=0
 bootstrap_args=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -32,17 +33,39 @@ while [[ $# -gt 0 ]]; do
     --latest) latest=1; shift ;;
     --dry-run) dry_run=1; shift ;;
     --no-bootstrap) bootstrap=0; shift ;;
+    --finish) finish=1; shift ;;
     --check|--install-docker|--without-docker) bootstrap_args+=("$1"); shift ;;
     --rollback) do_rollback=1; if [[ $# -ge 2 && "$2" != -* ]]; then rollback="$2"; shift; fi; shift ;;
-    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
     *) printf 'upgrade.sh: unknown option %s\n' "$1" >&2; exit 2 ;;
   esac
 done
 
 PY="$(python_for_upgrade)"
 if [[ "$do_rollback" == 1 ]]; then
-  if [[ -n "$rollback" ]]; then exec "$PY" "$SCRIPT_DIR/upgrade_kit.py" --deployment "$PROJECT_ROOT" --rollback "$rollback"
-  else exec "$PY" "$SCRIPT_DIR/upgrade_kit.py" --deployment "$PROJECT_ROOT" --rollback; fi
+  if [[ "$dry_run" == 1 || -n "$archive" || -n "$version" || "$latest" == 1 || "$bootstrap" == 0 || "$finish" == 1 || ${#bootstrap_args[@]} -gt 0 ]]; then
+    printf 'upgrade.sh: --rollback takes only an optional UPGRADE_ID; it cannot be combined with --dry-run, --archive, --version, --latest or bootstrap options (rollback has no preview and does not bootstrap)\n' >&2; exit 2
+  fi
+  if [[ -n "$rollback" ]]; then exec "$PY" "$SCRIPT_DIR/upgrade_package.py" --deployment "$PROJECT_ROOT" --rollback "$rollback"
+  else exec "$PY" "$SCRIPT_DIR/upgrade_package.py" --deployment "$PROJECT_ROOT" --rollback; fi
+fi
+finish_upgrade() {
+  "$PROJECT_ROOT/scripts/bootstrap.sh" ${bootstrap_args[@]+"${bootstrap_args[@]}"}
+  for arg in ${bootstrap_args[@]+"${bootstrap_args[@]}"}; do [[ "$arg" == "--check" ]] && exit 0; done
+  if ! "$PROJECT_ROOT/scripts/migrate.sh"; then
+    printf 'Action required: migrations were not applied. Start the database (./scripts/app-up.sh --database-only) and run ./scripts/migrate.sh, then ./scripts/kip doctor.\n' >&2
+    exit 75
+  fi
+  if "$PROJECT_ROOT/scripts/kip" doctor >/dev/null 2>&1; then
+    printf 'Upgrade complete. Run ./scripts/kip doctor for the full readiness report.\n'
+  else
+    printf 'Upgrade applied and migrated; ./scripts/kip doctor reported issues, run it for details.\n' >&2
+  fi
+}
+
+if [[ "$finish" == 1 ]]; then
+  [[ -z "$archive$version" && "$latest" == 0 && "$dry_run" == 0 ]] || { printf 'upgrade.sh: --finish takes only bootstrap options\n' >&2; exit 2; }
+  finish_upgrade; exit 0
 fi
 if [[ -z "$archive" ]]; then
   if [[ "$latest" == 1 || -n "$version" ]]; then
@@ -58,18 +81,8 @@ fi
 
 upgrade_args=(--deployment "$PROJECT_ROOT" --archive "$archive")
 [[ "$dry_run" == 1 ]] && upgrade_args+=(--dry-run)
-"$PY" "$SCRIPT_DIR/upgrade_kit.py" "${upgrade_args[@]}"
+"$PY" "$SCRIPT_DIR/upgrade_package.py" "${upgrade_args[@]}"
 if [[ "$dry_run" == 1 || "$bootstrap" == 0 ]]; then exit 0; fi
 
-# The tree now holds the new kit; finish with its own wrappers.
-"$PROJECT_ROOT/scripts/bootstrap.sh" ${bootstrap_args[@]+"${bootstrap_args[@]}"}
-for arg in ${bootstrap_args[@]+"${bootstrap_args[@]}"}; do [[ "$arg" == "--check" ]] && exit 0; done
-if ! "$PROJECT_ROOT/scripts/migrate.sh"; then
-  printf 'Action required: migrations were not applied. Start the database (./scripts/app-up.sh --database-only) and run ./scripts/migrate.sh, then ./scripts/kip doctor.\n' >&2
-  exit 75
-fi
-if "$PROJECT_ROOT/scripts/kip" doctor >/dev/null 2>&1; then
-  printf 'Upgrade complete. Run ./scripts/kip doctor for the full readiness report.\n'
-else
-  printf 'Upgrade applied and migrated; ./scripts/kip doctor reported issues, run it for details.\n' >&2
-fi
+# The tree now holds the new package; finish with its own wrappers.
+finish_upgrade

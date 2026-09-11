@@ -1,5 +1,50 @@
 # Changelog
 
+## 3.10.0 - 2026-09-11
+
+- Retire the "starter kit" name. The release archive is `kip-<version>.zip`
+  with `kip-<version>.zip.sha256`, its manifest is `KIP-MANIFEST.json`
+  (`schema_version` `kip.package-archive.v1`), the build/verify commands are
+  `./scripts/build-package.sh`, `./scripts/verify-package.sh` and the
+  `kip-package` console script, the source modules are `kip.package_archive*`,
+  the in-place upgrader is `scripts/upgrade_package.py`, the release bundle's
+  source directory is `package/`, and the adoption guide is
+  `docs/DEPLOYMENT_GUIDE.md`. Compatibility: the upgrader and the model still
+  read `STARTER-KIT-MANIFEST.json` and `kip.starter-archive.v1` from
+  deployments installed before 3.10.0 (the legacy manifest file is removed on
+  upgrade and restored by rollback), the installer falls back to the former
+  asset name for releases before 3.10.0, and each release also publishes a
+  legacy-format `kip-starter-kit-<version>.zip` (+ sidecar) built by
+  `scripts/legacy_archive.py`: the same payload with the manifest under its
+  former name and schema identifier, which is what the 3.9.x upgrader
+  requires, so `kip update` from 3.9.x keeps working with one command. When
+  the installer upgrades an existing deployment it applies the archive with
+  the upgrader shipped inside that archive, so a 3.9.x deployment can also be
+  upgraded by re-running the one-line installer; the deployment's new
+  `upgrade.sh --finish` then runs bootstrap, migrate and doctor.
+- Make `kip` a global command. The installer writes a launcher to
+  `~/.local/bin/kip` (`--bin-dir` to change) that runs the deployment's own
+  `scripts/kip`, and adds a marked, idempotent block to the login shell
+  profile (`~/.zshrc`, `~/.bashrc`/`~/.bash_profile`, or `~/.profile`)
+  exporting `KIP_HOME` and putting the launcher directory on `PATH`;
+  `--no-shell-profile` skips the profile change. The block is replaced, never
+  duplicated, and nothing else in the profile is touched. Paths are
+  shell-quoted, a symlinked profile is rewritten through the link with its
+  mode preserved, a new macOS `~/.bash_profile` sources an existing
+  `~/.profile`, a foreign `~/.local/bin/kip` is backed up to `kip.bak`, and
+  `--dry-run` leaves launcher and profile untouched. `scripts/kip` (and so the
+  launcher) now exits 69 with `KIP runtime is not installed at …; run
+  scripts/bootstrap.sh` when the deployment has no `.venv` and the system
+  Python cannot import the CLI, instead of a Python traceback.
+- Add `kip update` (`--version X.Y.Z`, `--archive ZIP`, `--dry-run`,
+  `--rollback [--rollback-id ID]`, `--no-bootstrap`), which runs
+  `scripts/upgrade.sh` and streams its output, and `kip version`. `--rollback`
+  has no preview, so combining it with `--dry-run`, `--archive` or `--version`
+  is rejected by both the CLI and `upgrade.sh` instead of rolling back.
+  Rolling back an upgrade that renamed the manifest also removes the newer
+  `KIP-MANIFEST.json` so the restored legacy manifest is authoritative again. Both work without a database; git checkouts
+  are still refused with the `git pull` hint.
+
 ## 3.9.0 - 2026-09-11
 
 - Add a one-command installer published with every release:

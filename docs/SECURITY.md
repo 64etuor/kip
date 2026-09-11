@@ -106,7 +106,7 @@ against a concurrent filesystem attacker. See ADR-056.
   A new host requires a regenerated, approved plan (ADR-057).
 - Do not place secrets in `.mcp.json`, `CLAUDE.md`, `AGENTS.md`, or Skill files.
 
-## Starter archive boundary
+## Package archive boundary
 
 - The online source ZIP is built from an explicit allowlist. Local config,
   `.env`, credentials, private evaluation data, databases, CAS/output data,
@@ -126,9 +126,22 @@ against a concurrent filesystem attacker. See ADR-056.
   origin, so it detects a corrupted or mismatched asset, not a compromised
   origin. The digest is checked before anything is extracted, a fresh install
   requires an empty target, and an upgrade replaces only manifest-listed
-  kit files. Where policy requires review, download `install.sh`, read it, and
-  pin `--version X.Y.Z`; the manual download, verify and unzip path is
+  package files. Where policy requires review, download `install.sh`, read it,
+  and pin `--version X.Y.Z`; the manual download, verify and unzip path is
   unchanged.
+- The installer is the one exception to "existing shell profiles are
+  preserved" (ADR-061): after installing or upgrading it writes the launcher
+  (`~/.local/bin/kip`, or `--bin-dir`/`KIP_BIN_DIR`) and replaces a single
+  block delimited by `# >>> KIP >>>` and `# <<< KIP <<<` in the login shell
+  profile (`~/.zshrc`, `~/.bashrc`/`~/.bash_profile`, or `~/.profile`). The
+  block only exports `KIP_HOME` and prepends the launcher directory to `PATH`;
+  it holds no secrets and is replaced rather than appended. The profile is
+  rewritten through a temporary copy with its mode preserved (a symlinked
+  profile is edited through the link), so only the marked block changes, but
+  hard links and extended attributes are not carried over, and running the
+  installer under `sudo` with a user `HOME` would reassign the file's owner.
+  `--no-shell-profile` opts out, and `./scripts/bootstrap.sh` still never
+  edits a profile (ADR-063).
 
 ## Telemetry boundary
 

@@ -1,6 +1,6 @@
 {
   "$defs": {
-    "StarterArchiveSource": {
+    "PackageArchiveSource": {
       "additionalProperties": false,
       "properties": {
         "git_commit": {
@@ -28,7 +28,7 @@
         "git_commit",
         "tracked_changes"
       ],
-      "title": "StarterArchiveSource",
+      "title": "PackageArchiveSource",
       "type": "object"
     }
   },
@@ -51,13 +51,16 @@
       "type": "string"
     },
     "schema_version": {
-      "const": "kip.starter-archive.v1",
-      "default": "kip.starter-archive.v1",
+      "default": "kip.package-archive.v1",
+      "enum": [
+        "kip.package-archive.v1",
+        "kip.starter-archive.v1"
+      ],
       "title": "Schema Version",
       "type": "string"
     },
     "source": {
-      "$ref": "#/$defs/StarterArchiveSource"
+      "$ref": "#/$defs/PackageArchiveSource"
     },
     "version": {
       "title": "Version",
@@ -71,6 +74,6 @@
     "files",
     "source"
   ],
-  "title": "StarterArchiveManifest",
+  "title": "PackageArchiveManifest",
   "type": "object"
 }

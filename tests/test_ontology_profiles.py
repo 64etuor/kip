@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_catalog_loads_empty_domain_without_research_project_symbols() -> None:
-    # Given the starter ontology root and its empty domain profile
+    # Given the package ontology root and its empty domain profile
     ontology_root = ROOT / "ontology"
 
     # When the catalog is loaded for a new deployment
@@ -37,7 +37,7 @@ def test_catalog_rejects_an_unknown_domain_profile() -> None:
 
 
 def test_release_composition_uses_the_selected_domain_profile() -> None:
-    # Given the starter ontology root and its empty domain profile
+    # Given the package ontology root and its empty domain profile
     ontology_root = ROOT / "ontology"
 
     # When a release is composed for a new deployment

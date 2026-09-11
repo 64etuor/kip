@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kip-knowledge-fabric"
-version = "3.9.0"
+version = "3.10.0"
 description = "Agent-first evidence-backed knowledge fabric for files, Slack, and mail"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -74,7 +74,7 @@ kip = "kip.cli:main"
 kip-api = "kip.api:main"
 kip-worker = "kip.worker:main"
 kip-mcp = "kip.mcp_server:main"
-kip-starter-kit = "kip.starter_archive_cli:main"
+kip-package = "kip.package_archive_cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

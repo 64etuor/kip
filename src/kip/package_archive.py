@@ -15,25 +15,25 @@ from typing import Final
 from unicodedata import normalize
 from urllib.parse import urlsplit, urlunsplit
 
-from kip.domain.starter_archive import (
-    StarterArchiveManifest,
-    StarterArchiveReceipt,
-    StarterArchiveSource,
+from kip.domain.package_archive import (
+    PackageArchiveManifest,
+    PackageArchiveReceipt,
+    PackageArchiveSource,
 )
 from kip.errors import ConflictError, ValidationError
-from kip.starter_archive_policy import (
+from kip.package_archive_policy import (
     scan_content,
     selected_source_files,
 )
-from kip.starter_archive_verifier import verify_starter_archive as verify_starter_archive
+from kip.package_archive_verifier import verify_package_archive as verify_package_archive
 
 ZIP_EPOCH: Final = 315532800
-MANIFEST_NAME: Final = "STARTER-KIT-MANIFEST.json"
+MANIFEST_NAME: Final = "KIP-MANIFEST.json"
 CHECKSUM_NAME: Final = "SHA256SUMS"
 
 
 @dataclass(frozen=True, slots=True)
-class StarterArchiveBuildOptions:
+class PackageArchiveBuildOptions:
     root: Path
     output: Path
     allow_dirty: bool = False
@@ -48,25 +48,25 @@ class ArchiveEntry:
     executable: bool = False
 
 
-def build_starter_archive(options: StarterArchiveBuildOptions) -> StarterArchiveReceipt:
+def build_package_archive(options: PackageArchiveBuildOptions) -> PackageArchiveReceipt:
     root = options.root.expanduser().resolve()
     output = options.output.expanduser().resolve()
     if output.exists() or _sidecar(output).exists():
-        raise ConflictError(f"starter archive output already exists: {output}")
+        raise ConflictError(f"package archive output already exists: {output}")
     version = _version(root)
-    expected_root = f"kip-starter-kit-{version}"
+    expected_root = f"kip-{version}"
     commit, tracked_changes = _source_state(root)
     if tracked_changes and not options.allow_dirty:
         raise ConflictError("tracked or untracked source changes require --allow-dirty")
     epoch = _source_epoch(options, root)
     entries = _source_entries(root)
     digests = {entry.relative: f"sha256:{_sha256(entry.content)}" for entry in entries}
-    manifest = StarterArchiveManifest(
+    manifest = PackageArchiveManifest(
         version=version,
         created_at=datetime.fromtimestamp(epoch, UTC),
         root=expected_root,
         files=digests,
-        source=StarterArchiveSource(
+        source=PackageArchiveSource(
             git_commit=commit,
             tracked_changes=tracked_changes,
             repository=_source_repository(options, root),
@@ -87,10 +87,10 @@ def build_starter_archive(options: StarterArchiveBuildOptions) -> StarterArchive
         for entry in (*checksum_entries, checksum_entry)
     )
     output.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="kip-starter-archive-", dir=output.parent) as temp:
+    with tempfile.TemporaryDirectory(prefix="kip-package-archive-", dir=output.parent) as temp:
         candidate = Path(temp) / output.name
         _write_zip(candidate, archive_entries, epoch)
-        verified = verify_starter_archive(candidate)
+        verified = verify_package_archive(candidate)
         digest = verified.archive_sha256
         sidecar = Path(temp) / _sidecar(output).name
         sidecar.write_text(f"{digest}  {output.name}\n", encoding="utf-8")
@@ -101,14 +101,14 @@ def build_starter_archive(options: StarterArchiveBuildOptions) -> StarterArchive
     )
 
 
-def default_starter_archive_output(root: Path) -> Path:
-    return root / "dist" / f"kip-starter-kit-{_version(root)}.zip"
+def default_package_archive_output(root: Path) -> Path:
+    return root / "dist" / f"kip-{_version(root)}.zip"
 
 
 def _source_entries(root: Path) -> tuple[ArchiveEntry, ...]:
     entries: list[ArchiveEntry] = []
     for path in selected_source_files(root):
-        # NFC keeps kits byte-identical across macOS (NFD file names) and Linux.
+        # NFC keeps packages byte-identical across macOS (NFD file names) and Linux.
         relative = normalize("NFC", path.relative_to(root).as_posix())
         content = path.read_bytes()
         scan_content(content, relative)
@@ -145,7 +145,7 @@ def _source_state(root: Path) -> tuple[str, bool]:
 
 
 def _source_repository(
-    options: StarterArchiveBuildOptions,
+    options: PackageArchiveBuildOptions,
     root: Path,
 ) -> str | None:
     if options.repository is not None:
@@ -180,7 +180,7 @@ def _normalize_repository(raw: str) -> str | None:
     return urlunsplit((parsed.scheme, f"{host}{port}", path, "", ""))
 
 
-def _source_epoch(options: StarterArchiveBuildOptions, root: Path) -> int:
+def _source_epoch(options: PackageArchiveBuildOptions, root: Path) -> int:
     value = options.source_date_epoch
     if value is None:
         configured = os.environ.get("SOURCE_DATE_EPOCH")
@@ -208,9 +208,9 @@ def _version(root: Path) -> str:
     try:
         version = (root / "VERSION").read_text(encoding="utf-8").strip()
     except OSError as error:
-        raise ValidationError("starter source VERSION is unavailable") from error
+        raise ValidationError("package source VERSION is unavailable") from error
     if not re.fullmatch(r"[0-9A-Za-z._-]+", version):
-        raise ValidationError("VERSION is not safe for a starter archive root")
+        raise ValidationError("VERSION is not safe for a package archive root")
     return version
 
 
@@ -219,7 +219,7 @@ def _checksum_bytes(entries: tuple[ArchiveEntry, ...]) -> bytes:
     return ("\n".join(lines) + "\n").encode()
 
 
-def _manifest_bytes(manifest: StarterArchiveManifest) -> bytes:
+def _manifest_bytes(manifest: PackageArchiveManifest) -> bytes:
     payload = manifest.model_dump(mode="json")
     return (json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode()
 

@@ -34,17 +34,57 @@ curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh \
 ```
 
 계속 실패하면 두 자산을 직접 내려받아
-`shasum -a 256 -c kip-starter-kit-X.Y.Z.zip.sha256`으로 확인하세요.
+`shasum -a 256 -c kip-X.Y.Z.zip.sha256`으로 확인하세요.
 
 ### `... is not empty and is not a KIP deployment`
 새로 설치할 디렉터리는 비어 있거나 아직 없어야 합니다. 기존 배포 위에 실행할
-때는 `VERSION`과 `STARTER-KIT-MANIFEST.json`이 있어야 제자리 업그레이드로
-넘어갑니다. 다른 경로를 지정하거나(`bash -s -- ~/kip2`) 기존 내용을 먼저
+때는 `VERSION`과 `KIP-MANIFEST.json`(3.10.0 이전 배포는
+`STARTER-KIT-MANIFEST.json`)이 있어야 제자리 업그레이드로 넘어갑니다. 다른 경로를 지정하거나(`bash -s -- ~/kip2`) 기존 내용을 먼저
 옮기세요. 설치기는 어떤 파일도 지우지 않습니다.
 
+### 설치는 끝났는데 `kip: command not found`
+설치기는 `~/.local/bin/kip` 런처를 쓰고(`--bin-dir DIR` 또는 `KIP_BIN_DIR`로
+위치를 바꿉니다) 로그인 셸 프로필에 표시된 블록 하나를 추가합니다. zsh는
+`~/.zshrc`, bash는 Linux에서 `~/.bashrc`·macOS에서 `~/.bash_profile`, 그 밖의
+셸은 `~/.profile`입니다.
+
+```sh
+# >>> KIP >>>
+export KIP_HOME='/home/kip/kip'
+KIP_BIN='/home/kip/.local/bin'
+case ":$PATH:" in *":$KIP_BIN:"*) ;; *) export PATH="$KIP_BIN:$PATH" ;; esac
+unset KIP_BIN
+# <<< KIP <<<
+```
+
+경로는 설치 시점의 절대 경로가 인용부호로 감싸여 들어갑니다.
+
+블록은 `KIP_HOME`을 내보내고 런처 디렉터리를 `PATH`에 넣을 뿐이며, 재설치나
+업그레이드 때 통째로 교체되므로 중복되지 않습니다. 프로필의 다른 내용은
+바뀌지 않습니다. 현재 셸에는 아직 반영되지 않았을 뿐이니 순서대로 확인하세요.
+
+1. 셸을 새로 열거나 프로필을 다시 읽습니다: `source ~/.zshrc`(쓰는 프로필로).
+2. 런처가 있는지 봅니다: `ls -l ~/.local/bin/kip`.
+3. `--no-shell-profile`로 설치했거나 fish 등 다른 셸을 쓴다면 프로필이 바뀌지
+   않았습니다. 해당 셸의 설정에 직접 넣으세요.
+
+```bash
+export KIP_HOME=~/kip
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+런처는 `KIP_HOME`(없으면 설치 시점의 배포 경로)의 `scripts/kip`를 실행합니다.
+배포를 옮겼거나 여러 개를 쓴다면 `KIP_HOME`으로 대상을 고르고, 저장소
+체크아웃에서는 `./scripts/kip`를 씁니다.
+
+### `KIP runtime is not installed at ...; Run: .../scripts/bootstrap.sh`
+`--no-bootstrap`으로 설치했거나 bootstrap이 중단돼 배포에 `.venv`가 없습니다.
+런처와 `./scripts/kip`는 시스템 Python으로 대신 실행하지 않고 종료 코드 69로
+멈춥니다. 안내된 `scripts/bootstrap.sh`를 실행한 뒤 다시 시도하세요.
+
 ### `... is a git checkout; update it with git pull`
-저장소를 복제해 쓰는 개발 트리입니다. 설치기와 `upgrade.sh`는 git 트리를
-건드리지 않습니다.
+저장소를 복제해 쓰는 개발 트리입니다. 설치기와 `upgrade.sh`, `kip update`는
+git 트리를 건드리지 않습니다.
 
 ```bash
 git pull
@@ -53,11 +93,11 @@ git pull
 
 ### `... predates the in-place upgrader`
 3.9.0 이전에 만들어진 배포에는 `scripts/upgrade.sh`가 없습니다.
-[`STARTER_KIT_GUIDE.md`](STARTER_KIT_GUIDE.md) 11.5의 수동 절차를 한 번 수행하면
+[`DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md) 11.5의 수동 절차를 한 번 수행하면
 그 뒤부터는 설치기와 `./scripts/upgrade.sh`로 올릴 수 있습니다.
 
 ### 업그레이드가 `Action required`와 exit 75로 끝남
-새 kit 파일은 적용됐지만 데이터베이스에 연결할 수 없어 마이그레이션이 실행되지
+새 패키지 파일은 적용됐지만 데이터베이스에 연결할 수 없어 마이그레이션이 실행되지
 않은 상태입니다. DB를 올린 뒤 나머지를 직접 실행하세요.
 
 ```bash

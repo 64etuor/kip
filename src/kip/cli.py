@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
@@ -11,6 +12,7 @@ import typer
 from pydantic import BaseModel
 from pydantic import ValidationError as PydanticValidationError
 
+from kip import __version__
 from kip.adapters.ocr.kordoc import KordocOcrConfig, probe_kordoc_version
 from kip.container import Container, build_container
 from kip.domain.interactions import (
@@ -161,7 +163,8 @@ def root(
         help="Comma-separated operator roles",
     ),
 ) -> None:
-    if ctx.invoked_subcommand == "setup":
+    if ctx.invoked_subcommand in {"setup", "update", "version"}:
+        # Operator commands that must work without a database or a full container.
         ctx.obj = None
         return
     try:
@@ -584,6 +587,65 @@ def _doctor_summary(checks: list[dict[str, Any]], required_failures: list[str]) 
 
 
 @app.command()
+def version() -> None:
+    """Print the installed KIP version."""
+    envelope = Envelope(
+        ok=True,
+        data={"version": __version__},
+        meta=EnvelopeMeta(request_id=new_id("req"), workspace="local"),
+    )
+    typer.echo(envelope.model_dump_json(indent=2))
+
+
+@app.command()
+def update(
+    target_version: str | None = typer.Option(None, "--version", help="Upgrade to this release instead of the latest"),
+    archive: Path | None = typer.Option(None, "--archive", help="Upgrade from an already downloaded kip-X.Y.Z.zip"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print the plan and CHANGELOG entries; change nothing"),
+    rollback: bool = typer.Option(False, "--rollback", help="Restore the previous package files"),
+    rollback_id: str | None = typer.Option(None, "--rollback-id", help="Specific var/upgrades record to restore"),
+    no_bootstrap: bool = typer.Option(False, "--no-bootstrap", help="Apply files only; skip bootstrap and migrate"),
+) -> None:
+    """Update this deployment in place (package deployments; git checkouts use git pull).
+
+    Runs scripts/upgrade.sh: download and verify the release, replace only
+    package-owned files, keep .env/config/.mcp.json/var, then bootstrap,
+    migrate and doctor. Output streams through unchanged.
+    """
+    if rollback and (dry_run or archive is not None or target_version or no_bootstrap):
+        raise typer.BadParameter("--rollback cannot be combined with --dry-run, --archive, --version or --no-bootstrap")
+    if rollback_id and not rollback:
+        raise typer.BadParameter("--rollback-id requires --rollback")
+    root = Path(os.environ.get("KIP_PROJECT_ROOT") or Path(__file__).resolve().parents[2])
+    script = root / "scripts" / "upgrade.sh"
+    if not script.is_file():
+        typer.echo(f"update: {script} is missing; this is not a KIP deployment directory", err=True)
+        raise typer.Exit(code=2)
+    arguments = [str(script)]
+    if rollback:
+        arguments.append("--rollback")
+        if rollback_id:
+            arguments.append(rollback_id)
+    elif archive is not None:
+        arguments.extend(["--archive", str(archive)])
+    elif target_version:
+        arguments.extend(["--version", target_version])
+    else:
+        arguments.append("--latest")
+    if dry_run:
+        arguments.append("--dry-run")
+    if no_bootstrap:
+        arguments.append("--no-bootstrap")
+    try:
+        completed = subprocess.run(arguments, check=False)
+    except OSError as error:
+        typer.echo(f"update: cannot run {script}: {error}", err=True)
+        raise typer.Exit(code=2) from error
+    code = completed.returncode
+    raise typer.Exit(code=code if code >= 0 else 128 - code)
+
+
+@app.command()
 def doctor(ctx: typer.Context) -> None:
     """Check configuration, source mounts, storage, and adapter availability."""
 
@@ -931,7 +993,7 @@ def sync_run(
     source: str = typer.Option(
         ..., "--source", help="Configured source name, nas, slack, mail, or all"
     ),
-    mode: str = typer.Option("incremental", "--mode", help="Starter supports incremental mode"),
+    mode: str = typer.Option("incremental", "--mode", help="Package supports incremental mode"),
     since: str | None = typer.Option(None, "--since", help="Optional Slack oldest timestamp"),
     enqueue: bool = typer.Option(False, "--enqueue"),
     dry_run: bool = typer.Option(False, "--dry-run"),
@@ -941,7 +1003,7 @@ def sync_run(
     def action(runtime: Runtime) -> Any:
         if mode != "incremental":
             raise ValidationError(
-                "the starter kit implements safe incremental sync only; "
+                "the package implements safe incremental sync only; "
                 "source reconciliation and forced full re-extraction require an explicit operator workflow"
             )
         return _sync_one(runtime, source, enqueue=enqueue, dry_run=dry_run, since=since)

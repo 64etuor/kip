@@ -1,0 +1,543 @@
+docs/adr/ADR-040-runnable-guided-setup-path.md
+  s_16a999dee6ecf2::t_fe06bebd4f01a5 30-31,74
+  s_16a999dee6ecf2::t_45a436defe2d5a 3,5-8
+evaluation/reports/embed-candidates-kure-v1/latest.json
+  s_16a999dee6ecf2::t_582c2617996f71 14-1726
+  s_16a999dee6ecf2::t_fc5de653bc21c5 1-13,1727-1743
+evaluation/reports/embed-candidates-baseline/latest.json
+  s_16a999dee6ecf2::t_a59052b106ad4b 1-1740
+docs/adr/ADR-024-typed-ontology-relation-candidates.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+docs/adr/ADR-063-package-naming-and-global-launcher.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-6
+VERSION
+  s_16a999dee6ecf2::t_12351609c9cb9c 1
+tests/test_shipped_defaults_parity.py
+  s_16a999dee6ecf2::t_5518777ad6c8b7 80-87
+  s_16a999dee6ecf2::t_e23b1cc77ce303 1-66,69-71,88-122
+  s_16a999dee6ecf2::t_3983fd7c976ba2 67-68,72-79
+src/kip/setup/writer.py
+  s_16a999dee6ecf2::t_edba5cec048b01 218-236,246-256
+  s_16a999dee6ecf2::t_92ec91d5f64357 237-245
+  s_16a999dee6ecf2::t_ccd8812b5abc63 22-43
+  s_16a999dee6ecf2::t_a0f6d597f3f9df 8,217
+  s_16a999dee6ecf2::t_e96362cbc6d999 141-150,155
+  s_16a999dee6ecf2::t_a075597dd468d7 151-154
+  s_16a999dee6ecf2::t_ab33924de83817 190-194,197-200,202-204
+.env.example
+  s_16a999dee6ecf2::t_2f70b0a3f8fe4f 22,71-78
+  s_16a999dee6ecf2::t_c463c6b16a5170 24-35,38
+  s_16a999dee6ecf2::t_a4779e9c9291f8 36-37
+  s_16a999dee6ecf2::t_45c851109d9e91 23
+docs/PRODUCTION_CHECKLIST.md
+  s_16a999dee6ecf2::t_8ecdf3ea4017ba 50-51
+  s_16a999dee6ecf2::t_44bff8ffe0b31a 12-19,139-146,150-158
+  s_16a999dee6ecf2::t_b5e1d70ab92516 29-37,40-43
+tests/test_bootstrap_locked.py
+  s_16a999dee6ecf2::t_1010fe98b7f343 83
+evaluation/reports/embed-candidates-arctic-ko/latest.json
+  s_16a999dee6ecf2::t_25ba9d03a5411f 1-1746
+skills/kip-setup/references/questions.md
+  s_16a999dee6ecf2::t_ce3a9f50dda045 52-58
+deploy/compose.roles.yaml
+  s_16a999dee6ecf2::t_2fe5188a91f875 1-60
+docs/adr/ADR-047-measured-auto-approve-policy.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3,5-6
+  s_16a999dee6ecf2::t_20445eee019339 22-25,91-92
+docs/adr/ADR-052-verified-online-source-zip.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3,5-8
+  s_16a999dee6ecf2::t_fe06bebd4f01a5 50-52
+src/kip/cli.py
+  s_16a999dee6ecf2::t_ec149d39dad030 585
+  s_16a999dee6ecf2::t_db99fefb59340e 56,275,977-980,994-999,1001,1040-1042,1057-1062,1064
+  s_16a999dee6ecf2::t_2402569dff86c3 71,190-193
+src/kip/container.py
+  s_16a999dee6ecf2::t_f97374e2ee393b 52
+  s_16a999dee6ecf2::t_db33f8c1f2ffc3 148-150,152-154,166,189
+  s_16a999dee6ecf2::t_00643fbc269e81 59
+  s_16a999dee6ecf2::t_72d7c522cd0fa6 246-248
+  s_16a999dee6ecf2::t_0c4ac7865a0fa6 135,236,307,584,605,617,629,723-735,763
+docs/adr/ADR-059-discovery-evidence-and-reproducible-startup.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+src/kip/adapters/rerankers/backend.py
+  s_16a999dee6ecf2::t_ca5007fd8918f9 14-22,27-31
+src/kip/adapters/embeddings/http.py
+  s_16a999dee6ecf2::t_d1577778d85efe 11,39-43,50-53,56
+tests/test_logging_configuration.py
+  s_16a999dee6ecf2::t_e00a5fe5bec6d1 15
+  s_16a999dee6ecf2::t_5b24a69a9fe3d6 1-14,16-24,28-58,60-63,65-74,76,78-85,87-95,97-110
+  s_16a999dee6ecf2::t_60fd6d90e033e6 25-27,59,64,75,77,86
+  s_16a999dee6ecf2::t_c0d0330c16de83 96
+  s_16a999dee6ecf2::t_0782e12a195191 111-124
+docs/TROUBLESHOOTING.md
+  s_16a999dee6ecf2::t_a92894b5956f6d 218,220-222,226
+  s_16a999dee6ecf2::t_4cb678ef43aa30 276,279-283
+  s_16a999dee6ecf2::t_42319baa8a4d76 33
+  s_16a999dee6ecf2::t_1d69d69135ccce 211-216,219,225
+  s_16a999dee6ecf2::t_1be34ee961d41c 217
+docs/adr/ADR-062-one-command-install-and-manifest-upgrade.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+  s_16a999dee6ecf2::t_fe06bebd4f01a5 10-11,27-28
+tests/test_semantic_projection_resume.py
+  s_16a999dee6ecf2::t_57b483845ce27d 9
+  s_16a999dee6ecf2::t_3bc53acfb7e783 160,183-188,190
+requirements/runtime.txt
+  s_16a999dee6ecf2::t_21a4d4572ca853 2,353
+src/kip/application/search_engine.py
+  s_16a999dee6ecf2::t_1501579324cb22 134-139,337-345
+  s_16a999dee6ecf2::t_be457c95edb3b1 6,31-51,182-185,191-196,274-279,290,365-366,376,381-406,434-439,508-513
+  s_16a999dee6ecf2::t_f92b5b39d71f8d 243-249
+  s_16a999dee6ecf2::t_83683052779ff6 53-64,224-232,328,331-332,363,380,414,451,454,456,466-481
+  s_16a999dee6ecf2::t_d8cad4ffcd5ca9 52,446-450
+tests/characterization/test_application_dependency_rules.py
+  s_16a999dee6ecf2::t_93c55daf4b0cd2 6,18,29
+config/kip.example.toml
+  s_16a999dee6ecf2::t_44321c0df1328b 116-117,235
+docs/adr/ADR-003-neo4j-optional.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-6
+docs/adr/ADR-004-xlsx-two-stage.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+docs/IMPLEMENTATION_STATUS.md
+  s_16a999dee6ecf2::t_f973443a359800 560
+  s_16a999dee6ecf2::t_e6be42bae787e1 129-130,132-137
+  s_16a999dee6ecf2::t_4cb678ef43aa30 122-126
+  s_16a999dee6ecf2::t_750e02fcca4505 585
+docs/AI_OPERATOR_RUNBOOK.md
+  s_16a999dee6ecf2::t_d3d23737269a37 189-190,278
+scripts/bootstrap.sh
+  s_16a999dee6ecf2::t_1010fe98b7f343 38
+migrations/0028_force_rls_all.sql
+  s_16a999dee6ecf2::t_819d0eb791b9a8 1-60
+docs/GLOSSARY.md
+  s_16a999dee6ecf2::t_dc7fdf3be2a6ca 60-65,124-127,142-146,174-176
+deploy/sql/roles.sql.template
+  s_16a999dee6ecf2::t_c32bf8eddb395a 71-79
+  s_16a999dee6ecf2::t_77bf516c7bc1cc 23-28
+  s_16a999dee6ecf2::t_baef03e6182db3 105-111
+  s_16a999dee6ecf2::t_c454affb7249eb 168-170,173-174,196-217
+  s_16a999dee6ecf2::t_d170e9c4f32c9e 171-172,175-195
+  s_16a999dee6ecf2::t_04ec00cea898ef 1-22,29-31,48-55,57-58,60-70,80-88,90-91,93-95,97,99-104,113-123,127-130,149-167,218
+  s_16a999dee6ecf2::t_97b25de886ea14 124-125
+contracts/openapi.yaml
+  s_16a999dee6ecf2::t_12351609c9cb9c 6
+  s_16a999dee6ecf2::t_9e53f7948bab08 22,41,63,66-70,92,95-96,124,127-128,156,159-160,188,191-192,227,230-231,259,262-263,291,294-295,323,326-327,355,358-359,387,390-391,438,441-442,470,473-474,502,505-506,556,559-563,599,602-603,648,651-652,697,700-701,731,734-735,763,766-767,795,798-799,833,836-837,859,862-863,890,893-894,922,925-926,954,957-958,988,991-992,1028,1031-1032,1069,1072-1073,1108,1111-1112,1140,1143-1144,1180,1183-1184,1212,1215-1216,1262,1265-1266,1308,1311-1312,1356,1359-1360,1396,1399-1400,1444,1447-1448,1492,1495-1496,1556,1559-1560,1595,1598-1599,1635,1638-1639,1690,1693-1694,1738,1741-1742,1784,1787-1788,2521-2538
+src/kip/setup/config_payload.py
+  s_16a999dee6ecf2::t_c10504bf7798d3 181
+docs/DEPLOYMENT_GUIDE.md
+  s_16a999dee6ecf2::t_2d74e0e362b186 124-125,127-128,656-657
+  s_16a999dee6ecf2::t_d7e23ba3cb4c7f 688-695
+  s_16a999dee6ecf2::t_9653b83fd8807b 490
+  s_16a999dee6ecf2::t_967bc74e1dbcec 126,129-132,640-655,658-687,696-701
+src/kip/application/search.py
+  s_16a999dee6ecf2::t_be457c95edb3b1 8,308-313
+  s_16a999dee6ecf2::t_517f2341740434 445-446
+  s_16a999dee6ecf2::t_65a85be38dc212 4,32,46-69,158-184,188,193,201,203-205,207,211,217,230-237,242-248,250-255,257,263-264,274-292,295-296,366,369,442-444
+tests/test_egress_policy.py
+  s_16a999dee6ecf2::t_39366ef8627340 401-403,409-417,454-533
+  s_16a999dee6ecf2::t_9f11bd635e895e 6,10,24,27,310-400,404-408,418-453
+evaluation/reports/evolution.jsonl
+  s_16a999dee6ecf2::t_25ba9d03a5411f 59-61
+  s_16a999dee6ecf2::t_a59052b106ad4b 56-58
+  s_16a999dee6ecf2::t_fc509758980beb 68-70
+  s_16a999dee6ecf2::t_582c2617996f71 65-67
+  s_16a999dee6ecf2::t_f0c02dc2a6ffa9 62-64
+scripts/verify_project.py
+  s_16a999dee6ecf2::t_93c55daf4b0cd2 9,104
+tests/test_semantic_default.py
+  s_16a999dee6ecf2::t_07cb53326eb828 578-606
+contracts/graph-edge.schema.json
+  s_16a999dee6ecf2::t_9e53f7948bab08 1-83
+tests/test_app_up.py
+  s_16a999dee6ecf2::t_5ad92562f3f0aa 36-44
+  s_16a999dee6ecf2::t_7bb41000e46550 88-91,94-95,100
+  s_16a999dee6ecf2::t_e2ad09759021c6 128-129,132-136
+evaluation/reports/embed-candidates-bge-m3/eval_20260912T115142925060Z.json
+  s_16a999dee6ecf2::t_fc509758980beb 1-1743
+docs/adr/ADR-002-edge-adapters.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+evaluation/reports/embed-candidates-arctic-ko/eval_20260912T085507912514Z.json
+  s_16a999dee6ecf2::t_25ba9d03a5411f 1-1746
+src/kip/api.py
+  s_16a999dee6ecf2::t_8f742992b98c4c 44,125-129,136-138,181-183,202-207,324-325,332-333
+  s_16a999dee6ecf2::t_2402569dff86c3 49,95-99
+src/kip/adapters/generators/anthropic.py
+  s_16a999dee6ecf2::t_6a78cbb0b12d88 4,42,51-53
+docs/adr/ADR-035-versioned-resumable-semantic-projections.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3,5-9
+docs/adr/ADR-044-discovery-approval-auto-release.md
+  s_16a999dee6ecf2::t_20445eee019339 17-18
+tests/test_setup_handoff.py
+  s_16a999dee6ecf2::t_28e68ae4be6be9 126,133,141-142
+  s_16a999dee6ecf2::t_e2ad09759021c6 143-149
+  s_16a999dee6ecf2::t_9db3a3134136ac 360-363
+  s_16a999dee6ecf2::t_9683cf0acd4624 127-128,134-135
+  s_16a999dee6ecf2::t_836d9748085aa5 173-233
+.claude/skills/knowledge-fabric/references/retrieval.md
+  s_16a999dee6ecf2::t_4cb678ef43aa30 11
+docs/PRD.md
+  s_16a999dee6ecf2::t_05382e0a4699c8 4,6,273,499,579,863
+  s_16a999dee6ecf2::t_d6edab44872435 643
+  s_16a999dee6ecf2::t_f973443a359800 603-604
+skills/knowledge-fabric/references/ontology.md
+  s_16a999dee6ecf2::t_ce3a9f50dda045 3
+docs/adr/ADR-021-canonical-classification-and-model-egress.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+docs/adr/ADR-023-verified-generated-answer-orchestration.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+docs/adr/ADR-055-focused-agent-instructions.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+docs/OPERATIONS.md
+  s_16a999dee6ecf2::t_88aa1aff9b7514 290-294
+  s_16a999dee6ecf2::t_2d40a8c370e350 403,1369
+  s_16a999dee6ecf2::t_ead491ca889d59 474-482
+  s_16a999dee6ecf2::t_d570709b1cc9bf 739-760,1001-1003,1005-1009
+  s_16a999dee6ecf2::t_426320c4597a9e 123-126
+  s_16a999dee6ecf2::t_334434b07a296a 190
+  s_16a999dee6ecf2::t_b74edec807510c 338-352
+src/kip/application/semantic.py
+  s_16a999dee6ecf2::t_ec149d39dad030 296-299
+  s_16a999dee6ecf2::t_6c8b9add3eba88 203-208,413-418,424-427,429-432
+docs/adr/ADR-034-bm25-reranker-promotion.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+docs/PRODUCTION_ACCEPTANCE_2026-08-10.md
+  s_16a999dee6ecf2::t_8eaa98502012e9 3-10
+scripts/bootstrap_env.py
+  s_16a999dee6ecf2::t_f2d5685c50e259 126-134
+  s_16a999dee6ecf2::t_a4779e9c9291f8 140-142
+  s_16a999dee6ecf2::t_624e94b7253a02 10,12-20,22-24,35,38-124,137-138
+  s_16a999dee6ecf2::t_93d2b68b8dadfa 125,135-136
+src/kip/domain/egress.py
+  s_16a999dee6ecf2::t_3000bc5157bf8c 4,6-7,67-72,139,232-271,275-286
+src/kip/application/operations.py
+  s_16a999dee6ecf2::t_4018931c1cdb42 73-80
+deploy/apply-roles.sh
+  s_16a999dee6ecf2::t_b651debd597e26 86
+  s_16a999dee6ecf2::t_c3a63c79a2eb0c 60-62,64-74
+  s_16a999dee6ecf2::t_87eb22639f8fe9 28-39,41
+  s_16a999dee6ecf2::t_44c587da31b9a5 1-5,12-27,40,42-59,63,75-85
+  s_16a999dee6ecf2::t_e3390ace6c9985 6-11
+CHANGELOG.md
+  s_16a999dee6ecf2::t_5b15e2ac1d3b23 26-33
+  s_16a999dee6ecf2::t_67180aac1d1b42 73-79,85-89,93-112,134-137
+  s_16a999dee6ecf2::t_d2de197de2a667 80-84,113-128
+  s_16a999dee6ecf2::t_096931b6032250 16-22
+  s_16a999dee6ecf2::t_2991e4cac9efed 34-36
+  s_16a999dee6ecf2::t_12351609c9cb9c 3
+  s_16a999dee6ecf2::t_c25e8086606c48 4,38-72
+  s_16a999dee6ecf2::t_8ef2b2c9d79ca6 90-92
+  s_16a999dee6ecf2::t_601cde79241517 129-133
+  s_16a999dee6ecf2::t_83ab614de3be06 5-15,23-25,37
+docs/CONNECTORS.md
+  s_16a999dee6ecf2::t_76a2c4a47fc217 175-177,182-185,195-224,233-238
+  s_16a999dee6ecf2::t_b7a82cf2204a62 67
+docs/adr/ADR-026-approved-graph-answer-context.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+pyproject.toml
+  s_16a999dee6ecf2::t_12351609c9cb9c 7
+tests/integration/test_rls_force.py
+  s_16a999dee6ecf2::t_eec23cfc856b2a 7-10,16-17,19,28,39-43,46-47,49-73
+  s_16a999dee6ecf2::t_b301d1042cfb11 1-6,11-15,18,20-27,29-38,44-45,48,74-96
+docs/TRD.md
+  s_16a999dee6ecf2::t_22e33540db80bf 2780
+  s_16a999dee6ecf2::t_fdb81a3d2945b1 281-293,1502-1506,1508,1511,1514,1522,2537-2544,2558-2561,2564-2568,2571-2591,4274-4287
+  s_16a999dee6ecf2::t_a4b6789951c2a0 336-339,3396,3405,3407,3409-3415,3417-3418,3420-3433,3435-3436,3438,3440-3446,3448-3453,3456-3460
+  s_16a999dee6ecf2::t_f3369758ad3180 413
+  s_16a999dee6ecf2::t_66171deb5d9cb1 4,6,538-555,559-564,4210-4225
+  s_16a999dee6ecf2::t_4cb678ef43aa30 2828-2830
+  s_16a999dee6ecf2::t_34131535404b48 4266,4269-4272
+  s_16a999dee6ecf2::t_9dd78c7231085a 4669
+  s_16a999dee6ecf2::t_750e02fcca4505 3144-3152
+  s_16a999dee6ecf2::t_601cde79241517 323
+  s_16a999dee6ecf2::t_e6be42bae787e1 2791-2799
+  s_16a999dee6ecf2::t_b06567ac72aad4 1420-1422,1425-1429,1442-1445,1450-1455,4087-4089,4108-4111
+  s_16a999dee6ecf2::t_d9321804834a55 409
+  s_16a999dee6ecf2::t_09a0c4b9106e5e 1456-1457,3461,4273
+evaluation/reports/embed-candidates-bge-m3/latest.json
+  s_16a999dee6ecf2::t_fc509758980beb 1-1743
+evaluation/reports/embed-candidates-bge-m3/latest.md
+  s_16a999dee6ecf2::t_fc509758980beb 1-29
+docs/adr/ADR-022-provider-neutral-structured-generation.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+docs/adr/ADR-039-filesystem-deletion-grace-reconciliation.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3,5
+docs/adr/ADR-042-korean-ocr-candidate-extraction.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3,5-8
+docs/adr/ADR-064-parser-pin-upgrade-and-pdf-reextraction.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+src/kip/adapters/generators/openai_compatible.py
+  s_16a999dee6ecf2::t_6a78cbb0b12d88 4,42,51-53
+evaluation/reports/embed-candidates-arctic-ko/latest.md
+  s_16a999dee6ecf2::t_25ba9d03a5411f 1-29
+tests/test_capacity_defaults_parity.py
+  s_16a999dee6ecf2::t_3e9466caeabf5f 183-200
+  s_16a999dee6ecf2::t_be457c95edb3b1 12,143-151,154-158
+  s_16a999dee6ecf2::t_b18a11d4fffa63 121-123,128,139-142,152-153,159-160
+  s_16a999dee6ecf2::t_a4b82282ac1760 161-162
+tests/test_config_key_validation.py
+  s_16a999dee6ecf2::t_59252fe38044f8 1-58,64-113,123
+  s_16a999dee6ecf2::t_e9d0f0d5e39838 59-63,116-117,119-122
+contracts/README.md
+  s_16a999dee6ecf2::t_ce3a9f50dda045 3-7
+.claude/skills/knowledge-fabric/SKILL.md
+  s_16a999dee6ecf2::t_4cb678ef43aa30 23-24
+scripts/setup_compose.py
+  s_16a999dee6ecf2::t_0c760c67cf6219 6,18-23
+  s_16a999dee6ecf2::t_336f17d7db41b1 125,128-138
+  s_16a999dee6ecf2::t_fbe8c5abb3621c 36-37
+  s_16a999dee6ecf2::t_bfeed4ccc31171 54
+  s_16a999dee6ecf2::t_919b857e5d5458 24
+  s_16a999dee6ecf2::t_5d0f6daee765c3 139
+docs/adr/ADR-049-measured-pdf-tables-and-hwp-section-locators.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3,5-8
+docs/adr/ADR-027-reviewed-ontology-migration-materialization.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+scripts/release_artifacts.py
+  s_16a999dee6ecf2::t_9653b83fd8807b 101
+src/kip/architecture_rules.py
+  s_16a999dee6ecf2::t_93c55daf4b0cd2 34-35
+config/kip.container.toml
+  s_16a999dee6ecf2::t_e8cb9263f82391 155-157,179-183
+  s_16a999dee6ecf2::t_5b9669f8842092 132
+  s_16a999dee6ecf2::t_e5d0def4d52cb9 58
+contracts/reextraction-summary.schema.json
+  s_16a999dee6ecf2::t_9e53f7948bab08 1-164
+docs/adr/ADR-017-hwp-native-primary.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+docs/adr/ADR-043-ontology-contract-collision-validation.md
+  s_16a999dee6ecf2::t_20445eee019339 21-22
+docs/APP_INTEGRATION.md
+  s_16a999dee6ecf2::t_f8e75e6db9c57b 108,113,119-120,125
+  s_16a999dee6ecf2::t_20445eee019339 173-174
+  s_16a999dee6ecf2::t_4cb678ef43aa30 38-42
+evaluation/reports/embed-candidates-bge-m3/eval_20260912T115142925060Z.md
+  s_16a999dee6ecf2::t_fc509758980beb 1-29
+evaluation/reports/embed-candidates-kure-v1/eval_20260912T102459163913Z.md
+  s_16a999dee6ecf2::t_582c2617996f71 1-29
+contracts/openapi.json
+  s_16a999dee6ecf2::t_9e53f7948bab08 1039-1046,1048-1058,1088,1106,1162,1166,1169-1177,1260,1264,1267-1275,1350,1354,1357-1365,1447,1451,1454-1462,1518,1522,1525-1533,1583,1587,1590-1597,1646,1650,1653-1660,1709,1713,1716-1723,1772,1776,1779-1786,1826,1830,1833-1840,1906,1910,1913-1921,1971,1975,1978-1985,2034,2038,2041-2048,2098,2102,2105-2112,2162,2166,2169-2176,2226,2230,2233-2240,2289,2293,2296-2303,2362,2366,2369-2376,2426,2430,2433-2440,2480,2484,2487-2494,2542,2546,2549-2556,2605,2609,2612-2619,2701,2705,2708-2716,2766,2770,2773-2780,2830,2834,2837-2844,2910,2914,2917-2925,2989,2993,2996-3004,3080,3084,3087-3095,3160,3164,3167-3175,3256,3260,3263-3271,3352,3356,3359-3367,3433,3437,3440-3448,3522,3526,3529-3537,3645,3649,3652-3660,3724,3728,3731-3739,3804,3808,3811-3819,3910,3914,3917-3925,4006,4010,4013-4021,4071,4075,4078-4085,4125,4129,4132-4139,4224,4228,4231-4239,4304,4308,4311-4319,4368,4372,4375-4382,4441,4445,4448-4455,4532,4536,4539-4546
+  s_16a999dee6ecf2::t_12351609c9cb9c 1065
+docs/adr/ADR-001-postgresql-canonical.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+tests/test_ontology_answer_context.py
+  s_16a999dee6ecf2::t_7b8885c6c8ca8b 435
+  s_16a999dee6ecf2::t_8a4671ce2c93d9 3,392-434,436-437
+docs/adr/ADR-058-agent-evidence-and-tool-contracts.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+docs/RAG_EVALUATION.md
+  s_16a999dee6ecf2::t_c9ee8b3c3c9eac 159-171
+evaluation/reports/embed-candidates-baseline/eval_20260912T072255289491Z.json
+  s_16a999dee6ecf2::t_a59052b106ad4b 1-1740
+evaluation/reports/embed-candidates-baseline/latest.md
+  s_16a999dee6ecf2::t_a59052b106ad4b 1-29
+compose.yaml
+  s_16a999dee6ecf2::t_9f2efa4d473b80 165-166
+  s_16a999dee6ecf2::t_11721f49e546c7 10,91-97,124-130,168-174
+  s_16a999dee6ecf2::t_63263f2bd4e54d 120-122
+  s_16a999dee6ecf2::t_62eb4ef8094766 3-7
+tests/setup_support.py
+  s_16a999dee6ecf2::t_632b69b57200e3 58-62
+src/kip/worker.py
+  s_16a999dee6ecf2::t_2402569dff86c3 13-14,137-141
+skills/knowledge-fabric/references/app-integration.md
+  s_16a999dee6ecf2::t_ce3a9f50dda045 16
+evaluation/reports/embed-candidates-arctic-ko/eval_20260912T085507912514Z.md
+  s_16a999dee6ecf2::t_25ba9d03a5411f 1-29
+contracts/job-record.schema.json
+  s_16a999dee6ecf2::t_9e53f7948bab08 1-52
+sdk/python/kip_client.py
+  s_16a999dee6ecf2::t_a55b3e6e0927ec 45-47,147,176
+docs/AGENT_QUALITY.md
+  s_16a999dee6ecf2::t_44bff8ffe0b31a 138-139
+  s_16a999dee6ecf2::t_e657c006bd8521 117-123
+evaluation/reports/embed-candidates-baseline/eval_20260912T072255289491Z.md
+  s_16a999dee6ecf2::t_a59052b106ad4b 1-29
+docs/PRODUCTION_DESIGN_ALIGNMENT.md
+  s_16a999dee6ecf2::t_fb3aad8d927db6 6
+  s_16a999dee6ecf2::t_e6be42bae787e1 40-48
+  s_16a999dee6ecf2::t_4cb678ef43aa30 38-39
+contracts/artifact-view.schema.json
+  s_16a999dee6ecf2::t_9e53f7948bab08 1-447
+docs/QUICKSTART.md
+  s_16a999dee6ecf2::t_57c5216b04e8cc 20
+docs/adr/ADR-018-jina-huggingface-reranker.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-12
+docs/adr/ADR-030-sealed-backup-and-rebuildable-lexical-projection.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+docs/adr/ADR-031-hwp-reextraction-and-local-reranking.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-9
+src/kip/settings.py
+  s_16a999dee6ecf2::t_2b3032054eef59 386-391
+  s_16a999dee6ecf2::t_7f07f9b498b3e8 300,305,315-321
+  s_16a999dee6ecf2::t_7236ea92b03977 392-397,399-400
+  s_16a999dee6ecf2::t_c830b208d22ab1 87-181,183-266,268-299,301-304,306-314,322-335,359-362,485,495
+  s_16a999dee6ecf2::t_d0fa176411efa8 182,267
+contracts/graph-path.schema.json
+  s_16a999dee6ecf2::t_9e53f7948bab08 1-38
+docs/adr/ADR-032-consent-based-interaction-memory.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-6
+docs/adr/ADR-054-pdf-inspector-hybrid-parser.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3,5-6
+docs/adr/ADR-053-kordoc-4-8-runtime.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3,5-6
+docs/adr/ADR-033-retrieval-and-authorization-hardening.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+scripts/backup.sh
+  s_16a999dee6ecf2::t_26061872f71075 72-79
+  s_16a999dee6ecf2::t_70d5993e4017c4 34-45,47
+README.md
+  s_16a999dee6ecf2::t_6901859358d1b4 145
+  s_16a999dee6ecf2::t_e6be42bae787e1 545-549
+  s_16a999dee6ecf2::t_8ecdf3ea4017ba 518,528-531
+docs/adr/ADR-051-mcp-v2-sdk-and-protocol.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3,5-7
+  s_16a999dee6ecf2::t_fe06bebd4f01a5 24-26
+tests/integration/test_backup_role_dump.py
+  s_16a999dee6ecf2::t_9b44b94521e5b8 202-203
+  s_16a999dee6ecf2::t_f469230042c66a 5,8-16,25,55-58,86-87,101,103-108,110-111,113-125,129,131-145,147-158,160-168,191-201,204-218
+  s_16a999dee6ecf2::t_db6a3c8b4883a0 1-4,6-7,17-24,26-54,59-85,88-100,102,109,112,126-128,130,146,159,181
+  s_16a999dee6ecf2::t_858bbf80b07145 169-180,182-190
+skills/knowledge-fabric/SKILL.md
+  s_16a999dee6ecf2::t_4cb678ef43aa30 23-24
+evaluation/reports/embed-candidates-kure-v1/latest.md
+  s_16a999dee6ecf2::t_582c2617996f71 3-18
+  s_16a999dee6ecf2::t_79201a252b684a 1-2,19-29
+docs/RAG_QUALITY_AUDIT_2026-08-06.md
+  s_16a999dee6ecf2::t_8eaa98502012e9 3-11
+evaluation/README.md
+  s_16a999dee6ecf2::t_14b9f63f40954c 26-31
+skills/knowledge-fabric/references/evidence.md
+  s_16a999dee6ecf2::t_ce3a9f50dda045 6-8,10-11
+docs/adr/ADR-025-reviewed-ontology-mining-jobs.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-6
+docs/DATA_CONTRACTS.md
+  s_16a999dee6ecf2::t_fa7bec138d776f 576-578
+  s_16a999dee6ecf2::t_96c3b4d7e3dcf1 171-174,181-185
+  s_16a999dee6ecf2::t_fa2698ec69c72f 163-168,380-389
+  s_16a999dee6ecf2::t_d3a351ab40c7dd 46-48,53-54
+  s_16a999dee6ecf2::t_cef3a696c7a475 55
+docs/adr/ADR-056-current-filesystem-source-access.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+skills/kip-setup/SKILL.md
+  s_16a999dee6ecf2::t_ce3a9f50dda045 39-41
+docs/adr/ADR-020-trusted-identity-and-acl-snapshots.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+docs/adr/README.md
+  s_16a999dee6ecf2::t_b4cfba15ca601c 1-54,59-66
+  s_16a999dee6ecf2::t_49e95791bdbc28 55-58
+docs/SECURITY.md
+  s_16a999dee6ecf2::t_319956c1ec22db 166-172
+  s_16a999dee6ecf2::t_e29d2951de71e7 93-98,181-183,237-241,269-271,309
+  s_16a999dee6ecf2::t_8b90817dddcd55 413-415
+  s_16a999dee6ecf2::t_2d74e0e362b186 109-165,173
+  s_16a999dee6ecf2::t_50a57572595512 310-315
+docs/adr/ADR-005-local-first-hybrid-retrieval.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3,5-6
+docs/adr/ADR-019-quality-control-plane.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+docs/adr/ADR-061-bootstrap-before-python.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+docs/adr/ADR-065-semantic-search-on-by-default.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+skills/knowledge-fabric/references/retrieval.md
+  s_16a999dee6ecf2::t_4cb678ef43aa30 11
+docs/adr/ADR-057-guided-setup-runtime-handoff.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+src/kip/application/ontology_context.py
+  s_16a999dee6ecf2::t_0d4a9a46599c7a 199-221
+  s_16a999dee6ecf2::t_0db373e7347412 66-98
+compose.production.yaml
+  s_16a999dee6ecf2::t_4796df0d688a48 22-27
+  s_16a999dee6ecf2::t_f2aa1edc6b2f55 160-196
+  s_16a999dee6ecf2::t_d6eaa518883a25 19-21
+  s_16a999dee6ecf2::t_ca540a0eb19c73 207-210,214-220
+docs/adr/ADR-029-reviewed-end-to-end-rag-gates.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+evaluation/reports/embed-candidates-kure-v1/eval_20260912T102459163913Z.json
+  s_16a999dee6ecf2::t_582c2617996f71 1-1743
+src/kip/errors.py
+  s_16a999dee6ecf2::t_914653457704b5 59-80
+docs/adr/ADR-037-production-search-contract-and-readiness-gates.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3,5-7
+skills/knowledge-fabric/references/interaction.md
+  s_16a999dee6ecf2::t_ce3a9f50dda045 4-6
+src/kip/mcp_server.py
+  s_16a999dee6ecf2::t_c655fcd3242fce 44
+  s_16a999dee6ecf2::t_1282394f515478 706-710
+  s_16a999dee6ecf2::t_8f742992b98c4c 36-42,143,153-157,165-169,229-230,260-261
+docs/adr/ADR-045-judge-proposed-golden-dataset-growth.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3,5-6
+scripts/backup_artifacts.py
+  s_16a999dee6ecf2::t_fcee72565fbe01 30-33
+tests/integration/test_application_role_rls.py
+  s_16a999dee6ecf2::t_dfdedce9cb7afc 161
+  s_16a999dee6ecf2::t_47063c08688f73 25-26
+  s_16a999dee6ecf2::t_33a7054f501138 1-24,27-73,79-160,162-170
+  s_16a999dee6ecf2::t_6c2445819d5bdc 74-78
+docs/adr/ADR-060-bind-answer-file-scope-before-retrieval.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-4
+scripts/generate_contracts.py
+  s_16a999dee6ecf2::t_8218ea4f801399 8,11-13,192-301,306,312
+  s_16a999dee6ecf2::t_70bbdc49a4bdc6 57,70,72,75,79,119,132-133,142-143
+tests/test_mcp_envelope_contract.py
+  s_16a999dee6ecf2::t_997f9960995e62 335-465
+tests/test_production_search_contract.py
+  s_16a999dee6ecf2::t_3bc53acfb7e783 83,85,93,144,146,151
+  s_16a999dee6ecf2::t_f8d105a8b45269 17
+contracts/ontology-discovery-candidate.schema.json
+  s_16a999dee6ecf2::t_9e53f7948bab08 307
+scripts/app-up.sh
+  s_16a999dee6ecf2::t_137cf585f39b1f 73-77
+  s_16a999dee6ecf2::t_7c7d3854c3e9f1 42,78
+docs/adr/ADR-028-redacted-query-tracing.md
+  s_16a999dee6ecf2::t_45a436defe2d5a 3-7
+src/kip/logging.py
+  s_16a999dee6ecf2::t_7236ea92b03977 23-31,34-36
+src/kip/__init__.py
+  s_16a999dee6ecf2::t_12351609c9cb9c 3
+docs/adr/ADR-048-adversarial-audit-hardening.md
+  s_16a999dee6ecf2::t_20445eee019339 31-33,101-105
+src/kip/adapters/parsers/registry.py
+  s_16a999dee6ecf2::t_db33f8c1f2ffc3 110
+scripts/restore.sh
+  s_16a999dee6ecf2::t_0a193edcaf83a9 50-59
+.claude/skills/kip-setup/SKILL.md
+  s_16a999dee6ecf2::t_a88dcba49b1fa4 39-41
+.claude/skills/kip-setup/references/questions.md
+  s_16a999dee6ecf2::t_ef39197f6aff4f 52-58
+.claude/skills/knowledge-fabric/references/app-integration.md
+  s_16a999dee6ecf2::t_878ecc1f6fea78 16
+.claude/skills/knowledge-fabric/references/evidence.md
+  s_16a999dee6ecf2::t_f93a49fab9ad42 6-8,10-11
+.claude/skills/knowledge-fabric/references/interaction.md
+  s_16a999dee6ecf2::t_3acf23a78a9c93 4-6
+.claude/skills/knowledge-fabric/references/ontology.md
+  s_16a999dee6ecf2::t_0396aa644ccd72 3
+evaluation/experiments/example.yaml
+  s_16a999dee6ecf2::t_28a23d00594419 8
+tests/test_generator_http_adapters.py
+  s_16a999dee6ecf2::t_36665d1f160007 325-383
+tests/test_settings_secrets.py
+  s_16a999dee6ecf2::t_c17bb94374d9d1 76-94
+uv.lock
+  s_16a999dee6ecf2::t_dcd03707b7355f 767,865
+evaluation/reports/embed-candidates-kure-v1/eval_20260912T102252390338Z.json
+  s_16a999dee6ecf2::t_61e36588fb6fa3 1-1743
+evaluation/reports/embed-candidates-kure-v1/eval_20260912T102252390338Z.md
+  s_16a999dee6ecf2::t_d9cf283e2a747e 1-29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "5722549ca92ce4a2b9f4efa3bd911fcb18411ee5",
+  "prompts": {},
+  "sessions": {
+    "s_16a999dee6ecf2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b9abc8ac-2c56-4e22-a7c7-3deb16f779f3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

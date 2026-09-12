@@ -28,7 +28,6 @@ from kip.adapters.repository.postgres import PostgresRepository
 from kip.adapters.rerankers import (
     Bm25RerankerAdapter,
     HttpRerankerAdapter,
-    HuggingFaceJinaRerankerAdapter,
     RapidFuzzRerankerAdapter,
     RerankerBackend,
     parse_reranker_backend,
@@ -38,7 +37,6 @@ from kip.adapters.storage import (
     LocalSourceFileInspector,
     LocalWorkbookReader,
 )
-from kip.adapters.telemetry.otel import OpenTelemetryQueryTraceExporter
 from kip.application.answering import AnsweringUseCases
 from kip.application.egress import EgressPolicyUseCases
 from kip.application.evidence import EvidenceUseCases
@@ -51,12 +49,14 @@ from kip.application.ontology_rag import OntologyRagUseCases
 from kip.application.operations import OperationsUseCases
 from kip.application.runtime import Application
 from kip.application.search import RetrievalUseCases
+from kip.application.semantic import EMBEDDING_DEFAULTS
 from kip.application.telemetry import TelemetryUseCases
 from kip.domain.egress import (
     DataClassification,
     EgressPolicy,
     EgressProvider,
     RetentionPolicy,
+    normalize_model_service_hosts,
 )
 from kip.errors import ConfigurationError
 from kip.ontology import OntologyCatalog
@@ -132,9 +132,7 @@ def build_container(
     )
     allow_remote_egress = bool(selected.get("security.allow_remote_model_egress", False))
     model_circuit_seconds = float(selected.get("models.circuit_cooldown_seconds", 30))
-    model_service_hosts = tuple(
-        str(host) for host in (selected.get("security.model_service_hosts", []) or [])
-    )
+    model_service_hosts = _model_service_hosts(selected)
     embedding_config = selected.get("models.embedding", {}) or {}
     selected_embedding = embedding
     if (
@@ -147,9 +145,13 @@ def build_container(
             model=str(embedding_config["model"]),
             revision=str(embedding_config["revision"]),
             dimensions=int(embedding_config.get("dimensions", 1024)),
-            query_instruction=str(embedding_config.get("query_instruction", "")),
+            query_instruction=str(
+                embedding_config.get("query_instruction", EMBEDDING_DEFAULTS["query_instruction"])
+            ),
             allow_remote_egress=allow_remote_egress,
-            timeout_seconds=float(embedding_config.get("timeout_seconds", 30)),
+            timeout_seconds=float(
+                embedding_config.get("timeout_seconds", EMBEDDING_DEFAULTS["timeout_seconds"])
+            ),
             query_timeout_seconds=float(embedding_config.get("query_timeout_seconds", 10)),
             model_service_hosts=model_service_hosts,
         )
@@ -161,7 +163,7 @@ def build_container(
 
     reranker_config = selected.get("models.reranker", {}) or {}
     backend = (
-        parse_reranker_backend(str(reranker_config.get("backend", "http")))
+        parse_reranker_backend(str(reranker_config.get("backend", "bm25")))
         if reranker is None and reranker_config.get("enabled", False)
         else None
     )
@@ -184,7 +186,7 @@ def build_container(
                             revision=str(reranker_config["revision"]),
                             allow_remote_egress=allow_remote_egress,
                             timeout_seconds=float(
-                                reranker_config.get("timeout_seconds", 30)
+                                reranker_config.get("timeout_seconds", 120)
                             ),
                             max_document_chars=int(
                                 reranker_config.get("max_document_chars", 2048)
@@ -192,16 +194,6 @@ def build_container(
                             model_service_hosts=model_service_hosts,
                         ),
                         ModelCircuit(cooldown_seconds=model_circuit_seconds),
-                    )
-            case RerankerBackend.HUGGINGFACE:
-                if load_models:
-                    selected_reranker = HuggingFaceJinaRerankerAdapter(
-                        model=str(reranker_config["model"]),
-                        revision=str(reranker_config["revision"]),
-                        max_length=int(reranker_config.get("max_length", 1024)),
-                        device=str(reranker_config["device"])
-                        if reranker_config.get("device")
-                        else None,
                     )
             case unreachable:
                 assert_never(unreachable)
@@ -241,6 +233,7 @@ def build_container(
             selected,
             generation_config,
             allow_remote_egress=allow_remote_egress,
+            model_service_hosts=model_service_hosts,
         )
     selected.cas_path.mkdir(parents=True, exist_ok=True)
     source_files = LocalSourceFileInspector(source_policy=source_policy)
@@ -250,22 +243,10 @@ def build_container(
     query_traces_enabled = telemetry_config.get("query_traces_enabled", True)
     if not isinstance(query_traces_enabled, bool):
         raise ConfigurationError("telemetry.query_traces_enabled must be boolean")
-    otel_config = telemetry_config.get("otel", {}) or {}
-    if not isinstance(otel_config, dict):
-        raise ConfigurationError("telemetry.otel must be a table")
+    # KIP ships no trace exporter: `QueryTraceStore` in PostgreSQL is the
+    # canonical trace record. A deployment that wants traces forwarded injects
+    # its own `QueryTraceExporter` here through `build_container`.
     selected_trace_exporters: tuple[QueryTraceExporter, ...] = trace_exporters or ()
-    if trace_exporters is None and otel_config.get("enabled", False):
-        otel_endpoint = str(otel_config.get("endpoint", "")).strip()
-        if not otel_endpoint:
-            raise ConfigurationError(
-                "enabled telemetry.otel requires an explicit endpoint"
-            )
-        selected_trace_exporters = (
-            OpenTelemetryQueryTraceExporter(
-                service_name=str(otel_config.get("service_name", "kip")),
-                endpoint=otel_endpoint,
-            ),
-        )
     telemetry = TelemetryUseCases(
         selected_repository.telemetry,
         enabled=query_traces_enabled,
@@ -323,7 +304,7 @@ def build_container(
         if ontology_root.is_dir()
         else None
     )
-    egress = EgressPolicyUseCases(_build_egress_policy(selected))
+    egress = EgressPolicyUseCases(_build_egress_policy(selected, model_service_hosts))
     mining_config = selected.get("models.relation_mining", {}) or {}
     if not isinstance(mining_config, dict):
         raise ConfigurationError("models.relation_mining must be a table")
@@ -600,6 +581,7 @@ def _build_generator(
     raw: dict[str, object],
     *,
     allow_remote_egress: bool,
+    model_service_hosts: tuple[str, ...] = (),
 ) -> GenerationPort:
     provider = str(raw.get("provider", "")).strip()
     model = str(raw.get("model", "")).strip()
@@ -620,6 +602,7 @@ def _build_generator(
                 revision=revision,
                 provider="local",
                 allow_remote_egress=False,
+                model_service_hosts=model_service_hosts,
                 timeout_seconds=timeout_seconds,
                 max_response_bytes=max_response_bytes,
             )
@@ -631,6 +614,7 @@ def _build_generator(
                 model=model,
                 revision=revision,
                 allow_remote_egress=allow_remote_egress,
+                model_service_hosts=model_service_hosts,
                 timeout_seconds=timeout_seconds,
                 max_response_bytes=max_response_bytes,
             )
@@ -642,6 +626,7 @@ def _build_generator(
                 model=model,
                 revision=revision,
                 allow_remote_egress=allow_remote_egress,
+                model_service_hosts=model_service_hosts,
                 timeout_seconds=timeout_seconds,
                 max_response_bytes=max_response_bytes,
             )
@@ -735,7 +720,19 @@ def _build_identity(settings: Settings) -> IdentityResolverPort:
     raise ValueError(f"unsupported identity mode: {mode}")
 
 
-def _build_egress_policy(settings: Settings) -> EgressPolicy:
+def _model_service_hosts(settings: Settings) -> tuple[str, ...]:
+    try:
+        return normalize_model_service_hosts(
+            str(host) for host in (settings.get("security.model_service_hosts", []) or [])
+        )
+    except ValueError as error:
+        raise ConfigurationError(str(error)) from error
+
+
+def _build_egress_policy(
+    settings: Settings,
+    model_service_hosts: tuple[str, ...] = (),
+) -> EgressPolicy:
     raw = settings.get("models.generation", {}) or {}
     if not isinstance(raw, dict):
         raise ConfigurationError("models.generation must be a table")
@@ -763,6 +760,7 @@ def _build_egress_policy(settings: Settings) -> EgressPolicy:
         retention_policy=retention,
         secret_reference=str(raw.get("secret_ref", "")).strip() or None,
         base_url=str(raw.get("base_url", "")).strip() or None,
+        model_service_hosts=model_service_hosts,
     )
 
 

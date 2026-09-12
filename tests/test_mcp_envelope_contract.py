@@ -332,3 +332,134 @@ def test_degraded_default_search_is_reported_identically_across_edges(test_conta
     for envelope in (cli_search, cli_context, rest_search, rest_context, mcp_search, mcp_context):
         assert envelope["ok"] and envelope["data"]
         assert envelope["meta"]["warnings"] == ["semantic_degraded"]
+
+
+class _DownEmbedding:
+    """The model runtime is unreachable for every call."""
+
+    name = "http"
+    provider = "infinity"
+    model = "kip-qwen3-embedding-0.6b"
+    revision = "fixture"
+    dimensions = 4
+    normalized = True
+
+    def embed_query(self, text):
+        from kip.errors import DependencyUnavailableError
+
+        raise DependencyUnavailableError("model runtime down")
+
+    def embed_documents(self, texts):
+        from kip.errors import DependencyUnavailableError
+
+        raise DependencyUnavailableError("model runtime down")
+
+
+def _degraded_container(test_container, monkeypatch, *, body: str = "정산 안내 문서"):
+    from kip.container import build_container
+
+    (test_container.settings.project_root / "source" / "정산.txt").write_text(body)
+    test_container.settings.raw["search"].update(
+        {"semantic_enabled": True, "default_mode": "hybrid"}
+    )
+    container = build_container(
+        test_container.settings,
+        repository=test_container.repository,
+        embedding=_DownEmbedding(),
+    )
+    context = container.application.operations.request_context()
+    container.application.ingestion.sync_filesystem(context, "fixture")
+    monkeypatch.setattr("kip.cli.build_container", lambda settings, load_models=True: container)
+    monkeypatch.setenv("KIP_WORKSPACE", "default")
+    monkeypatch.setenv("KIP_ACL_SCOPES", "workspace:default")
+    return container
+
+
+def _edge_envelopes(container, cli_arguments, rest_path, rest_body, mcp_tool, mcp_arguments):
+    from fastapi.testclient import TestClient
+    from mcp.client import Client
+    from typer.testing import CliRunner
+
+    from kip.api import create_app
+    from kip.cli import app
+
+    cli = CliRunner().invoke(app, cli_arguments)
+    with TestClient(create_app(container), raise_server_exceptions=False) as client:
+        rest = client.post(rest_path, json=rest_body, headers={"X-KIP-API-Key": "test-key"})
+
+    async def invoke():
+        async with Client(create_server(container)) as client:
+            result = await client.call_tool(mcp_tool, mcp_arguments)
+            return json.loads(result.content[0].text)
+
+    return [json.loads(cli.output), rest.json(), anyio.run(invoke)]
+
+
+def test_a_degraded_search_that_returns_nothing_still_reports_the_degradation(
+    test_container, monkeypatch
+):
+    # Given a deployment whose model runtime is down and a request filtered to
+    # a source kind nothing is indexed under.
+    container = _degraded_container(test_container, monkeypatch)
+
+    envelopes = _edge_envelopes(
+        container,
+        ["search", "정산", "--limit", "3", "--source-kind", "slack"],
+        "/v1/search",
+        {"query": "정산", "limit": 3, "source_kinds": ["slack"]},
+        "kip_search",
+        {"query": "정산", "limit": 3, "source_kinds": ["slack"]},
+    )
+
+    # Then every edge still says the ranking fell back, empty result or not.
+    for envelope in envelopes:
+        assert envelope["ok"] and envelope["data"] == []
+        assert envelope["meta"]["warnings"] == ["semantic_degraded"]
+
+
+def test_a_failed_search_is_named_in_the_error_envelope_on_every_edge(
+    test_container, monkeypatch
+):
+    # Given an explicit vector search while the model runtime is down.
+    container = _degraded_container(test_container, monkeypatch)
+
+    envelopes = _edge_envelopes(
+        container,
+        ["search", "정산", "--limit", "3", "--mode", "vector"],
+        "/v1/search",
+        {"query": "정산", "limit": 3, "mode": "vector"},
+        "kip_search",
+        {"query": "정산", "limit": 3, "mode": "vector"},
+    )
+
+    # Then the failure is typed and the caller is told what failed.
+    for envelope in envelopes:
+        assert envelope["ok"] is False
+        assert envelope["error"]["code"] == "dependency_unavailable"
+        assert envelope["meta"]["warnings"] == ["search_failed"]
+
+
+def test_a_truncated_context_bundle_is_named_in_meta_warnings_on_every_edge(
+    test_container, monkeypatch
+):
+    # Given a unit far longer than the requested context budget.
+    container = _degraded_container(
+        test_container,
+        monkeypatch,
+        body="정산 안내 문서입니다. " * 400,
+    )
+
+    envelopes = _edge_envelopes(
+        container,
+        ["context", "정산", "--limit", "1", "--max-chars", "1000"],
+        "/v1/context",
+        {"query": "정산", "limit": 1, "max_chars": 1000},
+        "kip_context",
+        {"query": "정산", "limit": 1, "max_chars": 1000},
+    )
+
+    # Then `ContextBundle.truncated` and its `context_truncated` marker agree
+    # on every edge instead of the marker living only in the query trace.
+    for envelope in envelopes:
+        assert envelope["ok"] and envelope["data"]["truncated"] is True
+        assert "context_truncated" in envelope["meta"]["warnings"]

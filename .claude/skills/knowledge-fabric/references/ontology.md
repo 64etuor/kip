@@ -1,6 +1,6 @@
 # Ontology and assertions
 
-The ontology under `ontology/` is a versioned meaning contract. PostgreSQL columns and Neo4j labels are projections, not the ontology itself.
+The ontology under `ontology/` is a versioned meaning contract. PostgreSQL columns are projections, not the ontology itself — and if a graph database is ever adopted, its labels would be a projection too.
 
 Before adding a predicate:
 

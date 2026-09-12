@@ -64,7 +64,7 @@ execute an unpinned package installer.
 
 ```toml
 [parsers.hwp]
-order = ["hwp-hwpx-parser", "kordoc", "unhwp", "paired_pdf"]
+order = ["hwp-hwpx-parser", "kordoc", "unhwp"]
 
 [parsers.hwp.hwp-hwpx-parser]
 enabled = true
@@ -172,12 +172,17 @@ non-current value is rejected.
 - Prefer conversations history/replies and event revisions over Slack search.
 - Record workspace, conversation, timestamp, thread root, edit timestamp, and deletion tombstone.
 - Respect channel membership and token scopes.
-- Download files only when explicitly enabled; otherwise retain metadata and a protected source URI.
+- File bodies are never downloaded. The connector retains metadata and a
+  protected source URI only. There is no `download_files` switch; a key by that
+  name in a deployment's config is read by nothing and enables nothing.
 
 ## Apple Mail
 
 - Use the macOS JXA adapter or a server protocol connector.
-- Configure account and mailbox allowlists.
+- Configure the account and the mailbox allowlist. **Junk and Trash are not
+  excluded by default.** There is no `excluded_mailboxes` key — a key by that
+  name is read by nothing — so a mailbox you do not want indexed must simply be
+  left out of the allowlist.
 - Grant Mail Automation permission to the host process.
 - Do not read `~/Library/Mail` databases directly in the normal path.
 
@@ -187,6 +192,36 @@ non-current value is rejected.
 - Store Message-ID, In-Reply-To, References, mailbox placement, and RFC822 hash.
 - Separate a message from its mailbox placements.
 
+## Connector ACL and classification policy
+
+Every push connector that is not one of the built-in remote sources needs an
+entry in `[[sources.connector_policies]]`. Outside `development` and `test`
+environments a missing entry is a hard `ConfigurationError` on the first event:
+the connector cannot be ingested at all. This table is therefore required in
+production.
+
+```toml
+[[sources.connector_policies]]
+name = "crm"                      # matches ConnectorEvent.connector_name
+event_family = "connector"        # "slack", "mail", or "connector"
+classification = "restricted"     # required; no default outside dev/test
+acl_mode = "dynamic"              # "dynamic" (default) or "static"
+acl_scopes = ["crm:deals"]
+acl_snapshot_ttl_seconds = 900    # dynamic mode only; must be positive
+```
+
+- `classification` is mandatory. An unknown value is a configuration error, not
+  a fallback to a safe default.
+- `acl_mode = "dynamic"` mints a snapshot per event that expires after
+  `acl_snapshot_ttl_seconds` (default 900). `acl_mode = "static"` derives one
+  stable configuration snapshot from the policy itself. Any other value is
+  rejected.
+- The scopes recorded on the snapshot come from the event, so the warning above
+  about an empty `acl_scopes` applies here too: the policy does not supply a
+  fallback scope for an event that omits them.
+- `event_family` selects how the application formats the connector's events and
+  defaults to `connector`.
+
 ## Push connector API
 
 External applications may send canonical `ConnectorEvent` objects to `POST /v1/connectors/events`.
@@ -195,6 +230,12 @@ External applications may send canonical `ConnectorEvent` objects to `POST /v1/c
 - Replaying the same operation and payload is idempotent because the canonical revision hash is unchanged.
 - Authenticate with both the API key and admin key in the starter profile.
 - Propagate the source ACL in `acl_scopes`; never grant broader access than the originating system.
+- **An empty `acl_scopes` means workspace-public, not private.** The ACL
+  predicate is `cardinality(acl_scopes) = 0 OR acl_scopes <@ caller_scopes`, so
+  a row with no scopes is visible to every principal in the workspace, and
+  `ConnectorEvent.acl_scopes` defaults to an empty list. A push connector that
+  omits the field therefore publishes to the whole workspace. Send the scopes
+  explicitly on every event; do not rely on the default to fail closed.
 - Treat `delete` as an immutable tombstone revision rather than physically deleting prior evidence.
 
 Example:

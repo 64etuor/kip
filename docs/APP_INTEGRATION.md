@@ -35,9 +35,11 @@ before quoting or citing it.
 3.12.0 turns semantic search on by default (ADR-065) without changing envelope
 versions: the default mode is `hybrid`, and the BGE cross-encoder reranker is
 opt-in. Omit `mode` to get the deployment default; it degrades to lexical while
-the model runtime or projection is unavailable and lists `semantic_degraded`
-(or, where the deployment's default mode is `reranked`, `rerank_degraded` when
-only the reranker failed) in the search and context `meta.warnings`. Surface those warnings rather than
+the model runtime or projection is unavailable, and reports every degradation
+in the search and context `meta.warnings`.
+[`DATA_CONTRACTS.md`](DATA_CONTRACTS.md) holds the canonical list of warning
+codes and their meanings; treat that list as the contract rather than the
+subset a client happens to have seen. Surface those warnings rather than
 presenting the result as semantic. An explicit `vector`, `hybrid`, or
 `reranked` mode fails instead of degrading. Inline sync and re-extraction
 summaries gain an optional `semantic_projection` object. Check
@@ -103,22 +105,24 @@ Interaction endpoints run under the authenticated caller's principal scope.
 - `GET /v1/admin/query-traces` (optional `request_id` and `limit` filters)
 - `DELETE /v1/admin/query-traces/expired`
 - `DELETE /v1/admin/interactions/clarifications/expired`
-- `GET /v1/ontology/entities`
+- `GET /v1/ontology/entities` (optional `limit`, default 100)
 - `POST /v1/ontology/entities`
 - `POST /v1/ontology/mining-jobs` (enqueues a reviewed mining job over
   `unit_ids`)
 - `GET /v1/admin/ontology/discovery-candidates` (optional `status`, default
-  `proposed`)
+  `proposed`; optional `limit`, default 100)
 - `POST /v1/admin/ontology/discovery-candidates/{candidate_id}/review`
   (approving an `entity_type`/`predicate` candidate materializes an additive
   ontology release and returns a `release` object with the file, bumped
   version, and `catalog_refresh` — `"restart_required"` for the long-running
   API/worker/MCP processes, immediate for fresh CLI invocations)
-- `GET /v1/ontology/entity-candidates` (optional `status`, default `proposed`)
+- `GET /v1/ontology/entity-candidates` (optional `status`, default `proposed`;
+  optional `limit`, default 100)
 - `GET /v1/ontology/entity-candidates/{candidate_id}`
 - `POST /v1/ontology/entity-candidates/{candidate_id}/approve` (optional `note`)
 - `POST /v1/ontology/entity-candidates/{candidate_id}/reject` (optional `note`)
 - `GET /v1/review/candidates` (returns `kip.assertion-candidate-listing.v1`;
+  optional `status`, default `proposed`; optional `limit`, default 100;
   optional `predicate` and `subject_id` filters)
 - `POST /v1/review/candidates` (records a human-origin assertion candidate,
   mirroring CLI `review propose`; the candidate enters the same review queue
@@ -166,7 +170,8 @@ capabilities never grant a principal, workspace, scope, or role.
 Deliberate scope boundary: MCP does not expose sync triggers, telemetry,
 projection maintenance, raw get-by-id record reads, or manual assertion
 candidate creation. Synchronization and rebuilds must never be triggered from
-a normal retrieval surface (architecture rule 13); use the CLI or the admin
+a normal retrieval surface (`AGENTS.md`: "Ordinary retrieval does not
+authorize sync, re-index, or projection rebuilds"); use the CLI or the admin
 REST routes for those operations.
 
 ## Trusted identity

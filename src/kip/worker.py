@@ -10,6 +10,8 @@ from kip.application.projection_maintenance import after_sync
 from kip.container import Container, build_container
 from kip.domain.models import JobRecord, RequestContext
 from kip.errors import ValidationError
+from kip.logging import configure_logging
+from kip.settings import Settings
 
 LOGGER = logging.getLogger(__name__)
 
@@ -132,7 +134,11 @@ def run_worker(
 
 
 def main() -> None:
-    run_worker(build_container())
+    settings = Settings.load()
+    # Configure before the container is built so a failure while wiring
+    # adapters is reported in the same JSON format on stderr.
+    configure_logging(settings.log_level)
+    run_worker(build_container(settings))
 
 
 if __name__ == "__main__":

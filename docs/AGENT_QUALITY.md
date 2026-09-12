@@ -114,8 +114,13 @@ The reviewed private-corpus floor was unavailable. This is a partial cold-start
 pass with an explicit recovery path, not an uninterrupted first-run success.
 
 Bootstrap additionally reported five npm package findings, propagated from two
-advisories: sharp 0.35.3 and adm-zip 0.6.0 in the Kordoc runtime. The Python
-dependency gate does not audit that npm graph. The sharp advisory has a 0.35.4
+advisories: sharp 0.35.3 and adm-zip 0.6.0 in the Kordoc runtime. That npm
+graph is audited: `./scripts/verify.sh` runs `scripts/audit-kordoc.sh`, which
+validates the lock against `package.json` and then runs `npm audit
+--package-lock-only --omit=dev --audit-level=high`, so high and critical
+findings fail the gate while moderate ones stay visible without failing it.
+Both findings below are moderate, which is why they were reported without
+failing the run. The sharp advisory has a 0.35.4
 fix; the adm-zip finding concerns archive extraction following destination
 symlinks, with a reachable ONNX installation extraction call rather than a
 demonstrated document-read exploit. These findings remain open in the tested
@@ -130,7 +135,8 @@ update does not change the tested release or claim broader production quality.
 
 - Contract tests and this live-client exercise do not replace broad, reviewed
   private-corpus answer/citation evaluation.
-- Semantic search remains disabled. Multilingual recall beyond these cases,
+- This run predates ADR-065 and exercised the lexical path only; semantic
+  search has since become the default. Multilingual recall beyond these cases,
   OCR accuracy, large-workbook reasoning, and ontology-RAG usefulness are not
   established by this run.
 - `.mcp.json` and the installer provide a Claude-oriented connection. Other

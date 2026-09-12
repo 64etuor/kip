@@ -671,19 +671,6 @@
         "title": "GraphPathRequest",
         "type": "object"
       },
-      "HTTPValidationError": {
-        "properties": {
-          "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
-            "title": "Detail",
-            "type": "array"
-          }
-        },
-        "title": "HTTPValidationError",
-        "type": "object"
-      },
       "KnowledgeEntity": {
         "additionalProperties": false,
         "properties": {
@@ -1049,53 +1036,33 @@
         ],
         "title": "UserPreferenceWrite",
         "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "AdminKeyAuth": {
+        "description": "Second factor for /v1/admin and other admin-only routes when identity.mode is api_key.",
+        "in": "header",
+        "name": "X-KIP-Admin-Key",
+        "type": "apiKey"
       },
-      "ValidationError": {
-        "properties": {
-          "ctx": {
-            "title": "Context",
-            "type": "object"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "title": "Location",
-            "type": "array"
-          },
-          "msg": {
-            "title": "Message",
-            "type": "string"
-          },
-          "type": {
-            "title": "Error Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
-        "title": "ValidationError",
-        "type": "object"
+      "ApiKeyAuth": {
+        "description": "Shared API key, used when identity.mode is api_key.",
+        "in": "header",
+        "name": "X-KIP-API-Key",
+        "type": "apiKey"
+      },
+      "BearerAuth": {
+        "bearerFormat": "JWT",
+        "description": "Identity-provider JWT, used when identity.mode is proxy_jwt. Admin routes additionally require the admin group claim.",
+        "scheme": "bearer",
+        "type": "http"
       }
     }
   },
   "info": {
     "description": "Optional REST edge adapter over the same application services used by the CLI and MCP.",
     "title": "KIP Knowledge Fabric API",
-    "version": "3.12.2"
+    "version": "3.13.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1118,6 +1085,7 @@
             "description": "Successful Response"
           }
         },
+        "security": [],
         "summary": "Healthz"
       }
     },
@@ -1135,6 +1103,7 @@
             "description": "Successful Response"
           }
         },
+        "security": [],
         "summary": "Readyz"
       }
     },
@@ -1190,13 +1159,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Prune Expired Clarifications"
       }
     },
@@ -1279,13 +1257,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Ontology Discovery Candidates"
       }
     },
@@ -1360,13 +1347,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Review Ontology Discovery Candidate"
       }
     },
@@ -1448,13 +1444,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Query Traces"
       }
     },
@@ -1510,13 +1515,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Prune Query Traces"
       }
     },
@@ -1566,13 +1580,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Answer"
       }
     },
@@ -1621,13 +1643,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Get Artifact"
       }
     },
@@ -1676,13 +1706,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Get Assertion"
       }
     },
@@ -1731,13 +1769,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Explain Assertion"
       }
     },
@@ -1777,13 +1823,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Capabilities"
       }
     },
@@ -1849,13 +1903,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Connector Event"
       }
     },
@@ -1905,13 +1968,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Context Bundle"
       }
     },
@@ -1960,13 +2031,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Get Document"
       }
     },
@@ -2016,13 +2095,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Graph Neighbors"
       }
     },
@@ -2072,13 +2159,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Graph Path"
       }
     },
@@ -2128,13 +2223,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Create Clarification"
       }
     },
@@ -2183,13 +2286,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Get Clarification"
       }
     },
@@ -2248,13 +2359,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Answer Clarification"
       }
     },
@@ -2304,13 +2423,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Submit Feedback"
       }
     },
@@ -2350,13 +2477,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "List Preferences"
       },
       "put": {
@@ -2404,13 +2539,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Save Preference"
       }
     },
@@ -2459,13 +2602,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Delete Preference"
       }
     },
@@ -2547,13 +2698,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Jobs"
       }
     },
@@ -2603,13 +2763,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Ontology Context"
       }
     },
@@ -2659,13 +2827,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Propose Ontology Discovery Candidate"
       }
     },
@@ -2731,13 +2907,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Ontology Entities"
       },
       "post": {
@@ -2801,13 +2986,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Ontology Entity Create"
       }
     },
@@ -2883,13 +3077,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Ontology Entity Candidates"
       }
     },
@@ -2954,13 +3157,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Ontology Entity Candidate"
       }
     },
@@ -3041,13 +3253,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Ontology Entity Candidate Approve"
       }
     },
@@ -3128,13 +3349,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Ontology Entity Candidate Reject"
       }
     },
@@ -3200,13 +3430,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Ontology Mining Job"
       }
     },
@@ -3280,13 +3519,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Revoke Assertion"
       }
     },
@@ -3394,13 +3642,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Candidates"
       },
       "post": {
@@ -3464,13 +3721,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Propose Candidate"
       }
     },
@@ -3535,13 +3801,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Candidate"
       }
     },
@@ -3632,13 +3907,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Approve"
       }
     },
@@ -3719,13 +4003,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Reject"
       }
     },
@@ -3775,13 +4068,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Search"
       }
     },
@@ -3821,13 +4122,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Status"
       }
     },
@@ -3912,13 +4221,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Sync Filesystem"
       }
     },
@@ -3983,13 +4301,22 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "AdminKeyAuth": [],
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Enqueue Source Sync"
       }
     },
@@ -4038,13 +4365,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Read Unit"
       }
     },
@@ -4103,13 +4438,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Vocabulary"
       }
     },
@@ -4186,13 +4529,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Envelope"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Validation error (kip.envelope.v1)"
           }
         },
+        "security": [
+          {
+            "ApiKeyAuth": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
         "summary": "Xlsx Range"
       }
     }

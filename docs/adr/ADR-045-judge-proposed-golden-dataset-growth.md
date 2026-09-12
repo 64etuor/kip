@@ -1,7 +1,9 @@
 # ADR-045: Judge-proposed golden-dataset growth with human sample-audit
 
-- **Status:** Accepted
+- **Status:** Amended
 - **Date:** 2026-08-14
+- **Amended by:** ADR-065 (2026-09-12) — semantic retrieval is on by default,
+  so activating it is no longer the pending evidence task this ADR describes
 
 ## Context
 

@@ -67,11 +67,7 @@ LGPL's own notice and relinking obligations.
 | PyMuPDF | 1.28.2 | **AGPL-3.0 or Artifex commercial** | `extractors` |
 | python-pptx | 1.0.2 | MIT | `extractors` |
 | hwp-hwpx-parser | 1.0.0 | Apache-2.0 | `extractors` |
-| torch | 2.13.0 | Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND BSL-1.0 AND MIT | `semantic` |
-| transformers | 5.15.0 | Apache-2.0 | `semantic` |
-| einops | 0.8.2 | MIT | `semantic` |
 | mcp | 2.2.0 | MIT | `mcp` |
-| opentelemetry-* | 1.30+ | Apache-2.0 | `telemetry` |
 
 Development-only dependencies (`dev` extra: pytest, ruff, mypy, pip-audit and
 their type stubs) are not distributed in the runtime image.

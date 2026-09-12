@@ -56,11 +56,6 @@ max_file_bytes = 524288000
 query_traces_enabled = true
 retention_days = 30
 
-[telemetry.otel]
-enabled = false
-service_name = "kip"
-endpoint = "http://127.0.0.1:4318"
-
 [search]
 # Hybrid lexical+vector retrieval is the default (ADR-065). Search falls back
 # to the lexical path, with a `semantic_degraded` warning, while the model
@@ -118,6 +113,8 @@ timeout_seconds = 120
 query_timeout_seconds = 10
 query_instruction = "Retrieve relevant Korean evidence for this query: "
 space_name = "qwen3-embedding-0.6b-1024"
+# Units per projection page: how many pending units one rebuild round claims.
+page_size = 1000
 
 [models.reranker]
 enabled = true
@@ -200,7 +197,6 @@ deletion_grace_scans = 2
 [parsers]
 parser_timeout_seconds = 120
 minimum_quality_score = 0.70
-shadow_parse_critical_documents = true
 
 [parsers.isolation]
 enabled = true
@@ -236,7 +232,7 @@ min_width_px = 96
 min_height_px = 48
 
 [parsers.hwp]
-order = ["hwp-hwpx-parser", "kordoc", "unhwp", "paired_pdf"]
+order = ["hwp-hwpx-parser", "kordoc", "unhwp"]
 
 [parsers.hwp.hwp-hwpx-parser]
 enabled = true
@@ -276,7 +272,6 @@ classification = "public"
 enabled = false
 workspace_id = ""
 allowed_conversation_ids = []
-download_files = false
 acl_snapshot_ttl_seconds = 900
 token_env = "KIP_SLACK_BOT_TOKEN"
 classification = "restricted"
@@ -285,7 +280,6 @@ classification = "restricted"
 enabled = false
 allowed_accounts = []
 allowed_mailboxes = ["INBOX", "Sent", "Archive"]
-excluded_mailboxes = ["Junk", "Trash"]
 lookback_days = 30
 acl_snapshot_ttl_seconds = 900
 classification = "restricted"

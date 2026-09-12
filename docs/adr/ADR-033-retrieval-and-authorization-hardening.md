@@ -1,7 +1,7 @@
 # ADR-033: Retrieval and authorization hardening
 
-- Status: accepted
-- Date: 2026-08-10
+- **Status:** Accepted
+- **Date:** 2026-08-10
 
 ## Context
 

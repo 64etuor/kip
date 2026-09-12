@@ -98,7 +98,7 @@ PACKAGE_EXCLUDED_PATHS = (
     "evaluation/golden/private-onedrive-nl.yaml",
     "evaluation/golden/private-onedrive-nl.floor.json",
 )
-CONFIG_FILES = ("kip.container.toml", "kip.example.toml", "logging.yaml")
+CONFIG_FILES = ("kip.container.toml", "kip.example.toml")
 COPY_IGNORED_NAMES = frozenset(
     {
         ".DS_Store",

@@ -73,3 +73,22 @@ def test_database_statement_timeout_can_be_raised_for_bounded_operations(
     settings = Settings.load()
 
     assert settings.database_statement_timeout_ms == 300000
+
+
+def test_missing_database_url_boots_memory_only_in_the_test_environment(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _base_environment(monkeypatch, tmp_path)
+    config = tmp_path / "config"
+    config.mkdir()
+    (config / "kip.toml").write_text('[app]\nworkspace = "default"\n', encoding="utf-8")
+
+    assert Settings.load().database_url == "memory://"
+
+    # Anywhere else the non-durable memory repository would silently accept
+    # ingests and lose them, so the missing variable has to be named instead.
+    for environment in ("development", "staging", "production"):
+        monkeypatch.setenv("KIP_ENV", environment)
+        with pytest.raises(ConfigurationError, match="KIP_DATABASE_URL"):
+            Settings.load()

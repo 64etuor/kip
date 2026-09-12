@@ -27,7 +27,10 @@ CONFIG_PATHS = (
     "config/kip.container.toml",
     "config/kip.example.toml",
     "config/kip.toml",
-    "config/logging.yaml",
+    # The database roles a restored deployment must recreate: the template, the
+    # script that applies it, and the Compose service that runs that script.
+    "deploy/apply-roles.sh",
+    "deploy/compose.roles.yaml",
     "deploy/sql/roles.sql.template",
     "migrations",
     "ontology",

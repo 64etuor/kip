@@ -1,6 +1,9 @@
 # ADR-003: Neo4j is optional and non-canonical
 
-Status: Accepted — mechanism amended by ADR-046 (2026-08-15)
+- **Status:** Amended
+- **Date:** 2026-08-02
+- **Amended by:** ADR-046 (2026-08-15) — the pre-provisioned Neo4j swap
+  scaffolding was removed; the decision itself stands
 
 > Amendment: the pre-provisioned swap scaffolding this ADR described
 > (`GraphProjectionPort`, the stub Neo4j adapter, the `graph.backend`

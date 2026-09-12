@@ -156,24 +156,19 @@ warmup pass per variant. The final warmed steady-state P95 is 1095.22 ms and
 passes the two-second gate. Reranking still did not improve quality over
 lexical, so the promotion decision remains `keep_disabled`.
 
-## Jina Hugging Face trial: 2026-08-06
+## Jina Hugging Face trial: 2026-08-06 (historical)
 
-The optional local backend is configured with a pinned Jina v2 revision:
+> Historical. The in-process `backend = "huggingface"` reranker adapter and the
+> `semantic` Python extra it needed were removed in 3.13.0; a cross-encoder now
+> runs only behind the HTTP model runtime (`backend = "http"`). The measurements
+> below stand as the record of the trial that kept the Jina reranker opt-in.
 
-```toml
-[models.reranker]
-enabled = true
-backend = "huggingface"
-model = "jinaai/jina-reranker-v2-base-multilingual"
-revision = "9cfeff2df7d40d1b78e75e5e9cebec92a99813c9"
-max_length = 1024
-device = "mps"
-```
-
-Install it with `uv sync --extra semantic` (or include `semantic` in the
-`all` extra). The adapter is deliberately opt-in and uses the model's pinned
-Transformers remote-code API. Review the model's `CC BY-NC 4.0` license before
-any production or commercial deployment.
+The trial configured the (then in-process) local backend with a pinned Jina v2
+revision, model `jinaai/jina-reranker-v2-base-multilingual` at revision
+`9cfeff2df7d40d1b78e75e5e9cebec92a99813c9`, `max_length = 1024` on `mps`. The
+adapter used the model's pinned Transformers remote-code API. The model's
+`CC BY-NC 4.0` license still requires review before any production or
+commercial deployment.
 
 The fresh trial synced six PDFs into 70 current content units and evaluated
 all 36 public-government cases after one untimed warmup pass. The Jina model

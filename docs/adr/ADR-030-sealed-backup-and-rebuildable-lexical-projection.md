@@ -1,8 +1,7 @@
 # ADR-030: Seal complete backups and preserve rebuildable lexical input
 
-## Status
-
-Accepted
+- **Status:** Accepted
+- **Date:** 2026-08-10
 
 ## Context
 

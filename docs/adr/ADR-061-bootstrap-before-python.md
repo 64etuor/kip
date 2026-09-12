@@ -1,6 +1,7 @@
 # ADR-061: Prepare prerequisites before loading the application environment
 
-Status: Accepted — 2026-09-11
+- **Status:** Accepted
+- **Date:** 2026-09-11
 
 ## Context
 

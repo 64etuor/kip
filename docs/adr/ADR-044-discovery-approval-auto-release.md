@@ -14,7 +14,8 @@ files. The owner decided approval itself must produce the release.
 
 Constraints that shaped the design:
 
-- Ontology files stay the meaning contract (architecture rule 4); the release
+- Ontology files stay the meaning contract (TRD section 2 architecture
+  invariant 4, "Ontology is external"); the release
   must land in the YAML tree, not in a database-only overlay.
 - `core/predicates.yaml` and domain profiles carry comment blocks, so a YAML
   round-trip rewrite would destroy them.

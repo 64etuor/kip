@@ -1,0 +1,60 @@
+# Application database roles for the single-machine Compose deployment.
+#
+# POSTGRES_USER is the image bootstrap role, which PostgreSQL creates as a
+# SUPERUSER with BYPASSRLS, and a superuser bypasses every row level security
+# policy whether it is merely enabled or forced. Migrations need that role
+# because they create objects; the API and worker must not have it. This
+# one-shot service applies deploy/sql/roles.sql.template as the owner once
+# migrate has completed, so the non-superuser kip_api / kip_worker logins that
+# compose.yaml points the API and worker at exist with their grants before
+# either service starts.
+#
+# It lives here rather than in compose.yaml because guided setup copies every
+# compose.yaml service verbatim into compose.generated.yaml
+# (src/kip/setup/writer.py), where this service's bundled-postgres host and
+# owner credentials do not apply. ./scripts/app-up.sh always passes both files:
+#
+#   docker compose -f compose.yaml -f deploy/compose.roles.yaml --profile app ...
+#
+# Relative paths resolve against the project directory of the first file, so
+# ./deploy is the repository's deploy directory.
+
+services:
+  roles:
+    profiles: ["app"]
+    image: ${KIP_POSTGRES_IMAGE:-pgvector/pgvector:0.8.2-pg18-trixie@sha256:b7337db8fe39d12fe8ecb0003c72680f24479813a744b43154eee6f2eab5a5f3}
+    restart: "no"
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-kip}
+      PGUSER: ${POSTGRES_USER:-kip_owner}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      KIP_API_DB_PASSWORD: ${KIP_API_DB_PASSWORD:?set KIP_API_DB_PASSWORD in .env (see docs/DEPLOYMENT_GUIDE.md 11.8)}
+      KIP_WORKER_DB_PASSWORD: ${KIP_WORKER_DB_PASSWORD:?set KIP_WORKER_DB_PASSWORD in .env (see docs/DEPLOYMENT_GUIDE.md 11.8)}
+      KIP_BACKUP_DB_PASSWORD: ${KIP_BACKUP_DB_PASSWORD:?set KIP_BACKUP_DB_PASSWORD in .env (see docs/DEPLOYMENT_GUIDE.md 11.8)}
+    entrypoint: ["/bin/bash", "/deploy/apply-roles.sh"]
+    volumes:
+      - ./deploy:/deploy:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    read_only: true
+    init: true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+
+  api:
+    depends_on:
+      roles:
+        condition: service_completed_successfully
+
+  worker:
+    depends_on:
+      roles:
+        condition: service_completed_successfully

@@ -73,7 +73,6 @@ jobs:
           --extra identity
           --extra extractors
           --extra mcp
-          --extra telemetry
           --extra dev
 
       - name: Cold prerequisite bootstrap without host Python or Node on PATH

@@ -186,7 +186,8 @@ If the sidecar is unavailable, run lexical retrieval as a valid partial cycle
 and record that semantic behavior is unverified. If a default-mode search
 returns a `semantic_degraded` (runtime or active projection unavailable) or
 `rerank_degraded` (default mode `reranked` only: reranker failed, fused
-ranking kept) warning in
+ranking kept) or `lexical_rerank_degraded` (the lexical reranker failed or is
+not configured; lexical order kept) warning in
 `meta.warnings`, report degradation; do not call that a successful semantic
 run.
 
@@ -274,7 +275,7 @@ Use at least one exact identifier/file-name query and one natural Korean content
 ./scripts/kip search "확인된 한국어 내용 질의" --limit 10
 ```
 
-For every useful hit, preserve `unit_id`, `artifact_id`, `title`, `snippet`, `score`, `locator`, `source_uri`, `source_sha256`, and any `semantic_degraded` or `rerank_degraded` warning.
+For every useful hit, preserve `unit_id`, `artifact_id`, `title`, `snippet`, `score`, `locator`, `source_uri`, `source_sha256`, and any degradation warning listed in `docs/DATA_CONTRACTS.md`.
 
 ### 3. Context bundle
 

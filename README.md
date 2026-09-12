@@ -142,7 +142,7 @@ shasum, unzip 또는 python3만 있으면 됩니다. 버전이 지정된 배포 
 ```bash
 # 설치 위치와 버전을 고정
 curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh \
-  | bash -s -- ~/kip --version 3.12.2
+  | bash -s -- ~/kip --version X.Y.Z
 ```
 
 `--check`, `--install-docker`, `--without-docker`는 bootstrap에 그대로
@@ -515,7 +515,7 @@ exact evidence와 함께 `kip answer`/`kip context`에 들어갑니다. Source�
 |---|---|
 | 최소 | PostgreSQL, filesystem source, lexical search(`KIP_SEMANTIC=off`), CLI |
 | 표준 | 최소 profile + 로컬 semantic search(model runtime), API, worker, HWP broker, 선택형 Slack/Mail connector |
-| 확장 | 표준 + opt-in 관계 추출/Neo4j. 검토는 CLI/API로 제공 |
+| 확장 | 표준 + opt-in 관계 추출. 검토는 CLI/API로 제공 |
 
 ## 10. 현재 제한 사항
 
@@ -525,8 +525,10 @@ contract, PostgreSQL migration, pgvector projection은 구현돼 있습니다. �
 path는 3.12.0부터 기본 경로이며, release가 검토한 embedding identity의 projection은
 완성되면 자동 활성화됩니다. 대형 corpus의 첫 projection은 오래 걸립니다. 기준
 Apple Silicon(24GB)에서 약 176,500 unit의 1,912-file OneDrive corpus는 약 3시간이
-필요했고, 그동안 검색은 lexical로 동작합니다. Slack, Apple Mail, IMAP, Neo4j는
-환경별 reference adapter입니다. stdio MCP adapter는 동일 application service를
+필요했고, 그동안 검색은 lexical로 동작합니다. Slack, Apple Mail, IMAP은
+환경별 reference adapter입니다. Neo4j adapter는 존재하지 않습니다(ADR-046).
+Graph traversal은 활성 repository backend 안에서 동작하며, 도입 게이트를
+통과하면 그때 전용 port와 함께 read projection으로 추가될 수 있습니다. stdio MCP adapter는 동일 application service를
 사용하도록 구현돼 있습니다.
 
 지원하는 PostgreSQL profile은 semantic search를 끈 배포에서도 pgvector와 1024d HNSW
@@ -540,9 +542,11 @@ Starter lexical path는 ACL-filtered candidate 최대 40개를 candidate-local B
 rerank하며 RapidFuzz 3.14.6을 fallback으로 사용합니다. 검토된 private 19-case에서
 최종 BM25는 Recall@10/MRR `0.789/0.646`, RapidFuzz는 `0.737/0.576`이었습니다.
 이는 retrieval 근거이지 answer 또는 ontology 품질 근거가 아닙니다. Lexical candidate
-set에 없는 문서는 reranking으로 복구할 수 없습니다. 3.12.0은 lexical unit의
-`search.lexical_common_term_fraction`(기본 0.02) 이상에 나타나는 query n-gram을
-candidate matching에서 제외합니다(BM25 reranker는 전체 질문을 계속 채점). 전체
+set에 없는 문서는 reranking으로 복구할 수 없습니다. 3.12.0은 흔한 query n-gram을
+candidate matching에서 제외합니다(BM25 reranker는 전체 질문을 계속 채점). 기준은
+`max(200, 전체 unit 수 * search.lexical_common_term_fraction)`(fraction 기본
+0.02)이라 10,000 unit 미만 corpus에서는 200-unit floor가 실제 기준이고, 전체
+unit이 약 400개 미만이면 probe를 건너뜁니다. 전체
 1,912-file corpus의 lexical mode에서 같은 19-case의 Recall@10은 78.9%→89.5%,
 MRR은 58.3%→63.8%, P95는 11.11 s→2.22 s였습니다.
 

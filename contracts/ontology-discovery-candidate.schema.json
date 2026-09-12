@@ -105,12 +105,6 @@
       "default": null,
       "title": "Extraction"
     },
-    "fingerprint": {
-      "maxLength": 128,
-      "minLength": 1,
-      "title": "Fingerprint",
-      "type": "string"
-    },
     "id": {
       "maxLength": 128,
       "minLength": 1,
@@ -310,8 +304,7 @@
     "kind",
     "symbol",
     "label",
-    "definition",
-    "fingerprint"
+    "definition"
   ],
   "title": "OntologyDiscoveryCandidate",
   "type": "object"

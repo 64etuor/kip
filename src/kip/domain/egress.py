@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
+import re
+from collections.abc import Iterable
 from enum import StrEnum, unique
 from urllib.parse import urlsplit
 
@@ -61,6 +64,12 @@ class EgressPolicy(EgressModel):
     retention_policy: RetentionPolicy | None = None
     secret_reference: str | None = Field(default=None, repr=False)
     base_url: str | None = None
+    model_service_hosts: tuple[str, ...] = ()
+
+    @field_validator("model_service_hosts")
+    @classmethod
+    def bare_service_names(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        return normalize_model_service_hosts(values)
 
     @field_validator("allowed_classifications")
     @classmethod
@@ -127,7 +136,7 @@ def evaluate_egress(
         )
 
     if policy.provider is EgressProvider.LOCAL:
-        if not _is_loopback(policy.base_url):
+        if not is_local_model_endpoint(policy.base_url, policy.model_service_hosts):
             return _deny(
                 policy,
                 fingerprint,
@@ -220,15 +229,61 @@ def _deny(
     )
 
 
-def _is_loopback(base_url: str | None) -> bool:
+# A deployment's model service is named, never guessed. Bare service names
+# only (compose `models`): a dotted name or an IP would quietly re-open the
+# remote egress `security.allow_remote_model_egress = false` keeps closed.
+_BARE_SERVICE_NAME = re.compile(r"[a-z][a-z0-9_-]*")
+
+
+def normalize_model_service_hosts(hosts: Iterable[str]) -> tuple[str, ...]:
+    """Validate `security.model_service_hosts` into comparable host names.
+
+    Raises ``ValueError`` on anything that is not a bare service name, so an
+    allowlist entry can only ever widen the local predicate by one named
+    in-deployment service.
+    """
+    normalized: list[str] = []
+    for name in hosts:
+        candidate = str(name).strip().lower()
+        if not _BARE_SERVICE_NAME.fullmatch(candidate):
+            raise ValueError(
+                "security.model_service_hosts entries must be bare service names, "
+                f"not {name!r}"
+            )
+        if candidate not in normalized:
+            normalized.append(candidate)
+    return tuple(normalized)
+
+
+def is_local_model_endpoint(
+    base_url: str | None,
+    model_service_hosts: Iterable[str] = (),
+) -> bool:
+    """The single local-endpoint predicate shared by every model call site.
+
+    Strict by default: only a loopback address (every 127.0.0.0/8 address,
+    ``::1`` and the literal ``localhost``) counts as local. It widens only for
+    a host explicitly named in ``security.model_service_hosts``, which is how a
+    container deployment reaches its own ``models`` service without enabling
+    remote egress. The egress policy and the HTTP model adapters must agree
+    here: a host one of them treats as local and the other does not is a
+    deployment that embeds where it may not generate.
+    """
     if not base_url:
         return False
     parsed = urlsplit(base_url)
-    return parsed.scheme in {"http", "https"} and parsed.hostname in {
-        "127.0.0.1",
-        "localhost",
-        "::1",
-    }
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return False
+    if parsed.username or parsed.password:
+        return False
+    host = parsed.hostname.lower()
+    try:
+        if ipaddress.ip_address(host).is_loopback:
+            return True
+    except ValueError:
+        if host == "localhost":
+            return True
+    return host in normalize_model_service_hosts(model_service_hosts)
 
 
 def _is_secret_reference(value: str) -> bool:

@@ -41,10 +41,12 @@ from kip.errors import (
     AuthorizationError,
     KipError,
     ValidationError,
+    envelope_warnings,
     error_code,
     http_status,
 )
 from kip.ids import new_id
+from kip.logging import configure_logging
 from kip.settings import Settings
 
 LOGGER = logging.getLogger(__name__)
@@ -90,6 +92,11 @@ class CandidateProposal(BaseModel):
 
 def create_app(container: Container | None = None) -> FastAPI:
     selected = container or build_container()
+    # App construction is the API process's startup: configure logging once,
+    # here, so `app.log_level` / `KIP_LOG_LEVEL` actually take effect and
+    # every module's records reach stderr in the JSON format instead of
+    # Python's lastResort handler.
+    configure_logging(selected.settings.log_level)
     app = FastAPI(
         title="KIP Knowledge Fabric API",
         version=kip_version,
@@ -115,14 +122,20 @@ def create_app(container: Container | None = None) -> FastAPI:
         return await call_next(request)
 
     def error_envelope(
-        request: Request, code: str, message: str, details: dict[str, Any] | None = None
+        request: Request,
+        code: str,
+        message: str,
+        details: dict[str, Any] | None = None,
+        warnings: list[str] | None = None,
     ) -> dict[str, Any]:
         context = _error_context(selected, request)
         return Envelope(
             ok=False,
             error=ErrorInfo(code=code, message=message, details=details or {}),
             meta=EnvelopeMeta(
-                request_id=context.request_id or new_id("req"), workspace=context.workspace
+                request_id=context.request_id or new_id("req"),
+                workspace=context.workspace,
+                warnings=warnings or [],
             ),
         ).model_dump(mode="json")
 
@@ -165,7 +178,9 @@ def create_app(container: Container | None = None) -> FastAPI:
             ok=False,
             error=ErrorInfo(code=error_code(exc), message=str(exc)),
             meta=EnvelopeMeta(
-                request_id=context.request_id or new_id("req"), workspace=context.workspace
+                request_id=context.request_id or new_id("req"),
+                workspace=context.workspace,
+                warnings=envelope_warnings(exc),
             ),
         )
         return JSONResponse(
@@ -184,7 +199,12 @@ def create_app(container: Container | None = None) -> FastAPI:
         )
         return JSONResponse(
             status_code=500,
-            content=error_envelope(request, "internal_error", "an internal error occurred"),
+            content=error_envelope(
+                request,
+                "internal_error",
+                "an internal error occurred",
+                warnings=envelope_warnings(exc),
+            ),
         )
 
     async def authenticated_context(
@@ -301,16 +321,16 @@ def create_app(container: Container | None = None) -> FastAPI:
         payload: SearchRequest,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
-        hits = selected.application.retrieval.search(context, payload)
-        return ok(hits, context, selected.application.retrieval.result_warnings(context, hits))
+        outcome = selected.application.retrieval.search_outcome(context, payload)
+        return ok(outcome.hits, context, outcome.warnings)
 
     @app.post("/v1/context", response_model=Envelope)
     def context_bundle(
         payload: ContextRequest,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
-        bundle = selected.application.retrieval.context_bundle(context, payload)
-        return ok(bundle, context, selected.application.retrieval.result_warnings(context, bundle.items))
+        outcome = selected.application.retrieval.context_outcome(context, payload)
+        return ok(outcome.bundle, context, outcome.warnings)
 
     @app.post("/v1/answer", response_model=Envelope)
     def answer(

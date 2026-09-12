@@ -55,4 +55,8 @@ def complete_setup_answers(tmp_path: Path) -> SetupAnswers:
 
 def prepare_setup_project(project_root: Path) -> None:
     project_root.mkdir(exist_ok=True)
-    shutil.copy2(Path(__file__).resolve().parents[1] / "compose.yaml", project_root / "compose.yaml")
+    root = Path(__file__).resolve().parents[1]
+    shutil.copy2(root / "compose.yaml", project_root / "compose.yaml")
+    # A generated project takes its one-shot `roles` service, and the script and
+    # SQL template that service runs, from this directory.
+    shutil.copytree(root / "deploy", project_root / "deploy", dirs_exist_ok=True)

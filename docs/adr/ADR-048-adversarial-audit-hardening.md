@@ -28,7 +28,9 @@ unchanged.
    defaults **off**; guided setup and the shipped configs never silently
    enable candidate promotion.
 2. **Ontology mutation requires admin at the shared application layer**
-   (architecture rule 6). `review_approve`/`review_reject`/
+   (ADR-002: CLI, REST and MCP must call the same application services; no
+   ACL or review rule may live only in an edge adapter).
+   `review_approve`/`review_reject`/
    `revoke_assertion`, ontology mining, entity creation, and entity-candidate
    review now enforce the admin role inside the application services, so
    CLI, REST, and MCP all fail closed for non-admins instead of REST-only
@@ -96,5 +98,8 @@ unchanged.
 ## References
 
 - migration `0023_assertion_candidate_decision_source.sql`
-- ADR-047 (auto-approve policy this amends), ADR-046, architecture rules 6,
-  10, 11, 12 (AGENTS.md)
+- ADR-047 (auto-approve policy this amends), ADR-046
+- TRD section 2 architecture invariants 7 (candidates are not facts) and 8
+  (ACL before retrieval); ADR-002 (edges share application services); the
+  shadow-extraction invariant in `AGENTS.md` ("failed shadow extraction must
+  preserve the active extraction")

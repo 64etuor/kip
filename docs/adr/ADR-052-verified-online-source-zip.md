@@ -1,7 +1,11 @@
 # ADR-052: Verified online source ZIP starter kit
 
-- **Status:** Accepted
+- **Status:** Amended
 - **Date:** 2026-08-17
+- **Amended by:** ADR-062 (2026-09-11) — the manual procedure became the
+  one-command installer and manifest-driven in-place upgrade
+- **Amended by:** ADR-063 (2026-09-11) — the "starter kit" name was dropped
+  and `docs/STARTER_KIT_GUIDE.md` was renamed `docs/DEPLOYMENT_GUIDE.md`
 
 ## Context
 
@@ -43,7 +47,8 @@ bootstrap, test, and continue development.
 
 ## References
 
-- `contracts/starter-archive-manifest.schema.json`
-- `docs/STARTER_KIT_GUIDE.md`
+- `contracts/package-manifest.schema.json`
+  (`contracts/starter-archive-manifest.schema.json` until 3.10.0)
+- `docs/DEPLOYMENT_GUIDE.md` (`docs/STARTER_KIT_GUIDE.md` until 3.10.0)
 - `docs/OPERATIONS.md`
 - `docs/SECURITY.md`

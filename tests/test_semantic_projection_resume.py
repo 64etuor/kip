@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from kip.application.semantic import SemanticProjectionUseCases
+from kip.application.semantic import EMBEDDING_DEFAULTS, SemanticProjectionUseCases
 from kip.container import build_container
 from kip.domain.embedding import EmbeddingProjectionProgress
 from kip.domain.models import EmbeddableUnit
@@ -157,7 +157,7 @@ def test_embedding_input_cap_is_bounded_and_versioned(
     assert expanded_space.name != bounded_space.name
 
 
-def test_embedding_input_cap_defaults_to_widened_bound(
+def test_embedding_input_cap_defaults_to_the_shipped_projection_bound(
     test_container,
     tmp_path: Path,
 ) -> None:
@@ -180,12 +180,14 @@ def test_embedding_input_cap_defaults_to_widened_bound(
     default_space = container.application.retrieval.embedding_space(context)
     container.application.retrieval.rebuild_semantic_projection(context)
 
-    # Then the widened 2026 default (12000, up from 4000) is used for both
-    # the space identity and the actual truncation bound.
-    assert default_space.configuration["max_document_chars"] == "12000"
-    assert default_space.name.endswith("-c12000-ht1")
+    # Then the shipped default (ADR-065) is used for both the space identity
+    # and the actual truncation bound. A fallback that disagreed with the
+    # shipped config built a space identity no release reviewed.
+    shipped = int(EMBEDDING_DEFAULTS["max_document_chars"])
+    assert default_space.configuration["max_document_chars"] == str(shipped)
+    assert default_space.name.endswith(f"-c{shipped}-ht1")
     assert embedding.document_batches
-    assert all(len(text) <= 12000 for text in embedding.document_batches[0])
+    assert all(len(text) <= shipped for text in embedding.document_batches[0])
     assert embedding.document_batches[0][0].endswith("TAIL")
 
 

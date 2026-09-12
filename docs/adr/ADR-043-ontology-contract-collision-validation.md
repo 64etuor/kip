@@ -18,7 +18,8 @@ were never cross-checked against the entity-type catalog. A typo'd or removed
 parent type passed validation silently, which made those fields dead
 documentation rather than part of the meaning contract.
 
-Architecture rule 4 makes `ontology/` the meaning contract. A contract whose
+TRD section 2 architecture invariant 4 makes `ontology/` — not a PostgreSQL
+enum or a vendor label — the meaning contract. A contract whose
 core vocabulary can be silently redefined by a profile, or whose source
 mappings can silently reference nonexistent types, is not a reliable
 contract.

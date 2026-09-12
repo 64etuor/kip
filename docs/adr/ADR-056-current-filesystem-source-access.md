@@ -1,7 +1,7 @@
 # ADR-056: Current filesystem roots authorize existing evidence
 
-- Status: Accepted
-- Date: 2026-09-10
+- **Status:** Accepted
+- **Date:** 2026-09-10
 
 ## Context
 

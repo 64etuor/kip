@@ -322,3 +322,62 @@ def test_container_requires_configured_remote_secret_reference(tmp_path) -> None
 
     with pytest.raises(ConfigurationError, match="KIP_TEST_MISSING_GENERATION_KEY"):
         build_container(settings=settings)
+
+
+@pytest.mark.parametrize(
+    "adapter",
+    [OpenAICompatibleGenerationAdapter, AnthropicGenerationAdapter],
+)
+def test_generator_refuses_an_unnamed_service_host_without_remote_egress(
+    adapter,
+) -> None:
+    with pytest.raises(ConfigurationError, match="model_service_hosts"):
+        adapter(
+            base_url="http://models:7998",
+            api_key="",
+            model="answer-model",
+            revision="abc123",
+            allow_remote_egress=False,
+        )
+
+
+@pytest.mark.parametrize(
+    "adapter",
+    [OpenAICompatibleGenerationAdapter, AnthropicGenerationAdapter],
+)
+def test_generator_accepts_an_explicitly_allowlisted_service_host(adapter) -> None:
+    built = adapter(
+        base_url="http://models:7998/",
+        api_key="",
+        model="answer-model",
+        revision="abc123",
+        allow_remote_egress=False,
+        model_service_hosts=("models",),
+    )
+
+    assert built.base_url == "http://models:7998"
+
+
+def test_container_builds_local_generator_on_an_allowlisted_service_host(
+    tmp_path,
+) -> None:
+    settings = Settings.for_test()
+    settings.cas_path = tmp_path / "cas"
+    settings.raw["security"] = {
+        "allow_remote_model_egress": False,
+        "model_service_hosts": ["models"],
+    }
+    settings.raw["models"] = {
+        "generation": {
+            "enabled": True,
+            "provider": "local",
+            "base_url": "http://models:7998",
+            "model": "local-answer-model",
+            "revision": "sha256:abc123",
+        }
+    }
+
+    container = build_container(settings=settings)
+
+    assert isinstance(container.generator, OpenAICompatibleGenerationAdapter)
+    assert container.generator.base_url == "http://models:7998"

@@ -1,7 +1,7 @@
 # ADR-022: Provider-neutral structured generation
 
-- Status: Accepted
-- Date: 2026-08-09
+- **Status:** Accepted
+- **Date:** 2026-08-09
 
 ## Context
 

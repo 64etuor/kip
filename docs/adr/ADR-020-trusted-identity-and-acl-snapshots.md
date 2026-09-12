@@ -1,7 +1,7 @@
 # ADR-020: Trusted identity and expiring ACL snapshots
 
-- Status: Accepted
-- Date: 2026-08-09
+- **Status:** Accepted
+- **Date:** 2026-08-09
 
 ## Context
 

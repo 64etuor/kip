@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import perf_counter
 
-from kip.application.search_engine import SearchEngine
+from kip.application.search_engine import SEARCH_DEFAULTS, RankedHits, SearchEngine
 from kip.application.semantic import SemanticProjectionUseCases
 from kip.application.telemetry import TelemetryUseCases
 from kip.domain.json_types import JsonObject
@@ -28,7 +29,7 @@ from kip.domain.telemetry import (
     TraceStage,
     safe_request_id,
 )
-from kip.errors import KipError
+from kip.errors import KipError, mark_envelope_warning
 from kip.ports.embedding import EmbeddingPort
 from kip.ports.evidence import EvidenceReaderPort
 from kip.ports.knowledge import KnowledgeStore
@@ -42,6 +43,30 @@ _DEGRADED_FLAGS: tuple[str, ...] = (
     "rerank_degraded",
     "lexical_rerank_degraded",
 )
+# One vocabulary for one event: `ContextBundle.truncated` is the structured
+# field and `context_truncated` is its name in the query trace and in
+# `meta.warnings`. Both are derived from the same bundle flag here so they
+# can never disagree.
+CONTEXT_TRUNCATED_WARNING = "context_truncated"
+# A search that raised: recorded in the trace and carried on the exception so
+# every edge can name it in the error envelope's `meta.warnings`.
+SEARCH_FAILED_WARNING = "search_failed"
+
+
+@dataclass(frozen=True, slots=True)
+class SearchOutcome:
+    """Search hits with the envelope warnings that describe how they came out."""
+
+    hits: list[SearchHit]
+    warnings: list[str]
+
+
+@dataclass(frozen=True, slots=True)
+class ContextOutcome:
+    """A context bundle with the envelope warnings that describe it."""
+
+    bundle: ContextBundle
+    warnings: list[str]
 
 
 def _result_metadata(result: object) -> dict[str, object]:
@@ -130,15 +155,42 @@ class RetrievalUseCases:
         *,
         mode: str | None = None,
     ) -> list[SearchHit]:
+        return self._ranked(context, request, mode=mode).hits
+
+    def search_outcome(
+        self,
+        context: RequestContext,
+        request: SearchRequest,
+        *,
+        mode: str | None = None,
+    ) -> SearchOutcome:
+        """Hits plus the `meta.warnings` every edge reports for them."""
+        ranked = self._ranked(context, request, mode=mode)
+        return SearchOutcome(
+            hits=ranked.hits,
+            warnings=self.result_warnings(
+                context,
+                ranked.hits,
+                degraded=ranked.degraded,
+            ),
+        )
+
+    def _ranked(
+        self,
+        context: RequestContext,
+        request: SearchRequest,
+        *,
+        mode: str | None = None,
+    ) -> RankedHits:
         started_at = datetime.now(UTC)
         started = perf_counter()
         try:
-            hits = self._search.search(
+            ranked = self._search.search_ranked(
                 context,
                 request,
                 mode=mode if mode is not None else request.mode,
             )
-        except Exception:
+        except Exception as exc:
             self._record_search_trace(
                 context,
                 request,
@@ -146,28 +198,23 @@ class RetrievalUseCases:
                 started_at=started_at,
                 duration_ms=(perf_counter() - started) * 1000,
                 outcome="failed",
-                warnings=["search_failed"],
+                warnings=[SEARCH_FAILED_WARNING],
             )
+            # The trace alone never reaches the caller; the edge adapters read
+            # this back off the exception when they build the error envelope.
+            mark_envelope_warning(exc, SEARCH_FAILED_WARNING)
             raise
-        semantic_degraded = any(
-            bool(hit.metadata.get("semantic_degraded")) for hit in hits
-        )
-        warnings = [
-            flag
-            for flag in _DEGRADED_FLAGS
-            if (flag == "semantic_degraded" and semantic_degraded)
-            or (flag != "semantic_degraded" and any(bool(hit.metadata.get(flag)) for hit in hits))
-        ]
+        warnings = _degradation_warnings(ranked.degraded)
         self._record_search_trace(
             context,
             request,
-            hits,
+            ranked.hits,
             started_at=started_at,
             duration_ms=(perf_counter() - started) * 1000,
             outcome="degraded" if warnings else "succeeded",
             warnings=warnings,
         )
-        return hits
+        return ranked
 
     def vocabulary(
         self,
@@ -180,30 +227,41 @@ class RetrievalUseCases:
     def has_ambiguous_filename(self, context: RequestContext, request: SearchRequest) -> bool:
         return self._store.has_ambiguous_filename(context, request)
 
-    def result_warnings(self, context: RequestContext, results: Sequence[object]) -> list[str]:
-        """Envelope warnings explaining an empty result without leaking scope.
+    def result_warnings(
+        self,
+        context: RequestContext,
+        results: Sequence[object],
+        *,
+        degraded: Sequence[str] = (),
+    ) -> list[str]:
+        """Envelope warnings explaining a result without leaking scope.
 
         `no_visible_indexed_units` means nothing is indexed for this caller's
         workspace and access scopes; it never states that hidden units exist.
         Applies to search hits and context items alike.
+
+        A default-mode search that fell back (model runtime down, space not
+        active yet) still answers; say so instead of implying the configured
+        semantic ranking was used. Degradation is reported by the search run
+        (`degraded`) as well as by hit metadata, because a degraded run that
+        returned nothing has no metadata left to carry it — and it must not
+        be swallowed by the empty-result explanation either.
         """
+        metadatas = [_result_metadata(result) for result in results]
+        warnings = [
+            flag
+            for flag in _DEGRADED_FLAGS
+            if flag in degraded or any(bool(metadata.get(flag)) for metadata in metadatas)
+        ]
         if results:
-            # A default-mode search that fell back (model runtime down, space
-            # not active yet) still answers; say so instead of implying the
-            # configured semantic ranking was used.
-            metadatas = [_result_metadata(result) for result in results]
-            return [
-                flag
-                for flag in _DEGRADED_FLAGS
-                if any(bool(metadata.get(flag)) for metadata in metadatas)
-            ]
+            return warnings
         try:
             visible = self._store.has_visible_units(context)
         except KipError:
             # A completed empty result must not turn into an error because
             # the explanatory probe failed afterwards.
-            return []
-        return [] if visible else ["no_visible_indexed_units"]
+            return warnings
+        return warnings if visible else [*warnings, "no_visible_indexed_units"]
 
     def filename_candidates(self, context: RequestContext, request: SearchRequest) -> list[str]:
         return self._store.filename_candidates(context, request)
@@ -213,9 +271,29 @@ class RetrievalUseCases:
         context: RequestContext,
         request: ContextRequest,
     ) -> ContextBundle:
+        return self._bundled(context, request)[0]
+
+    def context_outcome(
+        self,
+        context: RequestContext,
+        request: ContextRequest,
+    ) -> ContextOutcome:
+        """A bundle plus the `meta.warnings` every edge reports for it."""
+        bundle, degraded = self._bundled(context, request)
+        warnings = self.result_warnings(context, bundle.items, degraded=degraded)
+        if bundle.truncated:
+            warnings.append(CONTEXT_TRUNCATED_WARNING)
+        return ContextOutcome(bundle=bundle, warnings=warnings)
+
+    def _bundled(
+        self,
+        context: RequestContext,
+        request: ContextRequest,
+    ) -> tuple[ContextBundle, tuple[str, ...]]:
         started_at = datetime.now(UTC)
         started = perf_counter()
-        hits = self.search(context, request)
+        ranked = self._ranked(context, request)
+        hits = ranked.hits
         items: list[ContextItem] = []
         total_chars = 0
         truncated = False
@@ -227,7 +305,12 @@ class RetrievalUseCases:
         # actually retrieve longer passages instead of silently hitting the
         # same per-item ceiling.
         item_cap = max(
-            int(self._settings.get("search.context_item_max_chars", 8000)),
+            int(
+                self._settings.get(
+                    "search.context_item_max_chars",
+                    SEARCH_DEFAULTS["context_item_max_chars"],
+                )
+            ),
             request.max_chars // max(1, request.limit),
         )
         for hit in hits:
@@ -280,10 +363,10 @@ class RetrievalUseCases:
                     selected_evidence_ids=[item.hit.unit_id for item in items],
                     acl_policy_version=_acl_policy_version(context),
                     models=self._retrieval_models(hits),
-                    warnings=["context_truncated"] if truncated else [],
+                    warnings=[CONTEXT_TRUNCATED_WARNING] if truncated else [],
                 ),
             )
-        return bundle
+        return bundle, ranked.degraded
 
     def _record_search_trace(
         self,
@@ -354,6 +437,11 @@ class RetrievalUseCases:
                 )
             )
         return models
+
+
+def _degradation_warnings(degraded: Sequence[str]) -> list[str]:
+    """Degradation markers in their canonical envelope order."""
+    return [flag for flag in _DEGRADED_FLAGS if flag in degraded]
 
 
 def _filter_summary(request: SearchRequest) -> QueryFilterSummary:

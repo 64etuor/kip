@@ -43,10 +43,15 @@ See ADR-058.
   "error": null,
   "meta": {
     "request_id": "req_...",
-    "workspace": "default"
+    "workspace": "default",
+    "generated_at": "2026-09-12T00:00:00Z",
+    "warnings": []
   }
 }
 ```
+
+`meta` always carries all four fields. `schema_version` is always
+`kip.envelope.v1`; `ok` and `meta` are the only required top-level members.
 
 ## Package archive manifest
 
@@ -155,19 +160,29 @@ ties broken by source order, cut to a bounded window and NFC-normalized. The
 preview is presentation only. It is neither content filtering nor an exact
 quote, so a fact must still be reopened with `read` (or `xlsx-read` for
 workbook values) before it is cited. Previews are computed from the full unit
-body in the application layer, so `extraction.max_chars_per_unit` also bounds
-the per-hit transfer from PostgreSQL. When a search or context request
+body in the application layer, so the per-hit transfer from PostgreSQL is
+bounded by how large a unit the parser produced. There is no
+`extraction.max_chars_per_unit` key: the only configurable limit is
+`max_chars_per_unit` under `[parsers.hwp.hwp-hwpx-parser]` (default 4000),
+which bounds the chunk size of HWP/HWPX units at extraction time. Other
+parsers apply the same 4000-character bound as a hard-coded default. When a search or context request
 returns nothing and no indexed unit is visible to the caller, `meta.warnings`
 carries `no_visible_indexed_units` on every edge; it describes the caller's
-own scope and never asserts that hidden units exist. When results are
-returned and any hit or context item carries a degradation marker, the
-search and context envelopes' `meta.warnings` also list it on every edge:
+own scope and never asserts that hidden units exist. When the retrieval run
+degraded, the search and context envelopes' `meta.warnings` list it on every
+edge — alongside `no_visible_indexed_units` when the result is also empty,
+because a degraded run that returned nothing carries no hit metadata:
 `semantic_degraded` (default-mode search fell back to lexical because the
 model runtime or active projection was unavailable), `rerank_degraded` (only
 in a deployment whose default mode is `reranked`: only the reranker failed; the
 fused lexical+vector ranking was kept), or
 `lexical_rerank_degraded` (the lexical reranker failed or, in the semantic
 fallback, is not configured; lexical order was kept). The same markers remain in hit metadata and redacted traces.
+Two further markers use the same channel: `context_truncated` accompanies
+`ContextBundle.truncated` (one event, one name) when a bundle was cut to the
+requested budget, and `search_failed` rides the `ok: false` envelope of a
+request whose retrieval raised, so a failed search is named and not only
+traced.
 
 Verification fields report how the source was checked when the unit was
 reopened. `EvidenceRead.source_verification`,
@@ -362,11 +377,16 @@ unique, and all returned IDs must be a subset of the request.
 
 `AnswerResponse` remains `kip.answer.v1` and adds structured claims, generation
 metadata, and the applied `EgressDecision`. A successful generated answer cites
-only fresh evidence reopened by the application service. Typed refusals cover
-no admissible or fresh evidence, requested facts absent from the reopened
-evidence (`answer_not_present`), unresolved short multi-document ambiguity
-(`clarification_required`), exact XLSX-read requirements, egress denial,
-provider unavailability, and invalid generated citations.
+only fresh evidence reopened by the application service. `AnswerRefusalReason` is a closed vocabulary of exactly ten values:
+`no_admissible_evidence`, `no_fresh_evidence`, `answer_not_present` (the
+requested fact is absent from the reopened evidence),
+`clarification_required` (unresolved short multi-document ambiguity),
+`exact_xlsx_read_required`, `csv_full_table_required`,
+`insufficient_decision_evidence`, `model_egress_denied`,
+`generation_unavailable` (the configured provider could not be reached), and
+`generation_invalid` (the generator returned citations that do not validate).
+`contracts/answer-response.schema.json` and `contracts/query-trace.schema.json`
+mirror the same ten.
 
 When the entire `answer` query equals the basename of a `file://` source, the
 request is treated as a request for that document's extracts and is answered
@@ -553,8 +573,9 @@ server-generated ID format.
 
 PostgreSQL is canonical for query traces in production. Workspace RLS applies
 on write and read, while the application additionally requires an admin role
-for inspection and retention pruning. OTel spans and metrics receive only
-bounded route/outcome/count/latency attributes, not candidate or evidence IDs.
+for inspection and retention pruning. No trace exporter ships: `QueryTraceExporter`
+remains an extension seam with no adapter behind it, so a deployment that adds one
+owns the redaction budget it forwards.
 
 ## Adaptive interaction boundary
 

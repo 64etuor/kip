@@ -70,6 +70,14 @@ class OperationsUseCases:
             warnings.append(
                 "memory repository is non-durable and intended only for tests or demos"
             )
+        if self._settings.unknown_config_keys:
+            # One line for the whole config: a dead or misspelled key changes
+            # nothing at runtime, so it must not fail startup, but an operator
+            # editing a key that no longer exists deserves to hear about it.
+            warnings.append(
+                "configuration keys are not recognised and have no effect: "
+                + ", ".join(self._settings.unknown_config_keys)
+            )
         semantic_configured = bool(
             self._settings.get("search.semantic_enabled", False)
         )

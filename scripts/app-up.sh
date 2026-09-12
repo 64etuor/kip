@@ -39,7 +39,7 @@ run_compose() {
   if [[ "$using_generated" == "1" ]]; then
     "$(python_cmd)" "$SCRIPT_DIR/setup_compose.py" "$@"
   else
-    docker compose -f compose.yaml --profile app ${KIP_EXTRA_PROFILE:+--profile "$KIP_EXTRA_PROFILE"} "$@"
+    docker compose -f compose.yaml -f deploy/compose.roles.yaml --profile app ${KIP_EXTRA_PROFILE:+--profile "$KIP_EXTRA_PROFILE"} "$@"
   fi
 }
 
@@ -70,6 +70,12 @@ case "${1:-}" in
     else
       docker compose -f compose.yaml up -d --wait --wait-timeout 60 postgres
       "$SCRIPT_DIR/migrate.sh"
+      # The application roles belong to the database, not to the app profile:
+      # backup connects as kip_backup, and a later `app-up.sh` expects kip_api
+      # and kip_worker to exist. --no-deps keeps this from building the API and
+      # worker images on the database-only path.
+      docker compose -f compose.yaml -f deploy/compose.roles.yaml --profile app \
+        run --rm --no-deps roles
     fi
     start_semantic_server
     echo "Database ready and migrations complete."

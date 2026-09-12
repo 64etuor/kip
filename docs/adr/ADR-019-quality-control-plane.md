@@ -1,6 +1,7 @@
 # ADR-019: Evidence-first quality control plane
 
-**Status:** Accepted
+- **Status:** Accepted
+- **Date:** 2026-08-08
 
 ## Context
 

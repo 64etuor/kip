@@ -114,16 +114,10 @@ def build_config_payload(plan: SetupPlan, *, container: bool) -> JsonObject:
         "telemetry": {
             "query_traces_enabled": True,
             "retention_days": plan.retention_days,
-            "otel": {
-                "enabled": False,
-                "service_name": "kip",
-                "endpoint": "http://otel-collector:4318",
-            },
         },
         "search": {
             "semantic_enabled": semantic,
             "default_mode": SEMANTIC_DEFAULT_MODE,
-            "context_max_chars": 120000,
             "hybrid_candidate_limit": 40,
             "rerank_candidate_limit": 40,
             "lexical_rerank_enabled": True,
@@ -153,7 +147,6 @@ def build_config_payload(plan: SetupPlan, *, container: bool) -> JsonObject:
         "parsers": {
             "parser_timeout_seconds": 120,
             "minimum_quality_score": 0.70,
-            "shadow_parse_critical_documents": True,
             "pdf": {
                 "backend": "pdf_inspector",
                 "tables_enabled": True,
@@ -185,7 +178,7 @@ def build_config_payload(plan: SetupPlan, *, container: bool) -> JsonObject:
                 },
             },
             "hwp": {
-                "order": ["hwp-hwpx-parser", "kordoc", "unhwp", "paired_pdf"],
+                "order": ["hwp-hwpx-parser", "kordoc", "unhwp"],
                 "hwp-hwpx-parser": {
                     "enabled": True,
                     "max_chars_per_unit": 4000,

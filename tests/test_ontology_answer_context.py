@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -388,3 +389,49 @@ def test_rest_answer_and_ontology_context_share_the_same_approved_graph(
     answer = answer_response.json()["data"]
     assert answer["ontology_context"]["edges"][0]["assertion_id"] == assertion.id
     assert answer["citations"][0]["unit_id"] == unit_id
+
+
+def _count_graph_queries(container) -> dict[str, int]:
+    """Count the store round trips `OntologyContextUseCases.build` issues."""
+    counts: dict[str, int] = defaultdict(int)
+    knowledge = container.application.knowledge
+    for name in ("graph_neighbors", "graph_path", "get_assertion", "list_candidates"):
+        original = getattr(knowledge, name)
+
+        def counted(*args, _name=name, _original=original, **kwargs):
+            counts[_name] += 1
+            return _original(*args, **kwargs)
+
+        setattr(knowledge, name, counted)
+    return counts
+
+
+def test_answer_context_without_approved_assertions_skips_path_queries(
+    tmp_path: Path,
+) -> None:
+    container = _container(tmp_path)
+    context, unit_id, candidate = _seed_relation(container, tmp_path)
+    query = "비밀별 참여율 30% 변경 결정"
+    counts = _count_graph_queries(container)
+
+    empty = container.application.ontology_context.build(context, query)
+
+    # Nothing is approved yet: the pairwise recursive-CTE path queries and the
+    # per-path assertion reads must not run at all before the empty result.
+    assert empty.context is None
+    assert counts["graph_path"] == 0
+    assert counts["get_assertion"] == 0
+    assert counts["graph_neighbors"] <= 2
+
+    assertion = container.application.knowledge.review_approve(context, candidate.id)
+    counts.clear()
+    populated = container.application.ontology_context.build(context, query)
+
+    # With approved content the same context is still built, paths included.
+    assert counts["graph_path"] > 0
+    assert populated.context is not None
+    assert [edge.assertion_id for edge in populated.context.edges] == [assertion.id]
+    assert populated.context.edges[0].predicate == "records_decision"
+    assert populated.context.entities[0].id == "ent_secret_letter"
+    assert populated.context.evidence_unit_ids == [unit_id]
+    assert [path.assertion_ids for path in populated.context.paths] == [[assertion.id]]

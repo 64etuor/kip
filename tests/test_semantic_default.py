@@ -575,3 +575,32 @@ def test_a_runtime_serving_another_model_degrades_default_search_to_lexical(
     # An explicit vector request never silently falls back to another space.
     with pytest.raises(DependencyUnavailableError, match="not the configured"):
         container.application.retrieval.search(context, SearchRequest(query="승인"), mode="vector")
+
+
+def test_degradation_is_reported_even_when_the_result_set_is_empty(
+    test_container, tmp_path: Path
+) -> None:
+    container = _semantic_container(test_container, tmp_path, ReviewedEmbedding(fail=True))
+    context = container.application.operations.request_context()
+    container.application.ingestion.sync_filesystem(context, "fixture")
+    retrieval = container.application.retrieval
+
+    # Degraded first, then filtered down to nothing: the caller can see the
+    # corpus, so only the degradation is reported.
+    filtered = retrieval.search_outcome(
+        context,
+        SearchRequest(query="승인", source_kinds=["slack"]),
+    )
+
+    assert filtered.hits == []
+    assert filtered.warnings == ["semantic_degraded"]
+
+    # The other order: the answer is empty because this caller sees no indexed
+    # unit at all, and the ranking degraded on the way there. Both facts hold,
+    # so the envelope must carry both.
+    container.settings.raw["search"]["abstain_on_unknown_terms"] = False
+    outsider = container.application.operations.request_context(acl_scopes=[])
+    hidden = retrieval.search_outcome(outsider, SearchRequest(query="승인"))
+
+    assert hidden.hits == []
+    assert hidden.warnings == ["semantic_degraded", "no_visible_indexed_units"]

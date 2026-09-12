@@ -49,8 +49,13 @@ Use named subdirectories only. `/`, a home directory, a project root, or a paren
 `api_key` is the right answer for a single user or a small team piloting the
 system: it works immediately with a generated key. Choose `proxy_jwt` only when
 the deployment must recognize individual employees through company SSO — that
-path additionally needs the issuer, audience, and JWKS URL from whoever runs
-the identity provider. Never accept caller-supplied identity headers in either
+path additionally needs four answers from whoever runs the identity provider:
+`jwt_issuer` (HTTPS URL), `jwt_audience` (string), `jwt_jwks_url` (HTTPS URL),
+and `jwt_admin_groups`. `jwt_admin_groups` is a JSON array of identity group
+names (for example `["kip-admins"]`) whose members get sync and assertion
+review rights; it derives admin authority from a verified identity claim
+instead of a second shared secret, so an empty array leaves the deployment
+with no admin. Never accept caller-supplied identity headers in either
 mode.
 
 ## Lists

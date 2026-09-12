@@ -123,16 +123,30 @@ def test_generated_compose_has_one_database_and_only_approved_sources(tmp_path: 
     project = _project(tmp_path)
     plan = build_setup_plan(complete_setup_answers(tmp_path), project_root=project)
     apply_setup_plan(plan, project_root=project)
+    owner_url = _database_url("postgres:5432", secrets.token_urlsafe(24))
+    api_password = secrets.token_urlsafe(24)
+    worker_password = secrets.token_urlsafe(24)
     result = subprocess.run(
         ["docker", "compose", "-f", "compose.generated.yaml", "--profile", "app", "config", "--format", "json"],
         cwd=project, env={
             **_clean_environment(), "KIP_OPENAI_API_KEY": "synthetic-key",
-            "KIP_CONTAINER_DATABASE_URL": _database_url("postgres:5432", secrets.token_urlsafe(24)),
+            "KIP_CONTAINER_DATABASE_URL": owner_url,
+            "KIP_API_DB_PASSWORD": api_password, "KIP_WORKER_DB_PASSWORD": worker_password,
+            "KIP_BACKUP_DB_PASSWORD": secrets.token_urlsafe(24),
         },
         capture_output=True, text=True, check=True,
     )
     services = json.loads(result.stdout)["services"]
     assert "postgres" in services
+    # One database, three logins: only migrate keeps the owner URL, and the api
+    # and worker use the non-superuser roles the `roles` service creates.
+    assert services["migrate"]["environment"]["KIP_DATABASE_URL"] == owner_url
+    for name, role, password in (
+        ("api", "kip_api", api_password), ("worker", "kip_worker", worker_password),
+    ):
+        selected = urlsplit(services[name]["environment"]["KIP_DATABASE_URL"])
+        assert (selected.username, unquote(selected.password or "")) == (role, password)
+        assert (selected.hostname, selected.port, selected.path) == ("postgres", 5432, "/kip")
     for name in ("api", "worker", "migrate"):
         environment = services[name]["environment"]
         assert "@postgres:5432/" in environment["KIP_DATABASE_URL"]
@@ -154,6 +168,67 @@ def test_generated_compose_has_one_database_and_only_approved_sources(tmp_path: 
             cas_mount = next(mount for mount in services[name]["volumes"] if mount["target"] == "/var/lib/kip/cas")
             assert cas_mount["source"] == plan.cas_path
             assert not cas_mount.get("read_only", False)
+
+
+def test_generated_compose_never_gives_api_or_worker_the_owner_url(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    apply_setup_plan(
+        build_setup_plan(complete_setup_answers(tmp_path), project_root=project),
+        project_root=project,
+    )
+
+    services = yaml.safe_load(
+        (project / "compose.generated.yaml").read_text(encoding="utf-8")
+    )["services"]
+    # KIP_CONTAINER_DATABASE_URL is the bootstrap owner, which PostgreSQL
+    # creates SUPERUSER with BYPASSRLS: a superuser bypasses every workspace and
+    # ACL policy, so only migrate and the one-shot `roles` service may use it.
+    assert services["migrate"]["environment"]["KIP_DATABASE_URL"] == (
+        "${KIP_CONTAINER_DATABASE_URL:?start the generated profile with ./scripts/app-up.sh}"
+    )
+    for name, role, password in (
+        ("api", "kip_api", "KIP_API_DB_PASSWORD"),
+        ("worker", "kip_worker", "KIP_WORKER_DB_PASSWORD"),
+    ):
+        url = services[name]["environment"]["KIP_DATABASE_URL"]
+        assert url.startswith(f"postgresql://{role}:${{{password}:?")
+        assert "KIP_CONTAINER_DATABASE_URL" not in url
+        assert "POSTGRES_USER" not in url and "POSTGRES_PASSWORD" not in url
+        assert services[name]["depends_on"]["roles"] == {
+            "condition": "service_completed_successfully"
+        }
+    assert services["roles"]["depends_on"]["migrate"] == {
+        "condition": "service_completed_successfully"
+    }
+    assert services["roles"]["environment"]["PGUSER"] == "${POSTGRES_USER:-kip_owner}"
+    assert services["roles"]["volumes"] == [{
+        "type": "bind", "source": "./deploy", "target": "/deploy",
+        "read_only": True, "bind": {"create_host_path": False},
+    }]
+
+
+def test_generated_compose_for_external_database_leaves_role_creation_to_the_operator(
+    tmp_path: Path,
+) -> None:
+    project = _project(tmp_path)
+    answers = complete_setup_answers(tmp_path).model_copy(update={
+        "database_secret_ref": SecretReference.parse("env:ACME_DATABASE_URL"),
+    })
+    apply_setup_plan(build_setup_plan(answers, project_root=project), project_root=project)
+
+    compose = yaml.safe_load((project / "compose.generated.yaml").read_text(encoding="utf-8"))
+    # KIP neither owns nor can create roles in a database it did not start, so
+    # the one-shot service is left out and the file says who must do it.
+    assert "roles" not in compose["services"]
+    assert "postgres" not in compose["services"]
+    note = compose["x-kip-database-roles"]
+    assert "deploy/sql/roles.sql.template" in note
+    assert "env:ACME_DATABASE_URL" in note
+    assert "BYPASSRLS" in note
+    for name in ("api", "worker", "migrate"):
+        environment = compose["services"][name]["environment"]
+        assert environment["ACME_DATABASE_URL"] == "${ACME_DATABASE_URL:?required}"
+        assert "KIP_DATABASE_URL" not in environment
 
 
 def test_readiness_rejects_unreadable_database_secret_file(tmp_path: Path, monkeypatch) -> None:
@@ -282,6 +357,10 @@ def test_external_database_is_used_by_every_service_without_bundled_postgres(tmp
     )
     services = json.loads(result.stdout)["services"]
     assert "postgres" not in services
+    # No bundled database, so no `roles` service either: every remaining service
+    # uses the one external URL the operator approved (see
+    # test_generated_compose_for_external_database_leaves_role_creation_to_the_operator).
+    assert "roles" not in services
     for service in services.values():
         assert service["environment"]["ACME_DATABASE_URL"] == selected_url
         assert "KIP_DATABASE_URL" not in service["environment"]

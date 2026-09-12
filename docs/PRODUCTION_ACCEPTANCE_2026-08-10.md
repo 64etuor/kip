@@ -1,5 +1,13 @@
 # Production package acceptance: 2026-08-10
 
+> **Historical record.** Every count, verdict and limitation below was measured
+> against KIP 3.2.0 on 2026-08-10 and is preserved unchanged as the evidence of
+> that acceptance. It is not current status: test counts, migration counts,
+> corpus sizes and default behaviour have all moved since. Read
+> [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md) for what is true today,
+> and note in particular that semantic search has since become the default
+> (ADR-065) and that Neo4j was removed (ADR-046).
+
 ## Verdict
 
 KIP 3.2.0 passes repository and package acceptance for the canonical

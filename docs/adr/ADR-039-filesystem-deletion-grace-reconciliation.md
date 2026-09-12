@@ -1,8 +1,8 @@
 # ADR-039: Reconcile filesystem deletions with a complete-scan grace policy
 
-- **Status:** Accepted
+- **Status:** Amended
 - **Date:** 2026-08-13
-- **Safety clarification:** 2026-08-16
+- **Amended by:** 2026-08-16 — safety clarification
 
 ## Context
 

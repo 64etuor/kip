@@ -1,7 +1,9 @@
 # ADR-053: Upgrade the pinned offline Kordoc runtime to 4.8.0
 
-- **Status:** Accepted
+- **Status:** Superseded
 - **Date:** 2026-08-17
+- **Superseded by:** ADR-064 (2026-09-11) — the pinned offline Kordoc runtime
+  moved to 4.13.1
 
 ## Context
 

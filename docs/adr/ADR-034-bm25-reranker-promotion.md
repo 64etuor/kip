@@ -1,7 +1,7 @@
 # ADR-034: Promote the candidate-local BM25 reranker
 
-- Status: accepted
-- Date: 2026-08-11
+- **Status:** Accepted
+- **Date:** 2026-08-11
 
 ## Context
 

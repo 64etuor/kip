@@ -1,7 +1,11 @@
 # ADR-042: Korean OCR enriches candidate pages and presentation images
 
-- **Status:** Accepted; runtime version pin superseded by ADR-053
+- **Status:** Amended
 - **Date:** 2026-08-14
+- **Amended by:** ADR-053 (2026-08-17) — the pinned Kordoc runtime moved to
+  4.8.0
+- **Amended by:** ADR-064 (2026-09-11) — the pinned Kordoc runtime moved to
+  4.13.1
 
 ## Context
 

@@ -1,7 +1,12 @@
 # ADR-035: Version semantic inputs and resume projection rebuilds
 
-- **Status:** Accepted — default input cap amended 2026-08-15
+- **Status:** Amended
 - **Date:** 2026-08-13
+- **Amended by:** 2026-08-15 — `models.embedding.max_document_chars` default
+  raised 4,000 -> 12,000
+- **Amended by:** ADR-065 (2026-09-12) — that raise was **reverted**: the
+  shipped default is 4,000 characters (head/tail), and semantic search is on
+  by default rather than a shadow projection awaiting manual activation
 
 > Amendment (2026-08-15): `models.embedding.max_document_chars` default
 > raised 4,000 -> 12,000 (well inside the Qwen3 sidecar's 32k-token

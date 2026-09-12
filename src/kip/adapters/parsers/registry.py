@@ -107,7 +107,7 @@ def _raw_parser_registrations(settings: Settings) -> list[tuple[str, ParserPort]
             raise ConfigurationError(f"unsupported PDF parser backend: {pdf_backend}")
     hwp_configs: list[CommandParserConfig] = []
     native_parser: HwpNativeParser | None = None
-    for name in settings.get("parsers.hwp.order", ["kordoc", "unhwp"]):
+    for name in settings.get("parsers.hwp.order", ["hwp-hwpx-parser", "kordoc", "unhwp"]):
         if name == "paired_pdf":
             continue
         config = settings.get(f"parsers.hwp.{name}", {}) or {}

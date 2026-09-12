@@ -1,5 +1,34 @@
--- Run as the database object owner. Bind platform login roles to these NOLOGIN groups.
--- Local Compose uses kip_owner for convenience; production API and workers must not.
+-- KIP database roles. Apply as the database object owner AFTER migrations:
+-- the grants below cover the tables and sequences the migrations create, so
+-- applying this before `kip migrate` grants nothing. `deploy/apply-roles.sh`
+-- runs it in that order, and the Compose `roles` service runs that script
+-- once `migrate` has completed. It is re-runnable; run it again after every
+-- migration so that newly created tables are covered on existing databases
+-- (the ALTER DEFAULT PRIVILEGES below only covers objects created later).
+--
+-- Why this exists: PostgreSQL creates the image bootstrap role (POSTGRES_USER,
+-- kip_owner by default) as a SUPERUSER with BYPASSRLS. A superuser bypasses
+-- every row level security policy, enabled or forced, so an API or worker that
+-- connects as the owner has no workspace or ACL isolation in the database.
+-- Migrations must keep using the owner because they create objects; the API
+-- and worker must not.
+--
+-- These are NOLOGIN group roles. Bind the deployment's login roles to them
+-- (`GRANT kip_api TO <login>`); RLS policy role matching and table privileges
+-- both follow inherited membership. A deployment without an external identity
+-- provider can instead give these roles a password directly, which is what
+-- `deploy/apply-roles.sh` does when KIP_API_DB_PASSWORD / KIP_WORKER_DB_PASSWORD
+-- / KIP_BACKUP_DB_PASSWORD are set.
+--
+-- kip_backup is the exception: BYPASSRLS is a role attribute and role
+-- attributes are not inherited through membership, so a login that is merely a
+-- member of kip_backup still cannot set `row_security=off`. The backup process
+-- must log in as kip_backup itself, or as a login role that was created with
+-- BYPASSRLS.
+--
+-- Creating the roles requires CREATEROLE, and BYPASSRLS on kip_backup requires
+-- a superuser. The final DO block re-checks the role attributes and fails
+-- loudly rather than leaving a silently permissive deployment behind.
 
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='kip_api') THEN
@@ -16,36 +45,89 @@ DO $$ BEGIN
   END IF;
 END $$;
 
-GRANT CONNECT ON DATABASE kip TO kip_api, kip_worker, kip_reviewer, kip_backup;
-GRANT USAGE ON SCHEMA kip, source, content, knowledge, search, jobs, audit TO kip_api, kip_worker, kip_reviewer, kip_backup;
-GRANT EXECUTE ON FUNCTION kip.current_workspace_id(), kip.current_acl_scopes(), kip.acl_snapshot_is_fresh(text) TO kip_api, kip_worker, kip_reviewer;
+-- The database name is a deployment choice (POSTGRES_DB), so read it back
+-- instead of hard-coding `kip`.
+DO $$ BEGIN
+  EXECUTE format(
+    'GRANT CONNECT ON DATABASE %I TO kip_api, kip_worker, kip_reviewer, kip_backup',
+    current_database()
+  );
+END $$;
 
-GRANT SELECT ON ALL TABLES IN SCHEMA kip, source, content, knowledge, search, jobs, audit TO kip_api;
-GRANT INSERT, UPDATE ON jobs.queue, audit.events, audit.query_traces TO kip_api;
-GRANT INSERT, UPDATE ON knowledge.entity_candidates, knowledge.entity_candidate_evidence, knowledge.assertion_candidates, knowledge.assertion_candidate_evidence TO kip_api;
+GRANT USAGE ON SCHEMA kip, source, content, knowledge, search, jobs, audit, interaction
+  TO kip_api, kip_worker, kip_reviewer, kip_backup;
 
-GRANT SELECT ON ALL TABLES IN SCHEMA kip, source, content, knowledge, search, jobs, audit TO kip_worker;
-GRANT SELECT, INSERT, UPDATE ON source.systems, source.containers, source.objects, source.revisions, source.sync_cursors, source.acl_snapshots TO kip_worker;
-GRANT SELECT, INSERT, UPDATE ON content.logical_documents, content.artifacts, content.document_artifacts, content.extractions, content.units TO kip_worker;
-GRANT SELECT, INSERT, UPDATE, DELETE ON search.lexical_units, search.aliases, search.embedding_spaces, search.embeddings_1024 TO kip_worker;
-GRANT INSERT, UPDATE ON knowledge.entities, knowledge.entity_identifiers, knowledge.entity_aliases, knowledge.entity_candidates, knowledge.entity_candidate_evidence, knowledge.assertion_candidates, knowledge.assertion_candidate_evidence TO kip_worker;
-GRANT SELECT, INSERT, UPDATE, DELETE ON jobs.queue TO kip_worker;
-GRANT INSERT ON audit.events, audit.query_traces TO kip_worker;
+-- The API and the worker share one repository implementation
+-- (src/kip/adapters/repository/postgres), so a table-level split between them
+-- would only produce runtime failures: both open sessions that upsert the
+-- workspace and principal, enqueue and claim jobs, write audit rows, and read
+-- every projection. The control that isolates them is row level security,
+-- which now applies because neither role is a superuser and neither has
+-- BYPASSRLS. What these grants do buy: no DDL, no ownership, no ability to
+-- disable or bypass a policy, and no write access to migration bookkeeping.
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON ALL TABLES IN SCHEMA source, content, knowledge, search, jobs, audit, interaction
+  TO kip_api, kip_worker;
+-- Schema kip is granted table by table on purpose, with no ALTER DEFAULT
+-- PRIVILEGES backstop: it holds the cross-workspace bookkeeping that carries no
+-- workspace_id and therefore no RLS policy, so a blanket default grant there
+-- would hand every future table in it to the application roles with no policy
+-- behind it, and would hand kip.schema_migrations write access to the roles
+-- this file exists to keep out of migration bookkeeping. The cost is that a
+-- migration adding a table to schema kip must add its grant here; the final DO
+-- block fails the apply instead of letting that go unnoticed.
+--
+-- kip.workspaces carries no workspace_id and therefore no RLS policy; the
+-- repository upserts it on every session. Restrict it to SELECT and INSERT so
+-- an application session cannot rename or delete another workspace.
+GRANT SELECT, INSERT ON kip.workspaces TO kip_api, kip_worker;
+GRANT SELECT, INSERT ON kip.principals TO kip_api, kip_worker;
+GRANT SELECT ON kip.schema_migrations TO kip_api, kip_worker;
+GRANT USAGE, SELECT
+  ON ALL SEQUENCES IN SCHEMA source, content, knowledge, search, jobs, audit, interaction
+  TO kip_api, kip_worker;
 
+-- Optional human review login. It is not wired to any KIP process; a
+-- deployment that reviews candidates through the API uses kip_api.
 GRANT SELECT ON ALL TABLES IN SCHEMA source, content, knowledge TO kip_reviewer;
-GRANT UPDATE ON knowledge.assertion_candidates TO kip_reviewer;
-GRANT INSERT, UPDATE ON knowledge.entities, knowledge.entity_identifiers, knowledge.entity_aliases, knowledge.assertions, knowledge.assertion_evidence TO kip_reviewer;
-GRANT UPDATE ON knowledge.entity_candidates TO kip_reviewer;
+GRANT INSERT, UPDATE ON knowledge.entities, knowledge.entity_identifiers, knowledge.entity_aliases,
+  knowledge.assertions, knowledge.assertion_evidence TO kip_reviewer;
+GRANT UPDATE ON knowledge.entity_candidates, knowledge.assertion_candidates TO kip_reviewer;
 GRANT INSERT ON audit.events TO kip_reviewer;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA knowledge, audit TO kip_reviewer;
 
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA source, content, knowledge, search, jobs, audit TO kip_api, kip_worker, kip_reviewer;
+-- Backup reads everything and writes nothing. It is the only application role
+-- with BYPASSRLS, which scripts/backup.sh needs: it exports
+-- `PGOPTIONS=-c row_security=off`, and PostgreSQL rejects that setting for a
+-- FORCE ROW LEVEL SECURITY table unless the role bypasses RLS.
+GRANT SELECT ON ALL TABLES IN SCHEMA kip, source, content, knowledge, search, jobs, audit, interaction
+  TO kip_backup;
+-- pg_dump reads last_value from every sequence it dumps, so a backup role with
+-- SELECT on the tables and nothing on the sequences aborts with "failed to get
+-- data for sequence ...". pg_dump writes nothing until it has read everything,
+-- so that abort leaves a zero byte dump behind. SELECT, not USAGE: USAGE would
+-- let the backup role call nextval and advance a live sequence.
+GRANT SELECT ON ALL SEQUENCES IN SCHEMA kip, source, content, knowledge, search, jobs, audit, interaction
+  TO kip_backup;
 
-GRANT SELECT ON ALL TABLES IN SCHEMA kip, source, content, knowledge, search, jobs, audit TO kip_backup;
+-- Objects a later migration creates, for databases where this file is not
+-- re-applied afterwards. Only effective for objects created by the role that
+-- runs this file, which is the same owner that runs migrations.
+ALTER DEFAULT PRIVILEGES IN SCHEMA source, content, knowledge, search, jobs, audit, interaction
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO kip_api, kip_worker;
+ALTER DEFAULT PRIVILEGES IN SCHEMA kip, source, content, knowledge, search, jobs, audit, interaction
+  GRANT SELECT ON TABLES TO kip_backup;
+ALTER DEFAULT PRIVILEGES IN SCHEMA source, content, knowledge
+  GRANT SELECT ON TABLES TO kip_reviewer;
+ALTER DEFAULT PRIVILEGES IN SCHEMA source, content, knowledge, search, jobs, audit, interaction
+  GRANT USAGE, SELECT ON SEQUENCES TO kip_api, kip_worker, kip_reviewer;
+ALTER DEFAULT PRIVILEGES IN SCHEMA kip, source, content, knowledge, search, jobs, audit, interaction
+  GRANT SELECT ON SEQUENCES TO kip_backup;
 
-ALTER DEFAULT PRIVILEGES IN SCHEMA kip, source, content, knowledge, search, jobs, audit GRANT SELECT ON TABLES TO kip_api, kip_worker, kip_backup;
-ALTER DEFAULT PRIVILEGES IN SCHEMA source, content, knowledge GRANT SELECT ON TABLES TO kip_reviewer;
-ALTER DEFAULT PRIVILEGES IN SCHEMA source, content, knowledge, search, jobs, audit GRANT USAGE, SELECT ON SEQUENCES TO kip_api, kip_worker, kip_reviewer;
-
+-- The workspace_isolation policies from migration 0003 apply to PUBLIC and
+-- therefore to these roles. The two policies below are the worker's explicit
+-- ingestion predicate on the tables it rewrites most; they are permissive and
+-- match workspace_isolation, so they add no access.
 DROP POLICY IF EXISTS worker_workspace_access ON source.objects;
 CREATE POLICY worker_workspace_access ON source.objects
     FOR SELECT TO kip_worker
@@ -64,3 +146,73 @@ CREATE POLICY worker_workspace_update ON content.units
     FOR UPDATE TO kip_worker
     USING (workspace_id = kip.current_workspace_id())
     WITH CHECK (workspace_id = kip.current_workspace_id());
+
+-- Fail the apply rather than leave a deployment that looks fixed. Anything
+-- that can bypass RLS here makes every policy in this system decorative.
+DO $$
+DECLARE
+  offending text;
+BEGIN
+  SELECT string_agg(rolname, ', ' ORDER BY rolname) INTO offending
+  FROM pg_roles
+  WHERE rolname IN ('kip_api', 'kip_worker', 'kip_reviewer')
+    AND (rolsuper OR rolbypassrls);
+  IF offending IS NOT NULL THEN
+    RAISE EXCEPTION
+      'row level security would not apply: % is SUPERUSER or BYPASSRLS', offending;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='kip_backup' AND rolbypassrls) THEN
+    RAISE EXCEPTION
+      'kip_backup needs BYPASSRLS for PGOPTIONS=-c row_security=off in scripts/backup.sh';
+  END IF;
+
+  -- pg_dump aborts on the first object it cannot read and leaves a zero byte
+  -- file, so an ungranted table or sequence here is a silently broken backup.
+  -- The OFFSET 0 fences keep the planner from evaluating has_sequence_privilege
+  -- on a relation that is not a sequence, which errors out.
+  SELECT string_agg(name, ', ' ORDER BY name) INTO offending
+  FROM (
+    SELECT name FROM (
+      SELECT namespace_entry.nspname || '.' || class_entry.relname AS name, class_entry.oid
+      FROM pg_class AS class_entry
+      JOIN pg_namespace AS namespace_entry ON namespace_entry.oid = class_entry.relnamespace
+      WHERE namespace_entry.nspname = ANY (ARRAY[
+              'kip', 'source', 'content', 'knowledge', 'search', 'jobs', 'audit', 'interaction'])
+        AND class_entry.relkind IN ('r', 'p', 'v', 'm', 'f')
+      OFFSET 0
+    ) AS relations
+    WHERE NOT has_table_privilege('kip_backup', relations.oid, 'SELECT')
+    UNION ALL
+    SELECT name FROM (
+      SELECT namespace_entry.nspname || '.' || class_entry.relname AS name, class_entry.oid
+      FROM pg_class AS class_entry
+      JOIN pg_namespace AS namespace_entry ON namespace_entry.oid = class_entry.relnamespace
+      WHERE namespace_entry.nspname = ANY (ARRAY[
+              'kip', 'source', 'content', 'knowledge', 'search', 'jobs', 'audit', 'interaction'])
+        AND class_entry.relkind = 'S'
+      OFFSET 0
+    ) AS sequences
+    WHERE NOT has_sequence_privilege('kip_backup', sequences.oid, 'SELECT')
+  ) AS unreadable;
+  IF offending IS NOT NULL THEN
+    RAISE EXCEPTION
+      'kip_backup cannot read %; pg_dump would abort and write a zero byte backup', offending;
+  END IF;
+
+  -- Schema kip has no default-privileges backstop by design (see above), so a
+  -- migration that adds a table there must add its grant to this file.
+  SELECT string_agg(name, ', ' ORDER BY name) INTO offending
+  FROM (
+    SELECT 'kip.' || class_entry.relname AS name
+    FROM pg_class AS class_entry
+    JOIN pg_namespace AS namespace_entry ON namespace_entry.oid = class_entry.relnamespace
+    WHERE namespace_entry.nspname = 'kip'
+      AND class_entry.relkind IN ('r', 'p')
+      AND NOT (has_table_privilege('kip_api', class_entry.oid, 'SELECT')
+               AND has_table_privilege('kip_worker', class_entry.oid, 'SELECT'))
+  ) AS unreadable;
+  IF offending IS NOT NULL THEN
+    RAISE EXCEPTION
+      'kip_api/kip_worker have no SELECT on %; add the grant to this file', offending;
+  END IF;
+END $$;

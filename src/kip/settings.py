@@ -84,6 +84,255 @@ def _positive_integer(value: object, name: str) -> int:
     return parsed
 
 
+# Configuration keys this build understands. A key that is present in a
+# loaded TOML file but absent here is reported once as a startup warning, so
+# a misspelling (`serach.default_mode`) or a key left behind by an older
+# release stops being silently ignored.
+#
+# Why an explicit list rather than reflection over the code: the readers are
+# spread across the container, adapters and use cases, many of them reading a
+# whole sub-table and then `.get()`-ing inside it, so no runtime reflection
+# can enumerate them. Deriving the set from `config/kip.example.toml` at
+# runtime is not an option either — a deployment ships its own config and
+# need not carry the example. The list is therefore explicit and guarded
+# against rot by `tests/test_config_key_validation.py`, which fails whenever
+# the shipped example config or the setup writer's payload contains a key
+# this list does not recognise.
+#
+# `*` matches exactly one path segment (dynamically named tables, such as the
+# per-parser tables under `[parsers.hwp]`); `[]` marks an array of tables.
+_RECOGNISED_CONFIG_KEYS: tuple[str, ...] = (
+    "app.environment",
+    "app.workspace",
+    "app.log_level",
+    "setup.plan_fingerprint",
+    "setup.source_ownership",
+    "database.url_env",
+    "database.secret_ref",
+    "database.statement_timeout_ms",
+    "database.projection_statement_timeout_ms",
+    "database.pool_max_size",
+    "storage.cas_path",
+    "api.host",
+    "api.port",
+    "api.max_request_bytes",
+    "identity.mode",
+    "identity.owner",
+    "identity.api_key.principal_id",
+    "identity.api_key.acl_scopes",
+    "identity.api_key.api_key_env",
+    "identity.api_key.admin_key_env",
+    "identity.api_key.secret_ref",
+    "identity.api_key.admin_secret_ref",
+    "identity.jwt.issuer",
+    "identity.jwt.audience",
+    "identity.jwt.jwks_url",
+    "identity.jwt.algorithms",
+    "identity.jwt.principal_claim",
+    "identity.jwt.workspace_claim",
+    "identity.jwt.group_claim",
+    "identity.jwt.scope_claim",
+    "identity.jwt.group_scope_prefix",
+    "identity.jwt.admin_groups",
+    "identity.jwt.snapshot_id_claim",
+    "identity.jwt.snapshot_version_claim",
+    "identity.jwt.snapshot_captured_at_claim",
+    "identity.jwt.snapshot_expires_at_claim",
+    "identity.jwt.jwks_cache_seconds",
+    "identity.jwt.jwks_timeout_seconds",
+    "identity.jwt.clock_skew_seconds",
+    "security.allow_remote_model_egress",
+    "security.model_service_hosts",
+    "security.follow_symlinks",
+    "security.max_file_bytes",
+    "telemetry.query_traces_enabled",
+    "telemetry.retention_days",
+    "search.semantic_enabled",
+    "search.default_mode",
+    "search.semantic_auto_activate",
+    "search.context_item_max_chars",
+    "search.alias_expansion_enabled",
+    "search.alias_expansion_max_terms",
+    "search.max_hits_per_document",
+    "search.abstain_on_unknown_terms",
+    "search.korean_ngram_min",
+    "search.korean_ngram_max",
+    "search.hybrid_candidate_limit",
+    "search.rerank_candidate_limit",
+    "search.lexical_rerank_enabled",
+    "search.lexical_rerank_candidate_limit",
+    "search.rrf_rank_constant",
+    "search.hnsw_ef_search",
+    "search.hnsw_max_scan_tuples",
+    "search.lexical_common_term_fraction",
+    "models.circuit_cooldown_seconds",
+    "models.embedding.enabled",
+    "models.embedding.base_url",
+    "models.embedding.model",
+    "models.embedding.revision",
+    "models.embedding.dimensions",
+    "models.embedding.batch_size",
+    "models.embedding.page_size",
+    "models.embedding.max_batch_chars",
+    "models.embedding.max_document_chars",
+    "models.embedding.timeout_seconds",
+    "models.embedding.query_timeout_seconds",
+    "models.embedding.query_instruction",
+    "models.embedding.space_name",
+    "models.embedding.document_instruction",
+    # `[models.reranker]` and the optional `[models.lexical_reranker]` are
+    # read by the same adapter factory and accept the same keys.
+    "models.reranker.*",
+    "models.lexical_reranker.*",
+    "models.generation.enabled",
+    "models.generation.provider",
+    "models.generation.base_url",
+    "models.generation.model",
+    "models.generation.revision",
+    "models.generation.allowed_classifications",
+    "models.generation.retention_policy",
+    "models.generation.secret_ref",
+    "models.generation.api_key_env",
+    "models.generation.timeout_seconds",
+    "models.generation.max_response_bytes",
+    "models.generation.max_claims",
+    "models.generation.max_output_tokens",
+    "models.generation.fallback_on_error",
+    "models.relation_mining.enabled",
+    "models.relation_mining.max_units",
+    "models.relation_mining.max_characters",
+    "models.relation_mining.max_entity_proposals",
+    "models.relation_mining.max_relation_proposals",
+    "ontology.domain_profile",
+    "ontology.adaptive_discovery",
+    "ontology.reviewers",
+    "ontology.auto_approve.enabled",
+    "ontology.auto_approve.min_precision",
+    "ontology.auto_approve.min_confidence",
+    "ontology.auto_approve.min_reviewed",
+    "ontology.answer_context.entity_limit",
+    "ontology.answer_context.edge_limit",
+    "ontology.answer_context.max_depth",
+    "ontology.migrations.max_assertions",
+    "interaction.enabled",
+    "interaction.clarification_ttl_seconds",
+    "sync.deletion_grace_scans",
+    "parsers.parser_timeout_seconds",
+    "parsers.minimum_quality_score",
+    "parsers.isolation.enabled",
+    "parsers.isolation.wall_seconds",
+    "parsers.isolation.cpu_seconds",
+    "parsers.isolation.memory_mib",
+    "parsers.isolation.result_mib",
+    "parsers.isolation.diagnostic_kib",
+    "parsers.isolation.cpu_threads",
+    "parsers.isolation.nice",
+    "parsers.pdf.backend",
+    "parsers.pdf.tables_enabled",
+    "parsers.ocr.timeout_seconds",
+    "parsers.ocr.kordoc.enabled",
+    "parsers.ocr.kordoc.argv",
+    "parsers.ocr.kordoc.version_argv",
+    "parsers.ocr.kordoc.expected_version",
+    "parsers.ocr.pptx.max_images",
+    "parsers.ocr.pptx.max_image_bytes",
+    "parsers.ocr.pptx.max_total_bytes",
+    "parsers.ocr.pptx.min_width_px",
+    "parsers.ocr.pptx.min_height_px",
+    "parsers.hwp.order",
+    # Per-parser tables are named by `parsers.hwp.order`.
+    "parsers.hwp.*.enabled",
+    "parsers.hwp.*.argv",
+    "parsers.hwp.*.max_chars_per_unit",
+    "sources.filesystem[].name",
+    "sources.filesystem[].root",
+    "sources.filesystem[].enabled",
+    "sources.filesystem[].read_only",
+    "sources.filesystem[].follow_symlinks",
+    "sources.filesystem[].settle_seconds",
+    "sources.filesystem[].include_extensions",
+    "sources.filesystem[].exclude_globs",
+    "sources.filesystem[].acl_scope",
+    "sources.filesystem[].classification",
+    "sources.slack.enabled",
+    "sources.slack.workspace_id",
+    "sources.slack.allowed_conversation_ids",
+    "sources.slack.acl_snapshot_ttl_seconds",
+    "sources.slack.token_env",
+    "sources.slack.classification",
+    "sources.apple_mail.enabled",
+    "sources.apple_mail.allowed_accounts",
+    "sources.apple_mail.allowed_mailboxes",
+    "sources.apple_mail.lookback_days",
+    "sources.apple_mail.limit_per_mailbox",
+    "sources.apple_mail.acl_snapshot_ttl_seconds",
+    "sources.apple_mail.classification",
+    "sources.imap.enabled",
+    "sources.imap.host",
+    "sources.imap.port",
+    "sources.imap.username_env",
+    "sources.imap.password_env",
+    "sources.imap.mailboxes",
+    "sources.imap.use_ssl",
+    "sources.imap.acl_snapshot_ttl_seconds",
+    "sources.imap.classification",
+    "sources.connector_policies[].name",
+    "sources.connector_policies[].event_family",
+    "sources.connector_policies[].classification",
+    "sources.connector_policies[].acl_mode",
+    "sources.connector_policies[].acl_scopes",
+    "sources.connector_policies[].acl_snapshot_ttl_seconds",
+    "operations.backup_path",
+    "operations.retention_days",
+    "operations.sync_schedule",
+    "evaluation.dataset",
+)
+
+
+def _config_key_paths(value: Any, prefix: str = "") -> list[str]:
+    """Every leaf key path in a loaded config, arrays of tables included."""
+    if isinstance(value, dict):
+        return [
+            path
+            for key, item in value.items()
+            for path in _config_key_paths(item, f"{prefix}.{key}" if prefix else str(key))
+        ]
+    if isinstance(value, list) and any(isinstance(item, dict) for item in value):
+        return [
+            path
+            for item in value
+            for path in _config_key_paths(item, f"{prefix}[]")
+        ]
+    return [prefix] if prefix else []
+
+
+def _is_recognised_config_key(path: str) -> bool:
+    segments = path.split(".")
+    for pattern in _RECOGNISED_CONFIG_KEYS:
+        parts = pattern.split(".")
+        if len(parts) == len(segments) and all(
+            part in {"*", segment} for part, segment in zip(parts, segments, strict=True)
+        ):
+            return True
+        # An empty array of tables, such as `sources.filesystem = []`, yields
+        # the table-array prefix itself; the build reads it, so it is known.
+        if len(parts) > len(segments) and parts[len(segments) - 1] == f"{segments[-1]}[]" and all(
+            part in {"*", segment}
+            for part, segment in zip(parts[: len(segments) - 1], segments[:-1], strict=True)
+        ):
+            return True
+    return False
+
+
+def unknown_config_keys(raw: dict[str, Any]) -> tuple[str, ...]:
+    """Keys present in a loaded config that no part of this build reads."""
+    return tuple(
+        dict.fromkeys(
+            path for path in _config_key_paths(raw) if not _is_recognised_config_key(path)
+        )
+    )
+
+
 @dataclass(slots=True)
 class Settings:
     project_root: Path
@@ -107,6 +356,10 @@ class Settings:
     jwt_jwks_url: str = ""
     max_request_bytes: int = 10 * 1024 * 1024
     log_level: str = "INFO"
+    # Config keys present in the file but unknown to this build. Reported as
+    # a capability warning; never a startup failure, so an operator is never
+    # locked out by a key a newer or older release wrote.
+    unknown_config_keys: tuple[str, ...] = ()
 
     @classmethod
     def load(cls, config_path: str | Path | None = None) -> Settings:
@@ -130,9 +383,21 @@ class Settings:
             "KIP_ENV", str(_deep_get(raw, "app.environment", "development")),
         )
         if not database_url:
-            if env_name != "KIP_DATABASE_URL" or environment not in {"test", "development"}:
+            # The memory repository is non-durable: every ingested unit, job
+            # and assertion disappears with the process. Booting it because a
+            # database URL happened to be unset is a silent data-loss default,
+            # so only the test environment may fall back; any other
+            # environment fails loudly and names the variable to set.
+            if env_name != "KIP_DATABASE_URL" or environment != "test":
+                hint = (
+                    "set it to a PostgreSQL URL"
+                    if env_name != "KIP_DATABASE_URL"
+                    else "set it to a PostgreSQL URL, or run with KIP_ENV=test to use "
+                    "the non-durable memory repository"
+                )
                 raise ConfigurationError(
-                    f"required database secret is not set: {env_name} (or {env_name}_FILE)"
+                    f"required database secret is not set: {env_name} "
+                    f"(or {env_name}_FILE); {hint}"
                 )
             database_url = "memory://"
 
@@ -217,6 +482,7 @@ class Settings:
                 os.environ.get("KIP_MAX_REQUEST_BYTES", _deep_get(raw, "api.max_request_bytes", 10 * 1024 * 1024))
             ),
             log_level=os.environ.get("KIP_LOG_LEVEL", str(_deep_get(raw, "app.log_level", "INFO"))),
+            unknown_config_keys=unknown_config_keys(raw),
         )
 
     @classmethod
@@ -226,7 +492,7 @@ class Settings:
             project_root=root,
             config_path=root / "config/kip.example.toml",
             raw={
-                "search": {"semantic_enabled": False, "context_max_chars": 120000},
+                "search": {"semantic_enabled": False},
             },
             environment="test",
             workspace="default",

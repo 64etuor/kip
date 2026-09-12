@@ -1,8 +1,10 @@
 # ADR-028: Persist redacted RAG decisions and export bounded telemetry
 
-## Status
-
-Accepted
+- **Status:** Amended
+- **Date:** 2026-08-09
+- **Amended by:** 3.13.0 — the OpenTelemetry exporter adapter was removed. The
+  redacted PostgreSQL trace store below is unchanged; `QueryTraceExporter`
+  remains a port with no adapter behind it, so nothing is exported today
 
 ## Context
 

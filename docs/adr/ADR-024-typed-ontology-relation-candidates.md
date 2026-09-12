@@ -1,7 +1,7 @@
 # ADR-024: Typed ontology relation candidates
 
-- Status: Accepted
-- Date: 2026-08-09
+- **Status:** Accepted
+- **Date:** 2026-08-09
 
 ## Context
 

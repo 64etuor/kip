@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 import tomllib
@@ -13,6 +14,13 @@ import yaml
 
 from kip.errors import ConfigurationError
 from kip.settings import Settings
+
+# Every ${NAME:?...} / ${NAME?...} in the generated file: Compose refuses to
+# parse the project when one of them is unset. Deriving the set from the file
+# keeps teardown working when the template gains a required variable, as it did
+# with the kip_api / kip_worker / kip_backup login passwords the `roles`
+# service and the API and worker database URLs now interpolate.
+_REQUIRED_INTERPOLATION = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*):?\?")
 
 
 def main() -> int:
@@ -25,7 +33,8 @@ def main() -> int:
     try:
         with config_path.open("rb") as handle:
             config = tomllib.load(handle)
-        compose = yaml.safe_load((root / "compose.generated.yaml").read_text(encoding="utf-8"))
+        compose_text = (root / "compose.generated.yaml").read_text(encoding="utf-8")
+        compose = yaml.safe_load(compose_text)
         expected = {"mode": "standalone", "plan_fingerprint": config["setup"]["plan_fingerprint"]}
         if compose.get("x-kip-setup") != expected:
             raise ConfigurationError("generated Compose is outdated or mismatched; regenerate and apply a setup plan")
@@ -42,7 +51,7 @@ def main() -> int:
             # Compose still interpolates required values during teardown. This
             # branch can only stop services; never read expired/removed secrets
             # or require a database connection merely to remove containers.
-            required_names = {"POSTGRES_PASSWORD", "KIP_CONTAINER_DATABASE_URL"}
+            required_names = set(_REQUIRED_INTERPOLATION.findall(compose_text))
             required_names.update(reference[4:] for reference in references if reference.startswith("env:"))
             for name in required_names:
                 if not environment.get(name):
@@ -113,8 +122,20 @@ def main() -> int:
                 )
                 if result.returncode:
                     return result.returncode
-            return subprocess.run(
+            migrated = subprocess.run(
                 [str(root / "scripts/migrate.sh")], cwd=root, env=environment, check=False,
+            ).returncode
+            if migrated or "roles" not in compose["services"]:
+                return migrated
+            # The application roles belong to the database, not to the app
+            # profile: backup connects as kip_backup, and a later app-up.sh
+            # expects the kip_api and kip_worker logins to exist. The grants
+            # cover the tables migrations create, so this runs after them.
+            # --no-deps keeps it from building the API and worker images here.
+            return subprocess.run(
+                ["docker", "compose", "-f", "compose.generated.yaml", "--profile", "app",
+                 "run", "--rm", "--no-deps", "roles"],
+                cwd=root, env=environment, check=False,
             ).returncode
         profiles = ["--profile", "app"]
         if environment.get("KIP_EXTRA_PROFILE") == "semantic" and "models" in compose["services"]:

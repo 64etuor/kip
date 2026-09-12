@@ -1,7 +1,10 @@
 # ADR-037: Align the production search contract and readiness gates
 
-- **Status:** Accepted
+- **Status:** Amended
 - **Date:** 2026-08-13
+- **Amended by:** ADR-065 (2026-09-12) — semantic retrieval is enabled by
+  default; the readiness gates below still govern non-reviewed embedding
+  identities
 
 ## Context
 

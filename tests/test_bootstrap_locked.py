@@ -80,7 +80,7 @@ def test_bootstrap_installs_declared_extras_from_frozen_lock(
         assert {
             arguments[index + 1] for index, argument in enumerate(arguments)
             if argument == "--extra"
-        } == {"postgres", "api", "identity", "extractors", "mcp", "telemetry", "dev"}
+        } == {"postgres", "api", "identity", "extractors", "mcp", "dev"}
     installs = [call["args"] for call in calls if call["args"][:3] == ["-m", "pip", "install"]]
     assert installs == []
     if not existing_uv:

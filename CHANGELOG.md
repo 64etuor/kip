@@ -1,5 +1,140 @@
 # Changelog
 
+## 3.13.0 - 2026-09-12
+
+- The Compose API and worker no longer connect as the PostgreSQL bootstrap
+  role. That role is created SUPERUSER with BYPASSRLS, so it bypassed every row
+  level security policy and made workspace and ACL isolation in the database
+  decorative, including the tables migration 0028 forces RLS on. A one-shot
+  `roles` service (`deploy/compose.roles.yaml`, and the `migration` profile of
+  `compose.production.yaml`) now applies `deploy/sql/roles.sql.template` as the
+  owner after migrations, and the API and worker connect as the non-superuser,
+  NOBYPASSRLS `kip_api` and `kip_worker` logins. Migrations keep the owner
+  because they create objects. `scripts/bootstrap.sh` adds the three new
+  passwords to an existing `.env` without touching existing values; see
+  `docs/DEPLOYMENT_GUIDE.md` 11.8 for the migration of a running deployment.
+  Guided setup generates the same split: `compose.generated.yaml` carries the
+  `roles` service and the `kip_api` / `kip_worker` URLs whenever the generated
+  project runs its own PostgreSQL, and `./scripts/app-up.sh --database-only`
+  applies the roles after migrating. A project pointed at an external database
+  gets no `roles` service — KIP does not own that database — and its
+  `x-kip-database-roles` key tells the operator to apply the template there.
+  The host CLI and MCP still use the owner.
+- `scripts/backup.sh` uses the BYPASSRLS `kip_backup` login through
+  `KIP_BACKUP_DATABASE_URL` when set, and both backup and restore now refuse to
+  run as a role that cannot bypass row level security instead of producing a
+  silently workspace-filtered dump. That role also holds `SELECT` on every
+  sequence, without which `pg_dump` stops at the first sequence and leaves a
+  zero-byte dump, and `deploy/sql/roles.sql.template` now fails to apply when
+  the backup role is missing a table or sequence grant, or when a table in the
+  `kip` schema was added without granting the application roles. Applying the
+  template is a prerequisite for the backup path: a deployment that has never
+  run `deploy/apply-roles.sh` or `./scripts/app-up.sh` since upgrading still
+  has no such role. The configuration snapshot in a backup set
+  now carries `deploy/apply-roles.sh` and `deploy/compose.roles.yaml` beside
+  `deploy/sql/roles.sql.template`, so a restore can recreate the roles the
+  restored policies depend on.
+
+- Answering no longer issues up to 37 empty graph queries per answer. With no
+  approved assertion touching the query's entities, `ontology context` and
+  `answer` now skip the pairwise recursive-CTE `graph_path` queries entirely
+  instead of running them and discarding the result — the shape of every
+  answer on a deployment whose ontology has not been reviewed yet.
+- Envelope warnings now describe the retrieval run, not only its surviving
+  hits. A search that degraded and returned nothing reports its degradation
+  (`semantic_degraded`, `rerank_degraded`, `lexical_rerank_degraded`)
+  alongside `no_visible_indexed_units` instead of hiding it; a context bundle
+  cut to the requested budget reports `context_truncated` (the envelope name
+  for `ContextBundle.truncated`); and a request whose retrieval raised carries
+  `search_failed` in its `ok: false` envelope. CLI, REST and MCP all report
+  them identically.
+- A missing database URL no longer boots the non-durable in-memory repository
+  outside `KIP_ENV=test`. Any other environment fails at startup with a
+  configuration error naming the variable, instead of accepting ingests it
+  loses at exit.
+- Configuration keys the build does not read (a misspelling, or a key left
+  behind by an older release) are collected at load time and reported once in
+  `capabilities` warnings. Startup never fails on one.
+- The CLI, the API app and the worker configure logging at startup, so
+  `app.log_level` and `KIP_LOG_LEVEL` finally take effect and log records stop
+  reaching Python's lastResort handler. Output is JSON on stderr; the CLI's
+  stdout stays a parseable envelope.
+- Fallbacks used when a config omits a key now match the shipped profile in
+  `config/kip.example.toml`: the embedding projection cap (4000, not 12000 —
+  omitting it built a `-c12000-ht1` space no release reviewed and that could
+  never auto-activate), the embedding batch size (32), the rerank candidate
+  limit (40), the per-item context cap (16000) and lexical reranking (on when
+  a reranker adapter is configured; an explicit opt-in without an adapter is
+  still reported as a misconfiguration).
+- `search.context_max_chars` is gone from the setup writer: the overall
+  context budget was always per-request (`--max-chars`) and no code read the
+  key.
+
+- One predicate now decides whether a model endpoint is local. The egress
+  policy hardcoded three loopback spellings while the model adapters used the
+  full loopback range plus `security.model_service_hosts`, and the generators
+  used a third form, so a container deployment could embed against its
+  `models` service but was denied generation against the same host. The
+  allowlist is part of the policy and therefore part of its fingerprint, and a
+  malformed entry now fails closed regardless of egress mode.
+- Removed surface: the in-process HuggingFace cross-encoder reranker, which
+  the HTTP backend covers. A config that still sets
+  `models.reranker.backend = "huggingface"` or `"jina"` now fails to start
+  with an error naming `"http"` as the replacement; change the key before
+  upgrading. Also removed, and selectable by no configuration: the
+  OpenTelemetry exporter (the PostgreSQL query-trace store and its port stay),
+  two orphan ports, and the `telemetry` and `semantic` Python extras. Config
+  keys that were shipped but read by nothing are gone:
+  `parsers.shadow_parse_critical_documents`, `sources.slack.download_files`,
+  `sources.apple_mail.excluded_mailboxes`, the inert `paired_pdf` entry in the
+  HWP parser order, and `search.context_max_chars`. The example config gains
+  `models.embedding.page_size`, which the code reads but no shipped config
+  carried.
+- Documentation was reconciled with the code. Corrections include an operator
+  instruction that appended a duplicate key to `.env` and broke every script,
+  a `kip worker drain` command that does not exist, session GUC names, the
+  audit events and doctor checks the TRD claimed, the ranking weights, the
+  content-addressed storage layout, the context budget in the PRD, the
+  security claim that the answer service never reads candidate tables, and the
+  common-term pruning threshold, which has a 200-unit floor the docs omitted.
+  ADR status lines now use one vocabulary, ADRs superseded in practice say so,
+  and `docs/adr/README.md` records the convention and the unused 006-016
+  number range.
+- Container deployments set `KIP_ENV=production` explicitly, so a missing API
+  key fails fast instead of enabling anonymous access, and connector ACL
+  policy and classification stay mandatory. The container config classifies
+  its filesystem source and carries the `[identity.jwt] admin_groups` list
+  that admin routes require. `compose.production.yaml` used an identity mode
+  the code rejects, so its API could not start.
+- The published contracts match the API: validation errors are the KIP
+  envelope rather than FastAPI's default shape, the OpenAPI document declares
+  its three authentication schemes per operation, five payloads that REST and
+  MCP return have schemas for the first time, and a discovery-candidate field
+  that is never serialized is no longer marked required.
+- Upgrade notes for configs that omit a key. `models.reranker.backend` now
+  defaults to `bm25` rather than `http`, so a config that names a
+  cross-encoder model without naming the backend reranks locally instead of
+  calling the model runtime. Model timeouts default to 120 seconds rather
+  than 30, matching the shipped profile, so a hung runtime is tolerated four
+  times longer before the circuit opens. The embedding query instruction
+  defaults to the release-reviewed Korean prefix, which is what makes an
+  omitted key still build a space the release can activate.
+  `search.rerank_candidate_limit` defaulting to 40 rather than 20 doubles the
+  documents a cross-encoder scores per reranked query. A malformed
+  `security.model_service_hosts` entry now fails at startup even when remote
+  model egress is allowed.
+- The Python SDK stops sending its own retrieval budgets, so callers that omit
+  `max_chars` now get the server defaults: 120,000 characters for context and
+  32,000 for answers, rather than the SDK's 40,000 and 12,000.
+- Logging is configured at every entry point, including the MCP server, and
+  KIP configures only its own logger, so an application embedding the API
+  keeps its root handlers. The unused `config/logging.yaml` is gone: editing
+  it never changed anything, and the level comes from `app.log_level` or
+  `KIP_LOG_LEVEL`.
+- `.env.example` no longer pins an Apple Silicon device on every install, so
+  the documented automatic device detection applies, and the dev compose file
+  pins the same PostgreSQL digest production uses.
+
 ## 3.12.2 - 2026-09-12
 
 - KIP now checks which model the runtime actually serves. Infinity answers

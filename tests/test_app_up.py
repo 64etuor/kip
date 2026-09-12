@@ -33,7 +33,15 @@ def _installation(tmp_path: Path, *, external: bool = False, generated: bool = T
     scripts.mkdir()
     for name in ("app-up.sh", "common.sh", "load_dotenv.py", "setup_compose.py"):
         shutil.copy2(ROOT / "scripts" / name, scripts / name)
-    (project / ".env").write_text(f"AUDIT_API_KEY_FILE={tmp_path / 'missing-api-secret'}\n")
+    # The kip_api / kip_worker / kip_backup login passwords live in .env beside
+    # POSTGRES_PASSWORD: compose interpolates them for the api, worker and
+    # `roles` services of a bundled-database project.
+    (project / ".env").write_text(
+        f"AUDIT_API_KEY_FILE={tmp_path / 'missing-api-secret'}\n"
+        "KIP_API_DB_PASSWORD=test-api-password\n"
+        "KIP_WORKER_DB_PASSWORD=test-worker-password\n"
+        "KIP_BACKUP_DB_PASSWORD=test-backup-password\n"
+    )
     binary = project / ".venv/bin"
     binary.mkdir(parents=True)
     (binary / "python").write_text(f'#!/bin/sh\nexec {shlex.quote(sys.executable)} "$@"\n')
@@ -77,13 +85,19 @@ def test_database_only_waits_then_migrates_without_building(tmp_path: Path, gene
     result = _run(project, environment, "--database-only")
     assert result.returncode == 0, result.stderr
     calls = _calls(trace)
-    assert [call["command"] for call in calls] == ["docker", "migrate.sh"]
+    # postgres, host migrations, then the one-shot `roles` service: the kip_api,
+    # kip_worker and kip_backup logins belong to the database, not to the app
+    # profile, and their grants cover the tables migrations just created.
+    assert [call["command"] for call in calls] == ["docker", "migrate.sh", "docker"]
     assert calls[0]["args"][-6:] == ["up", "-d", "--wait", "--wait-timeout", "60", "postgres"]
     assert "--build" not in calls[0]["args"]
+    assert calls[2]["args"][-4:] == ["run", "--rm", "--no-deps", "roles"]
+    assert "--build" not in calls[2]["args"]
     assert "Database ready and migrations complete" in result.stdout
     if generated:
         assert calls[1]["config"] == str(project / "config/kip.host.generated.toml")
         assert calls[1]["api"] and calls[1]["api_file"] is None
+        assert "compose.generated.yaml" in calls[2]["args"]
 
 
 def test_database_only_external_never_invokes_compose(tmp_path: Path) -> None:
@@ -111,10 +125,15 @@ def test_database_only_compose_interpolation_does_not_need_model_or_identity_sec
     if real_docker is None:
         pytest.skip("Docker Compose CLI unavailable")
     project, environment, trace = _installation(tmp_path)
+    # Two invocations now: postgres, then the one-shot `roles` service. Both
+    # must interpolate from .env alone.
     (project / ".venv/bin/docker").write_text(
         f"#!{sys.executable}\nimport subprocess,sys\n"
-        "assert sys.argv[-6:]==['up','-d','--wait','--wait-timeout','60','postgres']\n"
-        f"raise SystemExit(subprocess.run([{real_docker!r},*sys.argv[1:-6],'config','--quiet']).returncode)\n"
+        "argv=sys.argv[1:]\n"
+        "starts_postgres=argv[-6:]==['up','-d','--wait','--wait-timeout','60','postgres']\n"
+        "assert starts_postgres or argv[-4:]==['run','--rm','--no-deps','roles']\n"
+        "head=argv[:-6] if starts_postgres else argv[:-4]\n"
+        f"raise SystemExit(subprocess.run([{real_docker!r},*head,'config','--quiet']).returncode)\n"
     )
     result = _run(project, environment, "--database-only")
     assert result.returncode == 0, result.stderr

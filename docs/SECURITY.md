@@ -90,7 +90,12 @@ against a concurrent filesystem attacker. See ADR-056.
   private network; the container config sets `["models"]` so API and worker
   reach the compose `models` service at `http://models:7997` while
   `allow_remote_model_egress` stays false, and host configs set `[]`. Model
-  base URLs must not carry credentials. The local `compose.yaml` `models`
+  base URLs must not carry credentials. Embedding, reranking and generation
+  share one predicate (`kip.domain.egress.is_local_model_endpoint`): a host is
+  local only when it is a loopback address or an explicitly allowlisted bare
+  service name, so a host the embedding adapter accepts is exactly the host a
+  `local` generation policy accepts, and any other host is refused with the
+  typed `invalid_local_endpoint` denial rather than silently downgraded. The local `compose.yaml` `models`
   service (profile `semantic`) publishes only on
   `127.0.0.1:${KIP_SEMANTIC_PORT:-7997}` so host CLI/MCP can share it.
   Production compose runs `models` read-only and offline on an internal
@@ -101,6 +106,71 @@ against a concurrent filesystem attacker. See ADR-056.
   trace/egress decision; the command name `answer` alone is not evidence that
   private content leaves the machine.
 
+## Database roles
+
+PostgreSQL creates the image bootstrap role (`POSTGRES_USER`, `kip_owner` by
+default) as a SUPERUSER with BYPASSRLS. A superuser bypasses every row level
+security policy, whether the table merely enables RLS or forces it, so an API
+or worker that connects as the owner has no workspace or ACL isolation in the
+database no matter what the policies say.
+
+| Process | Role | Why |
+| --- | --- | --- |
+| `migrate` | owner (`POSTGRES_USER`) | creates schemas, tables, policies |
+| `roles` (one-shot) | owner (`POSTGRES_USER`) | needs CREATEROLE, and superuser to set BYPASSRLS |
+| `api` | `kip_api` | NOSUPERUSER, NOBYPASSRLS, no DDL |
+| `worker` | `kip_worker` | NOSUPERUSER, NOBYPASSRLS, no DDL |
+| `scripts/backup.sh` | `kip_backup` | BYPASSRLS, SELECT only: it must read every workspace |
+| `scripts/restore.sh` | owner of the restore target | it creates the schema and must also bypass RLS |
+
+The API and the worker must never use the owner role. `deploy/apply-roles.sh`
+applies `deploy/sql/roles.sql.template` as the owner after migrations. The
+one-shot `roles` service in `deploy/compose.roles.yaml` runs it, `api` and
+`worker` start only after it succeeds, and `./scripts/app-up.sh` always passes
+that overlay alongside `compose.yaml`. `compose.production.yaml` carries the
+same service in its `migration` profile. Re-apply it after every migration: the
+grants cover the tables that exist when it runs.
+
+The API and worker roles are deliberately not separated from each other by
+table privilege. They share one repository implementation, so a table-level
+split between them would only cause runtime failures; the control that
+isolates a workspace is row level security, which applies because neither role
+is a superuser or has BYPASSRLS. What the grants do remove is DDL, object
+ownership, the ability to disable a policy, and write access to
+`kip.schema_migrations`.
+
+BYPASSRLS is a role attribute, and role attributes are not inherited through
+membership. A login that is only a member of `kip_backup` still cannot set
+`row_security=off`; the backup process must log in as `kip_backup` itself or as
+a login created with BYPASSRLS.
+
+What is checked and what is not:
+
+- `deploy/sql/roles.sql.template` ends with a `DO` block that fails the apply if
+  `kip_api`, `kip_worker`, or `kip_reviewer` is SUPERUSER or BYPASSRLS, or if
+  `kip_backup` lacks BYPASSRLS.
+- `scripts/backup.sh` refuses to run when its role cannot bypass RLS, because
+  such a backup would be silently incomplete rather than failing.
+- `tests/integration/test_application_role_rls.py` proves on a throwaway
+  database that a `kip_api` login reads nothing from another workspace while
+  the owner reads both.
+- Nothing verifies which role a running API or worker actually connected as.
+  That remains an operator responsibility. Check it against a live deployment
+  with `SELECT usename, current_setting('is_superuser') FROM pg_stat_activity
+  WHERE datname = current_database()`, or per connection with `SELECT
+  current_user, rolsuper, rolbypassrls FROM pg_roles WHERE rolname =
+  current_user`.
+- The single-machine developer setup still runs the host CLI and MCP, and
+  therefore `kip migrate`, as the owner through `KIP_DATABASE_URL`. Only the
+  API and worker containers use the restricted roles. A guided-setup
+  deployment started from `compose.generated.yaml` uses them too when it runs
+  its own PostgreSQL: that file carries the same one-shot `roles` service and
+  points its API and worker at `kip_api` and `kip_worker`. A generated
+  deployment pointed at an external database has no `roles` service — KIP does
+  not own that database — and uses the single approved URL for migrate, API and
+  worker alike; `x-kip-database-roles` in the generated file states what the
+  operator must apply there.
+
 ## Secrets
 
 - Keep secrets in environment variables or an approved secret manager. The
@@ -108,7 +178,9 @@ against a concurrent filesystem attacker. See ADR-056.
   credential); a secret manager must inject environment variables or files,
   and guided setup rejects `keychain:`/`secret-manager:` references at answer
   time.
-- Never commit `.env`, Slack tokens, IMAP passwords, API keys, or Neo4j credentials.
+- Never commit `.env`, Slack tokens, IMAP passwords, API keys, or database
+  passwords. `.env` now also holds the kip_api, kip_worker, and kip_backup
+  login passwords that `deploy/apply-roles.sh` sets.
 - Fresh bootstrap generates distinct random database/API/admin credentials
   into a private `.env`; existing deployments are not rotated. Setup honors
   the configured secret variable names instead of substituting default keys.
@@ -162,10 +234,11 @@ against a concurrent filesystem attacker. See ADR-056.
 - Only KIP-generated opaque request IDs are retained. Untrusted correlation
   headers are not copied into trace storage.
 - Trace inspection and retention pruning require the verified admin role in
-  addition to workspace RLS. Candidate and evidence IDs are never exported as
-  OTel attributes.
-- OTLP endpoints must be explicit HTTP(S) URLs without embedded credentials.
-  Authentication headers belong in the runtime secret environment.
+  addition to workspace RLS.
+- KIP ships no trace exporter: the PostgreSQL `QueryTraceStore` is the only
+  trace destination, so traces never leave the deployment. A deployment that
+  forwards traces supplies its own `QueryTraceExporter` and owns that
+  destination's boundary review.
 - Trace/exporter failure never weakens ACL, evidence freshness, refusal, or
   answer semantics.
 
@@ -193,9 +266,9 @@ against a concurrent filesystem attacker. See ADR-056.
   `review: required` and `risk: high`, so no assertion using them can become
   a fact without exact evidence and human review.
 - PostgreSQL sets workspace, principal, ACL scopes, and verified roles in the
-  transaction-local session before interaction queries. Production API/worker
-  logins must remain non-owner, non-`BYPASSRLS` roles as documented in
-  `docs/OPERATIONS.md`.
+  transaction-local session before interaction queries. The API and worker
+  logins must remain non-owner, non-`BYPASSRLS` roles; see "Database roles"
+  below for which process uses which role and how to check it.
 
 ## Retrieval authorization
 
@@ -233,7 +306,13 @@ against a concurrent filesystem attacker. See ADR-056.
 - Ontology answer context is built only from active assertions whose valid-time
   interval contains the database/application statement time. Every graph edge
   is discarded if any exact evidence unit is inaccessible, freshness-stale, or
-  source-changed. Candidate tables are never queried by the answer service.
+  source-changed. The answer service reads candidate tables only when the
+  caller opts in. `include_candidate_assertions` defaults to false on CLI,
+  REST, and MCP; when it is set, `knowledge.assertion_candidates` is read with
+  the caller's workspace, ACL scopes, snapshot freshness, and source-artifact
+  predicates, so a candidate is no more visible than its evidence. Returned
+  candidates are labeled `proposed`, never merged into approved edges, and
+  their evidence never joins the citation evidence set.
 - Asynchronous ontology jobs capture the verified submitting principal, scopes,
   roles, and ACL snapshot. Workers reject malformed or expired snapshots before
   reading evidence; candidates remain no more visible than every supporting
@@ -331,9 +410,9 @@ membership. Administrator credentials are entered only in the native terminal/UI
   A contract test requires every core project dependency to appear in that
   lock, preventing a wheel-only dependency from being absent at runtime.
 - Audit the production lock directly and audit the installed optional-extra
-  environment separately. The in-process `semantic` extra requires Transformers
-  `>=5.5.4,<6` and is currently locked at 5.15.0. The default semantic search
-  path does not use that extra; it calls the isolated model runtime below.
+  environment separately. 3.13.0 removed the in-process `semantic` extra, so
+  Transformers and Torch are no longer project dependencies; semantic search
+  calls the isolated model runtime below, which carries its own lock.
 - 3.12.0 installs the model runtime (`var/semantic-venv`) from the hash-locked
   `requirements/semantic.txt`, compiled from `requirements/semantic.in` and
   installed with `uv pip sync --require-hashes`. `scripts/audit-semantic.sh`

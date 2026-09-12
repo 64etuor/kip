@@ -1,7 +1,7 @@
 # ADR-021: Canonical classification and atomic model egress
 
-- Status: Accepted
-- Date: 2026-08-09
+- **Status:** Accepted
+- **Date:** 2026-08-09
 
 ## Context
 

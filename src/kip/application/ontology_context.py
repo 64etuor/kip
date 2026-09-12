@@ -63,47 +63,41 @@ class OntologyContextUseCases:
         )
         if not matched:
             return OntologyEvidenceContext(context=None, evidence=())
-        edge_by_id: dict[str, GraphEdge] = {}
-        for entity in matched:
-            for edge in self._knowledge.graph_neighbors(
-                context,
-                GraphNeighborsRequest(
-                    node_id=entity.id,
-                    direction="both",
-                    limit=self._edge_limit,
-                    approved_only=True,
-                ),
-            ):
-                edge_by_id.setdefault(edge.assertion_id, edge)
+        edge_by_id = self._neighbor_edges(context, matched)
+        paths: list[GraphPath] = []
+        # Every approved path between two matched entities starts with an
+        # approved assertion incident to one of them, which the neighbor
+        # queries above would have returned. With no approved neighbor edge
+        # at all there is nothing for `_paths` to find, so the pairwise
+        # recursive-CTE `graph_path` queries (up to entity_limit^2/2 of them)
+        # are skipped instead of being issued and discarded — the shape of
+        # every answer on a deployment with no approved assertions yet.
+        if edge_by_id:
+            paths = self._paths(context, [item.id for item in matched])
+            for path in paths:
+                for assertion_id in path.assertion_ids:
+                    if assertion_id in edge_by_id:
+                        continue
+                    try:
+                        assertion = self._knowledge.get_assertion(context, assertion_id)
+                    except NotFoundError:
+                        continue
+                    edge_by_id[assertion_id] = GraphEdge(
+                        assertion_id=assertion.id,
+                        subject_id=assertion.subject_id,
+                        predicate=assertion.predicate,
+                        object_entity_id=assertion.object_entity_id,
+                        object_value=assertion.object_value,
+                        status=assertion.status,
+                        valid_from=assertion.valid_from,
+                        valid_to=assertion.valid_to,
+                        ontology_version=assertion.ontology_version,
+                        evidence_unit_ids=assertion.evidence_unit_ids,
+                    )
+                    if len(edge_by_id) >= self._edge_limit:
+                        break
                 if len(edge_by_id) >= self._edge_limit:
                     break
-            if len(edge_by_id) >= self._edge_limit:
-                break
-        paths = self._paths(context, [item.id for item in matched])
-        for path in paths:
-            for assertion_id in path.assertion_ids:
-                if assertion_id in edge_by_id:
-                    continue
-                try:
-                    assertion = self._knowledge.get_assertion(context, assertion_id)
-                except NotFoundError:
-                    continue
-                edge_by_id[assertion_id] = GraphEdge(
-                    assertion_id=assertion.id,
-                    subject_id=assertion.subject_id,
-                    predicate=assertion.predicate,
-                    object_entity_id=assertion.object_entity_id,
-                    object_value=assertion.object_value,
-                    status=assertion.status,
-                    valid_from=assertion.valid_from,
-                    valid_to=assertion.valid_to,
-                    ontology_version=assertion.ontology_version,
-                    evidence_unit_ids=assertion.evidence_unit_ids,
-                )
-                if len(edge_by_id) >= self._edge_limit:
-                    break
-            if len(edge_by_id) >= self._edge_limit:
-                break
         now = datetime.now(UTC)
         evidence_by_id: dict[str, EvidenceRead] = {}
         accepted_edges: list[GraphEdge] = []
@@ -201,6 +195,29 @@ class OntologyContextUseCases:
             evidence=tuple(evidence_by_id[item] for item in evidence_ids),
             had_stale_evidence=had_stale_evidence,
         )
+
+    def _neighbor_edges(
+        self,
+        context: RequestContext,
+        matched: list[KnowledgeEntity],
+    ) -> dict[str, GraphEdge]:
+        edge_by_id: dict[str, GraphEdge] = {}
+        for entity in matched:
+            for edge in self._knowledge.graph_neighbors(
+                context,
+                GraphNeighborsRequest(
+                    node_id=entity.id,
+                    direction="both",
+                    limit=self._edge_limit,
+                    approved_only=True,
+                ),
+            ):
+                edge_by_id.setdefault(edge.assertion_id, edge)
+                if len(edge_by_id) >= self._edge_limit:
+                    break
+            if len(edge_by_id) >= self._edge_limit:
+                break
+        return edge_by_id
 
     def _candidate_edges(
         self,

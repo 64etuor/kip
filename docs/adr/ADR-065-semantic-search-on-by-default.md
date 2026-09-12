@@ -1,6 +1,7 @@
 # ADR-065: Semantic search on by default
 
-Status: Accepted — 2026-09-12
+- **Status:** Accepted
+- **Date:** 2026-09-12
 
 ## Context
 

@@ -33,8 +33,15 @@ from kip.domain.models import (
     SearchMode,
     SearchRequest,
 )
-from kip.errors import DependencyUnavailableError, KipError, ValidationError, error_code
+from kip.errors import (
+    DependencyUnavailableError,
+    KipError,
+    ValidationError,
+    envelope_warnings,
+    error_code,
+)
 from kip.ids import new_id
+from kip.logging import configure_logging
 
 LOGGER = logging.getLogger(__name__)
 
@@ -133,6 +140,7 @@ def create_server(container: Container | None = None) -> MCPServer:
                     raw, warnings = raw
                 data = json.loads(raw) if isinstance(raw, str) else raw
             except (KipError, PydanticValidationError) as exc:
+                error_warnings = envelope_warnings(exc)
                 if isinstance(exc, PydanticValidationError):
                     message = "; ".join(
                         f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
@@ -142,7 +150,11 @@ def create_server(container: Container | None = None) -> MCPServer:
                 envelope = Envelope(
                     ok=False,
                     error=ErrorInfo(code=error_code(exc), message=str(exc)),
-                    meta=EnvelopeMeta(request_id=request_id, workspace=workspace),
+                    meta=EnvelopeMeta(
+                        request_id=request_id,
+                        workspace=workspace,
+                        warnings=error_warnings,
+                    ),
                 )
                 return envelope.model_dump_json()
             except Exception as exc:
@@ -150,7 +162,11 @@ def create_server(container: Container | None = None) -> MCPServer:
                 return Envelope(
                     ok=False,
                     error=ErrorInfo(code="internal_error", message="An internal error occurred"),
-                    meta=EnvelopeMeta(request_id=request_id, workspace=workspace),
+                    meta=EnvelopeMeta(
+                        request_id=request_id,
+                        workspace=workspace,
+                        warnings=envelope_warnings(exc),
+                    ),
                 ).model_dump_json()
             envelope = Envelope(
                 ok=True,
@@ -210,8 +226,8 @@ def create_server(container: Container | None = None) -> MCPServer:
             include_candidate_assertions=include_candidate_assertions,
         )
         selected_context = context()
-        hits = application.retrieval.search(selected_context, request)
-        return _json(hits), application.retrieval.result_warnings(selected_context, hits)
+        outcome = application.retrieval.search_outcome(selected_context, request)
+        return _json(outcome.hits), outcome.warnings
 
     @tool(read_only=True)
     @_enveloped
@@ -241,8 +257,8 @@ def create_server(container: Container | None = None) -> MCPServer:
             include_candidate_assertions=include_candidate_assertions,
         )
         selected_context = context()
-        bundle = application.retrieval.context_bundle(selected_context, request)
-        return _json(bundle), application.retrieval.result_warnings(selected_context, bundle.items)
+        outcome = application.retrieval.context_outcome(selected_context, request)
+        return _json(outcome.bundle), outcome.warnings
 
     @tool(read_only=True)
     @_enveloped
@@ -687,7 +703,11 @@ def create_server(container: Container | None = None) -> MCPServer:
 
 
 def main() -> None:
-    create_server().run()
+    container = build_container()
+    # The MCP process writes its protocol on stdout, so its records must go to
+    # stderr at the deployment's configured level like every other entry point.
+    configure_logging(container.settings.log_level)
+    create_server(container).run()
 
 
 if __name__ == "__main__":

@@ -31,11 +31,8 @@ def imports_matching_prefixes(
     return violations
 
 
-def application_adapter_imports(root: Path, base: Path) -> list[str]:
-    return imports_matching_prefixes(root, base, ("kip.adapters",))
-
-
-def domain_adapter_imports(root: Path, base: Path) -> list[str]:
+def adapter_imports(root: Path, base: Path) -> list[str]:
+    """Adapter imports below `base`. Application and domain share this rule."""
     return imports_matching_prefixes(root, base, ("kip.adapters",))
 
 
@@ -46,7 +43,6 @@ VENDOR_SDK_PREFIXES: tuple[str, ...] = (
     "httpx",
     "anthropic",
     "openai",
-    "neo4j",
     "slack_sdk",
     "rapidfuzz",
 )

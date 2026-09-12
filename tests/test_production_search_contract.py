@@ -14,6 +14,7 @@ from typer.testing import CliRunner
 
 from kip.adapters.repository.memory import MemoryRepository
 from kip.adapters.repository.postgres import PostgresRepository
+from kip.application.search import SearchOutcome
 from kip.cli import app
 from kip.container import build_container
 from kip.domain.models import RequestContext, SearchRequest
@@ -79,9 +80,9 @@ def test_cli_search_builds_the_complete_search_request(
         request: SearchRequest,
         *,
         mode: str | None = None,
-    ) -> list[object]:
+    ) -> SearchOutcome:
         captured.append(request)
-        return []
+        return SearchOutcome(hits=[], warnings=[])
 
     monkeypatch.setattr(
         "kip.cli.build_container",
@@ -89,7 +90,7 @@ def test_cli_search_builds_the_complete_search_request(
     )
     monkeypatch.setattr(
         test_container.application.retrieval,
-        "search",
+        "search_outcome",
         record_search,
     )
 
@@ -140,14 +141,14 @@ def test_mcp_search_accepts_the_complete_search_request(
         request: SearchRequest,
         *,
         mode: str | None = None,
-    ) -> list[object]:
+    ) -> SearchOutcome:
         captured.append(request)
-        return []
+        return SearchOutcome(hits=[], warnings=[])
 
     monkeypatch.setattr("kip.mcp_server.build_container", lambda: test_container)
     monkeypatch.setattr(
         test_container.application.retrieval,
-        "search",
+        "search_outcome",
         record_search,
     )
     server = create_server()

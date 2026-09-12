@@ -1,7 +1,9 @@
 # ADR-005: Local-first Hybrid Retrieval Is Evaluation-gated
 
-- **Status:** Accepted
+- **Status:** Amended
 - **Date:** 2026-07-30
+- **Amended by:** ADR-065 (2026-09-12) — semantic search ships enabled by
+  default; the first-pilot decision to keep it disabled no longer holds
 - **Decision owners:** KIP maintainers
 
 ## Context

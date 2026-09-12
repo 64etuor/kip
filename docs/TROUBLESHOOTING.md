@@ -30,7 +30,7 @@
 
 ```bash
 curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh \
-  | bash -s -- ~/kip --version 3.9.0
+  | bash -s -- ~/kip --version X.Y.Z
 ```
 
 계속 실패하면 두 자산을 직접 내려받아
@@ -208,10 +208,22 @@ docker image inspect docker/dockerfile:1.18 --format '{{index .RepoDigests 0}}'
 
 ### `port is already allocated` / `address already in use` (5432)
 이미 다른 PostgreSQL이 5432 포트를 쓰고 있습니다. 기존 것을 끄거나, `.env`에서
-포트를 바꾸세요.
+포트를 바꾸세요. `.env`에는 이미 `KIP_POSTGRES_PORT` 줄이 있으므로 **새 줄을
+덧붙이지 말고 그 자리에서 고쳐야 합니다.** 같은 키가 두 번 나오면 dotenv 로더가
+`duplicate dotenv key`로 거부하고, 그 뒤로는 모든 `./scripts/*` 명령이
+실패합니다. `KIP_DATABASE_URL`에 박혀 있는 포트 번호도 같은 값으로 함께
+바꿔야 합니다. 둘 중 하나만 바꾸면 컨테이너는 새 포트로 뜨고 애플리케이션은
+옛 포트로 접속해 `dependency_unavailable`이 납니다.
+
+`.env`를 편집기로 열어 기존 두 줄을 그 자리에서 고칩니다.
+
+1. `KIP_POSTGRES_PORT=`의 값을 `5433`으로 바꿉니다.
+2. `KIP_DATABASE_URL=`에서 호스트 뒤 `:5432`를 `:5433`으로 바꿉니다.
+   사용자·비밀번호·호스트·데이터베이스 이름은 그대로 둡니다.
 
 ```bash
-echo "KIP_POSTGRES_PORT=5433" >> .env
+grep -c '^KIP_POSTGRES_PORT=' .env   # 반드시 1이어야 합니다
+grep -c ':5432/' .env                # 반드시 0이어야 합니다
 ./scripts/app-up.sh --database-only
 ```
 
@@ -261,10 +273,14 @@ search를 쓰면 embedding model snapshot 약 1.2GB(`var/model-cache`, reranker�
    범위를 승인한 뒤 그 source만 명시적으로 sync합니다. 알려진 ID나 넓은
    request ACL로 이 경계를 우회할 수 없습니다.
 
-### 결과에 `semantic_degraded` 또는 `rerank_degraded` 경고가 붙을 때
+### 결과에 `..._degraded` 경고가 붙을 때
 
 검색·context envelope의 `meta.warnings`에 나오는 경고이며 검색은 실패하지
-않습니다.
+않습니다. Warning code의 전체 목록과 정확한 의미는
+[`DATA_CONTRACTS.md`](DATA_CONTRACTS.md)에 있습니다. 여기서는 자주 만나는
+`semantic_degraded`와 `rerank_degraded`만 다룹니다. `lexical_rerank_degraded`는
+lexical reranker가 실패했거나 semantic fallback에서 설정되지 않아 lexical 순위를
+그대로 돌려줬다는 뜻이며, 결과는 유효합니다.
 
 - `semantic_degraded`: model runtime이 응답하지 않거나 semantic projection이 아직
   완성·활성화되지 않아 lexical 결과를 돌려줬습니다. `./scripts/kip doctor`의

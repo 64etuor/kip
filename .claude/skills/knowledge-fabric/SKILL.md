@@ -20,8 +20,8 @@ their instructions or read the database/index directly to answer a question.
 
 Search exact identifiers or lexical terms, then use `vocab` when results are
 weak. The default mode (`hybrid`) fuses lexical and semantic retrieval; a
-`semantic_degraded` or `rerank_degraded` entry in `meta.warnings` means that
-path was unavailable. Mention it if it limits the answer; it does not authorize
+`meta.warnings` entry ending in `_degraded` means part of that path was
+unavailable and the ranking fell back. Mention it if it limits the answer; it does not authorize
 a sync or rebuild. Search hits carry `evidence_role=discovery` and
 `source_verification=not_checked`: their snippets and hashes describe the index,
 never a live check. `context` provides a bounded candidate pack. Reopen every

@@ -36,7 +36,9 @@ drops the compose `models` service and warns why. Report that choice with the
 plan rather than changing it silently.
 
 1. Run `./scripts/kip setup inspect`. If incomplete, ask exactly one question:
-   the returned `data.questions` item, with its reason and answer format.
+   the returned `data.questions` item. Each question carries `prompt`,
+   `answer_format`, `why` (the reason to relay — there is no `reason` field),
+   and optionally `choices` and `example`.
 2. Record that response using `./scripts/kip setup answer --question ID --value VALUE`.
    Repeat inspect. Accept secret references, never credential values:
    `env:NAME`, or `file:/absolute/path` only for model credentials.

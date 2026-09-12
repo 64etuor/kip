@@ -1,6 +1,7 @@
 # ADR-059: Explicit evidence state and reproducible agent startup
 
-Status: Accepted — 2026-09-10
+- **Status:** Accepted
+- **Date:** 2026-09-10
 
 ## Context
 

@@ -1,8 +1,7 @@
 # ADR-027: Materialize ontology changes as reviewed assertion candidates
 
-## Status
-
-Accepted
+- **Status:** Accepted
+- **Date:** 2026-08-09
 
 ## Context
 

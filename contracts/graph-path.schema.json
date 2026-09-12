@@ -1,0 +1,38 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "assertion_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Assertion Ids",
+      "type": "array"
+    },
+    "depth": {
+      "title": "Depth",
+      "type": "integer"
+    },
+    "node_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Node Ids",
+      "type": "array"
+    },
+    "predicates": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Predicates",
+      "type": "array"
+    }
+  },
+  "required": [
+    "node_ids",
+    "assertion_ids",
+    "predicates",
+    "depth"
+  ],
+  "title": "GraphPath",
+  "type": "object"
+}

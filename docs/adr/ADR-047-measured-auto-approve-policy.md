@@ -1,8 +1,9 @@
 # ADR-047: Measured, audited auto-approve policy for low-risk mined relations
 
-- **Status:** Accepted (owner-approved evolution of architecture rule 10);
-  default made opt-in and precision hardened 2026-08-15 (see ADR-048)
+- **Status:** Amended
 - **Date:** 2026-08-15
+- **Amended by:** ADR-048 (2026-08-15) — the policy defaults off (opt-in) and
+  the precision statistic was made tamper-resistant and revocation-aware
 
 > Amendment (2026-08-15, ADR-048): after an adversarial audit the policy
 > defaults **off** (opt-in) instead of on — guided setup and the shipped
@@ -18,9 +19,10 @@ Every semantic mining candidate waited for full human review regardless of
 predicate risk or measured miner precision, so review throughput capped the
 curation loop no matter how good the mining model became. The capability
 roadmap flagged this as the constraint most likely to waste model
-improvement. Architecture rule 10 previously read "never silently promote";
-the owner approved rewording it to "never promote without an audited,
-measured, revocable policy; silent promotion is forbidden."
+improvement. The candidates-are-not-facts invariant (TRD section 2 invariant 7)
+previously read "never silently promote"; the owner approved rewording it to
+"never promote without an audited, measured, revocable policy; silent promotion
+is forbidden."
 
 ## Decision
 
@@ -86,7 +88,8 @@ measured, revocable policy; silent promotion is forbidden."
 - `src/kip/ports/knowledge.py` (`predicate_review_precision`),
   `src/kip/domain/knowledge.py` (`PredicateReviewStats`,
   `AUTO_APPROVE_POLICY_PRINCIPAL`)
-- `AGENTS.md` architecture rule 10 (revised wording)
+- `AGENTS.md` candidate-review trap and TRD section 2 architecture invariant 7
+  ("Candidates are not facts"), revised wording
 - [historical design](https://github.com/64etuor/kip/blob/1b04bad685762fe3002d9c4ec6a75f267df9fb94/docs/plans/2026-08-14-llm-capability-scaling.md) item 4
 - ADR-025 (fully-human review baseline this policy calibrates),
   ADR-045 (the sample-audit pattern this generalizes)

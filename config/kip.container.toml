@@ -55,6 +55,7 @@ timeout_seconds = 120
 query_timeout_seconds = 10
 query_instruction = "Retrieve relevant Korean evidence for this query: "
 space_name = "qwen3-embedding-0.6b-1024"
+page_size = 1000  # pending units claimed per projection rebuild round
 
 [models.reranker]
 enabled = true
@@ -93,7 +94,6 @@ clarification_ttl_seconds = 3600
 [parsers]
 parser_timeout_seconds = 120
 minimum_quality_score = 0.70
-shadow_parse_critical_documents = true
 
 [parsers.isolation]
 enabled = true
@@ -129,7 +129,7 @@ min_width_px = 96
 min_height_px = 48
 
 [parsers.hwp]
-order = ["hwp-hwpx-parser", "kordoc", "unhwp", "paired_pdf"]
+order = ["hwp-hwpx-parser", "kordoc", "unhwp"]
 
 [parsers.hwp.hwp-hwpx-parser]
 enabled = true
@@ -152,19 +152,20 @@ settle_seconds = 2
 include_extensions = [".md", ".txt", ".pdf", ".pptx", ".xlsx", ".hwp", ".hwpx", ".docx", ".csv"]
 exclude_globs = ["**/.DS_Store", "**/~$*", "**/.~lock.*"]
 acl_scope = "workspace:default"
+# Without this, sources default to `restricted`, which excludes every document
+# from any model-egress allowlist. Match the deployment's own classification.
+classification = "internal"
 
 [sources.slack]
 enabled = false
 workspace_id = ""
 allowed_conversation_ids = []
-download_files = false
 token_env = "KIP_SLACK_BOT_TOKEN"
 
 [sources.apple_mail]
 enabled = false
 allowed_accounts = []
 allowed_mailboxes = ["INBOX", "Sent", "Archive"]
-excluded_mailboxes = ["Junk", "Trash"]
 lookback_days = 30
 
 [sources.imap]
@@ -175,3 +176,8 @@ username_env = "KIP_IMAP_USERNAME"
 password_env = "KIP_IMAP_PASSWORD"
 mailboxes = ["INBOX", "Sent", "Archive"]
 use_ssl = true
+
+[identity.jwt]
+# proxy_jwt mode grants the admin role only to callers whose group claim
+# intersects this list; an empty list makes every admin route return 403.
+admin_groups = ["kip-admins"]

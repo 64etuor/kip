@@ -1,7 +1,11 @@
 # ADR-049: Measured PDF table extraction and HWP section locators
 
-- **Status:** Accepted; default PDF backend superseded by ADR-054
+- **Status:** Amended
 - **Date:** 2026-08-16
+- **Amended by:** ADR-054 (2026-08-17) — the default PDF backend became
+  pdf-inspector
+- **Amended by:** ADR-064 (2026-09-11) — the pdf-inspector pin moved to
+  1.19.0
 
 ## Context
 

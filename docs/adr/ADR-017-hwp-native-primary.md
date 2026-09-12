@@ -1,6 +1,7 @@
 # ADR-017: Native hwp-hwpx-parser is the HWP primary
 
-Status: Accepted
+- **Status:** Accepted
+- **Date:** 2026-08-08
 
 ## Decision
 

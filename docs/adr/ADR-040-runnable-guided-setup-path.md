@@ -1,7 +1,11 @@
 # ADR-040: Make guided setup end in a runnable deployment
 
-- **Status:** Accepted
+- **Status:** Amended
 - **Date:** 2026-08-13
+- **Amended by:** ADR-057 (2026-09-10) — runtime handoff decisions 3-5
+  superseded
+- **Amended by:** ADR-063 (2026-09-11) — `docs/STARTER_KIT_GUIDE.md` was
+  renamed `docs/DEPLOYMENT_GUIDE.md`
 
 Runtime handoff details in decisions 3–5 are superseded by
 [ADR-057](ADR-057-guided-setup-runtime-handoff.md): generated Compose is now
@@ -23,7 +27,8 @@ could resolve — deferring the failure to runtime instead of the answer.
 
 1. `bootstrap.sh` fails fast on Python < 3.12 with actionable guidance, and
    the `kip-setup` skill starts with an inspect-then-bootstrap step 0;
-   `STARTER_KIT_GUIDE` makes bootstrap step 1.
+   `DEPLOYMENT_GUIDE` (named `STARTER_KIT_GUIDE` until 3.10.0) makes
+   bootstrap step 1.
 2. Setup accepts only resolvable secret references: `env:` everywhere,
    `file:` only where the answer format allows it (the model credential); the
    database URL and bootstrap identity keys are `env:`-only. `keychain:` and
@@ -66,7 +71,7 @@ could resolve — deferring the failure to runtime instead of the answer.
 ## References
 
 - `docs/QUICKSTART.md`
-- `docs/STARTER_KIT_GUIDE.md`
+- `docs/DEPLOYMENT_GUIDE.md` (`docs/STARTER_KIT_GUIDE.md` until 3.10.0)
 - `docs/DATA_CONTRACTS.md`
 - `skills/kip-setup/SKILL.md`
 - `contracts/setup-answers.schema.json`, `contracts/setup-receipt.schema.json`

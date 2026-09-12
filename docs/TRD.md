@@ -1,9 +1,9 @@
 ---
 document_id: KIP-TRD-003
 title: KIP v3 Agent-First Knowledge Fabric 기술 요구사항 및 설계서
-version: 3.1.0
+version: 3.13.0
 status: accepted
-last_updated: 2026-09-10
+last_updated: 2026-09-12
 language: ko-KR
 audience:
   - backend-engineering
@@ -278,13 +278,19 @@ secrets:
 
 ### 5.3 Database roles
 
-| Role | Purpose |
-|---|---|
-| `kip_owner` | schema migration 전용, 일반 runtime 사용 금지 |
-| `kip_worker` | source/extraction/projection write |
-| `kip_agent` | RLS 적용 read, review proposal write 제한 |
-| `kip_reviewer` | candidate approve/reject |
-| `kip_backup` | 검증된 full backup |
+Role은 migration이 만들지 않는다. `deploy/sql/roles.sql.template`을 운영자가
+object owner로 직접 실행해야 생기며, 실행하지 않으면 존재하지 않고 doctor도
+확인하지 않는다. 기본 Compose 배포는 모든 연결이 `kip_owner`다.
+
+| Role | Purpose | 실제 상태 |
+|---|---|---|
+| `kip_owner` | schema migration 전용, 일반 runtime 사용 금지 | `KIP_DATABASE_URL`의 기본 계정. Migration 0028 이후에는 owner도 RLS를 우회하지 못한다 |
+| `kip_api` | RLS 적용 read, candidate write 제한 | template에 있음(NOLOGIN group). 문서가 이전에 `kip_agent`로 부르던 role |
+| `kip_worker` | source/extraction/projection write | template에 있음 |
+| `kip_reviewer` | candidate approve/reject | template에 있음 |
+| `kip_backup` | 검증된 full backup. `row_security=off`가 필요하므로 유일한 `BYPASSRLS` role | template에 있음 |
+
+`kip_agent`라는 role은 존재하지 않는다.
 
 ---
 
@@ -314,8 +320,7 @@ kip/
 │   └── adr/
 ├── config/
 │   ├── kip.example.toml
-│   ├── kip.container.toml
-│   └── logging.yaml
+│   └── kip.container.toml
 ├── contracts/
 │   ├── openapi.json
 │   ├── openapi.yaml
@@ -328,8 +333,10 @@ kip/
 │   ├── mappings/
 │   └── migrations/
 ├── migrations/
-│   ├── 0001_...sql through 0018_...sql
-│   └── 9001_...sql and 9002_...sql (manual optional projections)
+│   ├── 0001_...sql onward, applied in filename order (no gaps; the
+│   │   highest number is whatever the directory currently holds)
+│   └── 9xxx_...sql (manual optional projections; the runner skips every
+│       file whose name starts with `9`)
 ├── src/kip/
 │   ├── domain/
 │   ├── application/
@@ -399,11 +406,11 @@ workers  → application
 | Retrieval and semantic projection | `RetrievalStore` in `src/kip/ports/retrieval.py` |
 | Exact evidence and workbook read | `EvidenceStore`, `SourceFileInspectorPort`, `WorkbookReaderPort` in `src/kip/ports/evidence.py` |
 | Knowledge, jobs, operations, interactions | capability protocols in `src/kip/ports/{knowledge,jobs,operations,interactions}.py` |
-| Parsers and connectors | `ParserPort` and `SourceConnectorPort` |
+| Parsers and connectors | `ParserPort` in `src/kip/ports/parser.py`; connectors have no port of their own — a source adapter implements `SourceCatalogPort.events()` (plus `event_acl_snapshot`/`event_classification`/`event_family`) in `src/kip/ports/ingestion.py` |
 | Embedding and reranking | `EmbeddingPort` and `RerankerPort` |
 | Structured generation and relation mining | `GenerationPort` and `RelationMinerPort` |
 | Identity and graph projection | `IdentityResolverPort` and `GraphProjectionPort` |
-| Redacted telemetry | `QueryTraceStore` and `QueryTraceExporter` |
+| Redacted telemetry | `QueryTraceStore` and `QueryTraceExporter`. No exporter adapter ships: `QueryTraceExporter` stays an extension seam and the container defaults to an empty exporter tuple, so a deployment that wants one supplies it through `build_container` |
 
 ### 7.3 Adapter process contracts
 
@@ -528,16 +535,33 @@ allow_remote_model_egress = false
 
 ### 8.3 Configuration validation
 
-`kip doctor` MUST fail with actionable errors for:
+`kip doctor` fails with actionable errors for these checks, which are the
+required ones it implements today:
 
-- inaccessible source root
+- `configuration` — the configuration file exists (skipped in `development`
+  and `test`)
+- `canonical_repository` — the repository backend is `postgresql` or `memory`
+- `content_addressed_store` — the CAS path exists and is a directory
+- `filesystem_source:<name>` — each enabled source root exists and is a
+  directory
+- `ontology_adaptive_discovery_writable` — the ontology root is writable, when
+  adaptive discovery is on
+
+It also reports non-failing warnings for `kordoc_ocr_resolvable`,
+`semantic_search`, and `ontology_pending_release_journal`.
+
+**Target, not implemented.** `doctor` never opens a database connection for
+schema introspection, so none of the following is checked and a deployment
+that fails them still gets a green `doctor`:
+
 - PostgreSQL extension missing
-- invalid account/mailbox configuration
-- parser executable absent
-- inconsistent embedding dimension
-- unknown ontology release
 - RLS not enabled on protected tables
-- object store not writable
+- object store not writable (the CAS check tests existence, not writability, so
+  a read-only mount passes)
+- inconsistent embedding dimension (the `semantic_search` warning compares the
+  served model name only)
+- unknown ontology release
+- invalid account/mailbox configuration
 
 
 ---
@@ -1393,11 +1417,16 @@ COMMIT;
 
 ### 11.1 Session context
 
-CLI와 worker는 connection 시작 시 다음을 설정한다.
+CLI와 worker는 statement 실행 전에 다음 transaction-local GUC를 설정한다.
+Prefix는 `kip.`이며 `app.`이 아니다. Migration의 policy와 helper
+function(`kip.current_workspace_id()` 등)도 같은 이름을 읽는다.
 
 ```sql
-SELECT set_config('app.workspace_id', :workspace_id, true);
-SELECT set_config('app.principal_id', :principal_id, true);
+SELECT set_config('kip.workspace_id', :workspace_id, true);
+SELECT set_config('kip.principal_id', :principal_id, true);
+SELECT set_config('kip.acl_scopes', :comma_separated_scopes, true);
+SELECT set_config('kip.roles', :comma_separated_roles, true);
+SELECT set_config('kip.filesystem_sources', :json_sources, true);
 ```
 
 ### 11.2 Policy pattern
@@ -1410,15 +1439,20 @@ CREATE POLICY content_units_read_policy
 ON content.units
 FOR SELECT
 USING (
-  workspace_id = NULLIF(current_setting('app.workspace_id', true), '')::uuid
-  AND EXISTS (
-    SELECT 1
-    FROM core.scope_grants g
-    WHERE g.access_scope_id = content.units.access_scope_id
-      AND g.principal_id = NULLIF(current_setting('app.principal_id', true), '')::uuid
-      AND g.permission IN ('read', 'review', 'admin')
+  workspace_id = kip.current_workspace_id()
+  AND (
+    cardinality(acl_scopes) = 0
+    OR acl_scopes <@ kip.current_acl_scopes()
   )
 );
+```
+
+`cardinality(acl_scopes) = 0`는 의도된 것이며 **빈 scope는 비공개가 아니라
+workspace 전체 공개**를 뜻한다. Scope를 지정하지 않은 행은 workspace의 모든
+principal에게 보인다. `ConnectorEvent.acl_scopes`의 기본값이 빈 리스트이므로,
+scope를 생략한 push connector event는 조용히 workspace 전체에 공개된다.
+
+```sql
 ```
 
 동일 패턴을 source objects, revisions, artifacts, entities, assertions, search projections에 적용한다.
@@ -1465,17 +1499,19 @@ PostgreSQL에는 대형 raw binary를 기본 저장하지 않는다. 다음 파�
 
 ### 12.2 Layout
 
+실제 구현은 digest 한 개당 파일 한 개이며 2-hex 한 단계만 나눈다.
+`meta.json` sidecar나 digest별 디렉터리는 없고, PostgreSQL이 canonical
+catalog다. Root는 `KIP_CAS_PATH`, 없으면 `storage.cas_path`, 그것도 없으면
+`./var/cas`다.
+
 ```text
-var/objects/
+var/cas/
 └── sha256/
     └── ab/
-        └── cd/
-            └── abcdef.../
-                ├── payload
-                └── meta.json
+        └── abcdef...<64 hex><확장자>
 ```
 
-`meta.json`은 convenience metadata이며 PostgreSQL이 canonical catalog다.
+쓰기는 같은 디렉터리의 `.tmp` 파일에 쓴 뒤 `os.replace`로 원자적으로 옮긴다.
 
 ### 12.3 Object reference
 
@@ -1483,7 +1519,7 @@ var/objects/
 {
   "algorithm": "sha256",
   "digest": "abcdef...",
-  "uri": "cas://sha256/abcdef...",
+  "uri": "file:///.../var/cas/sha256/ab/abcdef...",
   "media_type": "message/rfc822",
   "byte_size": 183201
 }
@@ -2498,7 +2534,14 @@ ORDER BY lexical_score DESC
 LIMIT :candidate_limit;
 ```
 
-RLS가 이 query에 적용된다. Query response는 사용한 `generation_id`, analyzer version, config hash를 meta에 포함한다.
+RLS가 이 query에 적용된다.
+
+> **Target, not implemented.** `search.projection_generations`와
+> `generation_id`는 승인된 목표 설계다. 코드·contract·migration 어디에도
+> `generation_id`가 없고, query response의 `meta`에도 들어가지 않는다. 현재
+> lexical projection은 generation 없이 `search.lexical_units`를 직접 다시
+> 쓴다. Semantic projection의 versioning은 embedding space identity로
+> 처리한다(ADR-035).
 
 ### 22.8 Fuzzy and raw-text fallback
 
@@ -2512,20 +2555,40 @@ RLS가 이 query에 적용된다. Query response는 사용한 `generation_id`, a
 
 ### 22.9 Ranking
 
-Baseline weighted signals:
+두 단계를 구분한다.
+
+**Lexical candidate score (구현됨).** `search.lexical_units`에 대한 SQL
+표현식이며 상수는 코드에 하드코딩돼 있고 설정 키가 없다.
 
 ```text
-exact identifier                100
-exact normalized title          60
-verified alias                  40
-FTS title/identifier            30
-FTS body                        10
-source recency                   2
-active/current document bonus    5
-superseded document penalty     -8
+identifier_text ILIKE           30
+title ILIKE                     10
+body ILIKE                       6
+websearch tsquery 일치           ts_rank_cd(...) * 10
+similarity(title, query)         * 2
 ```
 
-Weights는 golden query로 조정한다.
+**Cross-channel fusion (구현됨).** Lexical과 vector 결과는 가중치 없는
+Reciprocal Rank Fusion으로 합친다: `Σ 1 / (search.rrf_rank_constant + rank)`,
+기본 rank constant 60. 채널별 가중치는 존재하지 않는다. Rerank blend는
+RapidFuzz backend의 `baseline_weight`(기본 0.15)뿐이다.
+
+> **Target, not implemented.** 아래 signal 표는 승인된 목표이며 코드에
+> 없다. Source recency, active/current document bonus, superseded document
+> penalty, verified alias 가중치는 ranking 식에 항이 하나도 없다.
+>
+> ```text
+> exact identifier                100
+> exact normalized title          60
+> verified alias                  40
+> FTS title/identifier            30
+> FTS body                        10
+> source recency                   2
+> active/current document bonus    5
+> superseded document penalty     -8
+> ```
+>
+> Weights는 golden query로 조정한다.
 
 ### 22.10 Document collapse
 
@@ -2714,7 +2777,7 @@ fused 결과를 BM25로 rerank하면 품질이 lexical보다 낮아졌고(Recall
 지연이 3-4배였다. `reranked`는 명시적 mode이자 cross-encoder를 켠 배포의
 설정값으로 남는다. BM25 reranker(`search.lexical_rerank_enabled = true`,
 `models.reranker.backend = "bm25"`)는 lexical mode와 lexical fallback에서 계속
-동작한다. `models.reranker.backend`가 model backend(`http`/`huggingface`)여도
+동작한다. `models.reranker.backend`가 model backend(`http`)여도
 cross-encoder는 fused `reranked` pool만 채점하고, lexical mode와
 `semantic_degraded` fallback은 선택적 `[models.lexical_reranker]` table의 local
 reranker를 쓰므로 model runtime을 기다리거나 그 장애로 실패하지 않는다. Key와
@@ -2725,10 +2788,15 @@ reranker를 쓰므로 model runtime을 기다리거나 그 장애로 실패하�
 `metadata.rerank_model`은 실제로 채점한 reranker model을 기록하며 trace의
 reranker revision도 그 기준으로 남는다.
 
-Lexical channel은 lexical unit의 `search.lexical_common_term_fraction`(기본
-0.02) 이상에 나타나는 query n-gram을 candidate matching에서 제외한다. 파일·폴더
-이름이 모든 unit의 lexical text에 들어가므로 공통 폴더 이름이 corpus 절반과
-일치하던 문제를 막기 위한 것이며, BM25 reranker는 전체 질문을 계속 채점한다.
+Lexical channel은 흔한 query n-gram을 candidate matching에서 제외한다. 기준은
+단순 비율이 아니라 `max(200, 전체 unit 수 * search.lexical_common_term_fraction)`
+(fraction 기본 0.02)이므로, unit이 10,000개 미만인 corpus에서는 2%가 아니라
+200-unit floor가 실제 기준이 된다. 전체 unit 수가 그 기준의 두 배 미만이면
+(기본값에서 약 400 unit) 흔한 term이라는 개념 자체가 성립하지 않으므로 probe를
+아예 건너뛰고, fraction이 0이면 비활성이다. 전체 unit 수는 정확한 count가 아니라
+PostgreSQL row 추정치를 쓴다. 파일·폴더 이름이 모든 unit의 lexical text에
+들어가므로 공통 폴더 이름이 corpus 절반과 일치하던 문제를 막기 위한 것이며,
+BM25 reranker는 전체 질문을 계속 채점한다.
 Abstention gate는 문서 수를 세지 않고 존재 여부(`any_term_visible`)만 확인한다.
 
 ### 23.8 Vector ACL
@@ -2757,7 +2825,9 @@ runtime을 하나만 띄운다. API/worker는
 - Model runtime이나 active projection이 없으면 기본 mode 검색은 lexical path로
   degrade하고 `semantic_degraded`를 envelope `meta.warnings`에 남긴다.
 - 기본 mode가 `reranked`인 배포에서 reranker만 실패하면 fused lexical+vector
-  순위를 유지하고 `rerank_degraded`를 남긴다. `lexical_rerank_degraded`는 기존 의미를 유지한다.
+  순위를 유지하고 `rerank_degraded`를 남긴다. Lexical reranker가 실패했거나
+  semantic fallback에서 설정되지 않았으면 `lexical_rerank_degraded`를 남긴다.
+  Warning code의 canonical 목록은 `docs/DATA_CONTRACTS.md`에 있다.
 - 명시적 `vector`/`hybrid`/`reranked` mode 요청은 degrade하지 않고 실패한다.
 - Adapter별 circuit이 실패한 runtime을 `models.circuit_cooldown_seconds`(기본
   30초) 동안 건너뛰고, query embedding은 별도 10초 timeout(connect 3초)을 쓴다.
@@ -3071,6 +3141,15 @@ LIMIT :limit;
 
 ## 27. Optional Neo4j projection
 
+> **Target, not implemented.** No Neo4j adapter, port, configuration key, or
+> packaging extra exists (ADR-046 removed the scaffolding ADR-003 had
+> described). Graph traversal runs inside the active repository backend, which
+> reports itself as `capabilities.graph_backend`. Everything in this section —
+> `GraphQueryPort`, the projection sync, the parity suite — describes what
+> would be built *if* the adoption gate in section 1.4 ever passed, and
+> introduces its own port at that time. Nothing here is deployed or
+> deployable today.
+
 ### 27.1 Projection role
 
 Neo4j는 read model이다.
@@ -3314,6 +3393,7 @@ kip
 │   ├── approve
 │   └── reject
 ├── jobs
+│   └── list
 ├── projection
 │   ├── status
 │   ├── rebuild
@@ -3322,15 +3402,62 @@ kip
 ├── export
 │   └── canonical
 ├── api
+│   └── serve
 ├── worker
+│   └── run
 ├── evaluate
+│   ├── validate
+│   ├── run
+│   ├── compare
+│   └── draft
+│       ├── validate
+│       ├── review
+│       └── promote
 ├── quality
+│   ├── validate-manifest
+│   └── recommend
 ├── ontology
+│   ├── validate
+│   ├── entities
+│   ├── context
+│   ├── entity-create
+│   ├── mine
+│   ├── candidates
+│   ├── entity-approve
+│   ├── entity-reject
+│   ├── diff
+│   ├── migrate-materialize
+│   └── discovery
+│       ├── propose
+│       ├── list
+│       └── review
 ├── telemetry
+│   ├── traces
+│   └── prune
 ├── parser
+│   └── reextract
 ├── interaction
+│   ├── clarify
+│   ├── answer
+│   ├── preferences
+│   ├── remember
+│   ├── forget
+│   ├── feedback
+│   └── prune
 └── setup
+    ├── inspect
+    ├── answer
+    ├── preview
+    ├── plan
+    ├── apply
+    └── verify
 ```
+
+`version` and `update` are also top-level commands and run without a database.
+`review` additionally has `revoke`, and `xlsx read` is the group form of the
+`xlsx-read` alias. `export-file` is a hidden alias of `export canonical`.
+`--config`, `--workspace`, `--principal`, `--role`/`--roles`, and
+`--acl-scope`/`--acl-scopes` are root options and must precede the subcommand.
 
 ### 29.3 Public response envelope
 
@@ -3957,8 +4084,9 @@ Public workspace/principal key는 application boundary에서 내부 UUID로 reso
 
 ```sql
 BEGIN;
-SELECT set_config('app.workspace_id', :workspace_uuid::text, true);
-SELECT set_config('app.principal_id', :principal_uuid::text, true);
+SELECT set_config('kip.workspace_id', :workspace_uuid::text, true);
+SELECT set_config('kip.principal_id', :principal_uuid::text, true);
+SELECT set_config('kip.acl_scopes', :comma_separated_scopes, true);
 -- application query
 COMMIT;
 ```
@@ -3977,12 +4105,10 @@ CREATE POLICY content_unit_read_policy
 ON content.content_unit
 FOR SELECT
 USING (
-  workspace_id = current_setting('app.workspace_id', true)::uuid
-  AND EXISTS (
-    SELECT 1
-    FROM core.principal_scope ps
-    WHERE ps.principal_id = current_setting('app.principal_id', true)::uuid
-      AND ps.scope_id = content_unit.access_scope_id
+  workspace_id = kip.current_workspace_id()
+  AND (
+    cardinality(acl_scopes) = 0
+    OR acl_scopes <@ kip.current_acl_scopes()
   )
 );
 ```
@@ -4081,12 +4207,26 @@ replacement for those deployment controls.
 
 ### 32.11 Audit events
 
-The following operations produce append-only audit events:
+Two operations produce append-only audit events today. They are the only
+`INSERT INTO audit.events` in the codebase, both inline in the ingest
+transaction of the PostgreSQL repository; the memory repository writes none.
+
+| Action | Object type | When |
+|---|---|---|
+| `ingest` | `source_object` | a source object revision is ingested |
+| `extraction.activate` | `artifact` | a shadow extraction is activated |
+
+Audit rows include actor, action, target, timestamp, request/run ID, and
+before/after hashes where applicable.
+
+**Target, not implemented.** The following operations are designed to emit
+audit events and currently emit none. Do not treat the audit table as a
+complete record of them, and do not rely on it for a compliance claim about
+them:
 
 - source configuration change
 - sync start/finish/cursor advance
 - source tombstone
-- parser activation
 - ontology release
 - candidate approve/reject/edit
 - assertion revoke/supersede
@@ -4094,8 +4234,6 @@ The following operations produce append-only audit events:
 - export
 - external model egress
 - backup and restore drill
-
-Audit rows include actor, action, target, timestamp, request/run ID, before/after hashes where applicable.
 
 ### 32.12 Retention and deletion
 
@@ -4125,14 +4263,28 @@ launchd timer
   -> kip sync run --source nas
   -> kip sync run --source slack
   -> kip sync run --source mail
-  -> kip worker drain --max-duration 10m
+  -> kip worker run --once
 ```
 
-PostgreSQL advisory locks prevent duplicate source sync.
+`kip worker run` is the only worker command. `--once` drains the queue and
+exits (the scheduled-process shape above); without it the worker loops and
+polls every `--poll-seconds` seconds (the daemon shape). There is no
+`drain` subcommand and no duration bound.
 
-```sql
-SELECT pg_try_advisory_lock(hashtextextended('ws_company:nas', 0));
-```
+> **Target, not implemented.** PostgreSQL advisory locks are not used
+> anywhere; `pg_advisory_lock` and `pg_try_advisory_lock` appear in no
+> migration and no source file. What exists today is enqueue-level dedupe:
+> `sync_source` inserts a job with the idempotency key
+> `sync:<workspace>:<source_name>` under
+> `UNIQUE (workspace_id, idempotency_key)` with `ON CONFLICT ... DO UPDATE`, so
+> a duplicate enqueue collapses into the existing job. A direct
+> `kip sync run` bypasses the queue and has no dedupe at all — two concurrent
+> invocations both proceed. The only advisory lock in the codebase is an
+> OS-level `fcntl.flock` guarding ontology discovery releases.
+>
+> ```sql
+> SELECT pg_try_advisory_lock(hashtextextended('ws_company:nas', 0));
+> ```
 
 ### 33.2 Recommended schedule
 
@@ -4514,7 +4666,7 @@ Cover:
 
 Every adapter runs the same contract suite.
 
-#### SourceConnectorPort
+#### SourceCatalogPort (connector events)
 
 - idempotent repeat collection
 - stable external key

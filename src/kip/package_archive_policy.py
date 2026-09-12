@@ -48,7 +48,6 @@ FULL_TREES: Final = (
 CONFIG_FILES: Final = (
     "config/kip.container.toml",
     "config/kip.example.toml",
-    "config/logging.yaml",
 )
 DOCUMENT_FILES: Final = tuple(
     f"docs/{name}"

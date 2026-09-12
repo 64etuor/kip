@@ -1,8 +1,7 @@
 # ADR-029: Bind end-to-end RAG gates to reviewed immutable datasets
 
-## Status
-
-Accepted
+- **Status:** Accepted
+- **Date:** 2026-08-09
 
 ## Context
 

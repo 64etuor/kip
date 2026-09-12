@@ -120,7 +120,10 @@ git 체크아웃은 `git pull`을 쓰라며 거부된다. `--latest`/`--version`
 `./scripts/bootstrap.sh`, `./scripts/migrate.sh`, `./scripts/kip doctor`가 이어지며,
 데이터베이스에 연결할 수 없으면 `Action required`와 함께 exit 75로 끝난다. 이때는
 `./scripts/app-up.sh --database-only`로 DB를 올린 뒤 `./scripts/migrate.sh`와
-`./scripts/kip doctor`를 실행한다. `--dry-run`은 `--latest`, `--version`, `--archive`
+`./scripts/kip doctor`를 실행한다. 마이그레이션이 포함된 업그레이드 뒤에는
+`./scripts/app-up.sh`(또는 `--database-only`)를 한 번 실행해 `roles` 서비스가
+`deploy/sql/roles.sql.template`을 다시 적용하게 한다. grant는 실행 시점에 존재하는
+테이블만 덮으므로, 재적용 전까지 새 테이블에는 `kip_api`/`kip_worker` 권한이 없다. `--dry-run`은 `--latest`, `--version`, `--archive`
 모두에 적용되며 다운로드와 검증만 하고 파일은 바꾸지 않는다. 버전 하향, git 체크아웃(`git pull`로 갱신), digest나 manifest가 맞지 않는
 아카이브는 거부된다. rollback은 패키지 파일만 되돌리고 데이터베이스는 복구하지
 않으므로, 마이그레이션을 지나는 업그레이드 전에는 반드시 `./scripts/backup.sh`를
@@ -184,7 +187,7 @@ managed Python 3.13.x under `var/runtime/python`. A stdlib-only Python stage
 then prepares Node/npm from the pinned Node 22 bundle when missing and checks
 Docker/Compose. Afterwards `.venv` is created with `uv venv` and synchronized
 from `uv.lock` with `uv sync --frozen` and the postgres, api, identity,
-extractors, mcp, telemetry, and dev extras. Wrappers select the managed runtimes
+extractors, mcp, and dev extras. Wrappers select the managed runtimes
 through `scripts/runtime-path.sh` (`var/runtime/bin`), and `./scripts/uv.sh`
 runs the resolved uv. `--check` is read-only; `--install-docker` and
 `--without-docker` are documented in ADR-061. Existing `.env` and config files
@@ -284,6 +287,11 @@ docker compose --env-file /etc/kip/production.env \
   -f compose.production.yaml up -d postgres
 docker compose --env-file /etc/kip/production.env \
   -f compose.production.yaml --profile migration run --rm migrate
+# Creates kip_api / kip_worker / kip_reviewer / kip_backup and their grants as
+# the owner, after the migration that created the tables. Re-run it after every
+# later migration.
+docker compose --env-file /etc/kip/production.env \
+  -f compose.production.yaml --profile migration run --rm roles
 docker compose --env-file /etc/kip/production.env \
   -f compose.production.yaml --profile models-fetch run --rm models-fetch
 docker compose --env-file /etc/kip/production.env \
@@ -327,9 +335,21 @@ All three KIP image variables must use the same verified
 paths to regular, non-symlink, single-line files with operator-only
 permissions. The PostgreSQL password and migration URL use owner credentials;
 the API and worker URLs must use separate login roles bound to the NOLOGIN
-groups in `deploy/sql/roles.sql.template`. Review and apply that template as
-the database object owner after migrations. Never give API or worker
-`kip_owner` or `BYPASSRLS`.
+groups in `deploy/sql/roles.sql.template`. Compose applies that template for
+you: the `roles` service in the `migration` profile runs
+`deploy/apply-roles.sh` with the migration (owner) secret, which is why the
+rollout above runs it immediately after `migrate`. Re-run that one service
+after every migration, because the grants only cover the tables that exist
+when it runs. Review the template before the first rollout; do not apply it by
+hand. Never give API or worker `kip_owner` or `BYPASSRLS`.
+
+`compose.production.yaml` never sets a password on these roles: they stay
+NOLOGIN groups and the deployment binds its own logins (`GRANT kip_api TO
+<login>`). Backup is the exception. BYPASSRLS is a role attribute and role
+attributes are not inherited through role membership, so a login that is only
+a member of `kip_backup` still cannot set `row_security=off` and would take a
+silently workspace-filtered dump. The backup process must log in as
+`kip_backup` itself, or as a login created with BYPASSRLS.
 
 The reference API binds only to loopback. Terminate TLS and verify organization
 identity in an identity-aware proxy before forwarding the Bearer JWT. The
@@ -380,7 +400,7 @@ Run the local gates and build a reproducible handoff bundle from a clean tree:
 
 ```bash
 uv export --frozen --no-dev --no-emit-project --extra postgres --extra api \
-  --extra identity --extra extractors --extra telemetry --extra mcp \
+  --extra identity --extra extractors --extra mcp \
   --output-file requirements/runtime.txt
 uv run pytest tests/test_release_bundle.py::test_runtime_lock_contains_every_core_dependency
 uv run pip-audit --requirement requirements/runtime.txt --disable-pip
@@ -451,9 +471,15 @@ backup if a literal secret survived. This protects only convention-following
 configuration keys; it is not a general secret scanner, so keep secrets out of
 TOML values in the first place.
 
-Run backup with the dedicated, audited `kip_backup` login membership or the
-database owner. That role needs full read access and verified `BYPASSRLS`;
-never reuse API or worker credentials. The script writes a private partial
+Run backup as the dedicated, audited `kip_backup` login itself, or as the
+database owner. Membership is not enough: BYPASSRLS is a role attribute and
+role attributes are not inherited through role membership, so a login that is
+only a member of `kip_backup` cannot set `row_security=off` and its dump would
+be silently filtered to one workspace. That role needs full read access and
+verified `BYPASSRLS`; never reuse API or worker credentials. On the Compose
+deployment, `deploy/apply-roles.sh` gives `kip_backup` a password from
+`KIP_BACKUP_DB_PASSWORD` and `scripts/bootstrap_env.py` writes the matching
+`KIP_BACKUP_DATABASE_URL` into `.env`. The script writes a private partial
 directory first and atomically publishes it only after every artifact is
 sealed. A retained `.partial-*` directory with `FAILED` is incident evidence,
 not a usable backup.
@@ -710,6 +736,28 @@ is enabled; it deletes only expired clarification rows in the active workspace.
 MCP reviewers must set `KIP_ROLES=admin`; normal users do not receive reviewer
 privileges merely by using MCP.
 
+## Startup configuration and logging
+
+A database URL is required: `KIP_DATABASE_URL` (or `KIP_DATABASE_URL_FILE`, or
+whatever `database.url_env` names). Only `KIP_ENV=test` may fall back to the
+non-durable in-memory repository; every other environment now fails at startup
+with a configuration error naming the missing variable instead of quietly
+booting a repository that loses every ingest at exit.
+
+Configuration keys the running build does not read — a misspelling, or a key
+left behind by an older release — never fail startup, but `capabilities`
+reports them once in `warnings`, next to the non-durable repository warning.
+Check it after editing a config or upgrading:
+
+```bash
+./scripts/kip capabilities | jq '.data.warnings'
+```
+
+The CLI, the API app and the worker each configure logging at startup from
+`app.log_level` (`KIP_LOG_LEVEL` overrides it). Records are one JSON object
+per line on stderr, so the CLI's stdout stays a parseable envelope; redirect
+stderr to collect them (`./scripts/kip status 2>>var/log/kip-cli.log`).
+
 ## Redacted RAG tracing
 
 Query tracing is enabled by default and persists only the versioned redacted
@@ -726,14 +774,6 @@ the command deletes only expired rows in the active workspace. REST operators
 use `GET /v1/admin/query-traces` and
 `DELETE /v1/admin/query-traces/expired`, both behind the normal admin identity
 gate.
-
-Optional OTLP/HTTP export requires the `telemetry` package extra and an explicit
-`telemetry.otel.endpoint`. KIP configures batched spans and periodic metrics to
-the collector's `/v1/traces` and `/v1/metrics` endpoints. Keep collector
-credentials in standard `OTEL_EXPORTER_OTLP_HEADERS` environment configuration,
-never in TOML. Telemetry delivery failure is intentionally non-fatal to search,
-answering, and mining; use the canonical PostgreSQL trace table to diagnose
-collector loss.
 
 ### Semantic search (default)
 
@@ -958,10 +998,15 @@ is unavailable, including a runtime that answers but serves a model other than
 `search.default_mode = "reranked"` and
 only the reranker fails, it keeps the fused lexical+vector ranking with
 `rerank_degraded`; `lexical_rerank_degraded` still marks a failed lexical
-reranker and now also a fallback left in lexical order because lexical rerank
-is enabled without a reranker (`models.reranker.enabled = false`). These warnings
+reranker and also a fallback left in lexical order because
+`search.lexical_rerank_enabled = true` is set without a reranker
+(`models.reranker.enabled = false`). These warnings
 appear in the search and context envelope `meta.warnings` on CLI, REST, and
-MCP, not only in traces. Public v1 `SearchRequest.mode` accepts `lexical`,
+MCP, not only in traces, and they survive an empty result: a degraded run that
+matched nothing reports both its degradation and `no_visible_indexed_units`.
+A bundle cut to the requested budget adds `context_truncated` (the envelope
+name for `ContextBundle.truncated`), and a request whose retrieval raised
+carries `search_failed` in its `ok: false` envelope. Public v1 `SearchRequest.mode` accepts `lexical`,
 `vector`, `hybrid`, and `reranked`; an explicit `--mode vector|hybrid|reranked`
 request fails instead of degrading. `capabilities` stays cheap because MCP
 clients call it first: `semantic_search` is true and `semantic_projection_status`
@@ -1321,7 +1366,7 @@ max_document_chars = 8000
 baseline_weight = 0.15
 ```
 
-When `[models.reranker]` selects a model backend (`http` or `huggingface`),
+When `[models.reranker]` selects the `http` model backend,
 lexical mode and the `semantic_degraded` fallback keep a local reranker from
 the optional `[models.lexical_reranker]` table instead of calling the model.
 Its keys and defaults match the shipped BM25 settings above, so lexical

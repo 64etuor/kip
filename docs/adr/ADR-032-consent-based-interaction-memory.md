@@ -1,8 +1,9 @@
 # ADR-032: Use consent-based interaction memory and staged ontology discovery
 
-## Status
-
-Accepted — choice cap amended 2026-08-15
+- **Status:** Amended
+- **Date:** 2026-08-10
+- **Amended by:** 2026-08-15 — the four-choice cap became the named domain
+  constant `CLARIFICATION_CHOICE_CAP = 8`
 
 > Amendment: the "at most four choices" bound was the one capability limit
 > enforced as a bare validation constraint with no widening path. It is now

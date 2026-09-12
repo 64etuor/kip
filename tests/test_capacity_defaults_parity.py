@@ -9,6 +9,7 @@ consistency in the codebase.
 
 from __future__ import annotations
 
+import ast
 import inspect
 import re
 import shlex
@@ -117,15 +118,14 @@ def _setup_config_payload(tmp_root: Path) -> JsonObject:
     return build_config_payload(plan, container=True)
 
 
-def test_context_max_chars_default_agrees_across_model_cli_mcp_and_writer(
-    tmp_path: Path,
-) -> None:
+def test_context_max_chars_default_agrees_across_model_cli_and_mcp() -> None:
+    # The overall context budget is a per-request value only: no config key
+    # carries it, so there is no writer default to keep in parity here.
     model_default = ContextRequest.model_fields["max_chars"].default
     cli_default = _click_command_default("context", "max_chars")
     mcp_default = _mcp_tool_default("kip_context", "max_chars")
-    writer_default = _setup_config_payload(tmp_path)["search"]["context_max_chars"]
 
-    assert model_default == cli_default == mcp_default == writer_default
+    assert model_default == cli_default == mcp_default
 
 
 def test_answer_max_chars_default_agrees_across_model_cli_and_mcp() -> None:
@@ -134,6 +134,30 @@ def test_answer_max_chars_default_agrees_across_model_cli_and_mcp() -> None:
     mcp_default = _mcp_tool_default("kip_answer", "max_chars")
 
     assert model_default == cli_default == mcp_default
+
+
+def test_python_sdk_omits_retrieval_capacity_defaults() -> None:
+    # docs/DATA_CONTRACTS.md: the SDK omits defaults rather than inventing a
+    # second wire contract. A literal here would silently shadow the canonical
+    # ContextRequest/AnswerRequest defaults for every SDK caller.
+    # Read the source instead of importing it: the SDK is a copyable file, not
+    # an installed module, and an application may copy it without httpx present.
+    tree = ast.parse((ROOT / "sdk/python/kip_client.py").read_text(encoding="utf-8"))
+    client = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ClassDef) and node.name == "KipClient"
+    )
+    methods = {node.name: node for node in client.body if isinstance(node, ast.FunctionDef)}
+
+    for method_name in ("context", "answer"):
+        method = methods[method_name]
+        index = [argument.arg for argument in method.args.kwonlyargs].index("max_chars")
+        default = method.args.kw_defaults[index]
+        assert isinstance(default, ast.Constant) and default.value is None, (
+            f"KipClient.{method_name} hardcodes a max_chars default; the "
+            "canonical default belongs to the request model"
+        )
 
 
 def test_version_file_matches_pyproject_project_version() -> None:
@@ -154,6 +178,24 @@ def test_postgres_image_digest_matches_between_production_compose_and_ci() -> No
     assert compose_match is not None, "no pgvector image found in compose.production.yaml"
     assert ci_match is not None, "no pgvector image found in .github/workflows/ci.yml"
     assert compose_match.group(0) == ci_match.group(0)
+
+
+def test_dev_compose_and_env_example_pin_the_production_postgres_digest() -> None:
+    # A floating tag in the local stack means developers and CI can silently
+    # run a different PostgreSQL build than production digest-pins.
+    pattern = re.compile(r"pgvector/pgvector:[\w.\-]+@sha256:[0-9a-f]+")
+
+    production = pattern.search((ROOT / "compose.production.yaml").read_text(encoding="utf-8"))
+    assert production is not None, "no pinned pgvector image in compose.production.yaml"
+
+    for relative in ("compose.yaml", ".env.example"):
+        text = (ROOT / relative).read_text(encoding="utf-8")
+        assert "pgvector/pgvector" in text, f"no pgvector image referenced in {relative}"
+        found = pattern.search(text)
+        assert found is not None, f"{relative} uses a floating pgvector tag"
+        assert found.group(0) == production.group(0), (
+            f"{relative} pins a different pgvector image than compose.production.yaml"
+        )
 
 
 def test_ci_install_only_requests_declared_optional_dependencies() -> None:

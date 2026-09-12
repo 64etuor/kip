@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from typing import Any
 
 import httpx
@@ -38,6 +39,7 @@ class OpenAICompatibleGenerationAdapter:
         revision: str,
         provider: str = "openai",
         allow_remote_egress: bool = False,
+        model_service_hosts: Sequence[str] = (),
         timeout_seconds: float = 60.0,
         max_response_bytes: int = 1024 * 1024,
         client: httpx.Client | None = None,
@@ -46,7 +48,9 @@ class OpenAICompatibleGenerationAdapter:
             raise ValueError("generation model and revision are required")
         if max_response_bytes < 1:
             raise ValueError("max_response_bytes must be positive")
-        self.base_url = require_allowed_model_url(base_url, allow_remote_egress)
+        self.base_url = require_allowed_model_url(
+            base_url, allow_remote_egress, model_service_hosts
+        )
         self.model = model
         self.revision = revision
         self.provider = provider

@@ -20,12 +20,20 @@ class JsonFormatter(logging.Formatter):
 
 
 def configure_logging(level: str = "INFO") -> None:
-    root = logging.getLogger()
-    root.handlers.clear()
+    """Send KIP's own records to stderr as JSON.
+
+    Only the `kip` logger is configured: an application that embeds this API
+    keeps the root handlers it installed, and the CLI keeps stdout free for
+    the envelope it prints.
+    """
+    logger = logging.getLogger("kip")
+    for existing in list(logger.handlers):
+        logger.removeHandler(existing)
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(JsonFormatter())
-    root.addHandler(handler)
-    root.setLevel(level.upper())
+    logger.addHandler(handler)
+    logger.setLevel(level.upper())
+    logger.propagate = False
     # The connection pool retries in the background and logs every failed
     # attempt at WARNING; the typed dependency_unavailable error already tells
     # the operator what to do, so keep the driver chatter out of CLI output.

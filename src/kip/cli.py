@@ -53,6 +53,7 @@ from kip.errors import (
     KipError,
     NotFoundError,
     ValidationError,
+    envelope_warnings,
     error_code,
 )
 from kip.evaluation.drafts import promote_draft, record_draft_review_decision, validate_draft
@@ -67,6 +68,7 @@ from kip.evaluation.runner import (
     validate_activation_report,
 )
 from kip.ids import new_id
+from kip.logging import configure_logging
 from kip.ontology import OntologyCatalog, validate_ontology
 from kip.ontology_discovery_release import RELEASE_JOURNAL_FILENAME
 from kip.ontology_migration import (
@@ -185,6 +187,10 @@ def root(
         return
     try:
         settings = Settings.load(config)
+        # Every CLI invocation is its own process: this is the one place the
+        # CLI's logging is set up. Records go to stderr so the JSON envelope
+        # on stdout stays parseable.
+        configure_logging(settings.log_level)
         if workspace is not None:
             settings = replace(settings, workspace=workspace)
         container = build_container(
@@ -266,6 +272,7 @@ def _emit_error(
         meta=EnvelopeMeta(
             request_id=context.request_id or new_id("req"),
             workspace=context.workspace,
+            warnings=envelope_warnings(exc),
         ),
     )
     typer.echo(envelope.model_dump_json(indent=2), err=True)
@@ -575,7 +582,7 @@ def _http_reranker_doctor_reason(
     config = settings.get("models.reranker", {}) or {}
     if not isinstance(config, dict) or not config.get("enabled", False):
         return None
-    if str(config.get("backend", "http")) != "http":
+    if str(config.get("backend", "bm25")) != "http":
         return None
     model = str(config.get("model", ""))
     if not model:
@@ -967,6 +974,10 @@ def search(
 ) -> None:
     """Search exact identifiers and lexical evidence units."""
 
+    # The envelope warnings are produced with the result, not recomputed from
+    # it: a degraded run that returned nothing has no hit metadata left.
+    envelope_meta_warnings: list[str] = []
+
     def action(runtime: Runtime) -> Any:
         selected_query = query_option or query
         if not selected_query:
@@ -980,13 +991,14 @@ def search(
             project_ids=_split_values(project_id),
             include_candidate_assertions=include_candidate_assertions,
         )
-        return runtime.container.application.retrieval.search(runtime.context, request)
+        outcome = runtime.container.application.retrieval.search_outcome(
+            runtime.context,
+            request,
+        )
+        envelope_meta_warnings[:] = outcome.warnings
+        return outcome.hits
 
-    def warnings(hits: Any) -> list[str]:
-        runtime = _runtime(ctx)
-        return runtime.container.application.retrieval.result_warnings(runtime.context, hits)
-
-    _run(ctx, action, warnings=warnings)
+    _run(ctx, action, warnings=lambda _result: list(envelope_meta_warnings))
 
 
 @app.command()
@@ -1025,6 +1037,9 @@ def context_command(
 ) -> None:
     """Build a bounded evidence bundle for an AI agent or application."""
 
+    # See `search`: warnings travel with the result, not derived from it.
+    envelope_meta_warnings: list[str] = []
+
     def action(runtime: Runtime) -> Any:
         selected_query = query_option or query
         if not selected_query:
@@ -1039,13 +1054,14 @@ def context_command(
             project_ids=_split_values(project_id),
             include_candidate_assertions=include_candidate_assertions,
         )
-        return runtime.container.application.retrieval.context_bundle(runtime.context, request)
+        outcome = runtime.container.application.retrieval.context_outcome(
+            runtime.context,
+            request,
+        )
+        envelope_meta_warnings[:] = outcome.warnings
+        return outcome.bundle
 
-    def warnings(bundle: Any) -> list[str]:
-        runtime = _runtime(ctx)
-        return runtime.container.application.retrieval.result_warnings(runtime.context, bundle.items)
-
-    _run(ctx, action, warnings=warnings)
+    _run(ctx, action, warnings=lambda _result: list(envelope_meta_warnings))
 
 
 @app.command()

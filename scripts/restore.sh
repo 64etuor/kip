@@ -47,6 +47,16 @@ if [[ -e "$EVIDENCE_ROOT" ]]; then
 fi
 mkdir -m 700 -p "$EVIDENCE_ROOT"
 export PGOPTIONS="${PGOPTIONS:+$PGOPTIONS }-c row_security=off"
+# Restore needs more than kip_backup: it creates the schema, runs `kip migrate`
+# and rebuilds projections, so it must be the object owner of the restore
+# target, and it must also bypass row level security because it loads rows into
+# FORCE ROW LEVEL SECURITY tables with `row_security=off`. On the reference
+# Compose deployment the owner is a superuser and satisfies both.
+BYPASSES_RLS="$(postgres_query "$TARGET_URL" "SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user" | tr -d '[:space:]')"
+if [[ "$BYPASSES_RLS" != "t" ]]; then
+  printf '%s\n' "KIP_RESTORE_DATABASE_URL connects as a role without BYPASSRLS; restore cannot load forced row level security tables. Use the restore target's object owner (a superuser, or a role created with BYPASSRLS)." >&2
+  exit 2
+fi
 postgres_restore \
   "$TARGET_URL" \
   "$BACKUP_DIR/kip.dump" \

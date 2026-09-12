@@ -1,7 +1,7 @@
 # ADR-055: Focused agent instructions and reliable local entry points
 
-- Status: Accepted
-- Date: 2026-09-10
+- **Status:** Accepted
+- **Date:** 2026-09-10
 
 ## Context
 

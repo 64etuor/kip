@@ -5,6 +5,7 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
+from typing import Any
 
 import tomli_w
 import yaml
@@ -17,6 +18,28 @@ from kip.setup.models import SetupApplyReceipt, SetupPlan
 from kip.setup.paths import canonical_managed_path, validate_container_source_target
 
 _JSON_OBJECT: TypeAdapter[JsonObject] = TypeAdapter(JsonObject)
+
+MANAGED_ROLES_NOTE = (
+    "api and worker connect as the non-superuser, NOBYPASSRLS kip_api and kip_worker "
+    "logins; only migrate and the one-shot roles service use the bootstrap owner, "
+    "which PostgreSQL creates SUPERUSER with BYPASSRLS. The roles service applies "
+    "deploy/sql/roles.sql.template after every migrate run; re-run it after later "
+    "migrations. KIP_API_DB_PASSWORD, KIP_WORKER_DB_PASSWORD and KIP_BACKUP_DB_PASSWORD "
+    "come from the same .env that carries POSTGRES_PASSWORD (scripts/bootstrap.sh "
+    "writes them); setup's secret references cover only the single database URL."
+)
+
+EXTERNAL_ROLES_NOTE = (
+    "External database: setup neither creates nor owns roles there, so this project has "
+    "no roles service. Apply deploy/sql/roles.sql.template yourself as the object owner, "
+    "after every migration. migrate, api and worker all read {name}, so that login needs "
+    "the rights migrations require and must never be SUPERUSER or BYPASSRLS - either is "
+    "enough to bypass every workspace and ACL policy. To isolate api and worker by row "
+    "level security, run migrations separately as the owner and point {name} at a login "
+    "bound to kip_api / kip_worker. BYPASSRLS is a role attribute and is not inherited "
+    "through membership, so back up as a login that has it (kip_backup) rather than a "
+    "member of it."
+)
 
 
 def apply_setup_plan(
@@ -115,6 +138,21 @@ def build_compose_payload(plan: SetupPlan, *, project_root: Path) -> JsonObject:
         services = base["services"]
         if not all(isinstance(services[name], dict) for name in ("api", "worker", "migrate", "postgres")):
             raise ValueError("missing application services")
+        # The bundled-database services keep the non-superuser application-role
+        # URLs the template already gives them (kip_api / kip_worker) instead of
+        # the owner URL below: PostgreSQL creates the bootstrap owner as a
+        # SUPERUSER with BYPASSRLS, and a superuser bypasses every workspace and
+        # ACL policy, so an API or worker that connects as the owner has no
+        # isolation in the database. Reading them here keeps one definition of
+        # those URLs, in compose.yaml.
+        role_database_urls = {
+            name: services[name]["environment"]["KIP_DATABASE_URL"] for name in ("api", "worker")
+        }
+        if any(
+            "${POSTGRES_USER" in url or "${POSTGRES_PASSWORD" in url
+            for url in role_database_urls.values()
+        ):
+            raise ValueError("api and worker template URLs carry the owner credentials")
     except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError) as exc:
         raise ValidationError("setup requires the package compose.yaml application template") from exc
     environment = {
@@ -149,11 +187,21 @@ def build_compose_payload(plan: SetupPlan, *, project_root: Path) -> JsonObject:
     for name in ("api", "worker", "migrate"):
         service = services[name]
         service.pop("env_file", None)
-        service.update(_compose_service(plan, environment, service_name=name))
+        service_environment = dict(environment)
+        if managed_database and name in role_database_urls:
+            # Only `migrate` (and the `roles` service) keep the owner URL.
+            service_environment["KIP_DATABASE_URL"] = role_database_urls[name]
+        service.update(_compose_service(plan, service_environment, service_name=name))
         if not managed_database:
             service.get("depends_on", {}).pop("postgres", None)
-    if not managed_database:
+    if managed_database:
+        _add_roles_service(services, project_root=project_root)
+        base["x-kip-database-roles"] = MANAGED_ROLES_NOTE
+    else:
         services.pop("postgres")
+        base["x-kip-database-roles"] = EXTERNAL_ROLES_NOTE.format(
+            name=plan.database_secret_ref.display()
+        )
     if not plan.semantic_search:
         # Lexical-only plan: no model runtime container (ADR-065).
         services.pop("models", None)
@@ -164,6 +212,46 @@ def build_compose_payload(plan: SetupPlan, *, project_root: Path) -> JsonObject:
     # This is a complete Compose project, not an override: merging source
     # mounts would retain the sample NAS mount outside the approved plan.
     return _JSON_OBJECT.validate_python(base)
+
+
+def _add_roles_service(services: Any, *, project_root: Path) -> None:
+    """Copy the one-shot `roles` service into a project that runs its own PostgreSQL.
+
+    Deliberate scope: the service is included only for the bundled database. It
+    creates the kip_api / kip_worker logins by connecting to the `postgres`
+    service as the image bootstrap owner, and both exist only in that shape.
+    When the operator pointed setup at an external database KIP holds neither
+    the owner credentials nor the authority to create roles there, so a
+    generated project leaves the service out and `x-kip-database-roles` tells
+    the operator to apply deploy/sql/roles.sql.template themselves. Emitting it
+    anyway would produce a service that fails on every start, or - worse - one
+    that silently did nothing while the API kept the operator's owner login.
+    """
+    try:
+        overlay = yaml.safe_load(
+            (project_root / "deploy/compose.roles.yaml").read_text(encoding="utf-8")
+        )
+        roles = overlay["services"]["roles"]
+        if not isinstance(roles, dict):
+            raise ValueError("roles service is not a mapping")
+        if roles.get("volumes") != ["./deploy:/deploy:ro"]:
+            raise ValueError("roles service mounts an unexpected path")
+        # Long form, like every other mount in a generated project: Compose
+        # would otherwise create an empty ./deploy and the apply would fail on a
+        # missing template instead of on the missing directory.
+        roles["volumes"] = [{
+            "type": "bind", "source": "./deploy", "target": "/deploy",
+            "read_only": True, "bind": {"create_host_path": False},
+        }]
+        services["roles"] = roles
+        for name in ("api", "worker"):
+            # api and worker must not start before the logins they use exist.
+            depends_on = services[name].setdefault("depends_on", {})
+            depends_on.update(overlay["services"][name]["depends_on"])
+    except (OSError, ValueError, TypeError, KeyError, yaml.YAMLError) as exc:
+        raise ValidationError(
+            "setup requires the package deploy/compose.roles.yaml database role template"
+        ) from exc
 
 
 def _mcp_payload(plan: SetupPlan) -> JsonObject:

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import ipaddress
 import math
-import re
 import threading
 import time
 from collections.abc import Callable, Sequence
@@ -10,6 +8,7 @@ from urllib.parse import urlparse
 
 import httpx
 
+from kip.domain.egress import is_local_model_endpoint, normalize_model_service_hosts
 from kip.errors import ConfigurationError, DependencyUnavailableError
 
 # How long a successful `/models` verification is trusted. Infinity answers
@@ -37,30 +36,24 @@ def require_allowed_model_url(
     ``model_service_hosts`` (``security.model_service_hosts``) names services
     on the deployment's own private network, such as the compose ``models``
     service; it is an allowlist of bare host names, never a wildcard.
+
+    The local decision itself is delegated to
+    :func:`kip.domain.egress.is_local_model_endpoint`, the same predicate the
+    generation egress policy applies, so embedding, reranking and generation
+    cannot disagree about which hosts are inside the deployment.
     """
     parsed = urlparse(base_url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         raise ConfigurationError("model base URL must be an absolute HTTP(S) URL")
     if parsed.username or parsed.password:
         raise ConfigurationError("model base URL must not contain credentials")
+    try:
+        allowed_services = normalize_model_service_hosts(model_service_hosts)
+    except ValueError as error:
+        raise ConfigurationError(str(error)) from error
     if allow_remote_egress:
         return base_url.rstrip("/")
-    host = parsed.hostname.lower()
-    try:
-        loopback = ipaddress.ip_address(host).is_loopback
-    except ValueError:
-        loopback = host == "localhost"
-    allowed_services = set()
-    for name in model_service_hosts:
-        candidate = name.strip().lower()
-        # Bare service names only (compose `models`): a dotted name or an IP
-        # would quietly re-open the remote egress this setting keeps closed.
-        if not re.fullmatch(r"[a-z][a-z0-9_-]*", candidate):
-            raise ConfigurationError(
-                f"security.model_service_hosts entries must be bare service names, not {name!r}"
-            )
-        allowed_services.add(candidate)
-    if not loopback and host not in allowed_services:
+    if not is_local_model_endpoint(base_url, allowed_services):
         raise ConfigurationError(
             "model base URL must be loopback or a configured security.model_service_hosts "
             "entry while remote model egress is disabled"

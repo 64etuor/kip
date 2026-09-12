@@ -35,7 +35,7 @@ if [[ ! -f config/kip.toml ]]; then
 fi
 UV_PROJECT_ENVIRONMENT="$PROJECT_ROOT/.venv" uv sync --frozen --python "$PROJECT_ROOT/.venv/bin/python" \
   --extra postgres --extra api --extra identity --extra extractors \
-  --extra mcp --extra telemetry --extra dev
+  --extra mcp --extra dev
 "$SCRIPT_DIR/install-kordoc.sh"
 mkdir -p var/cas var/backups var/log
 

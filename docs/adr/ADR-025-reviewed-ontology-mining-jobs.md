@@ -1,7 +1,9 @@
 # ADR-025: Reviewed ontology mining jobs
 
-- Status: Accepted — review tiering calibrated by ADR-047 (2026-08-15)
-- Date: 2026-08-09
+- **Status:** Amended
+- **Date:** 2026-08-09
+- **Amended by:** ADR-047 (2026-08-15) — review tiering calibrated; full human
+  review is no longer unconditional
 
 > Amendment: full human review is no longer unconditional. ADR-047 adds a
 > measured, audited, revocable auto-approve policy for low-risk

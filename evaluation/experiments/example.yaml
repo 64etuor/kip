@@ -5,7 +5,7 @@ baseline_variant: hybrid
 candidate_variant: reranked
 components:
   - kind: reranker
-    adapter: huggingface
+    adapter: http
     identifier: Qwen/Qwen3-Reranker-0.6B
     revision: f3f3c8a
     configuration:

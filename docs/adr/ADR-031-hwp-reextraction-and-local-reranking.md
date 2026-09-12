@@ -1,6 +1,12 @@
 # ADR-031: Guarded HWP re-extraction and local lexical reranking
 
-Status: Accepted — reranker-default framing superseded by ADR-034 (2026-08-11)
+- **Status:** Amended
+- **Date:** 2026-08-10
+- **Amended by:** ADR-034 (2026-08-11) — the reranker-default framing was
+  superseded; RapidFuzz is the fallback backend
+- **Amended by:** ADR-064 (2026-09-11) — the parser and reranker version pins
+  quoted below have moved; `pyproject.toml` and `requirements/runtime.txt` are
+  the current pins
 
 > Amendment: RapidFuzz is no longer "the" production reranker; ADR-034
 > promoted the candidate-local BM25 backend on an adversarially re-verified

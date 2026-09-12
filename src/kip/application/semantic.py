@@ -200,7 +200,12 @@ class SemanticProjectionUseCases:
             context,
             self.embedding_space(context),
         )
-        batch_size = int(self._settings.get("models.embedding.batch_size", 16))
+        batch_size = int(
+            self._settings.get(
+                "models.embedding.batch_size",
+                EMBEDDING_DEFAULTS["batch_size"],
+            )
+        )
         max_document_chars = self._max_document_chars()
         page_size = int(self._settings.get("models.embedding.page_size", 1000))
         if page_size < 1:
@@ -288,7 +293,10 @@ class SemanticProjectionUseCases:
             == str(identity.max_document_chars)
             and space.configuration.get("document_projection")
             == identity.document_projection
-            and str(configured.get("query_instruction", "")) == identity.query_instruction
+            and str(
+                configured.get("query_instruction", EMBEDDING_DEFAULTS["query_instruction"])
+            )
+            == identity.query_instruction
             for identity in RELEASE_REVIEWED_EMBEDDING_IDENTITIES
         )
 
@@ -402,14 +410,26 @@ class SemanticProjectionUseCases:
     def _max_batch_chars(self) -> int:
         # One request should not hold the shared model runtime for long:
         # interactive query embeddings wait behind it (ADR-065).
-        configured = int(self._settings.get("models.embedding.max_batch_chars", 16000))
+        configured = int(
+            self._settings.get(
+                "models.embedding.max_batch_chars",
+                EMBEDDING_DEFAULTS["max_batch_chars"],
+            )
+        )
         if configured < 1:
             raise ConfigurationError("embedding max_batch_chars must be positive")
         return configured
 
     def _max_document_chars(self) -> int:
+        # The space identity is built from this value, so a fallback that
+        # disagrees with the shipped default silently builds a space no
+        # release reviewed — hours of embedding that can never auto-activate.
+        # Every fallback for an embedding key comes from EMBEDDING_DEFAULTS.
         configured = int(
-            self._settings.get("models.embedding.max_document_chars", 12000)
+            self._settings.get(
+                "models.embedding.max_document_chars",
+                EMBEDDING_DEFAULTS["max_document_chars"],
+            )
         )
         if configured < 1:
             raise ConfigurationError(

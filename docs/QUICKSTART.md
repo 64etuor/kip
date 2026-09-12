@@ -17,7 +17,7 @@ agent는 `kip-setup` Skill에 따라 매번 하나의 누락된 결정만 질문
 
 ```bash
 curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh | bash
-# 위치와 버전 고정: | bash -s -- ~/kip --version 3.12.0
+# 위치와 버전 고정: | bash -s -- ~/kip --version X.Y.Z
 ```
 
 bash, curl 또는 wget, sha256sum 또는 shasum, unzip 또는 python3만 있으면 되고

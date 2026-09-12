@@ -1,7 +1,7 @@
 # ADR-058: Evidence completeness and discoverable tool contracts
 
-- Status: Accepted
-- Date: 2026-09-10
+- **Status:** Accepted
+- **Date:** 2026-09-10
 
 ## Decision
 

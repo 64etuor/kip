@@ -121,6 +121,15 @@ rollback을 다룬다.
    정해지며, lexical 전용 plan은 compose `models` 서비스를 빼고 이유를 경고한다.
    `./scripts/kip doctor`의 선택 항목 `semantic_search`가 runtime 연결과 projection
    완성도(`stale` 포함), 고칠 명령을 보고한다.
+   전체 `app-up.sh`는 `compose.yaml`과 `deploy/compose.roles.yaml`을 함께
+   넘겨, migrate 다음에 한 번만 도는 `roles` 서비스로
+   `deploy/sql/roles.sql.template`을 owner 권한으로 적용하고, API와 worker는
+   그 뒤에야 `kip_api`/`kip_worker`로 접속한다. `docker compose -f compose.yaml`만
+   직접 실행하면 이 role이 만들어지지 않아 API/worker 인증이 실패한다. `POSTGRES_USER`(기본
+   `kip_owner`)는 PostgreSQL이 SUPERUSER·BYPASSRLS로 만드는 bootstrap role이라
+   모든 row level security 정책을 우회하므로 migration 전용이다. host CLI와
+   MCP, 그리고 `migrate`는 여전히 `KIP_DATABASE_URL`의 owner로 동작한다
+   (docs/SECURITY.md "Database roles").
 8. receipt의 `next_steps`에 나온 승인된 source 이름으로 먼저
    `sync run --source SOURCE --dry-run`을 실행해 범위와 건수를 확인한다.
    사용자 폴더만 설정했다면 `sample` source가 있다고 가정하지 않는다.
@@ -478,7 +487,7 @@ secret file, 배포, backup, restore drill 명령은 `docs/OPERATIONS.md`를 따
 
 | 분류 | 경로 | 처리 |
 |---|---|---|
-| 패키지 소유 | `src/` `tests/` `contracts/` `docs/` `scripts/` `migrations/` `evaluation/` `.claude/` `skills/` `examples/` `.github/` `deploy/` `requirements/` `sample-data/` `sdk/`, `config/kip.example.toml`, `config/kip.container.toml`, `config/logging.yaml`, 루트 파일 전체 | 교체 |
+| 패키지 소유 | `src/` `tests/` `contracts/` `docs/` `scripts/` `migrations/` `evaluation/` `.claude/` `skills/` `examples/` `.github/` `deploy/` `requirements/` `sample-data/` `sdk/`, `config/kip.example.toml`, `config/kip.container.toml`, 루트 파일 전체 | 교체 |
 | 배포 소유 | `config/kip.toml`, `config/kip.generated.toml`, `config/kip.host.generated.toml`, `compose.generated.yaml`, `.kip/setup-state.json`, `.env`, `secrets/`, `var/`, `exports/`, `ontology/.release.lock`, `ontology/.pending-release.json`, `.venv/`, PostgreSQL 볼륨 | 보존 |
 | 양쪽 | `.mcp.json` | 11.2 참조 |
 | 기준선 + 확장 | `ontology/domains/`, `ontology/migrations/`, `evaluation/golden/` | 병합 |
@@ -628,3 +637,65 @@ Compose 파일은 PostgreSQL 메모리 설정(`KIP_POSTGRES_SHARED_BUFFERS` 기�
 `KIP_POSTGRES_EFFECTIVE_CACHE_SIZE` 3GB, `KIP_POSTGRES_WORK_MEM` 16MB,
 `KIP_POSTGRES_MAINTENANCE_WORK_MEM` 512MB)을 전달한다. 기존 container는
 `docker compose up -d postgres`로 다시 만들어야 적용된다.
+
+### 11.8 API·worker를 owner 대신 애플리케이션 role로 옮기기
+
+3.12.2 이전 배포의 compose는 API와 worker의 `KIP_DATABASE_URL`을
+`POSTGRES_USER`(기본 `kip_owner`)로 채웠다. PostgreSQL은 이 bootstrap role을
+SUPERUSER·BYPASSRLS로 만들고, superuser는 `ENABLE`이든 `FORCE`든 모든 row level
+security 정책을 우회한다. 따라서 migration 0028이 34개 테이블에 RLS를 강제해도
+그 연결에서는 workspace/ACL 격리가 데이터베이스 수준에서 작동하지 않았다.
+
+기존 배포에서 다음을 수행한다.
+
+1. `.env`에 `KIP_API_DB_PASSWORD`, `KIP_WORKER_DB_PASSWORD`,
+   `KIP_BACKUP_DB_PASSWORD`가 없으면 compose가 `docker compose` 호출 자체를
+   거부한다. `./scripts/bootstrap.sh`(또는 `kip update`가 실행하는 bootstrap)를
+   다시 돌리면 `scripts/bootstrap_env.py`가 기존 값은 건드리지 않고 이 세 개와
+   `KIP_BACKUP_DATABASE_URL`만 임의 값으로 덧붙인다. 직접 넣어도 된다.
+2. `./scripts/app-up.sh`(또는 `--database-only`)를 다시 실행한다. 이 스크립트가
+   `deploy/compose.roles.yaml` overlay를 함께 넘긴다. migrate가 끝난
+   뒤 `roles` 서비스가 `deploy/sql/roles.sql.template`을 owner로 적용해
+   `kip_api`, `kip_worker`, `kip_reviewer`, `kip_backup` role과 grant를 만들고
+   앞의 세 role에 로그인 암호를 설정한다. template은 재실행 가능하며, 이후
+   migration을 추가할 때마다 다시 적용해야 새 테이블 grant가 붙는다.
+3. 실제로 바뀌었는지 확인한다.
+
+   ```
+   docker compose -f compose.yaml exec -T postgres \
+     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+     "SELECT usename, backend_type FROM pg_stat_activity WHERE datname = current_database();"
+   ```
+
+   API/worker 연결이 `kip_api`/`kip_worker`로 보여야 한다. role 속성은
+   `SELECT rolname, rolsuper, rolbypassrls FROM pg_roles WHERE rolname LIKE 'kip%';`로
+   확인한다. `kip_api`/`kip_worker`는 둘 다 `f`, `kip_backup`만 `rolbypassrls = t`다.
+4. 백업은 `kip_backup`으로 돌린다. `scripts/backup.sh`는
+   `KIP_BACKUP_DATABASE_URL`(또는 `..._FILE`)이 있으면 그것을 쓰고, 없으면 기존
+   `KIP_DATABASE_URL`로 되돌아간다. 어느 쪽이든 role이 RLS를 우회하지 못하면
+   실행을 거부한다. 조용히 일부 workspace만 담긴 백업이 만들어지는 것보다 낫다.
+   `BYPASSRLS`는 role 속성이라 membership으로 상속되지 않는다. `kip_backup`의
+   member일 뿐인 login으로는 `row_security=off`를 쓸 수 없다.
+5. 복원은 `kip_backup`으로 할 수 없다. `scripts/restore.sh`는 스키마를 만들고
+   `kip migrate`와 projection rebuild까지 수행하므로 복원 대상의 owner여야 하고,
+   동시에 RLS를 우회할 수 있어야 한다. 참조 Compose의 owner는 superuser라 둘 다
+   만족한다. `restore.sh`도 시작 전에 이 조건을 확인한다.
+
+아직 owner로 남는 경로를 그대로 적는다.
+
+- 단일 머신 개발 환경의 host CLI와 MCP는 `KIP_DATABASE_URL`, 즉 owner로 접속한다.
+  `kip migrate`가 객체를 만들어야 하므로 이 경로는 owner여야 한다.
+- guided setup이 만든 `compose.generated.yaml`은 번들 PostgreSQL을 쓰는 경우
+  `deploy/compose.roles.yaml`의 `roles` 서비스를 그대로 포함하고, API와 worker는
+  `kip_api`/`kip_worker`로 접속한다. owner URL(`KIP_CONTAINER_DATABASE_URL`)은
+  `migrate`와 `roles`만 쓴다. 외부 데이터베이스를 지정한 경우에는 KIP이 그
+  데이터베이스의 role을 만들 권한이 없으므로 `roles` 서비스를 넣지 않고,
+  생성 파일의 `x-kip-database-roles`가 운영자가 직접
+  `deploy/sql/roles.sql.template`을 적용하라고 적는다. 이때 migrate·API·worker는
+  승인된 단일 URL 하나를 공유한다.
+- `compose.production.yaml`은 `migration` profile에 `roles` 서비스를 추가해
+  migration credential로 template을 적용하지만, 로그인 role은 만들지 않는다.
+  운영자가 자신의 login을 `GRANT kip_api TO <login>`으로 그룹에 묶고
+  `KIP_API_DATABASE_URL_FILE`/`KIP_WORKER_DATABASE_URL_FILE`이 그 login을
+  가리키게 한다. 백업 login은 그룹 membership이 아니라 `BYPASSRLS` 속성을 직접
+  가져야 한다.

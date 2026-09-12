@@ -3,7 +3,7 @@ info:
   title: KIP Knowledge Fabric API
   description: Optional REST edge adapter over the same application services used
     by the CLI and MCP.
-  version: 3.12.2
+  version: 3.13.0
 paths:
   /healthz:
     get:
@@ -19,6 +19,7 @@ paths:
                   type: string
                 type: object
                 title: Response Healthz Healthz Get
+      security: []
   /readyz:
     get:
       summary: Readyz
@@ -37,6 +38,7 @@ paths:
           content:
             application/json:
               schema: {}
+      security: []
   /v1/capabilities:
     get:
       summary: Capabilities
@@ -58,11 +60,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: &id001
+                $ref: '#/components/schemas/Envelope'
+      security: &id002
+      - ApiKeyAuth: []
+      - BearerAuth: []
   /v1/status:
     get:
       summary: Status
@@ -84,11 +89,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/search:
     post:
       summary: Search
@@ -116,11 +121,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/context:
     post:
       summary: Context Bundle
@@ -148,11 +153,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/answer:
     post:
       summary: Answer
@@ -180,11 +185,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/vocabulary:
     get:
       summary: Vocabulary
@@ -219,11 +224,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/units/{unit_id}:
     get:
       summary: Read Unit
@@ -251,11 +256,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/artifacts/{artifact_id}:
     get:
       summary: Get Artifact
@@ -283,11 +288,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/documents/{document_id}:
     get:
       summary: Get Document
@@ -315,11 +320,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/assertions/{assertion_id}:
     get:
       summary: Get Assertion
@@ -347,11 +352,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/assertions/{assertion_id}/explain:
     get:
       summary: Explain Assertion
@@ -379,11 +384,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/xlsx/{artifact_id}/range:
     get:
       summary: Xlsx Range
@@ -430,11 +435,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/graph/neighbors:
     post:
       summary: Graph Neighbors
@@ -462,11 +467,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/graph/path:
     post:
       summary: Graph Path
@@ -494,11 +499,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/sync/filesystem/{source_name}:
     post:
       summary: Sync Filesystem
@@ -548,11 +553,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: &id003
+      - ApiKeyAuth: []
+        AdminKeyAuth: []
+      - BearerAuth: []
   /v1/sync/{source_name}:
     post:
       summary: Enqueue Source Sync
@@ -588,11 +596,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
   /v1/jobs:
     get:
       summary: Jobs
@@ -637,11 +645,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
   /v1/admin/query-traces:
     get:
       summary: Query Traces
@@ -686,11 +694,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
   /v1/admin/query-traces/expired:
     delete:
       summary: Prune Query Traces
@@ -720,11 +728,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
   /v1/interactions/clarifications:
     post:
       summary: Create Clarification
@@ -752,11 +760,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/interactions/clarifications/{question_id}:
     get:
       summary: Get Clarification
@@ -784,11 +792,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/interactions/clarifications/{question_id}/answers:
     post:
       summary: Answer Clarification
@@ -822,11 +830,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/interactions/preferences:
     get:
       summary: List Preferences
@@ -848,11 +856,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
     put:
       summary: Save Preference
       operationId: save_preference_v1_interactions_preferences_put
@@ -879,11 +887,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/interactions/preferences/{key}:
     delete:
       summary: Delete Preference
@@ -911,11 +919,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/interactions/feedback:
     post:
       summary: Submit Feedback
@@ -943,11 +951,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/admin/interactions/clarifications/expired:
     delete:
       summary: Prune Expired Clarifications
@@ -977,11 +985,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
   /v1/connectors/events:
     post:
       summary: Connector Event
@@ -1017,11 +1025,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
   /v1/ontology/entities:
     get:
       summary: Ontology Entities
@@ -1058,11 +1066,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
     post:
       summary: Ontology Entity Create
       operationId: ontology_entity_create_v1_ontology_entities_post
@@ -1097,11 +1105,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
   /v1/ontology/context:
     post:
       summary: Ontology Context
@@ -1129,11 +1137,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/ontology/mining-jobs:
     post:
       summary: Ontology Mining Job
@@ -1169,11 +1177,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
   /v1/ontology/discovery-candidates:
     post:
       summary: Propose Ontology Discovery Candidate
@@ -1201,11 +1209,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id002
   /v1/admin/ontology/discovery-candidates:
     get:
       summary: Ontology Discovery Candidates
@@ -1251,11 +1259,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
   /v1/admin/ontology/discovery-candidates/{candidate_id}/review:
     post:
       summary: Review Ontology Discovery Candidate
@@ -1297,11 +1305,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
   /v1/ontology/entity-candidates:
     get:
       summary: Ontology Entity Candidates
@@ -1345,11 +1353,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
   /v1/ontology/entity-candidates/{candidate_id}:
     get:
       summary: Ontology Entity Candidate
@@ -1385,11 +1393,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
   /v1/ontology/entity-candidates/{candidate_id}/approve:
     post:
       summary: Ontology Entity Candidate Approve
@@ -1433,11 +1441,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
   /v1/ontology/entity-candidates/{candidate_id}/reject:
     post:
       summary: Ontology Entity Candidate Reject
@@ -1481,11 +1489,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
   /v1/review/candidates:
     get:
       summary: Candidates
@@ -1545,11 +1553,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
     post:
       summary: Propose Candidate
       operationId: propose_candidate_v1_review_candidates_post
@@ -1584,11 +1592,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
   /v1/review/candidates/{candidate_id}:
     get:
       summary: Candidate
@@ -1624,11 +1632,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
   /v1/review/candidates/{candidate_id}/approve:
     post:
       summary: Approve
@@ -1679,11 +1687,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
   /v1/review/candidates/{candidate_id}/reject:
     post:
       summary: Reject
@@ -1727,11 +1735,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
   /v1/review/assertions/{assertion_id}/revoke:
     post:
       summary: Revoke Assertion
@@ -1773,11 +1781,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/Envelope'
         '422':
-          description: Validation Error
+          description: Validation error (kip.envelope.v1)
           content:
             application/json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+              schema: *id001
+      security: *id003
 components:
   schemas:
     AclSnapshot:
@@ -2261,15 +2269,6 @@ components:
         Both repository adapters cap the number of returned paths at
 
         `GRAPH_PATH_RESULT_CAP`.'
-    HTTPValidationError:
-      properties:
-        detail:
-          items:
-            $ref: '#/components/schemas/ValidationError'
-          type: array
-          title: Detail
-      type: object
-      title: HTTPValidationError
     KnowledgeEntity:
       properties:
         id:
@@ -2519,29 +2518,21 @@ components:
       - values
       - confirmed
       title: UserPreferenceWrite
-    ValidationError:
-      properties:
-        loc:
-          items:
-            anyOf:
-            - type: string
-            - type: integer
-          type: array
-          title: Location
-        msg:
-          type: string
-          title: Message
-        type:
-          type: string
-          title: Error Type
-        input:
-          title: Input
-        ctx:
-          type: object
-          title: Context
-      type: object
-      required:
-      - loc
-      - msg
-      - type
-      title: ValidationError
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-KIP-API-Key
+      description: Shared API key, used when identity.mode is api_key.
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Identity-provider JWT, used when identity.mode is proxy_jwt. Admin
+        routes additionally require the admin group claim.
+    AdminKeyAuth:
+      type: apiKey
+      in: header
+      name: X-KIP-Admin-Key
+      description: Second factor for /v1/admin and other admin-only routes when identity.mode
+        is api_key.

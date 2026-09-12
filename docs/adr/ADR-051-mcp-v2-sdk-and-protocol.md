@@ -1,7 +1,10 @@
 # ADR-051: Adopt the stable MCP 2 SDK without changing KIP tool contracts
 
-- **Status:** Accepted
+- **Status:** Amended
 - **Date:** 2026-08-16
+- **Amended by:** later releases moved the lock; the `mcp>=2.0,<3` range below
+  still holds but the locked version is whatever `requirements/runtime.txt`
+  pins today, not 2.0.0
 
 ## Context
 
@@ -18,7 +21,9 @@ second data contract or allow protocol metadata to become authorization data.
 
 ## Decision
 
-1. Pin the optional dependency to `mcp>=2.0,<3` and lock 2.0.0.
+1. Pin the optional dependency to `mcp>=2.0,<3` and lock one version inside
+   that range. The lock was 2.0.0 at this decision; the current locked version
+   is whatever `requirements/runtime.txt` pins.
 2. Construct `MCPServer` with the KIP package version so clients can identify
    the running application build.
 3. Keep stdio as the only shipped transport and keep every tool result inside

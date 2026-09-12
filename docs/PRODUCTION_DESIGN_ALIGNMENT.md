@@ -3,7 +3,7 @@
 - **Status:** Living conformance register
 - **Last reviewed:** 2026-09-11 (3.12.0 semantic search on by default; older corpus measurements retain their dates)
 - **Target:** `docs/PRD.md`, `docs/TRD.md`, and the approved
-  [historical design](https://github.com/64etuor/kip/blob/1b04bad685762fe3002d9c4ec6a75f267df9fb94/docs/plans/2026-08-09-production-rag-package-design.md)
+  [historical design](https://github.com/64etuor/kip/blob/1b04bad685762fe3002d9c4ec6a75f267df9fb94/docs/plans/2026-08-09-production-rag-starter-kit-design.md)
 - **Current truth:** generated contracts, the current checkout, measured
   evaluation reports, and `docs/IMPLEMENTATION_STATUS.md`
 
@@ -35,10 +35,17 @@ lexical path, and the BGE cross-encoder is opt-in. Bootstrap installs the
 hash-locked model runtime, sync and activated re-extraction keep the projection current,
 and a complete release-reviewed space activates itself; other identities keep
 the ADR-036/037 evaluation and explicit activation. Default-mode search
-degrades to lexical with `semantic_degraded` (or, where a deployment sets
-default mode `reranked`, to the fused ranking with `rerank_degraded`) and
-reports it in `meta.warnings`. The lexical channel leaves query n-grams found
-in at least 2% of lexical units out of candidate matching, which on the 19 reviewed private cases in lexical mode moved
+degrades to lexical and reports every degradation in `meta.warnings`;
+`docs/DATA_CONTRACTS.md` is the canonical list of those warning codes. The lexical channel leaves query n-grams found
+in at least `max(200, total_units * search.lexical_common_term_fraction)`
+lexical units out of candidate matching. The threshold is not a bare percentage: the cutoff is
+`max(200, total_units * search.lexical_common_term_fraction)`, so on a corpus
+below 10,000 units the effective cutoff is the 200-unit floor rather than 2%.
+The probe is skipped entirely when the corpus holds fewer than twice the
+cutoff (about 400 units at the default), because a small corpus has no
+meaningfully common term, and when the fraction is set to 0. The unit total
+comes from a PostgreSQL row estimate, not an exact count. On the 19 reviewed private
+cases in lexical mode this moved
 Recall@10 from 78.9% to 89.5%, MRR from 58.3% to 63.8%, and P95 from 11.11 s to
 2.22 s. The portable gate now runs the default mode as well as lexical, and the
 private gate checks per-variant floors. Release evidence for the default mode:

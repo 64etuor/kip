@@ -1,5 +1,14 @@
 # RAG Quality Audit — 2026-08-06
 
+> **Historical record.** This audit measured the 2026-08-06 corpus and the
+> defaults of that release. Its central decision — keep lexical as the
+> production default and keep vector, hybrid and reranked retrieval in shadow
+> mode — was superseded by
+> [ADR-065](adr/ADR-065-semantic-search-on-by-default.md): semantic search is
+> on by default and `hybrid` is the default mode, re-measured on a larger
+> reviewed corpus. The scorecards below are preserved unchanged as the record
+> of that earlier run, not as current guidance.
+
 This audit evaluates the live 18,496-unit PostgreSQL workspace, the public
 36-case golden set, read-only real-file parser samples, and the executable
 contracts for ACL, graph, ontology, and evaluation reporting.

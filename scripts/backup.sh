@@ -31,9 +31,20 @@ fi
 
 PY="$(python_cmd)"
 KIP_CLI="${KIP_CLI:-$SCRIPT_DIR/kip}"
-DATABASE_URL="$($PY "$SCRIPT_DIR/secret_value.py" KIP_DATABASE_URL)"
+# Backup must read every workspace, so it needs a role that bypasses row level
+# security: it exports `row_security=off` below, and PostgreSQL rejects that
+# setting for a FORCE ROW LEVEL SECURITY table unless the role has BYPASSRLS.
+# deploy/sql/roles.sql.template defines kip_backup for exactly this, with
+# SELECT everywhere and no write privilege. A deployment that has not created
+# it yet falls back to KIP_DATABASE_URL, which on the single-machine Compose
+# setup is the superuser owner and therefore still bypasses.
+DATABASE_URL_VARIABLE=KIP_DATABASE_URL
+if [[ -n "${KIP_BACKUP_DATABASE_URL:-}${KIP_BACKUP_DATABASE_URL_FILE:-}" ]]; then
+  DATABASE_URL_VARIABLE=KIP_BACKUP_DATABASE_URL
+fi
+DATABASE_URL="$($PY "$SCRIPT_DIR/secret_value.py" "$DATABASE_URL_VARIABLE")"
 if [[ "$DATABASE_URL" != postgresql://* && "$DATABASE_URL" != postgres://* ]]; then
-  printf '%s\n' "backup requires a PostgreSQL KIP_DATABASE_URL" >&2
+  printf '%s\n' "backup requires a PostgreSQL $DATABASE_URL_VARIABLE" >&2
   exit 2
 fi
 
@@ -58,6 +69,14 @@ mark_failed() {
 trap mark_failed EXIT
 
 export PGOPTIONS="${PGOPTIONS:+$PGOPTIONS }-c row_security=off"
+# Fail here with the fix instead of half-way through pg_dump: a role without
+# BYPASSRLS either errors on the first forced table or, worse, silently dumps
+# only the rows its policies allow.
+BYPASSES_RLS="$(postgres_query "$DATABASE_URL" "SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user" | tr -d '[:space:]')"
+if [[ "$BYPASSES_RLS" != "t" ]]; then
+  printf '%s\n' "$DATABASE_URL_VARIABLE connects as a role without BYPASSRLS; a backup taken with it would be silently incomplete. Point KIP_BACKUP_DATABASE_URL at the kip_backup login from deploy/sql/roles.sql.template." >&2
+  exit 2
+fi
 postgres_dump \
   "$DATABASE_URL" \
   "$PARTIAL/kip.dump" \

@@ -1,9 +1,9 @@
 ---
 document_id: KIP-PRD-003
 title: KIP v3 Agent-First Knowledge Fabric 제품 요구사항 정의서
-version: 3.1.0
+version: 3.13.0
 status: accepted
-last_updated: 2026-09-10
+last_updated: 2026-09-12
 language: ko-KR
 audience:
   - product
@@ -270,7 +270,7 @@ KIP v3 기준 릴리스는 다음을 포함한다.
 
 - PostgreSQL 18 기반 canonical store
 - `pg_trgm`과 사전 토큰화 기반 lexical search
-- semantic projection contract와 참조 배포용 pgvector adapter; extension 미설치 상태에서도 필수 기능 동작
+- semantic projection contract와 참조 배포용 pgvector adapter. 필수 migration `0006`이 `CREATE EXTENSION IF NOT EXISTS vector`를 수행하므로 PostgreSQL 배포에는 pgvector가 설치돼 있어야 한다. Extension 없이 동작하는 것은 memory repository 경로다.
 - NAS 파일 증분 색인
 - HWP/HWPX parser broker
 - PDF 페이지 추출 및 OCR fallback hook
@@ -496,7 +496,7 @@ Agent 흐름:
 - **FR-XLSX-001 MUST**: 전체 XLSX는 shallow index를 생성해야 한다.
 - **FR-XLSX-002 MUST**: shallow index에는 파일 경로, 시트명, 시트 dimension, shared strings 전문, 주요 헤더가 포함돼야 한다.
 - **FR-XLSX-003 MUST**: shared strings를 소수 키워드로 압축하지 않아야 한다.
-- **FR-XLSX-004 MUST**: shallow index 크기 상한은 설정 가능해야 하며 잘림 여부를 표시해야 한다.
+- **FR-XLSX-004 MUST**: shallow index는 크기 상한을 적용하고 잘림 여부를 표시해야 한다. 현재 구현의 상한은 sheet당 240,000자, unit당 4,000자로 고정돼 있고 설정 키가 없다. 잘린 sheet는 warning과 unit metadata의 `truncated`로 드러난다. 설정 가능화는 target이다.
 - **FR-XLSX-005 MUST**: 후보 파일은 원본에서 시트·셀 범위를 정밀하게 읽고, 값이 없는 셀도 포함해 요청한 직사각형과 같은 좌표·행·열 shape를 반환해야 한다.
 - **FR-XLSX-006 MUST**: 숫자, 날짜, 시간, duration, 수식·캐시 결과, 합계는 shallow index가 아니라 live range read를 사용해야 하며 public 응답은 strict JSON scalar만 포함해야 한다.
 - **FR-XLSX-007 MUST**: deep read는 원본을 읽기 전용으로 열어야 한다.
@@ -576,7 +576,7 @@ Agent 흐름:
 
 - **FR-AGT-001 MUST**: 모든 공개 명령은 versioned JSON을 stdout으로 반환해야 한다.
 - **FR-AGT-002 MUST**: 진단 로그는 stderr로 분리해야 한다.
-- **FR-AGT-003 MUST**: `capabilities`, `status`, `sync`, `search`, `context`, `read`, `xlsx-read`, `graph`, `explain`, `review`, `backup`, `export`, `rebuild` 명령을 제공해야 한다.
+- **FR-AGT-003 MUST**: `capabilities`, `status`, `sync`, `search`, `context`, `read`, `xlsx-read`, `graph`, `explain`, `review`, `export`, `rebuild` 명령을 제공해야 한다. 백업은 CLI 명령이 아니라 `./scripts/backup.sh`가 담당한다(`kip backup`은 존재하지 않는다).
 - **FR-AGT-004 MUST**: 일반 질의 중 full sync나 projection rebuild를 자동 실행하지 않아야 한다.
 - **FR-AGT-005 MUST**: `AGENTS.md`는 공통 안전 규칙을 제공해야 한다.
 - **FR-AGT-006 MUST**: `CLAUDE.md`는 `@AGENTS.md`를 import해야 한다.
@@ -600,7 +600,8 @@ Agent 흐름:
 - **FR-SEC-001 MUST**: PostgreSQL은 localhost 또는 승인된 private network에만 노출해야 한다.
 - **FR-SEC-002 MUST**: source content를 untrusted input으로 취급해야 한다.
 - **FR-SEC-003 MUST**: 데이터 안의 prompt, shell command, link를 자동 실행하지 않아야 한다.
-- **FR-SEC-004 MUST**: workspace와 source scope에 PostgreSQL RLS를 적용해야 한다.
+- **FR-SEC-004 MUST**: workspace와 source scope에 PostgreSQL RLS를 적용해야 하며, RLS가 켜진 모든 테이블은 owner 연결에도 적용되도록 `FORCE ROW LEVEL SECURITY`여야 한다. 3.12.2까지는 34개 중 16개 테이블만 FORCE였고 나머지 18개는 ENABLE-only라 owner로 접속한 API·worker·유지보수 세션이 workspace/ACL predicate 없이 읽고 썼다. Migration `0028`이 해당 schema에서 RLS가 켜진 모든 테이블을 FORCE로 만들어 3.13.0에서 해소했다.
+- **FR-SEC-004a MUST**: 빈 `acl_scopes`는 비공개가 아니라 **workspace 전체 공개**를 뜻한다. ACL predicate는 `cardinality(acl_scopes) = 0 OR acl_scopes <@ 호출자 scope`이므로 scope가 비어 있는 행은 workspace의 모든 principal에게 보인다. `ConnectorEvent.acl_scopes`의 기본값이 빈 리스트이므로, scope를 생략한 connector event는 조용히 workspace 전체에 공개된다. 권한 없는 principal에게 아무것도 드러나지 않는다는 보장은 scope가 실제로 지정된 행에만 해당한다.
 - **FR-SEC-005 MUST**: backup이 RLS 때문에 일부 행을 누락하지 않도록 검증해야 한다.
 - **FR-SEC-006 MUST**: Slack token과 메일 자격증명은 저장소에 평문 커밋하지 않아야 한다.
 - **FR-SEC-007 MUST**: 회사 자료의 외부 LLM 전송은 명시적으로 승인된 adapter에서만 허용해야 한다.
@@ -639,7 +640,7 @@ Agent 흐름:
 - **NFR-PERF-003 MUST**: lexical search P95는 2초 이내를 목표로 한다.
 - **NFR-PERF-004 MUST**: depth 4 이하 graph query P95는 2초 이내를 목표로 한다.
 - **NFR-PERF-005 SHOULD**: vector search 활성 시 top-20 P95는 2초 이내를 목표로 한다.
-- **NFR-PERF-006 MUST**: context pack 생성은 기본 30,000자 또는 설정된 token budget을 넘지 않아야 한다.
+- **NFR-PERF-006 MUST**: context pack 생성은 요청된 문자 budget을 넘지 않아야 한다. `context`의 `max_chars` 기본값은 CLI·REST·MCP 모두 120,000자이고(범위 1,000-200,000), `answer`는 32,000자를 쓴다. 개별 item은 `search.context_item_max_chars`(기본 16,000)로 잘린다. 잘린 경우 `meta.warnings`에 `context_truncated`가 붙는다.
 
 ### 10.2 신뢰성
 
@@ -859,7 +860,7 @@ Agent는 다음을 지켜야 한다.
 KIP v3 baseline은 다음을 모두 만족해야 인수된다.
 
 1. PostgreSQL이 canonical store로 동작한다.
-2. pgvector extension이 없거나 비활성 상태에서도 모든 필수 테스트가 통과하고, 참조 profile에서는 선택적으로 설치·활성화할 수 있다.
+2. 필수 테스트는 기본적으로 memory repository(`memory://`)에서 돌기 때문에 pgvector 없이 통과한다. PostgreSQL integration 테스트는 URL이 설정되지 않으면 skip된다. PostgreSQL 참조 profile 자체에서는 pgvector가 선택 사항이 아니다: migration `0006`과 `0022`가 extension을 만들며, 선택형은 `9xxx` 접두사 migration뿐이다.
 3. Neo4j 없이 graph 명령이 동작한다.
 4. HWP/HWPX parser를 설정으로 교체할 수 있다.
 5. HWP/PDF representation pairing이 지원된다.

@@ -56,6 +56,28 @@ _ERROR_CODES: dict[type[BaseException], tuple[str, int]] = {
 }
 
 
+# Envelope warnings an error carries to the edge. `error_code` says what
+# failed; these say what the caller should also know about the failed call
+# (for example that a search, not the request shape, is what broke). Kept
+# here with the other shared error vocabulary so CLI, REST and MCP cannot
+# drift on it.
+_ENVELOPE_WARNINGS_ATTRIBUTE = "kip_envelope_warnings"
+
+
+def mark_envelope_warning(exc: BaseException, warning: str) -> None:
+    """Attach an envelope warning to an in-flight error, once."""
+    warnings = list(getattr(exc, _ENVELOPE_WARNINGS_ATTRIBUTE, ()))
+    if warning not in warnings:
+        warnings.append(warning)
+    setattr(exc, _ENVELOPE_WARNINGS_ATTRIBUTE, tuple(warnings))
+
+
+def envelope_warnings(exc: BaseException) -> list[str]:
+    """Envelope warnings recorded on an error, for `meta.warnings`."""
+    warnings = getattr(exc, _ENVELOPE_WARNINGS_ATTRIBUTE, ())
+    return [str(item) for item in warnings]
+
+
 def error_code(exc: BaseException) -> str:
     """Stable machine code for an error, shared by every edge adapter."""
     if isinstance(exc, PydanticValidationError):

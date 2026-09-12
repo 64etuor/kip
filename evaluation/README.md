@@ -23,8 +23,12 @@ Reports must not contain source bodies, secrets, model credentials, or private f
 The evaluator records document IDs, unit IDs, locators, hashes, metrics, and bounded error messages.
 Reviewer identities are intentionally omitted from reports.
 
-Semantic candidates remain shadow-only until the activation gates in
-`docs/plans/2026-07-30-rag-quality-stack-design.md` pass. An evaluator recommendation never
+Semantic search is on by default since ADR-065; see `docs/adr/ADR-065-semantic-search-on-by-default.md`.
+A complete projection whose embedding identity is release-reviewed activates automatically, and any
+other identity stays shadow-only until the ADR-036/037 activation gates pass and an operator runs
+`kip projection activate`. Those gates were first designed in the historical
+[RAG quality stack design](https://github.com/64etuor/kip/blob/1b04bad685762fe3002d9c4ec6a75f267df9fb94/docs/plans/2026-07-30-rag-quality-stack-design.md),
+which is not shipped in the distribution. An evaluator recommendation never
 changes active configuration automatically.
 
 `golden/private-starter.yaml` is a redacted acceptance template. It covers

@@ -1,7 +1,7 @@
 # ADR-026: Approved graph answer context
 
-- Status: Accepted
-- Date: 2026-08-09
+- **Status:** Accepted
+- **Date:** 2026-08-09
 
 ## Context
 

@@ -1,9 +1,15 @@
 # ADR-018: Jina Hugging Face reranker remains an opt-in shadow adapter
 
-- Status: Accepted for shadow evaluation — production-default claim
-  superseded by ADR-034 (BM25 is the promoted default backend; RapidFuzz is
-  the fallback)
-- Date: 2026-08-06
+- **Status:** Amended
+- **Date:** 2026-08-06
+- **Amended by:** ADR-034 (2026-08-11) — BM25 is the promoted default backend
+  and RapidFuzz the fallback; this ADR's production-default claim no longer
+  holds
+- **Amended by:** ADR-065 (2026-09-12) — semantic and reranked retrieval are
+  no longer shadow-only by default
+- **Amended by:** 3.13.0 — the in-process `huggingface` reranker adapter was
+  removed; a cross-encoder now runs only behind the HTTP model runtime
+  (`[models.reranker] backend = "http"`)
 - Re-test trigger: re-run the reranker comparison when the corpus grows
   materially past the 36-case/70-unit evaluation this ADR rests on
   (the private corpus is already 30,000+ units) or when a candidate

@@ -6,11 +6,6 @@ from typing import Protocol
 from kip.domain.models import ContentUnit, ExtractionRun
 
 
-class ParseOutput(Protocol):
-    extraction: ExtractionRun
-    units: list[ContentUnit]
-
-
 class ParserPort(Protocol):
     name: str
     version: str

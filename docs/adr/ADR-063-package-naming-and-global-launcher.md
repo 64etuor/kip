@@ -1,6 +1,9 @@
 # ADR-063: Package naming, global `kip` launcher and `kip update`
 
-Status: Accepted — 2026-09-11
+- **Status:** Amended
+- **Date:** 2026-09-11
+- **Amended by:** 3.12.1 — `kip update` no longer repoints the global `kip`
+  launcher or the shell profile (see the amendment in Decision below)
 
 ## Context
 

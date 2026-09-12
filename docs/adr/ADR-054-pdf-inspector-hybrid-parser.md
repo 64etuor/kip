@@ -1,7 +1,9 @@
 # ADR-054: Use pdf-inspector with selective PyMuPDF table fallback
 
-- **Status:** Accepted for the starter and pilot profile
+- **Status:** Amended
 - **Date:** 2026-08-17
+- **Amended by:** ADR-064 (2026-09-11) — the pdf-inspector pin moved to 1.19.0
+- **Scope:** accepted for the starter and pilot profile
 
 ## Context
 

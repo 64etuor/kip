@@ -42,6 +42,9 @@ def _retrieval_payload(
     project_ids: list[str] | None = None,
     include_candidate_assertions: bool = False,
 ) -> dict[str, Any]:
+    # `max_chars` is omitted unless the caller sets it: the canonical default
+    # lives in the request model (`ContextRequest`, `AnswerRequest`) and an SDK
+    # default here would be a second, silently diverging wire contract.
     payload: dict[str, Any] = {"query": query, "limit": limit}
     optional = {
         "mode": mode,
@@ -141,7 +144,7 @@ class KipClient:
         query: str,
         *,
         limit: int = 5,
-        max_chars: int = 40000,
+        max_chars: int | None = None,
         mode: SearchMode | None = None,
         source_kinds: list[str] | None = None,
         document_types: list[str] | None = None,
@@ -170,7 +173,7 @@ class KipClient:
         query: str,
         *,
         limit: int = 5,
-        max_chars: int = 12000,
+        max_chars: int | None = None,
         mode: SearchMode | None = None,
         source_kinds: list[str] | None = None,
         document_types: list[str] | None = None,

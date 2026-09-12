@@ -9,9 +9,14 @@ The default Compose profile is a local pilot profile. Before serving multiple us
 - Update PRD/TRD, contracts, operations, security, implementation status,
   examples, and ADRs in the same change whenever their behavior or design
   changes. A dated acceptance report is historical evidence, not current status.
-- Deploy the supported PostgreSQL reference profile with pgvector migration 0006
-  and the 1024-dimensional HNSW migration 0018. Keep semantic activation a
-  separate reviewed decision.
+- Deploy the supported PostgreSQL reference profile. `migrate` applies every
+  numbered migration in `migrations/` in order (pgvector arrives with 0006 and
+  the 1024-dimensional HNSW index with 0018); the `9xxx`-prefixed files are
+  optional and are never applied automatically. Check the directory rather than
+  a count quoted here.
+- Semantic search is on by default since ADR-065. A completed projection whose
+  embedding identity is release-reviewed activates itself; any other identity
+  still waits for evaluation and an explicit `kip projection activate`.
 - Require the 120-case portable search/ACL gate on every merge. Treat a skipped
   private golden gate as missing evidence; set
   `KIP_REQUIRE_PRIVATE_GOLDEN=1` on the approved corpus-bearing runner so an
@@ -21,17 +26,29 @@ The default Compose profile is a local pilot profile. Before serving multiple us
 
 - Create separate migration, worker, read-agent, reviewer, and backup roles.
 - Do not run API or worker with `kip_owner`.
-- Apply and review `deploy/sql/roles.sql.template` as the object owner; bind
-  platform login roles to its NOLOGIN groups.
+- Review `deploy/sql/roles.sql.template`, then let Compose apply it: the
+  `roles` service (`migration` profile of `compose.production.yaml`,
+  `deploy/compose.roles.yaml` for `compose.yaml`, and the `roles` service of a
+  guided-setup `compose.generated.yaml` that runs its own PostgreSQL) runs it
+  as the object owner after `migrate`. Re-run that one service after every
+  migration; its grants only cover the tables that exist when it runs. Bind
+  platform login roles to its NOLOGIN groups. A generated deployment pointed at
+  an external database has no `roles` service — apply the template there
+  yourself, as `x-kip-database-roles` in that file states.
 - Give only the backup role verified `BYPASSRLS`; keep API, worker, and reviewer
   roles `NOBYPASSRLS`.
+- Run backup as `kip_backup` itself, not as a login that is merely a member of
+  it: BYPASSRLS is a role attribute and role attributes are not inherited
+  through role membership, so a member cannot set `row_security=off` and its
+  dump would be silently filtered to one workspace.
 - Put API behind an organization-approved identity-aware proxy.
 - Derive workspace, principal, and ACL scopes from trusted identity; do not trust arbitrary client headers at an internet-facing boundary.
 - Run RLS tests using non-owner roles and verify inaccessible graph paths return no evidence of existence.
 
 ## Network and secrets
 
-- Keep PostgreSQL, Neo4j, and MCP stdio off public interfaces.
+- Keep PostgreSQL and MCP stdio off public interfaces. The same would apply
+  to a graph database if one were ever adopted; none is deployed today.
 - Bind the reference API to loopback or a private network.
 - Store secrets in the platform secret manager, not `.env` in production.
 - Materialize secret references as absolute, operator-only, regular one-line
@@ -119,15 +136,25 @@ The default Compose profile is a local pilot profile. Before serving multiple us
 - Pin production image digests and schedule upgrades.
 - Enable Dependabot and `upstream-watch`, create the `dependencies` and
   `quality-candidate` labels, and route notifications to a named owner.
+- Keep both dependency audits green; `./scripts/verify.sh` runs them and a
+  missing audit tool fails the gate rather than skipping it:
+  `scripts/audit-kordoc.sh` (`npm audit --package-lock-only --omit=dev
+  --audit-level=high` over the Node parser runtime lock) and
+  `scripts/audit-semantic.sh` (`pip-audit` over `requirements/semantic.txt`,
+  the isolated model runtime). Each ignored advisory in `audit-semantic.sh` is
+  listed with the reason it does not apply; a new one fails. The Python runtime
+  lock is audited separately with `pip-audit` over `requirements/runtime.txt`.
 - Require changelog/license review, shadow evaluation, rollback evidence, and
   explicit activation for every parser, model, database, and runtime upgrade.
 - Rebuild lexical, vector, and graph projections independently.
-- Do not activate semantic retrieval or Neo4j without the gates documented in
-  PRD/TRD. Installing pgvector/HNSW is readiness, not activation.
-- Require `projection verify --name semantic` parity and pass the full,
-  fingerprint-matched evaluation report to `projection activate --report ...
-  --candidate ...`. The command rejects non-promoted, stale-code, and
-  stale-configuration reports. Enabling semantic search in configuration
-  remains a separate reviewed change.
+- Do not activate a non-reviewed embedding identity without the gates
+  documented in PRD/TRD (ADR-036/037). The shipped identity activates on
+  completion (ADR-065); a custom model does not. Neo4j is not deployed at all
+  (ADR-046) — if it ever returns it arrives as a disposable read projection
+  behind its own gate.
+- For a custom embedding identity, require `projection verify --name semantic`
+  parity and pass the full, fingerprint-matched evaluation report to
+  `projection activate --report ... --candidate ...`. The command rejects
+  non-promoted, stale-code, and stale-configuration reports.
 - Keep the model sidecar on loopback with telemetry disabled and monitor its
   memory separately from Python RSS on Apple unified-memory systems.

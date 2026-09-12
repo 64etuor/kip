@@ -16,6 +16,15 @@ x-app-security: &app-security
       max-file: "5"
 
 services:
+  # POSTGRES_USER is the image's bootstrap role, which PostgreSQL creates as a
+  # SUPERUSER with BYPASSRLS. A superuser bypasses every row level security
+  # policy, enabled or forced, so pointing the API and worker database URLs at
+  # it disables workspace and ACL isolation in the database. The `roles`
+  # service below applies deploy/sql/roles.sql.template with the migration
+  # (owner) credentials; point KIP_API_DATABASE_URL_FILE /
+  # KIP_WORKER_DATABASE_URL_FILE at logins bound to the non-superuser kip_api /
+  # kip_worker groups, keep the bootstrap role for migrations only, and back up
+  # as the BYPASSRLS kip_backup role.
   postgres:
     image: pgvector/pgvector:0.8.2-pg18-trixie@sha256:b7337db8fe39d12fe8ecb0003c72680f24479813a744b43154eee6f2eab5a5f3
     restart: unless-stopped
@@ -148,6 +157,43 @@ services:
           memory: 1g
           pids: 256
 
+  # Runs with the `migration` profile, immediately after `migrate`: the grants
+  # in the template cover the tables migrations create, so it must not run
+  # before them, and it must be re-run after every migration. It never sets a
+  # password here; the groups stay NOLOGIN and this deployment binds its own
+  # login roles (GRANT kip_api TO <login>). BYPASSRLS is a role attribute and
+  # is not inherited through membership, so the backup process must log in as
+  # kip_backup itself or as a login created with BYPASSRLS.
+  roles:
+    <<: *app-security
+    image: ${KIP_POSTGRES_IMAGE:-pgvector/pgvector:0.8.2-pg18-trixie@sha256:b7337db8fe39d12fe8ecb0003c72680f24479813a744b43154eee6f2eab5a5f3}
+    restart: "no"
+    profiles: ["migration"]
+    entrypoint: ["/bin/bash", "/deploy/apply-roles.sh"]
+    environment:
+      KIP_ROLES_DATABASE_URL_FILE: /run/secrets/migrate_database_url
+    secrets:
+      - migrate_database_url
+    volumes:
+      - type: bind
+        source: ./deploy
+        target: /deploy
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks: [database]
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512m
+          pids: 128
+
   api:
     <<: *app-security
     image: ${KIP_API_IMAGE:?set a digest-pinned API image}
@@ -158,10 +204,20 @@ services:
       KIP_ENV: production
       KIP_API_HOST: 0.0.0.0
       KIP_CAS_PATH: /data/cas
-      KIP_IDENTITY_MODE: jwt
+      # `proxy_jwt` is the identity mode the container implements
+      # (src/kip/container.py `_build_identity`); any other value, including
+      # the bare `jwt`, aborts start-up with "unsupported identity mode".
+      KIP_IDENTITY_MODE: proxy_jwt
       KIP_JWT_ISSUER: ${KIP_JWT_ISSUER:?set the trusted JWT issuer}
       KIP_JWT_AUDIENCE: ${KIP_JWT_AUDIENCE:?set the trusted JWT audience}
       KIP_JWT_JWKS_URL: ${KIP_JWT_JWKS_URL:?set the trusted JWKS URL}
+      # Admin routes in `proxy_jwt` mode grant the admin role only from the
+      # token's group claim, and the group allowlist has no environment
+      # override: it is read from the mounted KIP_CONFIG only. Without it
+      # every /v1/admin/* route answers 403. Add to the file mounted at
+      # KIP_CONFIG (config/kip.container.toml by default):
+      #   [identity.jwt]
+      #   admin_groups = ["kip-admins"]   # the issuer's admin group claim
     secrets:
       - api_database_url
     command: ["api", "serve", "--host", "0.0.0.0", "--port", "8080"]

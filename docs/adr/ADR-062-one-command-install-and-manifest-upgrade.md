@@ -1,12 +1,14 @@
 # ADR-062: One-command installation and manifest-driven in-place upgrades
 
-Status: Accepted — 2026-09-11
+- **Status:** Accepted
+- **Date:** 2026-09-11
 
 ## Context
 
 Adopters installed KIP by downloading a starter ZIP, checking its sidecar by
 hand, unzipping and running bootstrap. Upgrading an existing deployment was a
-documented manual procedure (STARTER_KIT_GUIDE section 11) that unpacked the
+documented manual procedure (the guide now called `docs/DEPLOYMENT_GUIDE.md`,
+section 11) that unpacked the
 new kit beside the old one and moved deployment-owned paths across. Both were
 error-prone and there was no `kip upgrade` equivalent.
 
@@ -22,7 +24,8 @@ error-prone and there was no `kip upgrade` equivalent.
   `STARTER-KIT-MANIFEST.json`), the installer hands the verified archive to
   that deployment's `scripts/upgrade.sh`. Git checkouts are refused; they
   update with `git pull`.
-- `scripts/upgrade_kit.py` (standard library only) derives the boundary from
+- `scripts/upgrade_package.py` (standard library only; named
+  `scripts/upgrade_kit.py` until 3.10.0) derives the boundary from
   the manifests: paths in the installed or new manifest are kit-owned and are
   replaced or removed; all other paths are deployment-owned and never touched.
   `.mcp.json` is the one kit-listed file setup also generates, so it is

@@ -6,7 +6,7 @@ import json
 import sys
 from pathlib import Path
 
-from kip.architecture_rules import application_adapter_imports
+from kip.architecture_rules import adapter_imports
 from kip.documentation import documentation_link_errors
 from kip.ontology import validate_ontology
 from kip.package_archive_policy import selected_source_files
@@ -101,7 +101,7 @@ def main() -> int:
 
     errors.extend(
         f"concrete adapter imported by application layer: {violation}"
-        for violation in application_adapter_imports(
+        for violation in adapter_imports(
             ROOT,
             ROOT / "src/kip/application",
         )

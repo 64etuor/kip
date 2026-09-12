@@ -1,6 +1,7 @@
 # ADR-064: Upgrade pdf-inspector to 1.19.0 and Kordoc to 4.13.1 with PDF re-extraction
 
-Status: Accepted — 2026-09-11
+- **Status:** Accepted
+- **Date:** 2026-09-11
 
 ## Context
 

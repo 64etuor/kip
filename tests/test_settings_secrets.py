@@ -82,7 +82,9 @@ def test_missing_database_url_boots_memory_only_in_the_test_environment(
     _base_environment(monkeypatch, tmp_path)
     config = tmp_path / "config"
     config.mkdir()
-    (config / "kip.toml").write_text('[app]\nworkspace = "default"\n', encoding="utf-8")
+    path = config / "kip.toml"
+    path.write_text('[app]\nworkspace = "default"\n', encoding="utf-8")
+    monkeypatch.setenv("KIP_CONFIG", str(path))
 
     assert Settings.load().database_url == "memory://"
 

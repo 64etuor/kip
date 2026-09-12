@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.13.1 - 2026-09-13
+
+- Four tests added in 3.13.0 read the repository's own configuration instead
+  of the file they wrote, because CI exports `KIP_CONFIG` for the whole job
+  and they only set `KIP_PROJECT_ROOT`. They now name their own file, and the
+  backup-role dump test skips when the available `pg_dump` is older than the
+  server rather than failing. No shipped behaviour changed. The 3.13.0 tag
+  failed this gate and published no release.
+
 ## 3.13.0 - 2026-09-12
 
 - The Compose API and worker no longer connect as the PostgreSQL bootstrap

@@ -96,7 +96,9 @@ def test_the_log_level_environment_variable_reaches_settings(
     monkeypatch.delenv("KIP_LOG_LEVEL", raising=False)
     config = tmp_path / "config"
     config.mkdir()
-    (config / "kip.toml").write_text('[app]\nlog_level = "WARNING"\n', encoding="utf-8")
+    path = config / "kip.toml"
+    path.write_text('[app]\nlog_level = "WARNING"\n', encoding="utf-8")
+    monkeypatch.setenv("KIP_CONFIG", str(path))
 
     assert Settings.load().log_level == "WARNING"
 

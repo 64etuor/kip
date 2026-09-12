@@ -45,7 +45,11 @@ def _load(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, body: str) -> Setting
     monkeypatch.delenv("KIP_DATABASE_URL_FILE", raising=False)
     config = tmp_path / "config"
     config.mkdir(exist_ok=True)
-    (config / "kip.toml").write_text(body, encoding="utf-8")
+    path = config / "kip.toml"
+    path.write_text(body, encoding="utf-8")
+    # CI exports KIP_CONFIG for the whole job, so the file under test has to be
+    # named explicitly or Settings.load reads the repository's own config.
+    monkeypatch.setenv("KIP_CONFIG", str(path))
     return Settings.load()
 
 

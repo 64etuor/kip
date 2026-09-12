@@ -1,0 +1,90 @@
+pyproject.toml
+  s_16a999dee6ecf2::t_01ae0b435e8fc9 7
+contracts/openapi.json
+  s_16a999dee6ecf2::t_01ae0b435e8fc9 1098
+docs/TROUBLESHOOTING.md
+  s_16a999dee6ecf2::t_0d2437b42879a2 365
+  s_16a999dee6ecf2::t_3729322d6f053d 284-297
+  s_16a999dee6ecf2::t_ed4196c23bb2d9 280-283
+src/kip/adapters/rerankers/http.py
+  s_16a999dee6ecf2::t_61c33ff127b135 39,46,49-54,56
+  s_16a999dee6ecf2::t_a7813a9a4ea857 4-5,29,40-44,55,61
+  s_16a999dee6ecf2::t_e34b0f50a9924b 71
+  s_16a999dee6ecf2::t_fdce9e94c1bd36 9
+docs/IMPLEMENTATION_STATUS.md
+  s_16a999dee6ecf2::t_4a6f12735092a0 7-21
+tests/test_semantic_default.py
+  s_16a999dee6ecf2::t_6003dedf57d6e6 575-577
+  s_16a999dee6ecf2::t_488ba7889197b0 530-574
+contracts/openapi.yaml
+  s_16a999dee6ecf2::t_01ae0b435e8fc9 6
+README.md
+  s_16a999dee6ecf2::t_01ae0b435e8fc9 145
+src/kip/__init__.py
+  s_16a999dee6ecf2::t_01ae0b435e8fc9 3
+scripts/semantic-server.sh
+  s_16a999dee6ecf2::t_2da0809a058958 235
+  s_16a999dee6ecf2::t_466a33046f74c5 25-28,30-33
+  s_16a999dee6ecf2::t_b00c358283becb 218
+  s_16a999dee6ecf2::t_4dacb8324b6718 181-202
+tests/test_semantic_scripts.py
+  s_16a999dee6ecf2::t_3f7fdfc9011bc7 399-459
+VERSION
+  s_16a999dee6ecf2::t_01ae0b435e8fc9 1
+CHANGELOG.md
+  s_16a999dee6ecf2::t_4a6f12735092a0 3-31
+docs/OPERATIONS.md
+  s_16a999dee6ecf2::t_4b81301a05b566 879
+  s_16a999dee6ecf2::t_b74432c1a35d71 850-869
+  s_16a999dee6ecf2::t_bc2eb102cc84da 846-849,870
+  s_16a999dee6ecf2::t_45a39a2a82ba93 880-885
+  s_16a999dee6ecf2::t_42d842ace5d0a9 956
+  s_16a999dee6ecf2::t_d4098bcfac2761 957-958
+src/kip/cli.py
+  s_16a999dee6ecf2::t_22fcce629ba392 628,631-633,640-641
+  s_16a999dee6ecf2::t_c2cf34f8d1d489 627,634-635
+  s_16a999dee6ecf2::t_5bce521f1d0874 543-544,549-550,556-557,559-563,605-606
+  s_16a999dee6ecf2::t_330300e2ece542 654,659-660,666
+  s_16a999dee6ecf2::t_d5255ed9f6e9b4 648
+  s_16a999dee6ecf2::t_d38fd06f4c34c7 649-653,655-658,661-665
+  s_16a999dee6ecf2::t_b34fa2e4088fc1 542,545-548,551-555,558,564-604
+  s_16a999dee6ecf2::t_8e407f997cca29 687-690
+  s_16a999dee6ecf2::t_a865aea0c55162 17,50-57
+tests/test_cli_doctor.py
+  s_16a999dee6ecf2::t_512b2a7b19cd26 328-329,333-346,348-380,384-438
+  s_16a999dee6ecf2::t_62dcb538ea9df1 330-332,347,439-566
+  s_16a999dee6ecf2::t_d5255ed9f6e9b4 381-383
+src/kip/adapters/embeddings/http.py
+  s_16a999dee6ecf2::t_1b2ccd66d55bf6 6,19-25,149,172,184-186
+  s_16a999dee6ecf2::t_b6e86e33904348 71-95,98-99,108,129-130
+  s_16a999dee6ecf2::t_0adf205f929c57 166-171,173
+  s_16a999dee6ecf2::t_4b26b2640aa0d0 96-97,100-107,109-128
+  s_16a999dee6ecf2::t_86fe66377b3c60 7-8,15-18,26
+  s_16a999dee6ecf2::t_666c89584db99b 27
+tests/test_model_http_adapters.py
+  s_16a999dee6ecf2::t_ad8d964f1e8e2d 83-84
+  s_16a999dee6ecf2::t_61b92ade6e9b7c 20-24,29-30
+  s_16a999dee6ecf2::t_57b11ab0b1ff6d 71-73
+  s_16a999dee6ecf2::t_5d76c92f7b1eb2 4-5,158-162,187,213,227
+  s_16a999dee6ecf2::t_c66d65d1e4ccdc 10-11,155-157,163-169,180-186,188-212,214-226,228-296
+  s_16a999dee6ecf2::t_1c976bd4075840 170-179
+  s_16a999dee6ecf2::t_7b486649cf5868 297-383
+uv.lock
+  s_16a999dee6ecf2::t_921fea07d2dcf3 928
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "074597c254c36ffe257a6eb2a0687df41234d298",
+  "prompts": {},
+  "sessions": {
+    "s_16a999dee6ecf2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b9abc8ac-2c56-4e22-a7c7-3deb16f779f3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

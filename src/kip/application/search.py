@@ -29,7 +29,11 @@ from kip.domain.telemetry import (
     TraceStage,
     safe_request_id,
 )
-from kip.errors import KipError, mark_envelope_warning
+from kip.errors import (
+    KipError,
+    error_code,
+    mark_envelope_warning,
+)
 from kip.ports.embedding import EmbeddingPort
 from kip.ports.evidence import EvidenceReaderPort
 from kip.ports.knowledge import KnowledgeStore
@@ -48,9 +52,20 @@ _DEGRADED_FLAGS: tuple[str, ...] = (
 # `meta.warnings`. Both are derived from the same bundle flag here so they
 # can never disagree.
 CONTEXT_TRUNCATED_WARNING = "context_truncated"
-# A search that raised: recorded in the trace and carried on the exception so
-# every edge can name it in the error envelope's `meta.warnings`.
+# A search that raised for a reason a retry can resolve: recorded in the trace
+# and carried on the exception so every edge can name it in the error
+# envelope's `meta.warnings`. It means "the search execution broke, try
+# again", so it is the retryable half of a failure and `error.code` still says
+# which kind (`dependency_unavailable`, `source_unavailable`, `internal_error`).
 SEARCH_FAILED_WARNING = "search_failed"
+# The other half. These fail identically on every retry — the request or the
+# deployment is what is wrong, not a backend blip — so they keep their
+# `error.code` and carry no transient marker. Without this the marker rode a
+# bare `except Exception` and told an agent to retry a rejected query or a
+# misconfigured deployment.
+_NON_RETRYABLE_SEARCH_CODES = frozenset(
+    {"validation_error", "forbidden", "not_found", "configuration_error"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,6 +206,7 @@ class RetrievalUseCases:
                 mode=mode if mode is not None else request.mode,
             )
         except Exception as exc:
+            retryable = error_code(exc) not in _NON_RETRYABLE_SEARCH_CODES
             self._record_search_trace(
                 context,
                 request,
@@ -198,11 +214,13 @@ class RetrievalUseCases:
                 started_at=started_at,
                 duration_ms=(perf_counter() - started) * 1000,
                 outcome="failed",
-                warnings=[SEARCH_FAILED_WARNING],
+                warnings=[SEARCH_FAILED_WARNING] if retryable else [],
             )
-            # The trace alone never reaches the caller; the edge adapters read
-            # this back off the exception when they build the error envelope.
-            mark_envelope_warning(exc, SEARCH_FAILED_WARNING)
+            if retryable:
+                # The trace alone never reaches the caller; the edge adapters
+                # read this back off the exception when they build the error
+                # envelope.
+                mark_envelope_warning(exc, SEARCH_FAILED_WARNING)
             raise
         warnings = _degradation_warnings(ranked.degraded)
         self._record_search_trace(

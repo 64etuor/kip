@@ -196,7 +196,16 @@ class SearchHit(StrictModel):
     source_uri: str
     source_sha256: str
     source_modified_at: datetime | None = None
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "Retrieval-run annotations. is_latest compares this hit's source revision with "
+            "the newest revision of the SAME logical document only; it is not a claim that "
+            "no other document supersedes this one, and it defaults to true when the "
+            "document or its modification time is unknown. Other keys: file_name, "
+            "document_type, channel ranks and degradation markers."
+        ),
+    )
     evidence_role: Literal["discovery"] = Field(
         default="discovery", description="Candidate preview; reopen the unit before citing facts."
     )
@@ -239,8 +248,12 @@ class ContextItem(StrictModel):
     hit: SearchHit
     body: str
     current_source_sha256: str | None = None
-    source_changed_since_index: bool | None = None
-    source_verification: Literal["stat", "sha256", "unavailable"] = "unavailable"
+    source_changed_since_index: bool | None = Field(
+        default=None, description="true when the live source no longer matches the indexed revision, false when it matched, null when freshness could not be compared. null is unknown, never fresh: read source_verification before reporting staleness."
+    )
+    source_verification: Literal["stat", "sha256", "unavailable"] = Field(
+        default="unavailable", description="How freshness was checked: stat (indexed size and mtime still matched, no new digest), sha256 (the live source was re-hashed), or unavailable (the source could not be read, so source_changed_since_index is null)."
+    )
     body_truncated: bool = Field(
         default=False, description="When true, body is only the leading portion of the evidence unit."
     )
@@ -263,9 +276,19 @@ class AnswerCitation(StrictModel):
     source_uri: str
     locator: EvidenceLocator
     indexed_source_sha256: str
-    current_source_sha256: str | None = None
-    source_changed_since_index: bool
-    source_verification: Literal["stat", "sha256", "unavailable"] = "unavailable"
+    current_source_sha256: str | None = Field(
+        default=None,
+        description="Live digest when one was computed; null when stat reuse verified freshness.",
+    )
+    source_changed_since_index: bool = Field(
+        description=(
+            "Always false: a citation is only emitted for evidence whose freshness was "
+            "positively confirmed. Stale and unverifiable units are refused, never cited."
+        )
+    )
+    source_verification: Literal["stat", "sha256", "unavailable"] = Field(
+        default="unavailable", description="How freshness was checked: stat (indexed size and mtime still matched, no new digest), sha256 (the live source was re-hashed), or unavailable (the source could not be read, so source_changed_since_index is null)."
+    )
 
 
 class AnswerGeneration(StrictModel):
@@ -679,12 +702,24 @@ class ReextractionSummary(StrictModel):
 
 
 class EvidenceRead(StrictModel):
+    """One evidence unit reopened from the canonical store.
+
+    The same model carries the direct `read` result and the bulk reopen used
+    to assemble context items and answer citations, which is why
+    `source_verification` keeps all three values. The two paths differ, and
+    the field description says how.
+    """
+
     unit: ContentUnit
     source_uri: str
     indexed_source_sha256: str
     current_source_sha256: str | None = None
-    source_changed_since_index: bool | None = None
-    source_verification: Literal["stat", "sha256", "unavailable"] = "unavailable"
+    source_changed_since_index: bool | None = Field(
+        default=None, description="true when the live source no longer matches the indexed revision, false when it matched, null when freshness could not be compared. null is unknown, never fresh: read source_verification before reporting staleness."
+    )
+    source_verification: Literal["stat", "sha256", "unavailable"] = Field(
+        default="unavailable", description="How freshness was checked: stat (indexed size and mtime still matched, no new digest), sha256 (the live source was re-hashed), or unavailable (the source could not be read, so source_changed_since_index is null). A direct read always re-hashes, so it returns only sha256 or unavailable and never stat; stat appears on the bulk reopen paths that fill context items and answer citations."
+    )
 
 
 class XlsxRangeRead(StrictModel):
@@ -695,4 +730,13 @@ class XlsxRangeRead(StrictModel):
     cells: list[list[XlsxCell]]
     indexed_source_sha256: str
     current_source_sha256: str
-    source_changed_since_index: bool
+    source_changed_since_index: bool = Field(
+        description=(
+            "true when the live workbook no longer matches the indexed revision. Never null "
+            "here: an unreadable workbook fails the read instead of returning unverified cells, "
+            "so source_verification is always sha256."
+        )
+    )
+    source_verification: Literal["sha256"] = Field(
+        description="Always sha256: this path re-hashes the live workbook and fails closed when it cannot be read, so stat reuse and unavailable never occur here. Declared as a single-value type, the way SearchHit declares its own not_checked, so a generated client sees the one value it can get."
+    )

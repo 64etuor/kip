@@ -713,3 +713,79 @@ def test_reviewed_answer_and_ontology_metrics_gate_promotion(tmp_path: Path) -> 
     blocked = compare_variants(report, "lexical", "hybrid")
     assert blocked["gates"]["ontology_relation_recall"]["passed"] is False
     assert blocked["decision"]["status"] == "keep_disabled"
+
+
+def test_unverifiable_source_counts_as_a_stale_warning_not_as_fresh(tmp_path: Path) -> None:
+    """`null` freshness satisfies `expected_stale_warning: true`.
+
+    A source that could not be read reports `source_changed_since_index: null`.
+    A strict `is True` comparison scored that as a missed stale warning, which
+    is the mirror of the bug that made `null` read as fresh elsewhere.
+    """
+    from kip.evaluation.runner import _case_result
+
+    dataset_case = GoldenCase(
+        id="STALE-001",
+        question="삭제된 원본을 최신 근거로 쓸 수 있나?",
+        category="stale_source_refusal",
+        principal="principal_local",
+        acl_scopes=["workspace:default"],
+        expected_documents=["doc_a"],
+        expected_stale_warning=True,
+        recall_at=5,
+    )
+    hit = _hit("doc_a")
+    unknown = hit.model_copy(
+        update={"metadata": {**hit.metadata, "source_changed_since_index": None}},
+        deep=True,
+    )
+    fresh = hit.model_copy(
+        update={"metadata": {**hit.metadata, "source_changed_since_index": False}},
+        deep=True,
+    )
+
+    assert _case_result(dataset_case, [unknown], 1.0).stale_warning_match is True
+    assert _case_result(dataset_case, [fresh], 1.0).stale_warning_match is False
+
+
+def test_a_case_scores_no_stale_warning_when_freshness_was_never_enriched() -> None:
+    """An unenriched hit must not satisfy a stale-warning gate.
+
+    `kip evaluate compare` gates on `stale_warning_rate`. Enrichment swallows a
+    per-hit read failure, so scoring a hit that carries no freshness key at all
+    would certify the gate on evidence the run never read.
+    """
+    from kip.evaluation.runner import _case_result
+
+    case = GoldenCase(
+        id="STALE-001",
+        question="Does the memo still apply?",
+        category="natural_language",
+        principal="principal_public",
+        acl_scopes=["workspace:default"],
+        expected_documents=["doc_a"],
+        expected_stale_warning=True,
+        lifecycle="golden",
+        version="2026.09.1",
+        reviewer="role:knowledge-owner",
+        source_revision="sha256:" + "a" * 64,
+    )
+    locator = EvidenceLocator(type="text_line_range", data={"start_line": 1, "end_line": 2})
+    unenriched = SearchHit(
+        unit_id="unit_a",
+        artifact_id="art_a",
+        document_id="doc_a",
+        source_kind="filesystem",
+        title="memo",
+        snippet="...",
+        score=1.0,
+        locator=locator,
+        source_uri="file:///memo.md",
+        source_sha256="a" * 64,
+    )
+    enriched = unenriched.model_copy(
+        update={"metadata": {"source_changed_since_index": None}}, deep=True
+    )
+
+    assert _case_result(case, [unenriched], 1.0).stale_warning_match is False
+    assert _case_result(case, [enriched], 1.0).stale_warning_match is True

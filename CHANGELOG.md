@@ -1,5 +1,115 @@
 # Changelog
 
+## 3.14.0 - 2026-09-13
+
+- `source_changed_since_index` no longer reports "changed" when nothing was
+  compared. An unreadable source — a cloud placeholder with no local bytes, a
+  deleted file — produced `None != indexed_sha256`, so the field was `true`
+  beside `source_verification=unavailable`, and an agent following the shipped
+  instruction to report stale-source status told a user their legal document
+  had changed after indexing. The field is now three-valued on `EvidenceRead`
+  and `ContextItem`: `true`, `false`, or `null` when the source could not be
+  read. `null` is unknown and never fresh; the answer evidence loop, which was
+  the one consumer using a truthiness test, now fails closed like the others.
+  Envelope versions are unchanged, but this is not purely additive for
+  readers: a client that treated the field as a plain boolean now sees `null`
+  where it used to see `true`, so a deleted or unreadable source that used to
+  raise a stale-source warning raises none unless the client reads
+  `source_verification`. Test `is not False`, never truthiness (ADR-066).
+- `xlsx-read` reports `source_verification`, so a caller can tell a verified
+  cell value from an unverified one as it already could for `read`. It is
+  always `sha256`: an unreadable workbook fails the read rather than returning
+  unverified cells, which is why `XlsxRangeRead.source_changed_since_index` is
+  never `null`. `XlsxRangeRead.source_verification` is typed `Literal["sha256"]`
+  with no default, so a generated client sees the one value it can get, and
+  `read` — which always re-hashes — is documented as `sha256` or `unavailable`,
+  never `stat`. `stat` reuse appears only on the bulk reopen paths behind
+  `context` items and `answer` citations.
+- The retrieval evaluation gate scores the new verdict correctly.
+  `src/kip/evaluation/runner.py` matched `expected_stale_warning` against the
+  exact value of `source_changed_since_index`, so a case expecting a stale
+  warning would have been scored as a miss once an unreadable source started
+  reporting `null`. It now compares `is not False`, so an unverified source is
+  neither counted as fresh nor as a missed warning. A hit whose freshness
+  could not be enriched at all carries no such key, and is now scored as
+  unmatched rather than satisfying the case: `stale_warning_rate` is a
+  mandatory gate in `kip evaluate compare`, and it must not pass on evidence
+  the run never read.
+- `SearchHit.metadata` has a generated description: `is_latest` compares this
+  hit's revision with the newest revision of the same logical document only,
+  is not a claim that no other document supersedes it, and defaults to true
+  when the document or its modification time is unknown. The SQL is unchanged.
+- `allow_stale` says what it relaxes and what it still refuses, in the MCP
+  schema and in `kip xlsx-read --help` / `kip xlsx read --help`, where it was
+  previously undocumented on both surfaces.
+- `kip search|context|answer --help` names the `--mode` values the MCP schema
+  enumerates (`lexical | vector | hybrid | reranked`), `kip graph neighbors
+  --help` names the `--direction` values, and the repeated
+  `--source-kind`/`--document-type`/`--project-id` options say how they differ
+  in shape from the MCP `source_kinds`/`document_types`/`project_ids` arrays.
+- `kip --help` separates read-only retrieval commands from operator commands
+  that change state, as Rich help panels and as prose in the root help text so
+  the signal survives an installation without Rich. `telemetry` is listed as an
+  operator group, never as read-only, because `telemetry prune` deletes stored
+  query traces; `telemetry traces` keeps its read-only panel inside the group.
+- Refusal messages name a remedy the caller can execute. The generic
+  `clarification_required` case now tells the caller to run `search` on the
+  same question to see the candidate documents, because that refusal carries
+  no citations. The `csv_full_table_required` refusal names a remedy that
+  exists: reopen each
+  cited unit with `read`, or raise `max_chars` when the budget is the cause.
+  There is no CSV read tool. `docs/TROUBLESHOOTING.md` no longer points the CSV
+  refusal at `xlsx-read`.
+- `capabilities` and `answer` carry their warnings in `meta.warnings` as well
+  as `data.warnings` on CLI, REST and MCP; every instruction points a caller at
+  `meta.warnings`. A non-refused `answer` carrying
+  `generation_unavailable_extractive_fallback` or
+  `generation_invalid_extractive_fallback` is an extractive answer produced
+  after the generator failed, and reaches the caller as such instead of being
+  presented as generated.
+- `search_failed` now marks only failures a retry could resolve. It rode a bare
+  `except Exception`, so it told an agent to retry a rejected query or a
+  misconfigured deployment. `validation_error`, `forbidden`, `not_found` and
+  `configuration_error` carry no marker; when the marker is present `error.code`
+  still separates `dependency_unavailable`/`source_unavailable` from
+  `internal_error`.
+
+- The README is a front door again: a one-line description, the install
+  one-liner, a two-command first query and a real captured `search` envelope
+  from the bundled `sample-data/` come before anything else, followed by a
+  table of contents and a where-to-go table. The release-packaging section
+  moved beside the licence section at the end. The retrieval numbers were
+  separated into the current 3.12.0 measurement and clearly labelled past
+  measurements on different corpora, so the oldest run no longer sits in the
+  emphasis position labelled final. The Compose section now states that
+  3.13.0's API and worker roles are created by `./scripts/app-up.sh` and that a
+  bare `docker compose -f compose.yaml` leaves them unauthenticated. Duplicated
+  update, rollback and shell-profile prose was cut in favour of
+  `docs/DEPLOYMENT_GUIDE.md` 2 and 11.
+- The agent skills were rewritten around the three-valued rule, because the
+  shipped instructions were the other half of this release's defect.
+  `skills/knowledge-fabric/SKILL.md` and `references/evidence.md` now decide
+  freshness from `source_verification` first and state that `unavailable` is
+  unverified — never fresh, never changed; say which refusals can carry
+  citations and which are structurally citation-free; qualify the `hybrid`
+  default as conditional on the deployment having semantic search enabled and
+  point at `capabilities` to check; and correct the `kip_vocabulary` tool name,
+  the `connector_object` locator, `graph neighbors --node-id`, the REST
+  `allow_stale` surface and the preconditions of `setup preview`. The README
+  front door names `source_verification` before `source_changed_since_index`.
+- `AGENTS.md` was cut to what every agent needs in always-loaded context —
+  where to read for a task, the traps that change a decision, and the gate —
+  and the contributor procedure moved to a new `CONTRIBUTING.md` (the gate, the
+  append-only migration rule, the adapter contract-test rule, the skills copy
+  rule, where ADRs live). A short English `README.en.md` was added; both ship in
+  the distribution package.
+  `docs/QUICKSTART.md` opens with an explicit fork between installing a release
+  and developing from a clone, says which of `--install-docker` /
+  `--without-docker` applies, warns that a deployment scoped to the operator's
+  own folders has no `sample` source, and is now Korean throughout.
+  `docs/GLOSSARY.md` defines reciprocal-rank fusion, model runtime,
+  `semantic_degraded`, cross-encoder, receipt and `next_steps`.
+
 ## 3.13.1 - 2026-09-13
 
 - Four tests added in 3.13.0 read the repository's own configuration instead

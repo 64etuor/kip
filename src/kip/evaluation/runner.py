@@ -110,9 +110,21 @@ def _case_result(case: GoldenCase, hits: list[SearchHit], latency_ms: float) -> 
 
     stale_match: bool | None = None
     if case.expected_stale_warning is not None:
+        # The case asserts freshness, not a specific encoding of it. A reopen
+        # that could not read the source reports `null` (unknown), and a case
+        # expecting a stale warning is satisfied by anything that is not a
+        # positive freshness verdict — `null` must not read as fresh here
+        # either, and must not be scored as a missed warning.
+        # A hit whose freshness could not be enriched carries no key at all.
+        # Scoring it would let a gate pass on evidence it never read, so only
+        # enriched hits count and a case with none scores as unmatched.
+        enriched = [
+            hit for hit in relevant_hits if "source_changed_since_index" in hit.metadata
+        ]
         stale_match = any(
-            hit.metadata.get("source_changed_since_index") is case.expected_stale_warning
-            for hit in relevant_hits
+            (hit.metadata.get("source_changed_since_index") is not False)
+            is case.expected_stale_warning
+            for hit in enriched
         )
 
     return CaseMetrics(

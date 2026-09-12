@@ -510,6 +510,7 @@
     },
     "EvidenceRead": {
       "additionalProperties": false,
+      "description": "One evidence unit reopened from the canonical store.\n\nThe same model carries the direct `read` result and the bulk reopen used\nto assemble context items and answer citations, which is why\n`source_verification` keeps all three values. The two paths differ, and\nthe field description says how.",
       "properties": {
         "current_source_sha256": {
           "anyOf": [
@@ -537,6 +538,7 @@
             }
           ],
           "default": null,
+          "description": "true when the live source no longer matches the indexed revision, false when it matched, null when freshness could not be compared. null is unknown, never fresh: read source_verification before reporting staleness.",
           "title": "Source Changed Since Index"
         },
         "source_uri": {
@@ -545,6 +547,7 @@
         },
         "source_verification": {
           "default": "unavailable",
+          "description": "How freshness was checked: stat (indexed size and mtime still matched, no new digest), sha256 (the live source was re-hashed), or unavailable (the source could not be read, so source_changed_since_index is null). A direct read always re-hashes, so it returns only sha256 or unavailable and never stat; stat appears on the bulk reopen paths that fill context items and answer citations.",
           "enum": [
             "stat",
             "sha256",

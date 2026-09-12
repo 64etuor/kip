@@ -3,6 +3,28 @@
 > 처음 보는 단어가 나오면 [`GLOSSARY.md`](GLOSSARY.md)(용어집)를 먼저 보세요.
 > ACL, 온톨로지, 프로젝션 같은 말이 한 줄씩 쉬운 말로 정리되어 있습니다.
 
+## 먼저 갈림길을 고른다
+
+설치 명령과 준비물만 두 경로가 다르다. [A](#a-릴리스-설치)와
+[B](#b-복제-후-개발) 중 자기 경로의 절 하나만 읽고, 나머지 하나는 건너뛴다.
+그 뒤 [로컬 CLI 프로파일](#로컬-cli-프로파일),
+[어떤 명령을 쓸까](#어떤-명령을-쓸까),
+[명령 출력 읽는 법](#명령-출력-읽는-법),
+[애플리케이션 프로파일](#애플리케이션-프로파일)은 두 경로 공통이므로
+이어서 읽는다. 첫 질의까지 가려면 이 공통 절들이 필요하다.
+
+| | A. 릴리스를 설치해서 쓴다 | B. 저장소를 복제해서 개발한다 |
+|---|---|---|
+| 얻는 것 | 전역 `kip` 명령 | 개발 트리의 `./scripts/kip` |
+| 시작 | [A. 릴리스 설치](#a-릴리스-설치) | [B. 복제 후 개발](#b-복제-후-개발) |
+| 테스트·lint | 실행하지 않는다 | `./scripts/verify.sh` |
+| 대상 | 운영자, 사용자 | 기여자 |
+
+두 경로 모두 Docker 결정이 필요하다. 번들 PostgreSQL을 쓰면
+`--install-docker`(비대화형에서 시스템 Docker 설치를 명시적으로 허용), 이미
+있는 외부 데이터베이스만 쓰는 CLI/MCP 설치면 `--without-docker`를 붙인다.
+어느 쪽도 아직 정하지 않았다면 `--check`로 읽기 전용 준비 점검만 먼저 한다.
+
 처음 복제하거나 제3자 환경에 적용한다면 명령을 실행하기 전에
 [`DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md)의 데이터 경계, ACL, 외부
 전송, 품질 기준 결정을 먼저 완료한다.
@@ -10,6 +32,8 @@
 가장 안전한 진입점은 AI agent에게 “KIP을 셋업해줘”라고 요청하는 것이다.
 agent는 `kip-setup` Skill에 따라 매번 하나의 누락된 결정만 질문하고, CLI가
 수집 범위를 미리 계산한 뒤 승인된 plan만 원자적으로 적용한다.
+
+## A. 릴리스 설치
 
 가장 빠른 설치 경로는 릴리스에 게시된 한 줄 설치기다. 저장소 복제 없이 최신
 배포 패키지를 내려받아 digest를 검증한 뒤 `$KIP_HOME` 또는 `~/kip`(비어 있거나
@@ -48,6 +72,8 @@ kip update --dry-run   # --version X.Y.Z / --archive ZIP / --rollback / --no-boo
 `kip update`는 데이터베이스 없이도 동작하고, git 체크아웃은 거부하므로 개발
 트리는 `git pull`로 갱신한다. 아래 예제처럼 저장소에서 직접 작업할 때는 계속
 `./scripts/kip`를 쓴다.
+
+## B. 복제 후 개발
 
 저장소를 복제해 개발하는 경우에는 `./scripts/kip`가 `.venv`를 요구하므로 먼저
 `./scripts/bootstrap.sh`를 실행한다. 필요한 Python·Node는 프로젝트 안에
@@ -116,7 +142,7 @@ API/worker container는 lexical 검색(`semantic_degraded`)으로 동작한다.
 답할 수도 있다. preview의 ACL/분류와 local/cloud-only 건수를 확인한다.
 cloud-only 파일은 provider 앱에서 선택하여 다운로드한 뒤 수집한다.
 
-## Local CLI profile
+## 로컬 CLI 프로파일
 
 ```bash
 ./scripts/bootstrap.sh
@@ -126,14 +152,21 @@ cloud-only 파일은 provider 앱에서 선택하여 다운로드한 뒤 수집�
 ./scripts/kip xlsx-read --artifact-id ARTIFACT_ID --sheet "정산" --range "A1:F40"
 ```
 
+`sample`은 저장소에 포함된 예제 폴더의 source 이름이다. 운영자 자신의 폴더로
+설정한 배포에는 `sample` source가 없으므로, receipt의 `next_steps`에 나온 승인된
+source 이름을 쓰고 먼저 `sync run --source SOURCE --dry-run`으로 범위와 건수를
+확인한다(`DEPLOYMENT_GUIDE.md` 2장 8단계).
+
 Reference 설정은 filesystem parser를 파일 하나당 bounded child에서 직렬
 실행하도록 `[parsers.isolation]`을 활성화한다. 이 설정을 끄는 것은 raw/isolated
 개발 비교에만 사용한다. NAS/OneDrive 운영에서는 source를 별도로 read-only로
 마운트해야 하며, 검색과 `xlsx-read`는 parser child를 실행하지 않는다.
 
-For a real read-only OneDrive audit, use [`docs/AI_OPERATOR_RUNBOOK.md`](AI_OPERATOR_RUNBOOK.md); it defines parser comparison, source-grounded validation, A/B scoring, and the post-fix cycle.
+실제 OneDrive corpus를 읽기 전용으로 감사하려면
+[`AI_OPERATOR_RUNBOOK.md`](AI_OPERATOR_RUNBOOK.md)를 쓴다. parser 비교,
+원본 기반 검증, A/B 채점, 수정 후 재검증 주기가 정의돼 있다.
 
-## 어떤 명령을 쓸까 (Which command?)
+## 어떤 명령을 쓸까
 
 이름이 비슷한 네 명령의 차이입니다.
 
@@ -147,7 +180,7 @@ For a real read-only OneDrive audit, use [`docs/AI_OPERATOR_RUNBOOK.md`](AI_OPER
 발췌(snippet)만 보고 판단하지 말고, 중요한 내용은 `read`로 원문을 확인하세요.
 엑셀 숫자는 `xlsx-read`로 원본 셀 범위를 직접 읽어야 합니다.
 
-## 명령 출력 읽는 법 (Reading the output)
+## 명령 출력 읽는 법
 
 모든 출력은 JSON이며 `"ok": true`면 성공, `"error"`가 있으면 실패입니다.
 자주 보는 필드만 정리하면:
@@ -165,7 +198,7 @@ For a real read-only OneDrive audit, use [`docs/AI_OPERATOR_RUNBOOK.md`](AI_OPER
 막히면 [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)에서 증상별 해결 순서를
 찾을 수 있습니다.
 
-## Application profile
+## 애플리케이션 프로파일
 
 ```bash
 ./scripts/app-up.sh
@@ -177,9 +210,10 @@ API와 worker가 필요할 때만 전체 프로파일을 띄운다. CLI/MCP만 �
 standalone Compose와 secret references를 함께 해석한다. 직접 base Compose와 합치면 승인되지 않은 mount가 추가될 수 있으므로
 생성 배포는 wrapper로 실행한다.
 
-The API and CLI call the same service layer. App integrations should use REST/OpenAPI unless the calling system specifically supports MCP.
+API와 CLI는 같은 service layer를 호출한다. 호출하는 시스템이 MCP를 직접
+지원하는 경우가 아니면 애플리케이션 연동은 REST/OpenAPI를 쓴다.
 
-Push a change from a custom application connector:
+자체 애플리케이션 connector에서 변경을 밀어 넣는다.
 
 ```bash
 curl -sS http://127.0.0.1:8080/v1/connectors/events \
@@ -189,21 +223,19 @@ curl -sS http://127.0.0.1:8080/v1/connectors/events \
   --data-binary @examples/connector/event.json
 ```
 
-API-key mode always uses the principal, workspace, and scopes from approved
-configuration. Do not send identity or ACL headers. In multi-user production,
-set `identity.mode = "proxy_jwt"`, install `.[identity]`, and use
-`Authorization: Bearer ...`; the proxy JWT must include the configured identity
-and fresh ACL-snapshot claims.
+API-key mode는 승인된 설정의 principal, workspace, scope만 사용한다. identity나
+ACL header를 보내지 않는다. 다중 사용자 production에서는
+`identity.mode = "proxy_jwt"`로 두고 `.[identity]`를 설치한 뒤
+`Authorization: Bearer ...`를 쓴다. proxy JWT에는 설정된 identity와 최신
+ACL-snapshot claim이 들어 있어야 한다.
 
-## Licensed public RAG evaluation
+## 공개 corpus로 RAG 평가 재현하기
 
-The distributed configuration keeps the public corpus disabled; semantic
-search (`hybrid`) and the pinned embedding model are on by default (ADR-065);
-the BGE reranker is opt-in. To
-reproduce the checked-in pilot, set `enabled = true` for `public-government`
-in `config/kip.toml`. Bootstrap already installed the model runtime unless
-`KIP_SEMANTIC=off` was set; `./scripts/bootstrap-semantic.sh` installs or
-repairs it.
+배포되는 설정은 공개 corpus를 비활성 상태로 둔다. semantic search(`hybrid`)와
+고정된 embedding model은 기본으로 켜져 있고(ADR-065) BGE reranker는 opt-in이다.
+저장된 pilot을 재현하려면 `config/kip.toml`의 `public-government`를
+`enabled = true`로 바꾼다. `KIP_SEMANTIC=off`로 실행하지 않았다면 bootstrap이
+model runtime을 이미 설치했고, `./scripts/bootstrap-semantic.sh`가 설치·복구한다.
 
 ```bash
 make fetch-corpus
@@ -213,7 +245,7 @@ make fetch-corpus
 ./scripts/semantic-server.sh run
 ```
 
-In another terminal:
+다른 터미널에서 실행한다.
 
 ```bash
 ./scripts/semantic-smoke.sh
@@ -222,7 +254,8 @@ In another terminal:
 make evaluate
 ```
 
-With the pinned default embedding identity, sync embeds the corpus and a
-complete projection activates itself (`search.semantic_auto_activate`). A
-custom embedding identity stays in shadow mode; see `docs/RAG_EVALUATION.md`
-before considering `projection activate --report REPORT --candidate VARIANT`.
+고정된 기본 embedding identity에서는 sync가 corpus를 embedding하고 완성된
+projection이 스스로 활성화된다(`search.semantic_auto_activate`). 사용자 지정
+embedding identity는 shadow 상태로 남으므로
+`projection activate --report REPORT --candidate VARIANT`를 검토하기 전에
+[`RAG_EVALUATION.md`](RAG_EVALUATION.md)를 읽는다.

@@ -334,7 +334,12 @@ def _table_refusal(
         discovery = shallow
     elif partial:
         reason = "csv_full_table_required"
-        message = "CSV 전체 행을 포함한 정확한 근거가 필요합니다. 일부 조각만으로 답을 확정할 수 없습니다."
+        # There is no CSV-specific read tool: the remedy is `read` on each cited
+        # unit until the table's rows are covered end to end.
+        message = (
+            "CSV 표의 일부 행만 확보되어 답을 확정할 수 없습니다. "
+            "인용된 각 단위를 read로 다시 열어 전체 행을 확인한 뒤 판단하세요."
+        )
         discovery = partial
     else:
         return None
@@ -472,14 +477,30 @@ def prepare_answer_evidence(
         if table_refusal is not None:
             return table_refusal
     if not reference_ids and not mentioned and _requires_clarification(gate_request, relevant):
+        # This refusal carries no citations, so "be more specific" alone left
+        # the caller with nothing to be specific about. Name the step that
+        # produces the candidate list, the way `csv_full_table_required` names
+        # `read`.
         return AnswerPreparation(
             evidence=(),
             refusal=_refusal(
                 request,
                 "clarification_required",
-                "여러 문서가 해당하므로 대상이나 업무 범위를 더 구체적으로 지정해 주세요.",
+                "여러 문서가 해당하여 대상을 확정할 수 없습니다. "
+                "같은 질문으로 search를 실행해 후보 문서를 확인한 뒤, "
+                "파일명이나 업무 범위를 지정해 다시 질문하세요.",
             ),
         )
+    # `insufficient_decision_evidence` has two preconditions, and both have to
+    # hold for it to be reachable at all:
+    #   1. `apply_lexical_gate` is true, which the caller sets only when
+    #      generation is off or no generator is configured. A generation-enabled
+    #      deployment never reaches this branch.
+    #   2. the query contains the literal Korean substring `승인`. This is a
+    #      substring test, not a language-neutral intent check, so an English
+    #      or paraphrased approval question never reaches it either.
+    # Behaviour is deliberate and unchanged; this comment exists so the next
+    # reader does not read the refusal as a general approval-evidence gate.
     if apply_lexical_gate and not reference_ids and "승인" in gate_request.query and relevant:
         subject_scores = [
             _decision_subject_score(gate_request.query, item.unit.body) for item in relevant
@@ -522,7 +543,8 @@ def prepare_answer_evidence(
         if item.unit.locator.type == "csv_rows" and len(item.unit.body) > remaining:
             response = _refusal(
                 request, "csv_full_table_required",
-                "CSV 전체 근거가 max_chars에 들어가지 않습니다. 범위를 좁히거나 문맥 한도를 높여 다시 확인하세요.",
+                "CSV 전체 근거가 max_chars에 들어가지 않습니다. "
+                "max_chars를 높이거나, 인용된 각 단위를 read로 직접 열어 전체 행을 확인하세요.",
             )
             response.citations = [citation_from_evidence(value) for value in relevant if value.unit.locator.type == "csv_rows"]
             return AnswerPreparation(evidence=(), refusal=response)

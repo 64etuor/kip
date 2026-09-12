@@ -269,11 +269,18 @@
       "type": "string"
     },
     "source_changed_since_index": {
+      "description": "true when the live workbook no longer matches the indexed revision. Never null here: an unreadable workbook fails the read instead of returning unverified cells, so source_verification is always sha256.",
       "title": "Source Changed Since Index",
       "type": "boolean"
     },
     "source_uri": {
       "title": "Source Uri",
+      "type": "string"
+    },
+    "source_verification": {
+      "const": "sha256",
+      "description": "Always sha256: this path re-hashes the live workbook and fails closed when it cannot be read, so stat reuse and unavailable never occur here. Declared as a single-value type, the way SearchHit declares its own not_checked, so a generated client sees the one value it can get.",
+      "title": "Source Verification",
       "type": "string"
     }
   },
@@ -285,7 +292,8 @@
     "cells",
     "indexed_source_sha256",
     "current_source_sha256",
-    "source_changed_since_index"
+    "source_changed_since_index",
+    "source_verification"
   ],
   "title": "XlsxRangeRead",
   "type": "object"

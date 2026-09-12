@@ -80,7 +80,61 @@ from kip.quality import load_experiment, load_quality_report, recommend
 from kip.settings import Settings
 from kip.setup_cli import setup_app
 
-app = typer.Typer(no_args_is_help=True, add_completion=False, help="KIP knowledge fabric CLI")
+# Command groups. Rich renders these as separate help panels; the same split is
+# spelled out in the root help text because Typer silently drops the panels when
+# Rich is not installed, and an agent must still be able to tell a read-only
+# retrieval command from one that changes state.
+_RETRIEVAL_PANEL = "Retrieval (read-only)"
+_OPERATOR_PANEL = "Operator (changes state; retrieval does not authorize these)"
+_DEPLOYMENT_PANEL = "Deployment and diagnostics"
+
+# Option help for the surfaces an agent falls back to when MCP is unavailable.
+# The MCP schema enumerates these values and declares these shapes; `--help` is
+# the only place a CLI caller can discover them, so it must say the same thing.
+_MODE_HELP = (
+    "Retrieval mode: lexical | vector | hybrid | reranked. "
+    "Omit to use the deployment's configured default. "
+    "Same values as the MCP `mode` argument."
+)
+_SOURCE_KIND_HELP = (
+    "Keep only hits from these source kinds. Repeat the option or pass a "
+    "comma-separated list; the MCP counterpart `source_kinds` takes one array instead."
+)
+_DOCUMENT_TYPE_HELP = (
+    "Keep only hits with these document types. Repeat the option or pass a "
+    "comma-separated list; the MCP counterpart `document_types` takes one array instead."
+)
+_PROJECT_ID_HELP = (
+    "Keep only hits from these project IDs. Repeat the option or pass a "
+    "comma-separated list; the MCP counterpart `project_ids` takes one array instead."
+)
+_GRAPH_DIRECTION_HELP = (
+    "Edge direction: out | in | both. Same values as the MCP `direction` argument."
+)
+_ALLOW_STALE_HELP = (
+    "Relax only the freshness guarantee: return the range even when the live "
+    "workbook no longer matches the indexed revision. In that case the response "
+    "still reports both hashes, marks source_changed_since_index true and keeps "
+    "source_verification sha256, so the values must be labelled as read from a "
+    "changed source. "
+    "It still refuses when the workbook cannot be read, when the artifact is not "
+    "an XLSX/XLSM workbook, and when ACL or source scope denies the artifact."
+)
+
+_ROOT_HELP = """KIP knowledge fabric CLI
+
+Retrieval commands are read-only: capabilities, status, search, vocab, context,
+answer, read, explain, xlsx-read, xlsx, graph, get, jobs.
+
+Operator commands change state and are not authorized by an ordinary retrieval
+request: sync, projection, rebuild, migrate, review, ontology, parser,
+interaction, export, evaluate, quality, telemetry. The telemetry group is
+mixed: `telemetry traces` only reads, but `telemetry prune` deletes stored
+query traces, so the whole group is listed here and never as read-only.
+
+Deployment and diagnostics: version, doctor, setup, update, api, worker."""
+
+app = typer.Typer(no_args_is_help=True, add_completion=False, help=_ROOT_HELP)
 sync_app = typer.Typer(no_args_is_help=True, help="Synchronize configured sources")
 xlsx_app = typer.Typer(no_args_is_help=True, help="Read exact XLSX ranges")
 graph_app = typer.Typer(no_args_is_help=True, help="Traverse approved assertions")
@@ -100,7 +154,10 @@ evaluate_draft_app = typer.Typer(
 )
 quality_app = typer.Typer(no_args_is_help=True, help="Evaluate version-pinned candidates")
 ontology_app = typer.Typer(no_args_is_help=True, help="Validate and migrate ontology releases")
-telemetry_app = typer.Typer(no_args_is_help=True, help="Inspect redacted RAG query traces")
+telemetry_app = typer.Typer(
+    no_args_is_help=True,
+    help="Inspect and prune redacted RAG query traces (prune deletes them)",
+)
 parser_app = typer.Typer(no_args_is_help=True, help="Shadow and activate parser candidates")
 interaction_app = typer.Typer(
     no_args_is_help=True,
@@ -111,24 +168,29 @@ ontology_discovery_app = typer.Typer(
     help="Propose and review non-activating ontology discovery candidates",
 )
 
-app.add_typer(sync_app, name="sync")
-app.add_typer(xlsx_app, name="xlsx")
-app.add_typer(graph_app, name="graph")
-app.add_typer(review_app, name="review")
-app.add_typer(jobs_app, name="jobs")
-app.add_typer(api_app, name="api")
-app.add_typer(worker_app, name="worker")
-app.add_typer(get_app, name="get")
-app.add_typer(projection_app, name="projection")
-app.add_typer(export_app, name="export")
-app.add_typer(evaluate_app, name="evaluate")
+app.add_typer(sync_app, name="sync", rich_help_panel=_OPERATOR_PANEL)
+app.add_typer(xlsx_app, name="xlsx", rich_help_panel=_RETRIEVAL_PANEL)
+app.add_typer(graph_app, name="graph", rich_help_panel=_RETRIEVAL_PANEL)
+app.add_typer(review_app, name="review", rich_help_panel=_OPERATOR_PANEL)
+app.add_typer(jobs_app, name="jobs", rich_help_panel=_RETRIEVAL_PANEL)
+app.add_typer(api_app, name="api", rich_help_panel=_DEPLOYMENT_PANEL)
+app.add_typer(worker_app, name="worker", rich_help_panel=_DEPLOYMENT_PANEL)
+app.add_typer(get_app, name="get", rich_help_panel=_RETRIEVAL_PANEL)
+app.add_typer(projection_app, name="projection", rich_help_panel=_OPERATOR_PANEL)
+app.add_typer(export_app, name="export", rich_help_panel=_OPERATOR_PANEL)
+app.add_typer(evaluate_app, name="evaluate", rich_help_panel=_OPERATOR_PANEL)
 evaluate_app.add_typer(evaluate_draft_app, name="draft")
-app.add_typer(quality_app, name="quality")
-app.add_typer(ontology_app, name="ontology")
-app.add_typer(telemetry_app, name="telemetry")
-app.add_typer(parser_app, name="parser")
-app.add_typer(interaction_app, name="interaction")
-app.add_typer(setup_app, name="setup")
+app.add_typer(quality_app, name="quality", rich_help_panel=_OPERATOR_PANEL)
+app.add_typer(ontology_app, name="ontology", rich_help_panel=_OPERATOR_PANEL)
+# Mixed group: `traces` reads, `prune` deletes. A Typer group carries one
+# root panel, so the group is listed with the operator commands and the two
+# subcommands carry their own panels inside `kip telemetry --help`. Listing
+# the group as read-only would be the exact mislabelling the panels exist to
+# prevent.
+app.add_typer(telemetry_app, name="telemetry", rich_help_panel=_OPERATOR_PANEL)
+app.add_typer(parser_app, name="parser", rich_help_panel=_OPERATOR_PANEL)
+app.add_typer(interaction_app, name="interaction", rich_help_panel=_OPERATOR_PANEL)
+app.add_typer(setup_app, name="setup", rich_help_panel=_DEPLOYMENT_PANEL)
 ontology_app.add_typer(ontology_discovery_app, name="discovery")
 
 
@@ -481,12 +543,16 @@ def _sync_one(
     )
 
 
-@app.command()
+@app.command(rich_help_panel=_RETRIEVAL_PANEL)
 def capabilities(ctx: typer.Context) -> None:
     """Report available parsers, connectors, projections, and edge adapters."""
+    # Every instruction tells a caller to read degradation notices from
+    # `meta.warnings`, so capabilities carries them there as well as in
+    # `data.warnings`; the two lists are the same warnings.
     _run(
         ctx,
         lambda runtime: runtime.container.application.operations.capabilities(runtime.context),
+        warnings=lambda report: list(report.warnings),
     )
 
 
@@ -520,7 +586,7 @@ def _status_summary(report: StatusReport) -> str:
     )
 
 
-@app.command()
+@app.command(rich_help_panel=_RETRIEVAL_PANEL)
 def status(
     ctx: typer.Context,
     summary: bool = typer.Option(
@@ -778,7 +844,7 @@ def _doctor_summary(checks: list[dict[str, Any]], required_failures: list[str]) 
     return f"정상: 필수 점검 {required_ok}/{required_total} 통과. 경고 {len(optional_warnings)}건({hint})."
 
 
-@app.command()
+@app.command(rich_help_panel=_DEPLOYMENT_PANEL)
 def version() -> None:
     """Print the installed KIP version."""
     envelope = Envelope(
@@ -789,7 +855,7 @@ def version() -> None:
     typer.echo(envelope.model_dump_json(indent=2))
 
 
-@app.command()
+@app.command(rich_help_panel=_DEPLOYMENT_PANEL)
 def update(
     target_version: str | None = typer.Option(None, "--version", help="Upgrade to this release instead of the latest"),
     archive: Path | None = typer.Option(None, "--archive", help="Upgrade from an already downloaded kip-X.Y.Z.zip"),
@@ -837,7 +903,7 @@ def update(
     raise typer.Exit(code=code if code >= 0 else 128 - code)
 
 
-@app.command()
+@app.command(rich_help_panel=_DEPLOYMENT_PANEL)
 def doctor(ctx: typer.Context) -> None:
     """Check configuration, source mounts, storage, and adapter availability."""
 
@@ -951,22 +1017,22 @@ def doctor(ctx: typer.Context) -> None:
     _run(ctx, action)
 
 
-@app.command()
+@app.command(rich_help_panel=_OPERATOR_PANEL)
 def migrate(ctx: typer.Context) -> None:
     """Apply append-only PostgreSQL migrations."""
     _run(ctx, lambda runtime: {"applied": runtime.container.application.operations.migrate()})
 
 
-@app.command()
+@app.command(rich_help_panel=_RETRIEVAL_PANEL)
 def search(
     ctx: typer.Context,
     query: str | None = typer.Argument(None),
     query_option: str | None = typer.Option(None, "--query"),
     limit: int = typer.Option(10, min=1, max=100),
-    mode: str | None = typer.Option(None, "--mode"),
-    source_kind: list[str] | None = typer.Option(None, "--source-kind"),
-    document_type: list[str] | None = typer.Option(None, "--document-type"),
-    project_id: list[str] | None = typer.Option(None, "--project-id"),
+    mode: str | None = typer.Option(None, "--mode", help=_MODE_HELP),
+    source_kind: list[str] | None = typer.Option(None, "--source-kind", help=_SOURCE_KIND_HELP),
+    document_type: list[str] | None = typer.Option(None, "--document-type", help=_DOCUMENT_TYPE_HELP),
+    project_id: list[str] | None = typer.Option(None, "--project-id", help=_PROJECT_ID_HELP),
     include_candidate_assertions: bool = typer.Option(
         False,
         "--include-candidate-assertions",
@@ -1001,7 +1067,7 @@ def search(
     _run(ctx, action, warnings=lambda _result: list(envelope_meta_warnings))
 
 
-@app.command()
+@app.command(rich_help_panel=_RETRIEVAL_PANEL)
 def vocab(
     ctx: typer.Context,
     prefix: str | None = typer.Argument(None),
@@ -1019,17 +1085,17 @@ def vocab(
     _run(ctx, action)
 
 
-@app.command(name="context")
+@app.command(name="context", rich_help_panel=_RETRIEVAL_PANEL)
 def context_command(
     ctx: typer.Context,
     query: str | None = typer.Argument(None),
     query_option: str | None = typer.Option(None, "--query"),
     limit: int = typer.Option(5, min=1, max=30),
     max_chars: int = typer.Option(120000, min=1000, max=200000),
-    mode: str | None = typer.Option(None, "--mode"),
-    source_kind: list[str] | None = typer.Option(None, "--source-kind"),
-    document_type: list[str] | None = typer.Option(None, "--document-type"),
-    project_id: list[str] | None = typer.Option(None, "--project-id"),
+    mode: str | None = typer.Option(None, "--mode", help=_MODE_HELP),
+    source_kind: list[str] | None = typer.Option(None, "--source-kind", help=_SOURCE_KIND_HELP),
+    document_type: list[str] | None = typer.Option(None, "--document-type", help=_DOCUMENT_TYPE_HELP),
+    project_id: list[str] | None = typer.Option(None, "--project-id", help=_PROJECT_ID_HELP),
     include_candidate_assertions: bool = typer.Option(
         False,
         "--include-candidate-assertions",
@@ -1064,17 +1130,17 @@ def context_command(
     _run(ctx, action, warnings=lambda _result: list(envelope_meta_warnings))
 
 
-@app.command()
+@app.command(rich_help_panel=_RETRIEVAL_PANEL)
 def answer(
     ctx: typer.Context,
     query: str | None = typer.Argument(None),
     query_option: str | None = typer.Option(None, "--query"),
     limit: int = typer.Option(5, min=1, max=20),
     max_chars: int = typer.Option(32000, min=1000, max=200000),
-    mode: str | None = typer.Option(None, "--mode"),
-    source_kind: list[str] | None = typer.Option(None, "--source-kind"),
-    document_type: list[str] | None = typer.Option(None, "--document-type"),
-    project_id: list[str] | None = typer.Option(None, "--project-id"),
+    mode: str | None = typer.Option(None, "--mode", help=_MODE_HELP),
+    source_kind: list[str] | None = typer.Option(None, "--source-kind", help=_SOURCE_KIND_HELP),
+    document_type: list[str] | None = typer.Option(None, "--document-type", help=_DOCUMENT_TYPE_HELP),
+    project_id: list[str] | None = typer.Option(None, "--project-id", help=_PROJECT_ID_HELP),
     include_candidate_assertions: bool = typer.Option(
         False,
         "--include-candidate-assertions",
@@ -1105,16 +1171,24 @@ def answer(
             ),
         )
 
-    _run(ctx, action)
+    # `AnswerResponse.warnings` stays the structured field, but a caller is
+    # told to read `meta.warnings` on every call, so the envelope carries the
+    # same list here as it does for `search`, `context` and `capabilities`.
+    _run(ctx, action, warnings=lambda response: list(response.warnings))
 
 
-@app.command()
+@app.command(rich_help_panel=_RETRIEVAL_PANEL)
 def read(
     ctx: typer.Context,
     unit_id: str | None = typer.Argument(None),
     unit_id_option: str | None = typer.Option(None, "--unit-id"),
 ) -> None:
-    """Read one exact evidence unit and report source staleness."""
+    """Read one exact evidence unit and report source staleness.
+
+    This always re-hashes the live source, so source_verification is sha256
+    or unavailable, never stat. stat (size/mtime reuse) appears only on
+    `context` items and `answer` citations.
+    """
 
     def action(runtime: Runtime) -> Any:
         selected = unit_id_option or unit_id
@@ -1176,7 +1250,7 @@ def get_assertion(ctx: typer.Context, assertion_id: str = typer.Argument(...)) -
     )
 
 
-@app.command()
+@app.command(rich_help_panel=_RETRIEVAL_PANEL)
 def explain(ctx: typer.Context, assertion_id: str = typer.Option(..., "--assertion-id")) -> None:
     """Explain an approved assertion with its exact evidence units."""
     _run(
@@ -1297,7 +1371,7 @@ def xlsx_read(
     artifact_id: str = typer.Argument(...),
     sheet: str = typer.Option(..., "--sheet"),
     cell_range: str = typer.Option(..., "--range"),
-    allow_stale: bool = typer.Option(False, "--allow-stale"),
+    allow_stale: bool = typer.Option(False, "--allow-stale", help=_ALLOW_STALE_HELP),
 ) -> None:
     """Read an exact cell range from one XLSX artifact; never estimate totals from search."""
     _run(
@@ -1312,14 +1386,16 @@ def xlsx_read(
     )
 
 
-@app.command(name="xlsx-read")
+@app.command(name="xlsx-read", rich_help_panel=_RETRIEVAL_PANEL)
 def xlsx_read_alias(
     ctx: typer.Context,
     artifact_id: str | None = typer.Argument(None),
     artifact_id_option: str | None = typer.Option(None, "--artifact-id"),
     sheet: str = typer.Option(..., "--sheet"),
     cell_range: str = typer.Option(..., "--range"),
-    require_fresh: bool = typer.Option(True, "--require-fresh/--allow-stale"),
+    require_fresh: bool = typer.Option(
+        True, "--require-fresh/--allow-stale", help=_ALLOW_STALE_HELP
+    ),
 ) -> None:
     """Read an exact XLSX range; stable top-level alias for agents and apps."""
 
@@ -1343,7 +1419,7 @@ def graph_neighbors(
     ctx: typer.Context,
     node_id: str = typer.Option(..., "--node-id"),
     predicate: list[str] | None = typer.Option(None, "--predicate"),
-    direction: str = typer.Option("both"),
+    direction: str = typer.Option("both", help=_GRAPH_DIRECTION_HELP),
     limit: int = typer.Option(100, min=1, max=1000),
 ) -> None:
     """List approved assertions directly connected to a node."""
@@ -1643,7 +1719,7 @@ def projection_activate(
     _run(ctx, action)
 
 
-@app.command()
+@app.command(rich_help_panel=_OPERATOR_PANEL)
 def rebuild(
     ctx: typer.Context,
     projection: str = typer.Option("lexical", "--projection"),
@@ -2140,7 +2216,7 @@ def ontology_migrate_materialize(
     _run(ctx, action)
 
 
-@telemetry_app.command("traces")
+@telemetry_app.command("traces", rich_help_panel=_RETRIEVAL_PANEL)
 def telemetry_traces(
     ctx: typer.Context,
     request_id: str | None = typer.Option(None, "--request-id"),
@@ -2158,7 +2234,7 @@ def telemetry_traces(
     _run(ctx, action)
 
 
-@telemetry_app.command("prune")
+@telemetry_app.command("prune", rich_help_panel=_OPERATOR_PANEL)
 def telemetry_prune(ctx: typer.Context) -> None:
     """Delete query traces past their retention window (requires admin role)."""
 

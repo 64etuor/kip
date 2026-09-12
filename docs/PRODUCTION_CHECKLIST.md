@@ -63,7 +63,9 @@ The default Compose profile is a local pilot profile. Before serving multiple us
 - Set `${KIP_NAS_PATH}` for `compose.production.yaml`; it is bind-mounted
   read-only into both the worker and the API. The API needs the live source
   tree for evidence freshness checks and `xlsx-read`; without it every unit
-  reports stale and evidence is dropped.
+  reports `source_verification=unavailable` with
+  `source_changed_since_index=null` (unverified, not changed) and evidence is
+  dropped.
 - Set `${KIP_ONTOLOGY_PATH}` to the version-controlled ontology checkout; it
   is bind-mounted read-write into the API (discovery auto-release, ADR-044)
   and read-only into the worker. The directory must be writable by uid

@@ -367,8 +367,9 @@ deployment design rather than exposing the stdio server on a port.
 `${KIP_NAS_PATH}` is required and is bind-mounted read-only into **both** the
 worker and the API service. The API opens the live source path for evidence
 freshness checks and `xlsx-read` range reads; without the bind every unit
-reports stale and answers silently drop evidence. All three application
-services carry resource limits, the API and worker have container
+reports `source_verification=unavailable` with
+`source_changed_since_index=null` — unverified, not changed — and answers
+silently drop evidence. All three application services carry resource limits, the API and worker have container
 healthchecks (the worker check proves PostgreSQL reachability with the
 worker's own credentials), and the API healthcheck targets `/readyz`, which
 performs a real database round-trip and answers 503 when PostgreSQL is
@@ -769,6 +770,11 @@ decision contract. Inspect it through an administrative surface:
 ./scripts/kip telemetry prune
 ```
 
+`telemetry` sits in the operator group of `kip --help`, not the read-only
+retrieval group, because `telemetry prune` deletes stored query traces;
+`telemetry traces` on its own only reads. An ordinary retrieval request never
+authorizes the group.
+
 `telemetry.retention_days` defaults to 30. Schedule `telemetry prune` daily;
 the command deletes only expired rows in the active workspace. REST operators
 use `GET /v1/admin/query-traces` and
@@ -1005,8 +1011,12 @@ appear in the search and context envelope `meta.warnings` on CLI, REST, and
 MCP, not only in traces, and they survive an empty result: a degraded run that
 matched nothing reports both its degradation and `no_visible_indexed_units`.
 A bundle cut to the requested budget adds `context_truncated` (the envelope
-name for `ContextBundle.truncated`), and a request whose retrieval raised
-carries `search_failed` in its `ok: false` envelope. Public v1 `SearchRequest.mode` accepts `lexical`,
+name for `ContextBundle.truncated`), and a search whose retrieval raised for a
+reason a retry could resolve carries `search_failed` in its `ok: false`
+envelope. `validation_error`, `forbidden`, `not_found` and
+`configuration_error` carry no marker, because they fail identically on every
+retry; a support report of "search keeps failing" should quote `error.code`
+before anyone retries. Public v1 `SearchRequest.mode` accepts `lexical`,
 `vector`, `hybrid`, and `reranked`; an explicit `--mode vector|hybrid|reranked`
 request fails instead of degrading. `capabilities` stays cheap because MCP
 clients call it first: `semantic_search` is true and `semantic_projection_status`

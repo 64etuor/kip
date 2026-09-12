@@ -73,6 +73,19 @@ SearchLimit = Annotated[int, Field(json_schema_extra=_bounds(SearchRequest, "lim
 ContextChars = Annotated[int, Field(json_schema_extra=_bounds(ContextRequest, "max_chars"))]
 GraphLimit = Annotated[int, Field(json_schema_extra=_bounds(GraphNeighborsRequest, "limit"))]
 GraphDepth = Annotated[int, Field(json_schema_extra=_bounds(GraphPathRequest, "max_depth"))]
+AllowStale = Annotated[
+    bool,
+    Field(
+        description=(
+            "Relax only the freshness guarantee: return the range even when the live workbook "
+            "no longer matches the indexed revision. In that case the response still reports both "
+            "hashes, marks source_changed_since_index true and keeps source_verification sha256, so "
+            "the caller must label the values as read from a changed source. It still refuses when the workbook "
+            "cannot be read, when the artifact is not an XLSX/XLSM workbook, and when ACL or "
+            "source scope denies the artifact."
+        )
+    ),
+]
 
 
 def create_server(container: Container | None = None) -> MCPServer:
@@ -188,10 +201,15 @@ def create_server(container: Container | None = None) -> MCPServer:
 
     @tool(read_only=True)
     @_enveloped
-    def kip_capabilities() -> str:
-        """Return available source, parser, search, and graph capabilities."""
+    def kip_capabilities() -> ToolResult:
+        """Return available source, parser, search, and graph capabilities.
+
+        Degradation notices appear in meta.warnings, the documented place, and
+        stay in data.warnings for existing callers.
+        """
         selected_context = context()
-        return _json(application.operations.capabilities(selected_context))
+        report = application.operations.capabilities(selected_context)
+        return _json(report), list(report.warnings)
 
     @tool(read_only=True)
     @_enveloped
@@ -271,12 +289,14 @@ def create_server(container: Container | None = None) -> MCPServer:
         document_types: list[str] | None = None,
         project_ids: list[str] | None = None,
         include_candidate_assertions: bool = False,
-    ) -> str:
+    ) -> ToolResult:
         """Return cited extracts, or generated claims when a generator is configured.
 
         Insufficient evidence returns a typed refusal with next-step locators.
         For exact_xlsx_read_required, call kip_xlsx_read on the cited workbook
-        sheet/range. A refusal is not proof that no matching document exists.
+        sheet/range. For csv_full_table_required, reopen each cited unit with
+        kip_read until the table's rows are covered; there is no CSV-specific
+        read tool. A refusal is not proof that no matching document exists.
         """
         request = AnswerRequest(
             query=query,
@@ -288,7 +308,10 @@ def create_server(container: Container | None = None) -> MCPServer:
             project_ids=project_ids or [],
             include_candidate_assertions=include_candidate_assertions,
         )
-        return _json(application.answering.answer(context(), request))
+        response = application.answering.answer(context(), request)
+        # `data.warnings` stays the structured field; meta.warnings is where a
+        # caller is told to look, so the tuple form carries the same list.
+        return _json(response), list(response.warnings)
 
     @tool(read_only=True)
     @_enveloped
@@ -299,12 +322,20 @@ def create_server(container: Container | None = None) -> MCPServer:
     @tool(read_only=True)
     @_enveloped
     def kip_read(unit_id: str) -> str:
-        """Read one exact evidence unit and check whether the source changed since indexing."""
+        """Read one exact evidence unit and check whether the source changed since indexing.
+
+        source_changed_since_index is true (changed), false (verified unchanged)
+        or null (nothing was compared, with source_verification=unavailable).
+        Null is unknown, never fresh: do not report a null as a changed document.
+        This tool always re-hashes, so source_verification is sha256 or
+        unavailable and never stat; stat only appears on kip_context items and
+        kip_answer citations.
+        """
         return _json(application.evidence.read_unit(context(), unit_id))
 
     @tool(read_only=True)
     @_enveloped
-    def kip_xlsx_read(artifact_id: str, sheet: str, cell_range: str, allow_stale: bool = False) -> str:
+    def kip_xlsx_read(artifact_id: str, sheet: str, cell_range: str, allow_stale: AllowStale = False) -> str:
         """Read original XLSX/XLSM cells with exact coordinates and freshness.
 
         Use for numbers, dates and formulas. This does not execute formulas.

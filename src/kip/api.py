@@ -308,7 +308,10 @@ def create_app(container: Container | None = None) -> FastAPI:
     def capabilities(
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
-        return ok(selected.application.operations.capabilities(context), context)
+        report = selected.application.operations.capabilities(context)
+        # Mirrored into meta.warnings: that is the documented place a caller
+        # checks for warnings on every other endpoint.
+        return ok(report, context, list(report.warnings))
 
     @app.get("/v1/status", response_model=Envelope)
     def status(
@@ -337,7 +340,10 @@ def create_app(container: Container | None = None) -> FastAPI:
         payload: AnswerRequest,
         context: RequestContext = Depends(authenticated_context),
     ) -> Envelope:
-        return ok(selected.application.answering.answer(context, payload), context)
+        response = selected.application.answering.answer(context, payload)
+        # Mirrored into meta.warnings like capabilities/search/context:
+        # `data.warnings` stays the structured field, and the two agree.
+        return ok(response, context, list(response.warnings))
 
     @app.get("/v1/vocabulary", response_model=Envelope)
     def vocabulary(

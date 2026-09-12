@@ -34,8 +34,9 @@ application reloads its configuration; retaining old database rows grants no
 access. Explicit sync is required to authorize records under changed policy.
 Exact evidence and workbook reads recheck live containment and symlink policy
 before opening bytes. Unavailable or cloud-only source bytes leave cached text
-explicitly stale with no current hash; a live workbook read fails without
-hydration. Source configuration is operator-controlled, never a search argument.
+explicitly unverified with no current hash — `source_verification=unavailable`
+and `source_changed_since_index=null`, never "changed"; a live workbook read
+fails without hydration. Source configuration is operator-controlled, never a search argument.
 
 These checks do not replace read-only mounts or OS permissions. Cloud detection
 uses OS-reported residency flags, and is not a remote OneDrive API or a sandbox

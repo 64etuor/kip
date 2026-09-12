@@ -291,5 +291,8 @@ def test_missing_source_cannot_be_reported_as_hash_verified(test_container):
 
     read = test_container.application.evidence.read_unit(context, hit.unit_id)
 
+    # An unreadable source compares nothing, so the field must stay unknown.
+    # Reporting `true` here made an agent tell a user their legal document had
+    # been changed after indexing, which nothing had established.
     assert read.source_verification == "unavailable"
-    assert read.source_changed_since_index is True
+    assert read.source_changed_since_index is None

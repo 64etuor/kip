@@ -293,7 +293,7 @@ Take a real `unit_id` from search/context JSON and read it:
 ./scripts/kip read UNIT_ID
 ```
 
-Pass criteria are: non-empty exact body where extraction succeeded, a source URI, indexed/current hashes, a format-appropriate locator, and no unexpected stale flag. A hit with an empty body, missing locator, missing source metadata, or an unexplained stale flag is a defect.
+Pass criteria are: non-empty exact body where extraction succeeded, a source URI, indexed/current hashes, a format-appropriate locator, and no unexpected stale flag. A hit with an empty body, missing locator, missing source metadata, or an unexplained stale flag is a defect. `source_changed_since_index=null` with `source_verification=unavailable` is not a stale flag: it means the source could not be read, so record it as unverified rather than as a changed document.
 
 ### 5. XLSX deep read
 
@@ -306,7 +306,7 @@ Take an XLSX `artifact_id` from a search hit whose `locator.type` is `xlsx_sheet
   --range "A1:F40"
 ```
 
-Probe at least one text cell and one numeric/formula/date region. Record formula `value`, `cached_value`, `data_type`, sheet, range, source hashes, and `source_changed_since_index`. A workbook that is searchable but not deep-readable is only partially working.
+Probe at least one text cell and one numeric/formula/date region. Record formula `value`, `cached_value`, `data_type`, sheet, range, source hashes, `source_changed_since_index`, and `source_verification` (always `sha256` here, because an unreadable workbook fails the read). A workbook that is searchable but not deep-readable is only partially working.
 
 `.xlsm` is supported by the shallow parser and deep reader. Treat macro-preservation concerns separately: KIP reads the workbook without executing or mutating VBA, and deep reads must still report formula and cached-value fields independently.
 

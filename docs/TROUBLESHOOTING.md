@@ -420,12 +420,19 @@ export KIP_ROLES=admin
 
 ## 6. 엑셀 숫자 질문에 답을 거부할 때
 
-`refused: true`와 `exact_xlsx_read_required`(또는 CSV의
-`csv_full_table_required`)가 나오면 정상 동작입니다. 얕은 색인의 텍스트로
-합계를 지어내지 않고, 원본 셀 범위를 직접 읽으라는 뜻입니다.
+`refused: true`와 `exact_xlsx_read_required`가 나오면 정상 동작입니다. 얕은
+색인의 텍스트로 합계를 지어내지 않고, 원본 셀 범위를 직접 읽으라는 뜻입니다.
 
 ```bash
 ./scripts/kip xlsx-read ARTIFACT_ID --sheet "정산" --range "A1:F40"
+```
+
+CSV의 `csv_full_table_required`는 다릅니다. CSV 전용 읽기 도구는 없으므로
+인용된 각 단위를 `read`로 다시 열어 표 전체 행을 확보하거나, 한도가 원인이면
+`--max-chars`를 높이세요.
+
+```bash
+./scripts/kip read UNIT_ID
 ```
 
 ---

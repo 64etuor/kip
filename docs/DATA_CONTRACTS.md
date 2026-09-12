@@ -27,7 +27,9 @@ claims that the missing values were read.
 Partial CSV units qualify only with full contiguous, nonoverlapping row
 coverage from the same artifact/extraction/hash and sufficient `max_chars` to
 include the complete table. Otherwise `csv_full_table_required` identifies the
-missing completeness/budget boundary. Missing legacy completeness metadata is
+missing completeness/budget boundary and names the remedy that exists: reopen
+each cited unit with `read` (there is no CSV-specific read tool), or raise
+`max_chars` when the boundary is the budget. Missing legacy completeness metadata is
 not assumed to mean a complete table. Checks run again after evidence filtering;
 excluded table units cannot leave unsupported ontology context. Complete
 non-table evidence can still answer a query that also matched a workbook.
@@ -148,8 +150,12 @@ violate the contract.
 `source_kind`, title, snippet, scalar score, reproducible locator, source URI,
 indexed source hash, optional source modification time, and metadata.
 Channel ranks, `is_latest`, diversity backfill, and degradation markers live in
-metadata. Array order is result rank. The snippet and score remain discovery
-data, never final evidence.
+metadata, whose generated schema describes them because the map itself is
+free-form. `is_latest` compares the hit's source revision with the newest
+revision of the same logical document only. It is not a claim that no other
+document supersedes this one, and it defaults to `true` when the document or
+its modification time is unknown. Array order is result rank. The snippet and
+score remain discovery data, never final evidence.
 
 `SearchHit.evidence_role` is always `discovery` and
 `SearchHit.source_verification` is always `not_checked`: the hashes on a hit
@@ -181,19 +187,48 @@ fallback, is not configured; lexical order was kept). The same markers remain in
 Two further markers use the same channel: `context_truncated` accompanies
 `ContextBundle.truncated` (one event, one name) when a bundle was cut to the
 requested budget, and `search_failed` rides the `ok: false` envelope of a
-request whose retrieval raised, so a failed search is named and not only
-traced.
+search whose retrieval raised for a reason a retry could resolve, so a retryable
+failure is named and not only traced. It is deliberately not attached to
+`validation_error`, `forbidden`, `not_found` or `configuration_error`, which
+fail identically on every retry; when it is present, `error.code` still
+separates `dependency_unavailable`/`source_unavailable` from `internal_error`.
 
 Verification fields report how the source was checked when the unit was
 reopened. `EvidenceRead.source_verification`,
-`ContextItem.source_verification`, and `AnswerCitation.source_verification` are
-one of `stat` (size and modification time still matched the indexed revision,
-so no new digest was computed), `sha256` (the live file was hashed), or
-`unavailable` (the source could not be read, in which case
-`source_changed_since_index` is true). `ContextItem.body_truncated` is true
+`ContextItem.source_verification` and `AnswerCitation.source_verification` are
+one of `stat` (size and modification time still matched the indexed revision, so
+no new digest was computed), `sha256` (the live file was hashed), or
+`unavailable` (the source could not be read). The producers differ: a direct
+`read` always re-hashes, so `EvidenceRead` from that path is `sha256` or
+`unavailable` and never `stat`; `stat` appears only on the bulk reopen paths
+behind `context` items and `answer` citations.
+
+`XlsxRangeRead.source_verification` is typed `Literal["sha256"]` with no
+default, so a generated client sees `sha256` as the only permitted value: that
+path re-hashes the live workbook and fails closed when it cannot be read, so
+`stat` reuse and `unavailable` never occur there.
+
+`source_changed_since_index` is three-valued, not two-valued: `true` (the live
+source no longer matches the indexed revision), `false` (it was compared and
+matched), and `null` (nothing was compared, which is always paired with
+`source_verification=unavailable`). `null` is unknown and must never be
+rendered as either "this document changed after indexing" or "this document is
+current"; report it as an unverified source. Every application-side consumer
+tests `is not False`, so an unverifiable unit is refused rather than cited.
+`XlsxRangeRead.source_changed_since_index` is never `null` for the same reason
+its `source_verification` is only ever `sha256`. `SearchHit` carries neither field; a
+hit is `evidence_role=discovery` with `source_verification=not_checked`.
+`ContextItem.body_truncated` is true
 when the returned body is only the leading portion of the unit; a truncated
-context item cannot show that something is absent. These fields are additive:
-envelope versions are unchanged and readers must tolerate unknown fields.
+context item cannot show that something is absent.
+
+Envelope versions are unchanged and readers must tolerate unknown fields, but
+the three-valued `source_changed_since_index` is not purely additive for
+readers (ADR-066). A client that treated the field as a plain boolean now sees
+`null` where it used to see `true`: a deleted or unreadable source that used to
+raise a stale-source warning raises none unless the client reads
+`source_verification` and treats `unavailable` as unverified. Test
+`is not False`, never truthiness.
 
 ## PDF evidence boundary
 

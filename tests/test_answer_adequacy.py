@@ -140,6 +140,11 @@ def test_answer_requests_clarification_for_generic_multi_document_question() -> 
     assert response.refused is True
     assert response.refusal_reason == "clarification_required"
     assert response.citations == []
+    # This producer carries no citations, so "be more specific" on its own
+    # leaves the caller with nothing to be specific about. The message names
+    # the step that lists the candidates, the way `csv_full_table_required`
+    # names `read`.
+    assert "search" in response.answer
 
 
 def test_answer_refuses_when_document_anchor_matches_but_question_focus_is_absent() -> None:
@@ -500,3 +505,67 @@ def test_inflected_exclusion_markers_do_not_become_required_keywords(query: str)
 
     assert prepared.refusal is None, prepared.refusal
     assert [item.unit.id for item in prepared.evidence] == ["s2"]
+
+
+def test_partial_csv_refusal_names_read_because_no_csv_read_tool_exists() -> None:
+    # A refusal has to name a remedy the caller can actually run. There is no
+    # CSV read tool, so the message must point at `read` on the cited units.
+    item = _csv_evidence("part", "예산,450000", document_id="budget", csv_partial_table=True)
+
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query="예산 합계 얼마야?"), [item],
+        had_stale_evidence=False, apply_lexical_gate=False,
+    )
+
+    assert prepared.refusal is not None
+    assert prepared.refusal.refusal_reason == "csv_full_table_required"
+    assert "read" in prepared.refusal.answer
+    assert "xlsx" not in prepared.refusal.answer
+
+
+def test_csv_budget_refusal_names_read_as_well_as_the_context_budget() -> None:
+    item = _csv_evidence("complete", "예산,100\n" * 150, document_id="budget", csv_partial_table=False)
+
+    prepared = prepare_answer_evidence(
+        AnswerRequest(query="예산 합계 얼마야?", max_chars=1000), [item],
+        had_stale_evidence=False, apply_lexical_gate=False,
+    )
+
+    assert prepared.refusal is not None
+    assert prepared.refusal.refusal_reason == "csv_full_table_required"
+    assert "max_chars" in prepared.refusal.answer
+    assert "read" in prepared.refusal.answer
+
+
+def test_insufficient_decision_evidence_only_fires_on_its_two_preconditions() -> None:
+    # Given a memo that discusses a change without asserting an approval.
+    body = "A과제 참여율 변경 논의가 있었다. 공식 효력은 승인 공문을 확인해야 한다."
+    evidence = [_evidence("memo", body, document_id="doc_memo")]
+    korean = AnswerRequest(query="A과제 참여율 변경이 승인됐어?")
+
+    # The refusal needs the lexical gate AND the literal substring 승인. This
+    # pins both, because the branch reads as a general approval-evidence gate
+    # and is neither language-neutral nor reachable once generation is on.
+    gated = prepare_answer_evidence(korean, list(evidence), had_stale_evidence=False)
+    assert gated.refusal is not None
+    assert gated.refusal.refusal_reason == "insufficient_decision_evidence"
+
+    # 1. A generation-enabled deployment passes apply_lexical_gate=False.
+    generated = prepare_answer_evidence(
+        korean, list(evidence), had_stale_evidence=False, apply_lexical_gate=False
+    )
+    assert (
+        generated.refusal is None
+        or generated.refusal.refusal_reason != "insufficient_decision_evidence"
+    )
+
+    # 2. The gate is a substring test, so the same question in English misses it.
+    english = prepare_answer_evidence(
+        AnswerRequest(query="Was the A project participation change approved?"),
+        list(evidence),
+        had_stale_evidence=False,
+    )
+    assert (
+        english.refusal is None
+        or english.refusal.refusal_reason != "insufficient_decision_evidence"
+    )

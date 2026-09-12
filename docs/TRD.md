@@ -1,9 +1,9 @@
 ---
 document_id: KIP-TRD-003
 title: KIP v3 Agent-First Knowledge Fabric 기술 요구사항 및 설계서
-version: 3.13.0
+version: 3.14.0
 status: accepted
-last_updated: 2026-09-12
+last_updated: 2026-09-13
 language: ko-KR
 audience:
   - backend-engineering

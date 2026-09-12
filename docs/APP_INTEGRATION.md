@@ -45,12 +45,33 @@ presenting the result as semantic. An explicit `vector`, `hybrid`, or
 summaries gain an optional `semantic_projection` object. Check
 `capabilities.semantic_search` before offering a semantic-only path.
 
+3.14.0 makes source freshness three-valued (ADR-066) without changing envelope
+versions: it adds `source_verification` to `XlsxRangeRead` and lets
+`source_changed_since_index` be `true`, `false`, or `null` on `EvidenceRead` and
+`ContextItem`, where `null` means the source could not be read and nothing was
+compared. This is not purely additive for readers. A client that treated the
+field as a plain boolean now sees `null` where it used to see `true`: a deleted
+or unreadable source that used to raise a stale-source warning raises none
+unless the client reads `source_verification` and treats `unavailable` as
+unverified. Test `is not False`, never truthiness. `capabilities` now repeats
+its `data.warnings` in `meta.warnings` on every edge, which is where every
+instruction says to look, and so does `answer`: a successful answer can now
+carry `generation_unavailable_extractive_fallback` or
+`generation_invalid_extractive_fallback` there, which marks an extractive
+answer produced after the generator failed rather than an anomaly. In the
+other direction, `search_failed` no longer rides a failure whose `error.code`
+is `validation_error`, `forbidden`, `not_found` or `configuration_error`, so a
+client counting that marker to alert on search failures should count
+`ok: false` responses instead.
+
 Allowed filesystem directories come from the deployment's enabled source
 configuration, not REST/SDK request fields. This policy also hides previously
 indexed records after a source is removed or changed and the service reloads.
 Known unit/artifact IDs and broader caller ACLs cannot expand it. Exact reads
-recheck live paths; cloud-only bytes can leave cached text stale, and live XLSX
-reads fail until the operator makes the selected file locally available.
+recheck live paths; cloud-only bytes leave cached text unverified
+(`source_verification=unavailable`, `source_changed_since_index=null`, not
+"changed"), and live XLSX reads fail until the operator makes the selected file
+locally available.
 
 ## Health probes
 

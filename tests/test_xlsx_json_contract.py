@@ -35,6 +35,9 @@ def test_xlsx_dates_are_json_safe_in_the_public_envelope(tmp_path: Path) -> None
         indexed_source_sha256="a" * 64,
         current_source_sha256="a" * 64,
         source_changed_since_index=False,
+        # Required and single-valued: the read path fails closed, so sha256 is
+        # the only verification this model can carry.
+        source_verification="sha256",
     )
     envelope = Envelope(
         ok=True,

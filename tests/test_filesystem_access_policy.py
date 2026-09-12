@@ -311,7 +311,9 @@ def test_placeholder_reopen_does_not_hash_or_claim_matching_stat(scoped_containe
     monkeypatch.setattr("kip.adapters.storage.local._sha256_file", forbidden_hash)
     read = scoped_container.application.evidence.read_unit(context, hit.unit_id, verify_hash=False)
     assert read.current_source_sha256 is None
-    assert read.source_changed_since_index is True
+    # A cloud placeholder was never compared: unknown, not changed.
+    assert read.source_changed_since_index is None
+    assert read.source_verification == "unavailable"
 
 
 def test_cli_rest_mcp_share_source_removal_boundary(scoped_container, monkeypatch):

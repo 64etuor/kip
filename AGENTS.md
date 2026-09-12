@@ -26,7 +26,8 @@ Read the relevant section, not every document at startup.
   database or index access.
 - Search/context snippets are discovery aids. Reopen each relied-on unit with
   `read`; use `xlsx-read` on the original range for spreadsheet numbers, dates,
-  formulas, and totals. Include the locator and stale-source status. Ordinary
+  formulas, and totals. Include the locator and the freshness verdict from
+  `source_verification`: an unreadable source is unknown, never changed. Ordinary
   retrieval does not authorize sync, re-index, or projection rebuilds.
 - Candidate review is a separate human decision: do not approve, reject,
   revoke, or promote on a general request to search or improve KIP. The measured
@@ -44,18 +45,10 @@ Read the relevant section, not every document at startup.
 
 ## Changes and completion
 
-- Add a contract test before changing an adapter. Keep vendor integrations in
-  `src/kip/adapters/` behind ports; all edges retain shared services and ACL
-  semantics. Preserve public IDs and versioned envelopes. MCP name, argument,
-  or envelope changes also update `tests/test_mcp_envelope_contract.py`.
-- Migrations are append-only. Generate OpenAPI with
-  `./scripts/generate-contracts.sh`; export `requirements/runtime.txt` using its
-  header command. Edit `skills/` then copy it to `.claude/skills/` byte-for-byte.
-  `.mcp.json` is written by setup (`src/kip/setup/writer.py`); preserve a
-  deployment's copy. Keep `CLAUDE.md` importing this file.
-- Update affected canonical docs and `CHANGELOG.md` with behavior, contract,
-  configuration, or deployment changes. Architecture decisions need an ADR
-  plus the affected parent docs. Update status/alignment when evidence or
-  limitations change; historical plans and green tests are not live acceptance.
-- Run `./scripts/verify.sh` before completion. Missing checks are a failure,
-  not a substitute for the full gate. Keep shell wrappers executable.
+- Contributor procedure lives in `CONTRIBUTING.md`: adapter contract tests,
+  port boundaries, append-only migrations, contract and requirements
+  regeneration, the byte-identical `.claude/skills/` mirror, and the
+  doc/ADR/CHANGELOG obligations. Read it before changing code; a retrieval or
+  operations task does not need it.
+- Run `./scripts/verify.sh` before completion of any code change. Missing
+  checks are a failure, not a substitute for the full gate.

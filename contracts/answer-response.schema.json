@@ -17,6 +17,7 @@
             }
           ],
           "default": null,
+          "description": "Live digest when one was computed; null when stat reuse verified freshness.",
           "title": "Current Source Sha256"
         },
         "indexed_source_sha256": {
@@ -27,6 +28,7 @@
           "$ref": "#/$defs/EvidenceLocator"
         },
         "source_changed_since_index": {
+          "description": "Always false: a citation is only emitted for evidence whose freshness was positively confirmed. Stale and unverifiable units are refused, never cited.",
           "title": "Source Changed Since Index",
           "type": "boolean"
         },
@@ -36,6 +38,7 @@
         },
         "source_verification": {
           "default": "unavailable",
+          "description": "How freshness was checked: stat (indexed size and mtime still matched, no new digest), sha256 (the live source was re-hashed), or unavailable (the source could not be read, so source_changed_since_index is null).",
           "enum": [
             "stat",
             "sha256",

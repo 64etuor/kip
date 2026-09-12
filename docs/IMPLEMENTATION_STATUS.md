@@ -4,6 +4,37 @@ This is the current readiness inventory, not the target architecture. The
 target-to-current matrix and ordered gap register live in
 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`.
 
+## 2026-09-13 unknown source freshness is null (3.14.0)
+
+An unreadable source no longer reports itself as changed. `read` computed
+`source_changed_since_index` as `current_hash != indexed_sha256` with
+`current_hash` `None`, so a cloud placeholder holding no local bytes produced
+`true` beside `source_verification=unavailable`, and an agent following the
+shipped instruction to report stale-source status told a user a legal document
+had changed after indexing. `EvidenceUseCases.read_unit` now returns `null`
+with `source_verification=unavailable` when the live source cannot be read, and
+the one truthiness test — the answer evidence loop in
+`AnsweringUseCases` — tests `is not False` like every other consumer, so an
+unverifiable unit is refused rather than admitted (ADR-066). `XlsxRangeRead`
+now reports `source_verification`, always `sha256`, because that path fails
+closed on an unreadable workbook.
+
+Envelope versions are unchanged, but the change is not purely additive for
+readers: a client that treated `source_changed_since_index` as a plain boolean
+now sees `null` where it used to see `true`, so a deleted or unreadable source
+that used to raise a stale-source warning raises none unless the client reads
+`source_verification`. The published retrieval gate moved with it:
+`src/kip/evaluation/runner.py` scores `expected_stale_warning` against
+`is not False` rather than an exact match, so an unknown verdict is neither
+counted as fresh nor as a missed warning.
+
+The shipped instructions were the other half of the defect and were rewritten:
+`skills/knowledge-fabric/` states the three-valued rule and which refusals can
+carry citations, the README front door names `source_verification` first, and
+`AGENTS.md` moved contributor procedure into a new `CONTRIBUTING.md`. No
+retrieval-quality claim is implied by this release; the measured numbers remain
+the 3.12.0 run.
+
 ## 2026-09-12 the served model is verified (3.12.2)
 
 Evaluating candidate embedding models on the private corpus exposed a silent
@@ -385,7 +416,9 @@ digest), `sha256` (live file hashed), or `unavailable` (source unreadable, with
 `source_changed_since_index` true) — on `EvidenceRead`, `ContextItem`, and
 `AnswerCitation`. `ContextItem.body_truncated` marks a body that is only the
 leading portion of the unit. The fields are additive, envelope versions are
-unchanged, and generated `contracts/` carry them.
+unchanged, and generated `contracts/` carry them. `XlsxRangeRead` did not
+report `source_verification` yet, and `unavailable` reporting a change was the
+defect 3.14.0 corrects; see the 2026-09-13 section.
 
 Both Memory and PostgreSQL, lexical and vector, now build the same
 paragraph-bounded, query-aware preview (`src/kip/domain/snippets.py`): the

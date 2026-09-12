@@ -439,6 +439,36 @@ def test_a_failed_search_is_named_in_the_error_envelope_on_every_edge(
         assert envelope["meta"]["warnings"] == ["search_failed"]
 
 
+def test_a_rejected_search_is_not_marked_retryable_on_any_edge(test_container, monkeypatch):
+    # `search_failed` tells an agent the backend blipped and a retry may work.
+    # It used to ride a bare `except Exception`, so an authorization or
+    # configuration failure — identical on every retry — carried it too.
+    from kip.application.search_engine import SearchEngine
+    from kip.errors import AuthorizationError
+
+    container = _degraded_container(test_container, monkeypatch)
+
+    def rejected(self, context, request, *, mode=None):
+        raise AuthorizationError("acl scope denies this query")
+
+    monkeypatch.setattr(SearchEngine, "search_ranked", rejected)
+
+    envelopes = _edge_envelopes(
+        container,
+        ["search", "정산", "--limit", "3"],
+        "/v1/search",
+        {"query": "정산", "limit": 3},
+        "kip_search",
+        {"query": "정산", "limit": 3},
+    )
+
+    # `error.code` is what distinguishes the failure; no transient marker.
+    for envelope in envelopes:
+        assert envelope["ok"] is False
+        assert envelope["error"]["code"] == "forbidden"
+        assert envelope["meta"]["warnings"] == []
+
+
 def test_a_truncated_context_bundle_is_named_in_meta_warnings_on_every_edge(
     test_container, monkeypatch
 ):
@@ -463,3 +493,138 @@ def test_a_truncated_context_bundle_is_named_in_meta_warnings_on_every_edge(
     for envelope in envelopes:
         assert envelope["ok"] and envelope["data"]["truncated"] is True
         assert "context_truncated" in envelope["meta"]["warnings"]
+
+
+def test_mcp_allow_stale_argument_describes_what_it_relaxes(test_container, monkeypatch):
+    from mcp.client import Client
+
+    monkeypatch.setattr("kip.mcp_server.build_container", lambda: test_container)
+    server = create_server()
+
+    async def discover():
+        async with Client(server) as client:
+            return (await client.list_tools()).tools
+
+    tools = {tool.name: tool for tool in anyio.run(discover)}
+    description = tools["kip_xlsx_read"].input_schema["properties"]["allow_stale"]["description"]
+
+    # It relaxes an evidence guarantee, so the schema has to say which one and
+    # which refusals survive it.
+    assert "Relax only the freshness guarantee" in description
+    assert "marks source_changed_since_index true" in description
+    assert "still refuses" in description
+    assert "ACL or source scope" in description
+
+
+def test_mcp_read_tool_explains_the_unknown_freshness_value(test_container, monkeypatch):
+    from mcp.client import Client
+
+    monkeypatch.setattr("kip.mcp_server.build_container", lambda: test_container)
+    server = create_server()
+
+    async def discover():
+        async with Client(server) as client:
+            return (await client.list_tools()).tools
+
+    tools = {tool.name: tool for tool in anyio.run(discover)}
+
+    assert "null" in tools["kip_read"].description
+    assert "never fresh" in tools["kip_read"].description
+    # No CSV read tool exists, so the answer tool names `kip_read` instead.
+    assert "csv_full_table_required" in tools["kip_answer"].description
+    assert "kip_read" in tools["kip_answer"].description
+
+
+def test_mcp_read_reports_unknown_freshness_as_null_in_the_envelope(test_container, monkeypatch):
+    from mcp.client import Client
+
+    from kip.domain.models import SearchRequest
+
+    source = test_container.settings.project_root / "source" / "placeholder.txt"
+    source.write_text("클라우드전용 원본")
+    context = test_container.application.operations.request_context()
+    test_container.application.ingestion.sync_filesystem(context, "fixture")
+    unit_id = test_container.application.retrieval.search(
+        context, SearchRequest(query="클라우드전용")
+    )[0].unit_id
+    monkeypatch.setattr("kip.adapters.storage.local.is_cloud_placeholder", lambda _stat: True)
+
+    async def invoke():
+        async with Client(create_server(test_container)) as client:
+            result = await client.call_tool("kip_read", {"unit_id": unit_id})
+            return json.loads(result.content[0].text)
+
+    payload = anyio.run(invoke)["data"]
+
+    assert payload["source_verification"] == "unavailable"
+    assert payload["source_changed_since_index"] is None
+
+
+def test_mcp_xlsx_read_envelope_carries_source_verification(test_container, monkeypatch):
+    from mcp.client import Client
+    from openpyxl import Workbook
+
+    from kip.domain.models import SearchRequest
+
+    path = test_container.settings.project_root / "source" / "범위.xlsx"
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet["A1"] = "정산범위"
+    sheet["B1"] = 42
+    workbook.save(path)
+    context = test_container.application.operations.request_context()
+    test_container.application.ingestion.sync_filesystem(context, "fixture")
+    artifact_id = test_container.application.retrieval.search(
+        context, SearchRequest(query="정산범위")
+    )[0].artifact_id
+    monkeypatch.setattr("kip.mcp_server.build_container", lambda: test_container)
+
+    async def invoke():
+        async with Client(create_server(test_container)) as client:
+            result = await client.call_tool(
+                "kip_xlsx_read",
+                {"artifact_id": artifact_id, "sheet": "Sheet", "cell_range": "A1:B1"},
+            )
+            return json.loads(result.content[0].text)
+
+    payload = anyio.run(invoke)["data"]
+
+    # `read` reports it, so `xlsx-read` must too; otherwise a caller cannot
+    # tell a verified cell value from an unverified one.
+    assert payload["source_verification"] == "sha256"
+    assert payload["source_changed_since_index"] is False
+
+
+def test_answer_warnings_reach_meta_warnings_on_every_edge(tmp_path, monkeypatch):
+    # The agent skill tells callers that warnings always arrive in
+    # `meta.warnings`. `AnswerResponse.warnings` was populated but no edge
+    # lifted it, so an extractive fallback after a generator failure was
+    # indistinguishable from a normal generated answer.
+    from kip.errors import DependencyUnavailableError
+    from tests.test_generated_answers import RecordingGenerator, _container, _ingest
+
+    generator = RecordingGenerator(
+        failure=DependencyUnavailableError("provider unavailable")
+    )
+    container = _container(tmp_path, generator, fallback_on_error=True)
+    _ingest(container, "제출기한.txt", "정산 증빙 제출기한은 2026년 8월 15일이다.")
+    monkeypatch.setattr(
+        "kip.cli.build_container", lambda settings, load_models=True: container
+    )
+    monkeypatch.setenv("KIP_WORKSPACE", "default")
+    monkeypatch.setenv("KIP_ACL_SCOPES", "workspace:default")
+
+    envelopes = _edge_envelopes(
+        container,
+        ["answer", "정산 증빙 제출기한", "--limit", "5"],
+        "/v1/answer",
+        {"query": "정산 증빙 제출기한", "limit": 5},
+        "kip_answer",
+        {"query": "정산 증빙 제출기한", "limit": 5},
+    )
+
+    for envelope in envelopes:
+        assert envelope["ok"], envelope
+        # The structured field stays where it is, and meta.warnings agrees.
+        assert envelope["data"]["warnings"] == ["generation_unavailable_extractive_fallback"]
+        assert envelope["meta"]["warnings"] == ["generation_unavailable_extractive_fallback"]

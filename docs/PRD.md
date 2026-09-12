@@ -1,9 +1,9 @@
 ---
 document_id: KIP-PRD-003
 title: KIP v3 Agent-First Knowledge Fabric 제품 요구사항 정의서
-version: 3.13.0
+version: 3.14.0
 status: accepted
-last_updated: 2026-09-12
+last_updated: 2026-09-13
 language: ko-KR
 audience:
   - product

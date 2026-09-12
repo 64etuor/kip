@@ -5,35 +5,9 @@ description: Install or configure a KIP deployment through its guided setup stat
 
 # KIP Guided Setup
 
-Run from the KIP repository with `./scripts/kip`. On a fresh clone, use
-`./scripts/bootstrap.sh` first; it prepares Python 3.12+ and Node/npm locally
-when missing, without changing system runtimes or shell profiles. A recipient
-without the repository can instead run the published installer
-(`curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh
-| bash`), which verifies the release archive before extracting into an empty
-directory and then runs bootstrap; `./scripts/upgrade.sh --latest` updates an
-existing package deployment in place. That installer also writes a global `kip`
-launcher and a marked block in the login shell profile, so an installed
-deployment runs `kip setup inspect` and `kip update` (the same upgrade) from any
-directory after the shell is restarted; a repository checkout keeps using
-`./scripts/kip`. Use `--check` for read-only prerequisite status. System Docker installation uses
-`--install-docker`; explain that action and obtain authorization if the request
-has not already provided it. Native administrator authentication and Desktop
-license/first-run choices belong to the user's terminal/UI, never chat secrets.
-An action-required exit is not a successful setup: explain the next step and
-rerun after it is completed. Use `--without-docker` only for an external-DB
-CLI/MCP installation. Explicit `KIP_PYTHON` remains authoritative; a broken or
-old existing `.venv` is preserved for the user to move aside. Resume interrupted
-configuration from inspect.
-
-Semantic search (`hybrid`) is the default and the BGE reranker is opt-in
-(ADR-065): bootstrap also installs an isolated model runtime and the pinned
-embedding model (about 1.2 GB) unless
-`KIP_SEMANTIC=off` is set or the host has less than 8 GiB of RAM. A failure
-there leaves bootstrap successful and search lexical. The plan's
-`semantic_search` records whether the runtime is installed; a lexical-only plan
-drops the compose `models` service and warns why. Report that choice with the
-plan rather than changing it silently.
+Run the state machine with `./scripts/kip` from the KIP repository. On a fresh
+clone run `./scripts/bootstrap.sh` first. Resume an interrupted configuration
+from inspect.
 
 1. Run `./scripts/kip setup inspect`. If incomplete, ask exactly one question:
    the returned `data.questions` item. Each question carries `prompt`,
@@ -52,6 +26,8 @@ plan rather than changing it silently.
    `./scripts/kip setup verify --plan PLAN`. Report the receipt's limitations
    and failed `runtime_readiness` items with their remediation.
 
+## After apply
+
 Setup is configuration-only. Follow the receipt's `next_steps` within the
 authorized setup: `./scripts/app-up.sh --database-only` (database readiness and
 migration for CLI/MCP; only the database credential is required and no
@@ -68,11 +44,46 @@ downloads; a local generation choice still needs a separately verified service.
 `sync_schedule` is declarative metadata; a scheduler must be installed separately.
 A missing evaluation dataset means installation-ready, not production-ready.
 
+## Never bypass the state machine
+
 Never edit TOML, Compose, `.mcp.json`, setup state, or plans to bypass the state
 machine. A rejected root, stale fingerprint, or failed read-only check needs
-resolution before apply. Clarification is not consent to remember a preference.
-Ontology discovery approval is a separate admin decision and can automatically
-write an additive YAML release (ADR-044); setup does not authorize that review.
+resolution before apply. An action-required exit is not a successful setup:
+explain the next step and rerun after it is completed. Native administrator
+authentication and Desktop license/first-run choices belong to the user's
+terminal/UI, never chat secrets. Clarification is not consent to remember a
+preference. Ontology discovery approval is a separate admin decision and can
+automatically write an additive YAML release (ADR-044); setup does not authorize
+that review.
+
+## Environment caveats
+
+Bootstrap prepares Python 3.12+ and Node/npm locally when missing, without
+changing system runtimes or shell profiles. Use `--check` for read-only
+prerequisite status. System Docker installation uses `--install-docker`; explain
+that action and obtain authorization if the request has not already provided it.
+Use `--without-docker` only for an external-DB CLI/MCP installation. Explicit
+`KIP_PYTHON` remains authoritative; a broken or old existing `.venv` is preserved
+for the user to move aside.
+
+A recipient without the repository can instead run the published installer
+(`curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh
+| bash`), which verifies the release archive before extracting into an empty
+directory and then runs bootstrap; `./scripts/upgrade.sh --latest` updates an
+existing package deployment in place. That installer also writes a global `kip`
+launcher and a marked block in the login shell profile, so an installed
+deployment runs `kip setup inspect` and `kip update` (the same upgrade) from any
+directory after the shell is restarted; a repository checkout keeps using
+`./scripts/kip`.
+
+Semantic search (`hybrid`) is the default and the BGE reranker is opt-in
+(ADR-065): bootstrap also installs an isolated model runtime and the pinned
+embedding model (about 1.2 GB) unless
+`KIP_SEMANTIC=off` is set or the host has less than 8 GiB of RAM. A failure
+there leaves bootstrap successful and search lexical. The plan's
+`semantic_search` records whether the runtime is installed; a lexical-only plan
+drops the compose `models` service and warns why. Report that choice with the
+plan rather than changing it silently.
 
 Read [question formats](references/questions.md) only when the returned answer
 format needs clarification.

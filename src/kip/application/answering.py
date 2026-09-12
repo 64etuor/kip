@@ -199,7 +199,11 @@ class AnsweringUseCases:
                 hit.unit_id,
                 verify_hash=False,
             )
-            if item.source_changed_since_index:
+            # `is not False` and not a truthiness test: `null` means the source
+            # could not be compared, which is unverified, not fresh. A truthy
+            # test would admit an unverifiable unit as evidence here and then
+            # fail in `citation_from_evidence`.
+            if item.source_changed_since_index is not False:
                 had_stale_evidence = True
                 continue
             fresh.append(item)
@@ -225,6 +229,10 @@ class AnsweringUseCases:
                 if ontology_bundle.context is not None
                 else []
             ),
+            # Off on a generation-enabled deployment: the generator sees the
+            # evidence the lexical gate would have dropped. This is also what
+            # makes `insufficient_decision_evidence` unreachable here — see the
+            # preconditions on that branch in `prepare_answer_evidence`.
             apply_lexical_gate=not (self._enabled and self._generator is not None),
         )
         if prepared.refusal is not None:

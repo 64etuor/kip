@@ -51,6 +51,7 @@
     },
     "metadata": {
       "additionalProperties": true,
+      "description": "Retrieval-run annotations. is_latest compares this hit's source revision with the newest revision of the SAME logical document only; it is not a claim that no other document supersedes this one, and it defaults to true when the document or its modification time is unknown. Other keys: file_name, document_type, channel ranks and degradation markers.",
       "title": "Metadata",
       "type": "object"
     },

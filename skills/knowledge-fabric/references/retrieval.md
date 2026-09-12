@@ -6,14 +6,14 @@
 2. Supported filters such as source kind, project, or document type. Date-range
    filtering is not in the current search contract; inspect dates in exact evidence.
 3. PostgreSQL lexical search.
-4. Vocabulary and verified alias expansion.
+4. `vocab` prefix lookup to confirm the indexed spelling, then approved aliases through the graph. `vocab` shares prefixes only; it expands no synonyms.
 5. Approved graph traversal.
 6. Default search (`hybrid`) already fuses vector and lexical candidates when the deployment's semantic projection is active, and reranks them only where the deployment chose `reranked`; any `meta.warnings` entry ending in `_degraded` means that ranking fell back, so treat the result as weaker. Request an explicit `vector` or `hybrid` mode only to diagnose, not to answer.
 7. Exact source read.
 
 ## Weak result signals
 
-Treat a result set as weak when it has no exact identifier match, low score separation, repeated duplicate documents, stale sources, or no readable evidence locator. Use `vocab` and a narrower query rather than inventing unsupported synonyms.
+Treat a result set as weak when it has no exact identifier match, low score separation, repeated duplicate documents, stale or unverifiable sources, or no readable evidence locator. Use `vocab` and a narrower query rather than inventing unsupported synonyms. A failed search is not a weak result: retry it when `meta.warnings` carries `search_failed`, and read `error.code` instead of retrying when it does not. See [evidence](evidence.md).
 
 ## Context packs
 
@@ -27,4 +27,4 @@ For each material claim report:
 - source kind;
 - page, section, cell range, Slack message timestamp, or Message-ID;
 - indexed source hash;
-- whether the original changed after indexing.
+- the freshness verdict from `source_verification`, and a changed-after-indexing claim only when that verdict is `sha256`.

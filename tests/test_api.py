@@ -92,7 +92,7 @@ def test_rest_answer_refuses_when_only_evidence_is_stale(test_container):
     assert answer["citations"] == []
 
 
-def test_read_marks_missing_source_as_changed(test_container):
+def test_read_marks_missing_source_as_unknown_not_changed(test_container):
     path = test_container.settings.project_root / "source" / "삭제됨.txt"
     path.write_text("삭제 전 원본", encoding="utf-8")
     context = test_container.application.operations.request_context()
@@ -106,7 +106,8 @@ def test_read_marks_missing_source_as_changed(test_container):
     evidence = test_container.application.evidence.read_unit(context, unit_id)
 
     assert evidence.current_source_sha256 is None
-    assert evidence.source_changed_since_index is True
+    assert evidence.source_changed_since_index is None
+    assert evidence.source_verification == "unavailable"
 
 
 def test_rest_answer_requires_exact_xlsx_read_for_numeric_claim(test_container):

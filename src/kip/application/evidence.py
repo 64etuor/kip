@@ -49,13 +49,26 @@ class EvidenceUseCases:
                 source_verification="stat",
             )
         current_hash = self._current_hash(view.artifact.source_path)
+        if current_hash is None:
+            # The live source could not be read (missing file, or a cloud
+            # placeholder holding no local bytes). Nothing was compared, so the
+            # field must not assert a change: `null` is unknown, and every
+            # consumer treats "not exactly False" as unverified, never fresh.
+            return EvidenceRead(
+                unit=unit,
+                source_uri=view.source_object.canonical_uri,
+                indexed_source_sha256=view.revision.sha256,
+                current_source_sha256=None,
+                source_changed_since_index=None,
+                source_verification="unavailable",
+            )
         return EvidenceRead(
             unit=unit,
             source_uri=view.source_object.canonical_uri,
             indexed_source_sha256=view.revision.sha256,
             current_source_sha256=current_hash,
             source_changed_since_index=current_hash != view.revision.sha256,
-            source_verification="sha256" if current_hash is not None else "unavailable",
+            source_verification="sha256",
         )
 
     def _stat_matches_revision(self, view: ArtifactView) -> bool:
@@ -104,6 +117,11 @@ class EvidenceUseCases:
             indexed_source_sha256=view.artifact.sha256,
             current_source_sha256=current_hash,
             source_changed_since_index=current_hash != view.artifact.sha256,
+            # `require_sha256` above fails closed on an unreadable workbook, so
+            # a returned range is always backed by a live digest. Reporting the
+            # field keeps `xlsx-read` readable by the same freshness rule as
+            # `read`, `search` hits and `context` items.
+            source_verification="sha256",
         )
 
     def get_artifact(

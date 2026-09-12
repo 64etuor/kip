@@ -1,3 +1,4 @@
+import inspect
 import json
 import re
 import shutil
@@ -5,7 +6,13 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from kip.cli import app
+from kip.cli import (
+    _DEPLOYMENT_PANEL,
+    _OPERATOR_PANEL,
+    _RETRIEVAL_PANEL,
+    _ROOT_HELP,
+    app,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -458,3 +465,102 @@ def test_update_and_version_commands_work_without_a_database(tmp_path, monkeypat
     version = runner.invoke(app, ["version"])
     assert version.exit_code == 0
     assert json.loads(version.output)["data"]["version"] == __version__
+
+
+def _help(*command: str) -> str:
+    """`--help` text with Rich's panel borders and line wrapping removed."""
+    result = CliRunner().invoke(app, [*command, "--help"], env=_env())
+    assert result.exit_code == 0, result.stdout
+    unboxed = re.sub(r"[\u2500-\u257f]", " ", result.stdout)
+    return re.sub(r"\s+", " ", unboxed)
+
+
+def test_root_help_separates_read_only_retrieval_from_operator_commands() -> None:
+    # An agent told that ordinary retrieval does not authorize sync, re-index
+    # or projection rebuild gets no signal from one flat list of 30 commands.
+    text = _help()
+
+    assert "Retrieval (read-only)" in text
+    assert "Operator (changes state" in text
+    # The same split is spelled out in prose, because Typer drops the Rich
+    # panels entirely when Rich is not installed.
+    assert "Retrieval commands are read-only" in text
+    assert "Operator commands change state and are not authorized by an ordinary retrieval request" in text
+    for operator_command in ("sync", "projection", "rebuild", "migrate", "review", "ontology", "parser"):
+        assert operator_command in text
+
+
+# A leaf command that changes state. Matched against the command's own help
+# text, so a new mutating command is caught by the same rule instead of
+# needing to be remembered in a hand-kept list here.
+_STATE_CHANGING_VERBS = re.compile(
+    r"\b(delete|deletes|prune|prunes|rebuild|rebuilds|approve|approves|reject|rejects"
+    r"|revoke|revokes|activate|activates|promote|promotes|migrate|migrates|write|writes"
+    r"|remove|removes|create|creates|cancel|cancels|register|registers"
+    r"|synchronize|synchronizes|sync|syncs)\b",
+    re.IGNORECASE,
+)
+
+
+def _leaf_commands(typer_app, prefix: tuple[str, ...] = ()) -> list[tuple[tuple[str, ...], str]]:
+    leaves = [
+        ((*prefix, command.name or command.callback.__name__.replace("_", "-")),
+         command.help or inspect.getdoc(command.callback) or "")
+        for command in typer_app.registered_commands
+    ]
+    for group in typer_app.registered_groups:
+        leaves.extend(_leaf_commands(group.typer_instance, (*prefix, group.name)))
+    return leaves
+
+
+def test_no_state_changing_command_is_listed_as_read_only_retrieval() -> None:
+    # `telemetry` was grouped as read-only retrieval while `telemetry prune`
+    # deleted query traces. The panels exist so an agent can tell a read-only
+    # command from one that changes state, so a mutating leaf under the
+    # retrieval panel defeats the whole grouping.
+    panels = {
+        command.name or command.callback.__name__.replace("_", "-"): command.rich_help_panel
+        for command in app.registered_commands
+    }
+    panels.update({group.name: group.rich_help_panel for group in app.registered_groups})
+
+    mutating = {
+        path[0]
+        for path, help_text in _leaf_commands(app)
+        if _STATE_CHANGING_VERBS.search(help_text)
+    }
+    assert "telemetry" in mutating  # `telemetry prune` deletes query traces.
+
+    retrieval_prose, operator_prose = _ROOT_HELP.split("Operator commands change state")
+    for name in sorted(mutating):
+        assert panels[name] != _RETRIEVAL_PANEL, name
+        assert panels[name] == _OPERATOR_PANEL or panels[name] == _DEPLOYMENT_PANEL, name
+        # Typer drops the Rich panels when Rich is absent, so the prose list
+        # has to agree with the panel it is a fallback for.
+        assert name not in retrieval_prose, name
+        assert name in operator_prose, name
+
+
+def test_search_help_lists_the_same_mode_values_the_mcp_schema_enumerates() -> None:
+    # The CLI is the fallback surface when MCP is unavailable, so an allowed
+    # value that only the MCP schema names is undiscoverable.
+    for command in ("search", "context", "answer"):
+        text = _help(command)
+        assert "lexical | vector | hybrid | reranked" in text, command
+        # `--source-kind` differs in shape from MCP's `source_kinds` array.
+        assert "Repeat the option or pass a comma-separated list" in text, command
+        assert "source_kinds" in text, command
+        assert "document_types" in text, command
+        assert "project_ids" in text, command
+
+    assert "out | in | both" in _help("graph", "neighbors")
+
+
+def test_allow_stale_help_says_what_it_relaxes_and_what_it_still_refuses() -> None:
+    for command in (("xlsx-read",), ("xlsx", "read")):
+        text = _help(*command)
+        assert "Relax only the freshness guarantee" in text, command
+        assert "still refuses when the workbook cannot be read" in text, command
+        assert "ACL or source scope denies the artifact" in text, command
+        assert "marks source_changed_since_index true" in text, command
+        assert "keeps source_verification sha256" in text, command

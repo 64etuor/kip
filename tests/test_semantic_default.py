@@ -527,3 +527,51 @@ def test_runtime_outage_degrades_even_when_the_reranker_is_disabled(test_contain
     assert hits[0].metadata["lexical_rerank_degraded"] is True
     with pytest.raises(DependencyUnavailableError):
         container.application.retrieval.search(context, SearchRequest(query="승인"), mode="lexical")
+
+
+def test_a_runtime_serving_another_model_degrades_default_search_to_lexical(
+    test_container, tmp_path: Path
+) -> None:
+    """Infinity answers `/embeddings` with HTTP 200 for a model it does not
+    serve, so an operator evaluating a candidate through KIP_EMBEDDING_MODEL
+    would otherwise embed queries in a space the active projection never used.
+    """
+    import httpx
+
+    from kip.adapters.embeddings.http import HttpEmbeddingAdapter
+
+    def runtime(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/models":
+            return httpx.Response(200, json={"data": [{"id": "kip-arctic-embed-l-v2-ko"}]})
+        raise AssertionError("a runtime serving another model must never be embedded in")
+
+    container = _semantic_container(
+        test_container,
+        tmp_path,
+        HttpEmbeddingAdapter(
+            base_url="http://127.0.0.1:7997",
+            model=ReviewedEmbedding.model,
+            revision=ReviewedEmbedding.revision,
+            dimensions=ReviewedEmbedding.dimensions,
+            query_instruction=REVIEWED_INSTRUCTION,
+            client=httpx.Client(transport=httpx.MockTransport(runtime)),
+        ),
+    )
+    context = container.application.operations.request_context()
+
+    summary = after_sync(
+        container.application.retrieval,
+        context,
+        container.application.ingestion.sync_filesystem(context, "fixture"),
+    )
+
+    assert summary.inserted == 2
+    update = summary.semantic_projection
+    assert update is not None and update.status == "unavailable"
+    assert update.reason and "not the configured 'kip-qwen3-embedding-0.6b'" in update.reason
+    hits = container.application.retrieval.search(context, SearchRequest(query="승인"))
+    assert hits and hits[0].metadata["semantic_degraded"] is True
+    assert container.application.retrieval.result_warnings(context, hits) == ["semantic_degraded"]
+    # An explicit vector request never silently falls back to another space.
+    with pytest.raises(DependencyUnavailableError, match="not the configured"):
+        container.application.retrieval.search(context, SearchRequest(query="승인"), mode="vector")

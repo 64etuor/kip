@@ -22,11 +22,15 @@ DEVICE="${KIP_SEMANTIC_DEVICE:-$(default_device)}"
 # CPU inference stays float32.
 if [[ "$DEVICE" == cpu ]]; then default_dtype=float32; else default_dtype=float16; fi
 DTYPE="${KIP_SEMANTIC_DTYPE:-$default_dtype}"
-EMBED_MODEL="${KIP_EMBEDDING_MODEL:-Qwen/Qwen3-Embedding-0.6B}"
-EMBED_REVISION="${KIP_EMBEDDING_REVISION:-97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3}"
+EMBED_MODEL_DEFAULT="Qwen/Qwen3-Embedding-0.6B"
+EMBED_REVISION_DEFAULT="97b0c614be4d77ee51c0cef4e5f07c00f9eb65b3"
+EMBED_MODEL="${KIP_EMBEDDING_MODEL:-$EMBED_MODEL_DEFAULT}"
+EMBED_REVISION="${KIP_EMBEDDING_REVISION:-$EMBED_REVISION_DEFAULT}"
 EMBED_SERVED="${KIP_EMBEDDING_SERVED_MODEL:-kip-qwen3-embedding-0.6b}"
-RERANK_MODEL="${KIP_RERANKER_MODEL:-BAAI/bge-reranker-v2-m3}"
-RERANK_REVISION="${KIP_RERANKER_REVISION:-953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e}"
+RERANK_MODEL_DEFAULT="BAAI/bge-reranker-v2-m3"
+RERANK_REVISION_DEFAULT="953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
+RERANK_MODEL="${KIP_RERANKER_MODEL:-$RERANK_MODEL_DEFAULT}"
+RERANK_REVISION="${KIP_RERANKER_REVISION:-$RERANK_REVISION_DEFAULT}"
 RERANK_SERVED="${KIP_RERANKER_SERVED_MODEL:-kip-bge-reranker-v2-m3}"
 EMBED_BATCH_SIZE="${KIP_EMBEDDING_SERVER_BATCH_SIZE:-4}"
 RERANK_BATCH_SIZE="${KIP_RERANKER_SERVER_BATCH_SIZE:-2}"
@@ -174,6 +178,28 @@ require_reranker_served() {
   exit 1
 }
 
+require_named_override() {
+  # Loading other weights or another revision under the pinned served name is
+  # invisible to every client: Infinity's `GET /models` reports the served
+  # name only, with no revision or weight hash, so KIP's served-model check
+  # cannot tell that space apart from the configured one. Refuse instead.
+  local weights="$1" weights_default="$2" revision="$3" revision_default="$4"
+  local served="$5" served_variable="$6" variables="$7" setting="$8"
+  [[ "$weights" != "$weights_default" || "$revision" != "$revision_default" ]] || return 0
+  [[ -z "${!served_variable:-}" ]] || return 0
+  printf '%s loads %s@%s, but the runtime would still serve it as "%s" and GET /models reports no revision or weight hash, so KIP cannot tell it from the configured model. Set %s to a distinct name and %s in config/kip*.toml to the same name, then start again.\n' \
+    "$variables" "$weights" "${revision:0:12}" "$served" "$served_variable" "$setting" >&2
+  exit 1
+}
+
+require_named_model_overrides() {
+  require_named_override "$EMBED_MODEL" "$EMBED_MODEL_DEFAULT" "$EMBED_REVISION" "$EMBED_REVISION_DEFAULT" \
+    "$EMBED_SERVED" KIP_EMBEDDING_SERVED_MODEL "KIP_EMBEDDING_MODEL/KIP_EMBEDDING_REVISION" models.embedding.model
+  [[ "$RERANKER" == on ]] || return 0
+  require_named_override "$RERANK_MODEL" "$RERANK_MODEL_DEFAULT" "$RERANK_REVISION" "$RERANK_REVISION_DEFAULT" \
+    "$RERANK_SERVED" KIP_RERANKER_SERVED_MODEL "KIP_RERANKER_MODEL/KIP_RERANKER_REVISION" models.reranker.model
+}
+
 supervisor_log() {
   if [[ "$(uname -s)" == Darwin ]]; then
     printf '%s\n' "$LOG_DIR/launchd-semantic.err.log"
@@ -189,6 +215,7 @@ case "$action" in
     # While another runtime runs (possibly still loading) or answers on the
     # port, loading the models again would only fail to bind, so wait and
     # take over once the port is free.
+    require_named_model_overrides
     waiting=0
     while other="$(supervised_pid)" || answers || port_open; do
       if (( ! waiting )); then
@@ -205,6 +232,7 @@ case "$action" in
     exec "${command_line[@]}"
     ;;
   start)
+    require_named_model_overrides
     if running_pid; then
       require_reranker_served
       printf 'Semantic server already running with PID %s\n' "$(<"$PID_FILE")"

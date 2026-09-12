@@ -325,3 +325,242 @@ def test_semantic_doctor_check_never_promises_auto_activation_over_an_explicit_s
     assert "outside the release-reviewed identities is never replaced automatically" in reason
     assert "projection activate --report REPORT --candidate VARIANT" in reason
     assert "to embed and activate it" not in reason
+
+
+def _runtime_serving(
+    monkeypatch, tmp_path: Path, served: list[str], raw_models: dict, raw: dict | None = None
+) -> Settings:
+    """A reachable runtime whose `/models` answer lists `served`."""
+    real_client = httpx.Client
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": [{"id": model_id} for model_id in served]})
+
+    monkeypatch.setattr(
+        httpx,
+        "Client",
+        lambda **kwargs: real_client(transport=httpx.MockTransport(answer), **kwargs),
+    )
+    return Settings(
+        project_root=tmp_path,
+        config_path=tmp_path / "kip.toml",
+        raw={"models": raw_models, **(raw or {})},
+        environment="test",
+        database_url="memory://",
+        cas_path=tmp_path / "cas",
+    )
+
+
+def test_semantic_doctor_check_separates_a_wrong_model_from_an_unreachable_runtime(
+    tmp_path: Path, monkeypatch
+) -> None:
+    # Given a runtime started with another model (the documented
+    # KIP_EMBEDDING_MODEL override, or a stale unit file).
+    settings = _runtime_serving(
+        monkeypatch,
+        tmp_path,
+        ["kip-arctic-embed-l-v2-ko"],
+        {
+            "embedding": {
+                "enabled": True,
+                "base_url": "http://127.0.0.1:9",
+                "model": "kip-qwen3-embedding-0.6b",
+            }
+        },
+    )
+
+    check = _semantic_doctor_check(settings, _capabilities(configured=True, ready=True, status="active"))
+
+    # Then the runtime counts as reachable, and the reason names both models
+    # instead of reading like an outage.
+    assert check["ok"] is False and check["required"] is False
+    assert check["details"]["model_runtime"] is True
+    reason = check["details"]["reason"]
+    assert "serves ['kip-arctic-embed-l-v2-ko']" in reason
+    assert "not the configured models.embedding.model 'kip-qwen3-embedding-0.6b'" in reason
+    assert "KIP_EMBEDDING_SERVED_MODEL" in reason and "falls back to lexical" in reason
+    assert "no revision or weight hash" in reason
+    assert "models.embedding.revision stays unverified at runtime" in reason
+    assert "semantic-server.sh start" not in reason
+
+
+def test_semantic_doctor_check_reports_a_wrong_cross_encoder_model(tmp_path: Path, monkeypatch) -> None:
+    settings = _runtime_serving(
+        monkeypatch,
+        tmp_path,
+        ["kip-qwen3-embedding-0.6b"],
+        {
+            "embedding": {
+                "enabled": True,
+                "base_url": "http://127.0.0.1:9",
+                "model": "kip-qwen3-embedding-0.6b",
+            },
+            "reranker": {
+                "enabled": True,
+                "backend": "http",
+                "base_url": "http://127.0.0.1:9",
+                "model": "kip-bge-reranker-v2-m3",
+            },
+        },
+    )
+
+    check = _semantic_doctor_check(settings, _capabilities(configured=True, ready=True, status="active"))
+
+    assert check["ok"] is False
+    reason = check["details"]["reason"]
+    assert "not the configured models.reranker.model 'kip-bge-reranker-v2-m3'" in reason
+    assert "Reranked mode fails until then" in reason
+
+
+def test_semantic_doctor_check_passes_when_the_runtime_serves_both_configured_models(
+    tmp_path: Path, monkeypatch
+) -> None:
+    settings = _runtime_serving(
+        monkeypatch,
+        tmp_path,
+        ["kip-qwen3-embedding-0.6b", "kip-bge-reranker-v2-m3"],
+        {
+            "embedding": {
+                "enabled": True,
+                "base_url": "http://127.0.0.1:9",
+                "model": "kip-qwen3-embedding-0.6b",
+            },
+            "reranker": {
+                "enabled": True,
+                "backend": "http",
+                "model": "kip-bge-reranker-v2-m3",
+            },
+        },
+    )
+
+    check = _semantic_doctor_check(settings, _capabilities(configured=True, ready=True, status="active"))
+
+    assert check["ok"] is True and check["details"]["reason"] is None
+
+
+def test_semantic_doctor_check_reports_a_runtime_that_serves_nothing(tmp_path: Path, monkeypatch) -> None:
+    settings = _runtime_serving(
+        monkeypatch,
+        tmp_path,
+        [],
+        {"embedding": {"enabled": True, "base_url": "http://127.0.0.1:9", "model": "kip-qwen3-embedding-0.6b"}},
+    )
+
+    check = _semantic_doctor_check(settings, _capabilities(configured=True, ready=True, status="active"))
+
+    assert check["ok"] is False and check["details"]["model_runtime"] is True
+    reason = check["details"]["reason"]
+    assert "answers but serves no model" in reason and "semantic-server.sh wait" in reason
+
+
+def test_semantic_doctor_check_never_probes_a_base_url_egress_forbids(tmp_path: Path, monkeypatch) -> None:
+    # The adapters refuse a remote model URL while egress is closed; doctor
+    # must report that instead of connecting to it.
+    connected: list[str] = []
+    real_client = httpx.Client
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        connected.append(str(request.url))
+        return httpx.Response(200, json={"data": []})
+
+    monkeypatch.setattr(
+        httpx,
+        "Client",
+        lambda **kwargs: real_client(transport=httpx.MockTransport(answer), **kwargs),
+    )
+    settings = Settings(
+        project_root=tmp_path,
+        config_path=tmp_path / "kip.toml",
+        raw={
+            "models": {
+                "embedding": {
+                    "enabled": True,
+                    "base_url": "https://models.example.com",
+                    "model": "kip-qwen3-embedding-0.6b",
+                }
+            }
+        },
+        environment="test",
+        database_url="memory://",
+        cas_path=tmp_path / "cas",
+    )
+
+    check = _semantic_doctor_check(settings, _capabilities(configured=True, ready=True, status="active"))
+
+    assert check["ok"] is False and connected == []
+    reason = check["details"]["reason"]
+    assert "models.embedding.base_url is not usable" in reason and "loopback" in reason
+
+
+@pytest.mark.parametrize(
+    "reranker",
+    [
+        {"enabled": False, "backend": "http", "model": "kip-bge-reranker-v2-m3"},
+        {"enabled": True, "backend": "bm25"},
+        {"enabled": True, "backend": "rapidfuzz", "model": "kip-bge-reranker-v2-m3"},
+    ],
+)
+def test_semantic_doctor_check_only_verifies_a_cross_encoder_taken_from_a_runtime(
+    tmp_path: Path, monkeypatch, reranker: dict
+) -> None:
+    settings = _runtime_serving(
+        monkeypatch,
+        tmp_path,
+        ["kip-qwen3-embedding-0.6b"],
+        {
+            "embedding": {
+                "enabled": True,
+                "base_url": "http://127.0.0.1:9",
+                "model": "kip-qwen3-embedding-0.6b",
+            },
+            "reranker": reranker,
+        },
+    )
+
+    check = _semantic_doctor_check(settings, _capabilities(configured=True, ready=True, status="active"))
+
+    assert check["ok"] is True and check["details"]["reason"] is None
+
+
+def test_semantic_doctor_check_reports_a_cross_encoder_runtime_of_its_own(tmp_path: Path, monkeypatch) -> None:
+    # A reranker on another loopback port: the embedding probe says nothing
+    # about it, so it is probed separately and reported as unreachable.
+    real_client = httpx.Client
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        if request.url.port == 9:
+            return httpx.Response(200, json={"data": [{"id": "kip-qwen3-embedding-0.6b"}]})
+        raise httpx.ConnectError("connection refused", request=request)
+
+    monkeypatch.setattr(
+        httpx,
+        "Client",
+        lambda **kwargs: real_client(transport=httpx.MockTransport(answer), **kwargs),
+    )
+    settings = Settings(
+        project_root=tmp_path,
+        config_path=tmp_path / "kip.toml",
+        raw={
+            "models": {
+                "embedding": {
+                    "enabled": True,
+                    "base_url": "http://127.0.0.1:9",
+                    "model": "kip-qwen3-embedding-0.6b",
+                },
+                "reranker": {
+                    "enabled": True,
+                    "backend": "http",
+                    "base_url": "http://127.0.0.1:10",
+                    "model": "kip-bge-reranker-v2-m3",
+                },
+            }
+        },
+        environment="test",
+        database_url="memory://",
+        cas_path=tmp_path / "cas",
+    )
+
+    check = _semantic_doctor_check(settings, _capabilities(configured=True, ready=True, status="active"))
+
+    assert check["ok"] is False and check["details"]["model_runtime"] is True
+    assert "reranker model runtime not reachable at http://127.0.0.1:10" in check["details"]["reason"]

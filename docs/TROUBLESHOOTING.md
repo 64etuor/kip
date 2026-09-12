@@ -277,6 +277,24 @@ search를 쓰면 embedding model snapshot 약 1.2GB(`var/model-cache`, reranker�
   첫 projection은 몇 시간이 걸리며, 그동안 이 경고가 계속 붙는 것은 정상입니다.
   Sync 중 runtime이 멈춰 있으면 `semantic_projection.status`가 `unavailable`이
   되고 다음 sync가 이어서 처리합니다.
+  Runtime이 떠 있는데도 이 경고가 붙는다면 설정과 다른 model을 serve하고 있을 수
+  있습니다. Infinity는 serve하지 않는 model 이름으로 요청해도 HTTP 200으로
+  답하므로, KIP가 `GET /models`로 `models.embedding.model`(HTTP reranker면
+  `models.reranker.model`)이 실제로 올라와 있는지 먼저 확인하고 다르면 runtime을
+  사용하지 않습니다. `KIP_EMBEDDING_SERVED_MODEL`(reranker면
+  `KIP_RERANKER_SERVED_MODEL`)이 다른 이름을 가리키거나, runtime을 다시 시작하지
+  않고 `models.embedding.model`만 바꿨거나, 오래된 launchd/systemd unit이 남아
+  있을 때 나타나며, `doctor`의 `reason`이 serve 중인 model 목록과 설정값을 함께
+  보여줍니다. 설정한 model로 runtime을 다시 시작하거나 `models.embedding.model`을
+  맞추세요.
+  확인하는 것은 serve 이름뿐입니다. Infinity 0.0.77의 `GET /models`는 revision도
+  weight hash도 알려주지 않으므로 **같은 이름으로 다른 weight나 다른 revision을
+  serve하면 KIP는 알아채지 못하고**, `models.embedding.revision`은 runtime에서
+  검증되지 않습니다. 그래서 `KIP_EMBEDDING_MODEL`/`KIP_EMBEDDING_REVISION`(그리고
+  `KIP_SEMANTIC_RERANKER=on`일 때 `KIP_RERANKER_MODEL`/`KIP_RERANKER_REVISION`)으로
+  기본값과 다른 model을 띄우려 하면 `./scripts/semantic-server.sh`가 시작을
+  거부합니다. 후보 model을 평가할 때는 `KIP_EMBEDDING_SERVED_MODEL`로 다른 이름을
+  주고 `models.embedding.model`도 그 이름으로 맞추세요.
 - `rerank_degraded`: 기본 mode를 `reranked`로 바꾼 배포에서 reranker만 실패해
   lexical+vector fusion 순위를 그대로 돌려줬습니다. BGE reranker
   (`models.reranker.backend = "http"`)는 runtime을 `KIP_SEMANTIC_RERANKER=on`으로
@@ -344,7 +362,7 @@ Reference 설정에서는 모든 filesystem parser가 파일 하나당 fresh chi
 | `canonical_repository` | 데이터베이스에 연결하지 못했습니다. `./scripts/app-up.sh --database-only`로 PostgreSQL이 떠 있는지, `KIP_DATABASE_URL`이 맞는지 확인하세요. |
 | `content_addressed_store` | 원본 사본 저장 폴더(CAS)에 접근할 수 없습니다. 경로 권한을 확인하세요. |
 | `filesystem_source:이름` | 그 소스 폴더가 없거나 읽을 수 없습니다. 경로와 접근 권한을 확인하세요. |
-| `semantic_search` | Semantic search가 켜져 있는데 model runtime에 연결할 수 없거나 projection이 active가 아니거나 완성되지 않았습니다(`stale`). 필수 항목은 아니며 그동안 검색은 lexical로 동작합니다. `details.reason`의 명령(`./scripts/semantic-server.sh start`, `./scripts/bootstrap-semantic.sh && ./scripts/semantic-server.sh prefetch`, `./scripts/kip sync run --source 소스이름` 또는 `./scripts/kip projection rebuild --name semantic`)을 실행하세요. |
+| `semantic_search` | Semantic search가 켜져 있는데 model runtime에 연결할 수 없거나, runtime이 설정과 다른 model을 serve하고 있거나, projection이 active가 아니거나 완성되지 않았습니다(`stale`). 필수 항목은 아니며 그동안 검색은 lexical로 동작합니다. 다른 model을 serve하는 경우 `details.reason`이 serve 중인 model 목록과 `models.embedding.model`(HTTP reranker면 `models.reranker.model`)을 함께 보여주며, 그 model로 runtime을 다시 시작하면 됩니다. 나머지는 `details.reason`의 명령(`./scripts/semantic-server.sh start`, `./scripts/bootstrap-semantic.sh && ./scripts/semantic-server.sh prefetch`, `./scripts/kip sync run --source 소스이름` 또는 `./scripts/kip projection rebuild --name semantic`)을 실행하세요. |
 | `kordoc_ocr_resolvable` | OCR이 켜져 있는데 `kordoc` 실행 파일을 찾지 못했습니다. `./scripts/install-kordoc.sh`를 실행하거나, 스캔 문서가 없다면 설정에서 `parsers.ocr.kordoc.enabled = false`로 끄세요. 끄지 않으면 이미지가 든 PDF/PPTX가 `partial`로 처리됩니다. |
 | `ontology_adaptive_discovery_writable` | 새 용어 제안 기능이 켜져 있는데 `ontology/` 폴더에 쓸 수 없습니다. 컨테이너라면 그 폴더가 쓰기 가능하게 연결(마운트)되어야 합니다. |
 | `ontology_pending_release_journal` | 이전 작업이 중단된 흔적이 남아 있습니다. 다음 실행 때 자동 복구되며, 계속 남아 있으면 파일 권한을 확인하세요. |

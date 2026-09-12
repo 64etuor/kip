@@ -142,7 +142,7 @@ shasum, unzip 또는 python3만 있으면 됩니다. 버전이 지정된 배포 
 ```bash
 # 설치 위치와 버전을 고정
 curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh \
-  | bash -s -- ~/kip --version 3.12.1
+  | bash -s -- ~/kip --version 3.12.2
 ```
 
 `--check`, `--install-docker`, `--without-docker`는 bootstrap에 그대로

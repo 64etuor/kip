@@ -396,3 +396,64 @@ def test_runtime_reads_models_from_the_same_hub_cache_prefetch_fills(tmp_path: P
     assert result.returncode == 0, result.stderr
     cache = f"{project}/var/model-cache"
     assert f"cache hf={cache} hub={cache}/hub st=unset tf=unset" in _trace(trace)
+
+
+@pytest.mark.parametrize("action", ["run", "start"])
+def test_a_model_override_must_also_rename_the_served_model(tmp_path: Path, action: str) -> None:
+    # Infinity's `GET /models` reports the served name only, so other weights
+    # under the pinned name are undetectable by KIP's served-model check.
+    project, environment, trace = _semantic_project(tmp_path, KIP_EMBEDDING_MODEL="BAAI/bge-m3")
+
+    result = _script(project, environment, "semantic-server.sh", action)
+
+    assert result.returncode == 1
+    assert "KIP_EMBEDDING_SERVED_MODEL" in result.stderr
+    assert "models.embedding.model" in result.stderr
+    assert "no revision or weight hash" in result.stderr
+    assert not _trace(trace)  # the runtime never loaded
+
+
+def test_a_revision_override_must_also_rename_the_served_model(tmp_path: Path) -> None:
+    project, environment, trace = _semantic_project(tmp_path, KIP_EMBEDDING_REVISION="0123456789abcdef")
+
+    result = _script(project, environment, "semantic-server.sh", "run")
+
+    assert result.returncode == 1
+    assert "KIP_EMBEDDING_SERVED_MODEL" in result.stderr
+    assert not _trace(trace)
+
+
+def test_a_renamed_override_starts_and_advertises_the_new_name(tmp_path: Path) -> None:
+    project, environment, trace = _semantic_project(
+        tmp_path, KIP_EMBEDDING_MODEL="BAAI/bge-m3", KIP_EMBEDDING_SERVED_MODEL="kip-bge-m3",
+    )
+
+    result = _script(project, environment, "semantic-server.sh", "run")
+
+    assert result.returncode == 0, result.stderr
+    assert "--served-model-name kip-bge-m3" in _trace(trace)[-1]
+
+
+def test_a_reranker_override_must_also_rename_the_served_reranker(tmp_path: Path) -> None:
+    project, environment, trace = _semantic_project(
+        tmp_path, KIP_SEMANTIC_RERANKER="on", KIP_RERANKER_MODEL="jinaai/jina-reranker-v2-base-multilingual",
+    )
+
+    result = _script(project, environment, "semantic-server.sh", "run")
+
+    assert result.returncode == 1
+    assert "KIP_RERANKER_SERVED_MODEL" in result.stderr and "models.reranker.model" in result.stderr
+    assert not _trace(trace)
+
+
+def test_a_reranker_override_is_inert_while_the_cross_encoder_is_off(tmp_path: Path) -> None:
+    # The default runtime loads the embedding model only, so the reranker
+    # override changes nothing that could be served under the pinned name.
+    project, environment, trace = _semantic_project(
+        tmp_path, KIP_RERANKER_MODEL="jinaai/jina-reranker-v2-base-multilingual",
+    )
+
+    result = _script(project, environment, "semantic-server.sh", "run")
+
+    assert result.returncode == 0, result.stderr
+    assert _trace(trace)[-1].startswith("infinity v2 ")

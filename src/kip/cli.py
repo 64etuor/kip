@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from pydantic import ValidationError as PydanticValidationError
 
 from kip import __version__
+from kip.adapters.embeddings.http import require_allowed_model_url
 from kip.adapters.ocr.kordoc import (
     KordocOcrConfig,
     probe_kordoc_version,
@@ -46,7 +47,14 @@ from kip.domain.models import (
     SearchRequest,
     StatusReport,
 )
-from kip.errors import AuthorizationError, KipError, NotFoundError, ValidationError, error_code
+from kip.errors import (
+    AuthorizationError,
+    ConfigurationError,
+    KipError,
+    NotFoundError,
+    ValidationError,
+    error_code,
+)
 from kip.evaluation.drafts import promote_draft, record_draft_review_decision, validate_draft
 from kip.evaluation.models import GoldenCase
 from kip.evaluation.reporting import append_evolution_record, write_report
@@ -531,6 +539,71 @@ def status(
 _KORDOC_DOCTOR_PROBE_TIMEOUT_SECONDS = 5
 
 
+def _served_model_ids(settings: Settings, base_url: str) -> list[str] | None:
+    """Model ids the runtime serves, or ``None`` when it is not reachable.
+
+    Probes through the same egress allowlist the adapters enforce, so doctor
+    never connects to a host a query would refuse; a rejected URL raises
+    ``ConfigurationError`` for the caller to report as its own reason. An
+    empty list means "reachable, serving nothing", which is a different
+    operator action from an unreachable runtime.
+    """
+    allowed = require_allowed_model_url(
+        base_url,
+        bool(settings.get("security.allow_remote_model_egress", False)),
+        tuple(str(host) for host in (settings.get("security.model_service_hosts", []) or [])),
+    )
+    try:
+        with httpx.Client(timeout=httpx.Timeout(3.0), trust_env=False) as client:
+            response = client.get(f"{allowed}/models")
+            if response.status_code != 200:
+                return None
+            return sorted(str(row["id"]) for row in response.json()["data"])
+    except (httpx.HTTPError, KeyError, TypeError, ValueError):
+        return None
+
+
+def _http_reranker_doctor_reason(
+    settings: Settings, embedding_base_url: str, embedding_served: list[str] | None
+) -> str | None:
+    """Why the configured cross-encoder cannot answer, if it cannot.
+
+    Only ``models.reranker.backend = "http"`` takes a model name from a
+    runtime; every other backend runs in-process and cannot be swapped under
+    its name. Reuses the embedding probe when both point at the same runtime.
+    """
+    config = settings.get("models.reranker", {}) or {}
+    if not isinstance(config, dict) or not config.get("enabled", False):
+        return None
+    if str(config.get("backend", "http")) != "http":
+        return None
+    model = str(config.get("model", ""))
+    if not model:
+        return None
+    base_url = str(config.get("base_url", "http://127.0.0.1:7997")).rstrip("/")
+    try:
+        served = (
+            embedding_served
+            if base_url == embedding_base_url
+            else _served_model_ids(settings, base_url)
+        )
+    except ConfigurationError as error:
+        return f"models.reranker.base_url is not usable: {error}; reranked mode fails until it is fixed"
+    if served is None:
+        return (
+            f"reranker model runtime not reachable at {base_url}; reranked mode fails "
+            "and default search keeps the lexical reranker until it is started"
+        )
+    if model not in served:
+        return (
+            f"the model runtime at {base_url} serves {served}, not the configured "
+            f"models.reranker.model {model!r}; start it with that model "
+            "(KIP_SEMANTIC_RERANKER=on, and KIP_RERANKER_SERVED_MODEL names what it advertises) "
+            "or fix models.reranker.model. Reranked mode fails until then"
+        )
+    return None
+
+
 def _semantic_doctor_check(
     settings: Settings,
     capabilities: Capabilities,
@@ -551,22 +624,45 @@ def _semantic_doctor_check(
         }
     embedding = settings.get("models.embedding", {}) or {}
     base_url = str(embedding.get("base_url", "http://127.0.0.1:7997")).rstrip("/")
-    runtime_ok = False
+    served: list[str] | None = None
+    egress_reason: str | None = None
     if isinstance(embedding, dict) and embedding.get("enabled", False):
         try:
-            with httpx.Client(timeout=httpx.Timeout(3.0), trust_env=False) as client:
-                runtime_ok = client.get(f"{base_url}/models").status_code == 200
-        except httpx.HTTPError:
-            runtime_ok = False
+            served = _served_model_ids(settings, base_url)
+        except ConfigurationError as error:
+            egress_reason = f"models.embedding.base_url is not usable: {error}"
+    runtime_ok = served is not None
+    configured_model = str(embedding.get("model", "")) if isinstance(embedding, dict) else ""
     projection = capabilities.semantic_projection_status
     reason: str | None = None
     if not isinstance(embedding, dict) or not embedding.get("enabled", False):
         reason = "search.semantic_enabled is on but models.embedding is disabled; enable it or turn semantic search off"
+    elif egress_reason is not None:
+        reason = egress_reason
     elif not runtime_ok:
         reason = (
             f"model runtime not reachable at {base_url}; start it with ./scripts/semantic-server.sh start "
             "(or install it with ./scripts/bootstrap-semantic.sh && ./scripts/semantic-server.sh prefetch). "
             "Search falls back to lexical until then"
+        )
+    elif configured_model and served == []:
+        reason = (
+            f"the model runtime at {base_url} answers but serves no model; it is still loading "
+            "or was started without one. Wait with ./scripts/semantic-server.sh wait, or start it "
+            "again. Search falls back to lexical until then"
+        )
+    elif configured_model and served is not None and configured_model not in served:
+        # Reachable but advertising another name (KIP_EMBEDDING_SERVED_MODEL
+        # pointing elsewhere, a stale unit file, an edited models.embedding.model):
+        # queries would be embedded in another space, so the adapter refuses
+        # and search degrades to lexical.
+        reason = (
+            f"the model runtime at {base_url} serves {served}, not the configured "
+            f"models.embedding.model {configured_model!r}; start it with that model "
+            "(KIP_EMBEDDING_SERVED_MODEL names what it advertises) or fix "
+            "models.embedding.model. Search falls back to lexical until then. Only the served "
+            "name is compared: /models exposes no revision or weight hash, so "
+            "models.embedding.revision stays unverified at runtime"
         )
     elif projection == "incompatible":
         reason = (
@@ -588,6 +684,10 @@ def _semantic_doctor_check(
             f"{verification.get('content_units')} visible units; run ./scripts/kip sync run "
             "--source SOURCE or ./scripts/kip projection rebuild --name semantic"
         )
+    else:
+        # Last: the cross-encoder only affects `reranked` mode, so a projection
+        # or runtime problem above is the more useful thing to report first.
+        reason = _http_reranker_doctor_reason(settings, base_url, served)
     return {
         "name": "semantic_search",
         "ok": reason is None,

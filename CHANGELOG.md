@@ -1,5 +1,34 @@
 # Changelog
 
+## 3.12.2 - 2026-09-12
+
+- KIP now checks which model the runtime actually serves. Infinity answers
+  `POST /embeddings` with HTTP 200 even for a model name it does not serve and
+  embeds with whatever is loaded, so a runtime started with a different model
+  than `models.embedding.model` silently embedded queries with one model and
+  searched a space built with another. Found while evaluating candidate
+  embedding models on a real corpus. The HTTP embedding and reranker adapters
+  now verify the served name before each request, cached for 300 seconds, and
+  raise the usual dependency error on a mismatch: default-mode search degrades
+  to lexical with `semantic_degraded`, an explicit mode fails, and a sync
+  reports `semantic_projection` as `unavailable` instead of writing foreign
+  vectors into the projection. `kip doctor` distinguishes an unreachable
+  runtime, a runtime serving a different model, and a runtime that loaded
+  nothing, and it now refuses a model base URL that `security` does not allow
+  instead of connecting to it.
+- `./scripts/semantic-server.sh` refuses to start when `KIP_EMBEDDING_MODEL` or
+  `KIP_EMBEDDING_REVISION` is overridden without `KIP_EMBEDDING_SERVED_MODEL`,
+  and likewise for the reranker pair. Otherwise the runtime would load other
+  weights while still advertising the configured name, which nothing can
+  detect. `GET /models` exposes no revision or weight hash, so
+  `models.embedding.revision` stays unverified at runtime and is enforced only
+  as part of the stored embedding-space identity.
+- Upgrading: the served name is compared exactly. A deployment whose
+  `models.embedding.model` is not the name its runtime advertises, for example
+  the Hugging Face repository id instead of the served name, now degrades to
+  lexical with a message naming both sides, where it previously returned
+  results from whatever model was loaded.
+
 ## 3.12.1 - 2026-09-12
 
 - Fresh 3.12.0 installs could not start the semantic runtime offline, so

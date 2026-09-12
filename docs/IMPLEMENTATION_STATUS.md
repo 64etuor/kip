@@ -4,6 +4,21 @@ This is the current readiness inventory, not the target architecture. The
 target-to-current matrix and ordered gap register live in
 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`.
 
+## 2026-09-12 the served model is verified (3.12.2)
+
+Evaluating candidate embedding models on the private corpus exposed a silent
+failure: Infinity answers an embedding request for a model name it does not
+serve with HTTP 200 and the loaded model's vectors. KIP compared nothing, so a
+runtime started with another model embedded queries with model B against a
+space built with model A, with no warning. The HTTP adapters now verify the
+served name before each request with a 300-second cache, `kip doctor`
+separates an unreachable runtime from one serving the wrong model, and
+`semantic-server.sh` refuses a model override that would keep the configured
+served name. Verified live: the same query that had returned vector results
+from the wrong model now degrades to lexical with `semantic_degraded`.
+Remaining limitation: `GET /models` carries no revision or weight hash, so
+other weights under the configured name stay undetectable at runtime.
+
 ## 2026-09-12 offline semantic runtime and `kip update` launchers (3.12.1)
 
 The live 3.11.0 -> 3.12.0 upgrade of a deployment installed with

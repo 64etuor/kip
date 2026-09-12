@@ -1095,7 +1095,7 @@
   "info": {
     "description": "Optional REST edge adapter over the same application services used by the CLI and MCP.",
     "title": "KIP Knowledge Fabric API",
-    "version": "3.12.1"
+    "version": "3.12.2"
   },
   "openapi": "3.1.0",
   "paths": {

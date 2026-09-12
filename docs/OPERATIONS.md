@@ -843,6 +843,31 @@ Infinity's optional Optimum precheck is invalid on that path. Server batches of
 four embedding inputs and two reranking pairs fit the validated 24 GB Apple
 Silicon profile.
 
+Infinity answers `/embeddings` and `/rerank` with HTTP 200 for a model name it
+does not serve, embedding with whatever it loaded, so before its first request
+(and every 300 seconds after, to catch a restart) the embedding adapter checks
+`GET /models` for `models.embedding.model`, and the HTTP reranker for
+`models.reranker.model`. A runtime that advertises another name — a
+`KIP_EMBEDDING_SERVED_MODEL` (or `KIP_RERANKER_SERVED_MODEL`) pointing
+elsewhere, a `models.embedding.model` edited without restarting the runtime, or
+a stale launchd/systemd unit — is treated as unavailable: default-mode search
+degrades to lexical with `semantic_degraded` instead of embedding queries in a
+space the active projection was never built with.
+
+This is a served-name check only. `GET /models` on Infinity 0.0.77 reports no
+revision and no weight hash, so **other weights or another revision served
+under the configured name are not detected**, and
+`models.embedding.revision` stays unverified at runtime; it is enforced only as
+part of the embedding-space identity in the database. Because
+`--model-id`/`--revision` and `--served-model-name` are independent,
+`scripts/semantic-server.sh` refuses to start when `KIP_EMBEDDING_MODEL` or
+`KIP_EMBEDDING_REVISION` (and, with `KIP_SEMANTIC_RERANKER=on`,
+`KIP_RERANKER_MODEL` or `KIP_RERANKER_REVISION`) differ from the pinned
+defaults without a matching `KIP_EMBEDDING_SERVED_MODEL` /
+`KIP_RERANKER_SERVED_MODEL`: evaluating a candidate model means giving it a
+name of its own and setting `models.embedding.model` (or
+`models.reranker.model`) to that name.
+
 `./scripts/kip doctor` reports a non-required `semantic_search` check with the
 runtime reachability, the projection state including the full completeness
 count (`stale` when the active space is missing units), and the command that
@@ -851,7 +876,13 @@ fixes it:
 `./scripts/bootstrap-semantic.sh && ./scripts/semantic-server.sh prefetch` when
 it is not installed, and `kip sync run --source SOURCE` or
 `kip projection rebuild --name semantic` when the projection is missing,
-shadow, or stale.
+shadow, or stale. A reachable runtime that serves a different model is reported
+separately from an unreachable one (and from a runtime that answers while
+serving nothing yet): the reason names the served ids and the configured
+`models.embedding.model`, and `models.reranker.model` when
+`models.reranker.backend = "http"`. The probe goes through the same egress
+allowlist as a query, so a `base_url` that `security.allow_remote_model_egress`
+forbids is reported instead of being connected to.
 
 #### Embedding settings
 
@@ -922,7 +953,9 @@ warning, until the projection is complete and active.
 
 Default-mode search falls back to the lexical path (BM25-reranked) with the
 envelope warning `semantic_degraded` when the runtime or the active projection
-is unavailable. When a deployment sets `search.default_mode = "reranked"` and
+is unavailable, including a runtime that answers but serves a model other than
+`models.embedding.model`. When a deployment sets
+`search.default_mode = "reranked"` and
 only the reranker fails, it keeps the fused lexical+vector ranking with
 `rerank_degraded`; `lexical_rerank_degraded` still marks a failed lexical
 reranker and now also a fallback left in lexical order because lexical rerank

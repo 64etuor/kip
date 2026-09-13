@@ -1,0 +1,104 @@
+scripts/common.sh
+  s_16a999dee6ecf2::t_73c35bd7717d55 96-100,102,110-115,118,120,122-124,131,138-143,150-158
+  s_16a999dee6ecf2::t_00175c62765df4 83-95,101,103-109,116-117,119,121,125-130,132-137,144-149,159
+pyproject.toml
+  s_16a999dee6ecf2::t_877e2c1e5cddcc 7
+scripts/postgres-tools.sh
+  s_16a999dee6ecf2::t_d05eb6424b98be 94
+  s_16a999dee6ecf2::t_b24162792a420d 40
+  s_16a999dee6ecf2::t_b58fe6ef617a81 13-14
+  s_16a999dee6ecf2::t_173bb039b9d7b1 70
+.claude/skills/kip-setup/SKILL.md
+  s_16a999dee6ecf2::t_fceba76f19f7fe 54-63,65-69
+  s_16a999dee6ecf2::t_05878ee0b41717 64
+scripts/doctor.sh
+  s_16a999dee6ecf2::t_efbd137f2ffdcd 69-83
+scripts/dev-up.sh
+  s_16a999dee6ecf2::t_1baaa97d41fccd 6
+src/kip/__init__.py
+  s_16a999dee6ecf2::t_877e2c1e5cddcc 3
+scripts/dev-down.sh
+  s_16a999dee6ecf2::t_c4312e0bfc0ed5 6
+scripts/app-up.sh
+  s_16a999dee6ecf2::t_65ad4e34cc3197 31,37,40-44
+  s_16a999dee6ecf2::t_2efee7c844532e 45
+scripts/backup.sh
+  s_16a999dee6ecf2::t_323c11e91e8ed5 61-63,65
+  s_16a999dee6ecf2::t_c2e19117140ee4 64
+docs/OPERATIONS.md
+  s_16a999dee6ecf2::t_867f59bace2811 66-69
+  s_16a999dee6ecf2::t_3042ffb5219f8e 57-62
+  s_16a999dee6ecf2::t_898a0d01641d1d 49-53
+  s_16a999dee6ecf2::t_18c59ea9d7af66 42-48,54-56,63-65,70-71
+contracts/openapi.json
+  s_16a999dee6ecf2::t_877e2c1e5cddcc 1065
+README.en.md
+  s_16a999dee6ecf2::t_48d0026f3774aa 19-26
+docs/DEPLOYMENT_GUIDE.md
+  s_16a999dee6ecf2::t_d1e3f7c7a89fe5 134,136-139
+  s_16a999dee6ecf2::t_e95691fb6287f7 133,135,140-141
+tests/test_semantic_scripts.py
+  s_16a999dee6ecf2::t_93eb099e6aa956 150
+CHANGELOG.md
+  s_16a999dee6ecf2::t_56369e23d8208f 29-45
+  s_16a999dee6ecf2::t_39d3fc964aa8fe 3-15,20-23,46
+  s_16a999dee6ecf2::t_1b9668f286674c 24-28
+  s_16a999dee6ecf2::t_0caaa0f8b06ba7 16-19
+skills/kip-setup/SKILL.md
+  s_16a999dee6ecf2::t_5969f161eafbec 64
+  s_16a999dee6ecf2::t_0288486ae5adda 54-63,65-69
+contracts/openapi.yaml
+  s_16a999dee6ecf2::t_877e2c1e5cddcc 6
+VERSION
+  s_16a999dee6ecf2::t_877e2c1e5cddcc 1
+scripts/install.sh
+  s_16a999dee6ecf2::t_5556e2bd7924cf 389-390,400-402
+  s_16a999dee6ecf2::t_eb7793e47503ef 391-393
+  s_16a999dee6ecf2::t_6f7dfac65649e8 403
+tests/test_app_up.py
+  s_16a999dee6ecf2::t_f0ca79596eb93e 37-40
+  s_16a999dee6ecf2::t_e1619fdb73218c 64-68
+  s_16a999dee6ecf2::t_20b9a18e637398 42-43
+  s_16a999dee6ecf2::t_ba6d6f6fae2ece 293-295
+  s_16a999dee6ecf2::t_ef958e516e9c74 14
+  s_16a999dee6ecf2::t_f6453de20da326 91,95-106
+  s_16a999dee6ecf2::t_f0337872678ec1 8
+  s_16a999dee6ecf2::t_4fb4cfd4acd040 5
+  s_16a999dee6ecf2::t_fe28fb0ba5ca52 231-292,296-321
+  s_16a999dee6ecf2::t_c42b05f78408a6 322-482
+  s_16a999dee6ecf2::t_0dc6310a3ded48 74
+  s_16a999dee6ecf2::t_ebec60bf25c2ee 107-108
+scripts/e2e-install.sh
+  s_16a999dee6ecf2::t_f05eaf0b428adb 111,113-115
+  s_16a999dee6ecf2::t_f2f4578ad18005 106-107,109-110,112,116
+tests/test_install_and_upgrade.py
+  s_16a999dee6ecf2::t_a4dd6b878cf028 492-498,501-510,520-521
+  s_16a999dee6ecf2::t_75a0bc30b32dcb 511-519
+  s_16a999dee6ecf2::t_d26f172be280f5 488-491,499-500
+scripts/ops-report.sh
+  s_16a999dee6ecf2::t_ff4b1a24f06fde 188-189
+  s_16a999dee6ecf2::t_4f72618ebf81f7 164-170,174-175
+  s_16a999dee6ecf2::t_8e2e3e4d97e744 57
+  s_16a999dee6ecf2::t_2e2bca9be610a1 52-56,58-60
+  s_16a999dee6ecf2::t_2f371c70251def 113
+README.md
+  s_16a999dee6ecf2::t_3a2e7d3d890fbf 21-28
+uv.lock
+  s_16a999dee6ecf2::t_3c5c173a8f639f 767
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "f0683295ab1038e36b9d9637016e90d229f03ea3",
+  "prompts": {},
+  "sessions": {
+    "s_16a999dee6ecf2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b9abc8ac-2c56-4e22-a7c7-3deb16f779f3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

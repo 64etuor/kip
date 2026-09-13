@@ -1,5 +1,33 @@
 # Changelog
 
+## 3.15.3 - 2026-09-14
+
+- A fresh agent was given only the repository URL and asked to install KIP,
+  set it up and connect it to Claude Code. It worked in a throwaway HOME, as a
+  second deployment beside a running one. It finished every step: the MCP
+  server connected with 31 tools, a sample search returned a hit with its
+  locator, and doctor passed. Its friction log produced these fixes:
+  - The `kip-setup` skill now covers a machine that already runs another
+    deployment. Leave that stack alone and, with consent, give this
+    deployment's `.env` a unique `COMPOSE_PROJECT_NAME`, free
+    `KIP_POSTGRES_PORT` and `KIP_API_PORT`, and the same port in
+    `KIP_DATABASE_URL` and `KIP_BACKUP_DATABASE_URL`. Before, this lived only
+    in `docs/DEPLOYMENT_GUIDE.md`, which the skill does not send an agent to.
+  - `app-up.sh --database-only` on a deployment without generated setup files
+    refuses, with exit code 2, a loopback `KIP_DATABASE_URL` or
+    `KIP_BACKUP_DATABASE_URL` whose port differs from `KIP_POSTGRES_PORT`.
+    Such a URL can reach another deployment's PostgreSQL, so migrations or a
+    backup would run against that database. The URL is parsed the way
+    `setup_compose.py` already checks generated deployments. A deployment
+    that deliberately migrates into a separate local PostgreSQL on another
+    port runs `./scripts/migrate.sh` directly. Host commands that use a
+    mismatched URL without going through `app-up.sh` are not checked yet.
+  - When the `docker` CLI works but `docker compose version` fails, bootstrap
+    names the failure and its output instead of "Docker is missing". On
+    macOS with Docker Desktop installed it points at Desktop's CLI plugin
+    link. On Linux, or on macOS without Desktop, it keeps
+    `--install-docker` as the fix.
+
 ## 3.15.2 - 2026-09-13
 
 - An agent asked to install KIP from the repository URL can now finish the job

@@ -35,7 +35,12 @@ Resume an interrupted configuration from inspect.
 
 ## After apply
 
-Setup is configuration-only. Follow the receipt's `next_steps` within the
+Setup is configuration-only. If another KIP deployment already runs on this
+machine (`app-up.sh` refuses naming another directory, or port 5432 is taken),
+do not start or stop its stack. With consent, set in this deployment's `.env`:
+a unique `COMPOSE_PROJECT_NAME`, free `KIP_POSTGRES_PORT` and `KIP_API_PORT`,
+and the same port in `KIP_DATABASE_URL` and `KIP_BACKUP_DATABASE_URL`; keep one
+model runtime per machine. Then follow the receipt's `next_steps` within the
 authorized setup: `./scripts/app-up.sh --database-only` (database readiness and
 migration for CLI/MCP; only the database credential is required and no
 API/worker image is built; it also starts an installed model runtime), source

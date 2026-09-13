@@ -106,6 +106,46 @@ def test_remote_docker_context_is_not_replaced(prereq, tmp_path, monkeypatch):
         prereq.ensure_docker(tmp_path, {}, "darwin-arm64", install=True, check=False)
 
 
+def test_a_missing_compose_plugin_is_named_instead_of_missing_docker(prereq, tmp_path, monkeypatch):
+    # Given a working docker CLI whose `docker compose` subcommand fails, as when
+    # Docker Desktop's plugin is not linked into ~/.docker/cli-plugins.
+    monkeypatch.delenv("DOCKER_HOST", raising=False)
+    monkeypatch.delenv("DOCKER_CONTEXT", raising=False)
+    monkeypatch.setattr(prereq, "docker_ready", lambda: False)
+    monkeypatch.setattr(prereq.shutil, "which", lambda name: "/bin/docker")
+    monkeypatch.setattr(prereq.sys.stdin, "isatty", lambda: False)
+    monkeypatch.setattr(prereq, "run", lambda args, **kwargs: subprocess.CompletedProcess(
+        args, 1 if args[1:3] == ["compose", "version"] else 0, "default\n", "docker: 'compose' is not a docker command."
+    ))
+    real_exists = Path.exists
+    monkeypatch.setattr(Path, "exists", lambda path: True if str(path) == "/Applications/Docker.app" else real_exists(path))
+
+    # Then bootstrap names the Compose plugin rather than claiming Docker is missing.
+    with pytest.raises(prereq.ActionRequired, match="Compose plugin") as raised:
+        prereq.ensure_docker(tmp_path, {}, "darwin-arm64", install=False, check=False)
+    assert "Docker is missing" not in str(raised.value)
+    assert "not a docker command" in str(raised.value)
+
+
+@pytest.mark.parametrize(("target", "desktop"), [("linux-x86_64", False), ("darwin-arm64", False)], ids=["linux", "macos-without-desktop"])
+def test_a_failed_compose_keeps_the_install_docker_fix_where_it_applies(prereq, tmp_path, monkeypatch, target, desktop):
+    # Given a docker CLI whose Compose fails where --install-docker is the fix:
+    # Linux installs the plugin, macOS without Desktop installs Desktop.
+    monkeypatch.delenv("DOCKER_HOST", raising=False)
+    monkeypatch.delenv("DOCKER_CONTEXT", raising=False)
+    monkeypatch.setattr(prereq, "docker_ready", lambda: False)
+    monkeypatch.setattr(prereq.shutil, "which", lambda name: "/bin/docker")
+    monkeypatch.setattr(prereq.sys.stdin, "isatty", lambda: False)
+    monkeypatch.setattr(prereq, "run", lambda args, **kwargs: subprocess.CompletedProcess(
+        args, 1 if args[1:3] == ["compose", "version"] else 0, "default\n", "compose missing"
+    ))
+    real_exists = Path.exists
+    monkeypatch.setattr(Path, "exists", lambda path: desktop if "Docker.app" in str(path) else real_exists(path))
+
+    with pytest.raises(prereq.ActionRequired, match="--install-docker"):
+        prereq.ensure_docker(tmp_path, {}, target, install=False, check=False)
+
+
 def test_desktop_wait_does_not_accept_license_or_claim_success(prereq, tmp_path, monkeypatch):
     monkeypatch.delenv("DOCKER_HOST", raising=False)
     monkeypatch.delenv("DOCKER_CONTEXT", raising=False)

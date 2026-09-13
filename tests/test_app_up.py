@@ -188,6 +188,42 @@ def test_database_only_refuses_mismatched_host_config_before_starting(tmp_path: 
     assert not _calls(trace)
 
 
+@pytest.mark.parametrize(
+    ("published", "url", "backup", "expected"),
+    [
+        # Only the package scanner's example password may appear in URL literals.
+        ("55432", "postgresql://kip_owner:test-password@127.0.0.1:5432/kip", None, 2),
+        ("5432", "postgresql://kip_owner:test-password@127.0.0.1:5432/kip", None, 0),
+        (None, "postgresql://kip_owner:test-password@127.0.0.1:5432/kip", None, 0),
+        (None, "postgresql://kip_owner:test-password@127.0.0.1:5432?sslmode=disable", None, 0),
+        (None, "postgresql://kip_owner:test-password@127.0.0.1/kip", None, 0),
+        ("55432", "postgresql://kip_owner:test-password@[::1]:5432/kip", None, 2),
+        (None, "postgresql://kip_owner:test-password@127.0.0.1:5432/kip",
+         "postgresql://kip_backup:test-password@localhost:55432/kip", 2),
+    ],
+    ids=["other-port", "same-port", "default", "query-without-path", "no-port", "ipv6-loopback", "stale-backup-url"],
+)
+def test_plain_database_only_refuses_a_database_url_on_another_port(
+    tmp_path: Path, published: str | None, url: str, backup: str | None, expected: int
+) -> None:
+    # Given a plain deployment whose database URLs may name a port other than
+    # the one it publishes, which another deployment may own.
+    project, environment, trace = _installation(tmp_path, generated=False)
+    environment["KIP_DATABASE_URL"] = url
+    if published is not None:
+        environment["KIP_POSTGRES_PORT"] = published
+    if backup is not None:
+        environment["KIP_BACKUP_DATABASE_URL"] = backup
+
+    result = _run(project, environment, "--database-only")
+
+    # Then it refuses before starting or migrating, and names the setting.
+    assert result.returncode == expected, result.stderr
+    if expected:
+        assert "KIP_POSTGRES_PORT" in result.stderr
+        assert not _calls(trace)
+
+
 @pytest.mark.parametrize("external", [False, True])
 def test_database_only_missing_database_secret_fails_closed(tmp_path: Path, external: bool) -> None:
     project, environment, trace = _installation(tmp_path, external=external)

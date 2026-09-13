@@ -254,6 +254,14 @@ def ensure_docker(root: Path, catalog: dict[tuple[str, str], Asset], target: str
             print("Docker engine/Compose is missing. Install Docker system software? [y/N] ", end="", file=sys.stderr, flush=True)
             install = input().strip().casefold() in {"y", "yes"}
         if not install:
+            if compose_only and compose is not None and compose.returncode:
+                detail = (compose.stderr or compose.stdout).strip() or "no output"
+                if target.startswith("darwin-") and not desktop_missing:
+                    # Desktop is installed, so --install-docker would change
+                    # nothing: its CLI plugin link is what is missing.
+                    raise ActionRequired(f"The docker CLI is present but `docker compose version` failed ({detail}); the Compose plugin is likely not linked into ~/.docker/cli-plugins. Repair Docker Desktop's CLI tools (Settings > Advanced, or reinstall Desktop), or run ./scripts/bootstrap.sh --without-docker when using an external database.")
+                if not desktop_missing:
+                    raise ActionRequired(f"The docker CLI is present but `docker compose version` failed ({detail}). Run ./scripts/bootstrap.sh --install-docker to install the Compose plugin, or --without-docker when using an external database.")
             raise ActionRequired("Docker is missing. Run ./scripts/bootstrap.sh --install-docker to install it, or --without-docker when using an external database.")
         install_docker(root, catalog, target, compose_only=compose_only)
         docker_bin = Path("/Applications/Docker.app/Contents/Resources/bin")

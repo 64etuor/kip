@@ -285,6 +285,41 @@ def check_capabilities(args: argparse.Namespace) -> None:
     )
 
 
+def check_doctor(args: argparse.Namespace) -> None:
+    path = Path(args.file)
+    payload = _envelope(path, expect_ok=True, allowed_warnings=frozenset(args.allow_warning))
+    data = payload.get("data")
+    _require(isinstance(data, dict), f"{path}: doctor data is {type(data).__name__}, expected an object")
+    assert isinstance(data, dict)
+    checks = {item.get("name"): item for item in data.get("checks") or [] if isinstance(item, dict)}
+    if args.deployment:
+        # The configuration check names the config file the answering process
+        # loaded, which is the one envelope field that says WHICH deployment
+        # answered. A skill copy that resolved to another checkout fails here.
+        config = (checks.get("configuration") or {}).get("details", {}).get("path")
+        deployment = Path(args.deployment).resolve()
+        _require(
+            isinstance(config, str) and Path(config).resolve().is_relative_to(deployment),
+            f"{path}: doctor loaded configuration {config!r}, which is not inside the deployment {deployment}",
+        )
+    for name, expected in [(name, True) for name in args.check_ok] + [(name, False) for name in args.check_not_ok]:
+        check = checks.get(name)
+        _require(check is not None, f"{path}: doctor reports no {name!r} check; it reports {sorted(checks)}")
+        assert check is not None
+        _require(
+            check.get("ok") is expected,
+            f"{path}: doctor check {name!r} is ok={check.get('ok')!r}, expected {expected!r}: {check.get('details')!r}",
+        )
+        if name == "skill_installs" and args.skill_installs is not None:
+            installs = check.get("details", {}).get("installs") or []
+            _require(
+                len(installs) == args.skill_installs,
+                f"{path}: skill_installs lists {len(installs)} skill copies, expected {args.skill_installs}: {installs!r}",
+            )
+    answered = f"answered from {args.deployment}; " if args.deployment else ""
+    print(f"doctor: {answered}checks {sorted(args.check_ok)} ok, {sorted(args.check_not_ok)} not ok")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -335,6 +370,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Whether this deployment is expected to have semantic search configured",
     )
     capabilities.set_defaults(handler=check_capabilities)
+
+    doctor = subparsers.add_parser("doctor", help="Assert a doctor envelope")
+    add_common(doctor)
+    doctor.add_argument("--deployment", default=None, help="The loaded configuration must be inside this deployment")
+    doctor.add_argument("--check-ok", action="append", default=[], metavar="NAME")
+    doctor.add_argument("--check-not-ok", action="append", default=[], metavar="NAME")
+    doctor.add_argument("--skill-installs", type=int, default=None, metavar="N", help="skill copies skill_installs must list")
+    doctor.set_defaults(handler=check_doctor)
 
     return parser
 

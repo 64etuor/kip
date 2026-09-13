@@ -171,6 +171,10 @@ KNOWN_ABSENT_AMBIENT_KEYS: Mapping[str, str] = MappingProxyType(
         "KIP_GENERATION_API_KEY_FILE": _SECRET_FILE_TWIN,
         "KIP_OPENAI_API_KEY_FILE": _SECRET_FILE_TWIN,
         "KIP_ROLES": _REQUEST_IDENTITY,
+        # Setup verify reads it from an MCP registration's `env` mapping, never
+        # from the process environment; the installer's shell profile exports it
+        # only for the `kip` launcher.
+        "KIP_HOME": "launcher override read from a registration entry, not the environment",
         "KIP_SEMANTIC": _INSTALL_CHOICE,
         "KIP_SEMANTIC_RERANKER": _INSTALL_CHOICE,
         "KIP_ANTHROPIC_API_KEY": _EXTERNAL_CREDENTIAL,

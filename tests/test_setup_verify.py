@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -55,6 +56,90 @@ def test_verify_reports_runtime_readiness_without_failing_config_checks(
         "./scripts/kip read UNIT_ID",
     ]
     assert any("configuration" in item for item in receipt.limitations)
+
+
+@pytest.mark.parametrize(
+    ("args", "config", "expected"),
+    [
+        (["scripts/mcp.sh"], "config/kip.host.generated.toml", True),
+        (["scripts/mcp.sh"], "config/kip.toml", False),
+        (["/elsewhere/scripts/mcp.sh"], "config/kip.host.generated.toml", False),
+    ],
+    ids=["pre-3.15.1-relative", "other-config", "other-deployment"],
+)
+def test_verify_accepts_the_relative_mcp_entry_upgrades_preserve(
+    tmp_path: Path,
+    args: list[str],
+    config: str,
+    expected: bool,
+) -> None:
+    # Given a deployment whose `.mcp.json` still holds the entry setup wrote
+    # before 3.15.1, which an upgrade keeps.
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    state = tmp_path / "state.json"
+    answers = _complete_answers(tmp_path)
+    state.write_text(answers.model_dump_json(), encoding="utf-8")
+    plan = build_setup_plan(answers, project_root=project_root)
+    apply_setup_plan(plan, project_root=project_root)
+    entry = {"command": "bash", "args": args,
+             "env": {"KIP_CONFIG": config, "KIP_WORKSPACE": plan.workspace}}
+    (project_root / ".mcp.json").write_text(
+        json.dumps({"mcpServers": {"kip": entry}}), encoding="utf-8"
+    )
+
+    # When setup verifies the applied plan.
+    receipt = SetupService(project_root=project_root, state_path=state).verify(plan)
+
+    # Then only an entry selecting this deployment's generated config passes.
+    checks = {check.name: check.ok for check in receipt.checks}
+    assert checks["mcp_runtime_config"] is expected
+
+
+@pytest.mark.parametrize(
+    ("entry", "expected"),
+    [
+        ({"command": "bash", "args": ["{root}/scripts/mcp.sh"],
+          "env": {"KIP_CONFIG": "{root}/config/kip.host.generated.toml", "KIP_WORKSPACE": "{workspace}"}}, True),
+        ({"command": "bash", "args": ["/elsewhere/scripts/mcp.sh"],
+          "env": {"KIP_CONFIG": "/elsewhere/config/kip.host.generated.toml", "KIP_WORKSPACE": "{workspace}"}}, False),
+        ({"command": "kip", "args": ["mcp"]}, True),
+        ({"command": "{root}/scripts/kip", "args": ["mcp"], "env": {"KIP_WORKSPACE": "{workspace}"}}, True),
+        ({"command": "/srv/other-deployment/scripts/kip", "args": ["mcp"]}, False),
+        ({"command": "kip", "args": ["mcp"], "env": {"KIP_PROJECT_ROOT": "/srv/other-deployment"}}, False),
+        ({"command": "kip", "args": ["mcp"], "env": {"KIP_WORKSPACE": "another"}}, False),
+        ({"command": "kip", "args": ["mcp"], "env": {"KIP_CONFIG": "/elsewhere/config/kip.toml"}}, False),
+    ],
+    ids=["absolute", "absolute-other-deployment", "launcher", "deployment-scripts-kip", "other-deployment-scripts-kip",
+         "launcher-other-root", "launcher-other-workspace", "launcher-other-config"],
+)
+def test_verify_accepts_absolute_and_launcher_mcp_entries_for_this_deployment(
+    tmp_path: Path,
+    entry: dict[str, object],
+    expected: bool,
+) -> None:
+    # Given an applied plan whose `.mcp.json` the operator replaced with the
+    # absolute or launcher entry `kip doctor` suggests.
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    state = tmp_path / "state.json"
+    answers = _complete_answers(tmp_path)
+    state.write_text(answers.model_dump_json(), encoding="utf-8")
+    plan = build_setup_plan(answers, project_root=project_root)
+    apply_setup_plan(plan, project_root=project_root)
+    rendered = json.dumps(entry).replace("{root}", str(project_root.resolve())).replace(
+        "{workspace}", plan.workspace
+    )
+    (project_root / ".mcp.json").write_text(
+        json.dumps({"mcpServers": {"kip": json.loads(rendered)}}), encoding="utf-8"
+    )
+
+    # When setup verifies the applied plan.
+    receipt = SetupService(project_root=project_root, state_path=state).verify(plan)
+
+    # Then an entry serving this deployment passes and one naming another fails.
+    checks = {check.name: check.ok for check in receipt.checks}
+    assert checks["mcp_runtime_config"] is expected
 
 
 def test_verify_resolves_database_secret_from_environment(

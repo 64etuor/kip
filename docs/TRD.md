@@ -3954,13 +3954,54 @@ Agent instructions MUST state that such content is quoted evidence. It may be su
 
 - Project Skills call only public `kip` commands.
 - Skills do not import application Python modules directly.
-- CLI location is resolved through repository root or `KIP_PROJECT_DIR`.
-- A personal installation may store a project pointer under `~/.config/kip/project-root`.
-- An invalid explicit `KIP_PROJECT_DIR` stops resolution rather than falling
-  back to a different runtime. Installation stages both skill bundles and
-  restores old trees on handled failures before committing the runtime pointer.
-  It serializes installs to the same destination and rejects symlink bundles;
-  this is not a crash-atomic multi-directory transaction (ADR-055).
+- `scripts/install-agent-files.sh personal | project DIR` installs both bundles
+  for `--client claude` (default, `.claude/skills`), `--client codex`
+  (`.agents/skills`, Codex's documented user and repository location) or
+  `--client all`. It refuses a destination inside the deployment itself,
+  compared by file identity so cased or symlinked spellings are refused too.
+  The deployment's `.claude/skills` is the package-owned, byte-identical
+  mirror of `skills/`. Refresh and uninstall never touch it. Codex's
+  documented `USER` scope is `$HOME/.agents/skills`.
+- Every installed skill directory carries `.kip-skill-install`
+  (`kip.skill-install.v1`: skill, absolute deployment root, deployment
+  `VERSION`, client, scope, installed_at). The deployment registers each
+  destination in `var/skill-installs.json` (`kip.skill-install-registry.v1`),
+  which upgrades preserve. `kip.skill_installs` reads both without
+  dependencies and reports each copy as current, stale, missing,
+  other_deployment or unrecorded.
+- `scripts/kip.sh` resolves `KIP_PROJECT_DIR`, then an enclosing checkout, then
+  its own record, whose deployment must be an absolute path. Only a copy without a record (3.15.0 and earlier) reads
+  the legacy `~/.config/kip/project-root`, which installs no longer write. An
+  invalid explicit `KIP_PROJECT_DIR` or a recorded deployment without
+  `scripts/kip` stops resolution rather than falling back to a different
+  runtime.
+- The upgrade finish path runs `--refresh` after bootstrap. It reinstalls each
+  registered destination where both skills carry this deployment's record, and
+  checks that again under the install lock. It skips and reports removed
+  destinations and destinations with a missing, other-deployment or
+  unrecorded skill, and never creates a destination or a skill. A failed
+  refresh warns without failing the upgrade. An explicit install over another
+  deployment's copy warns and names that deployment. An archive upgrade from
+  3.15.0 or earlier finishes with the old in-memory `upgrade.sh`, which has no
+  refresh, so it needs one `install-agent-files.sh --refresh` afterwards. That
+  run also adopts. From 3.15.1 the archive path execs the upgraded tree's
+  `upgrade.sh --finish`.
+- Refresh adopts one legacy location: `~/.claude/skills` when the legacy pointer
+  names this deployment and both skills are record-less real directories whose
+  `SKILL.md` declares the matching `name:`. Adoption leaves the pointer in
+  place. Project copies from 3.15.0 and earlier left no trace. They keep
+  resolving through the pointer at their old version, and reinstalling them
+  with `install-agent-files.sh project DIR` is recommended so they get a record
+  and later upgrades refresh them.
+- `scripts/uninstall-agent-files.sh` removes only skill directories whose record
+  names this deployment and drops the registry entry. It never removes the
+  legacy pointer: when the pointer names this deployment, it prints the `rm`
+  command for once no 3.15.0-or-earlier copy remains. It reports every path
+  removed or left with the reason.
+- Installation stages both skill bundles, writes their records and restores old
+  trees on handled failures before committing the registry. It serializes
+  installs per registry and destination and rejects symlink bundles; this is
+  not a crash-atomic multi-directory transaction (ADR-055).
 - Skill package must remain usable when Postgres, Neo4j, parser, or embedding adapter changes.
 
 ### 30.9 Agent regression tests

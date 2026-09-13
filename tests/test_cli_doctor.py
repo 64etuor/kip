@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -9,10 +10,27 @@ import pytest
 from typer.testing import CliRunner
 
 from kip.adapters.repository.memory import MemoryRepository
-from kip.cli import _kordoc_ocr_doctor_check, _semantic_doctor_check, app
+from kip.cli import (
+    _kordoc_ocr_doctor_check,
+    _mcp_registration_doctor_check,
+    _semantic_doctor_check,
+    _skill_installs_doctor_check,
+    app,
+)
 from kip.container import build_container
 from kip.domain.models import Capabilities
 from kip.settings import Settings
+from kip.setup.planner import build_setup_plan
+from kip.setup.writer import apply_setup_plan
+from kip.skill_installs import (
+    RECORD_FILENAME,
+    REGISTRY_PATH,
+    REGISTRY_SCHEMA,
+    SKILL_NAMES,
+    InstallRecord,
+    format_install_record,
+)
+from tests.setup_support import complete_setup_answers
 
 
 def _settings(tmp_path: Path, kordoc: dict[str, object] | None) -> Settings:
@@ -564,3 +582,152 @@ def test_semantic_doctor_check_reports_a_cross_encoder_runtime_of_its_own(tmp_pa
 
     assert check["ok"] is False and check["details"]["model_runtime"] is True
     assert "reranker model runtime not reachable at http://127.0.0.1:10" in check["details"]["reason"]
+
+
+_LEGACY_MCP_JSON = {
+    "mcpServers": {
+        "kip": {
+            "command": "bash",
+            "args": ["scripts/mcp.sh"],
+            "env": {"KIP_CONFIG": "config/kip.host.generated.toml", "KIP_WORKSPACE": "acme-rnd"},
+        }
+    }
+}
+
+
+def test_mcp_registration_check_flags_the_relative_entry_older_setup_wrote(tmp_path: Path) -> None:
+    # Given the relative .mcp.json setup used to write, which upgrades preserve.
+    mcp_json = tmp_path / ".mcp.json"
+    mcp_json.write_text(json.dumps(_LEGACY_MCP_JSON), encoding="utf-8")
+    before = mcp_json.read_bytes()
+
+    # When the doctor check runs.
+    check = _mcp_registration_doctor_check(_settings(tmp_path, kordoc=None))
+
+    # Then it warns, names each relative path and gives the absolute entry to use.
+    assert check["name"] == "mcp_registration"
+    assert check["ok"] is False
+    assert check["required"] is False
+    details = check["details"]
+    assert details["relative_paths"] == ["scripts/mcp.sh", "config/kip.host.generated.toml"]
+    assert "No such file or directory" in details["reason"]
+    assert "never rewrites" in details["fix"]
+    assert details["replacement"] == {
+        "command": "bash",
+        "args": [str(tmp_path / "scripts/mcp.sh")],
+        "env": {
+            "KIP_CONFIG": str(tmp_path / "config/kip.host.generated.toml"),
+            "KIP_WORKSPACE": "acme-rnd",
+        },
+    }
+    # And the operator's file is left exactly as it was.
+    assert mcp_json.read_bytes() == before
+
+
+def test_doctor_command_warns_about_a_relative_mcp_registration_without_failing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / ".mcp.json").write_text(json.dumps(_LEGACY_MCP_JSON), encoding="utf-8")
+    settings = _settings(tmp_path, kordoc=None)
+    # Every other check passes, so the summary names this warning.
+    settings.config_path.write_text("", encoding="utf-8")
+    settings.cas_path.mkdir(parents=True, exist_ok=True)
+    container = build_container(settings, repository=MemoryRepository())
+    monkeypatch.setattr("kip.cli.build_container", lambda settings, load_models=True: container)
+
+    result = CliRunner().invoke(app, ["doctor"])
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    check = next(item for item in payload["data"]["checks"] if item["name"] == "mcp_registration")
+    assert check["ok"] is False
+    assert "mcp_registration" not in payload["data"]["required_failures"]
+    assert "mcp_registration" in payload["data"]["summary"]
+
+
+@pytest.mark.parametrize(
+    "registration",
+    [
+        None,
+        {"mcpServers": {"kip": {"command": "kip", "args": ["mcp"]}}},
+        # common.sh exports KIP_PROJECT_ROOT, so a relative config beside an
+        # absolute script resolves from any directory.
+        {"mcpServers": {"kip": {"command": "bash", "args": ["/srv/kip/scripts/mcp.sh"],
+                                "env": {"KIP_CONFIG": "config/kip.toml"}}}},
+        # Client-expanded values are not rewritten against the root.
+        {"mcpServers": {"kip": {"command": "bash", "args": ["${KIP_HOME}/scripts/mcp.sh"]}}},
+    ],
+    ids=["no-mcp-json", "launcher", "absolute-script-relative-config", "client-expanded"],
+)
+def test_mcp_registration_check_passes_entries_that_work_from_any_directory(
+    tmp_path: Path, registration: dict[str, object] | None
+) -> None:
+    if registration is not None:
+        (tmp_path / ".mcp.json").write_text(json.dumps(registration), encoding="utf-8")
+
+    check = _mcp_registration_doctor_check(_settings(tmp_path, kordoc=None))
+
+    assert check["ok"] is True
+    assert check["details"]["relative_paths"] == []
+
+
+def test_mcp_registration_check_passes_the_entry_setup_writes(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    plan = build_setup_plan(complete_setup_answers(tmp_path), project_root=project_root)
+    apply_setup_plan(plan, project_root=project_root)
+
+    check = _mcp_registration_doctor_check(_settings(project_root, kordoc=None))
+
+    assert check["ok"] is True, check
+    assert check["details"]["relative_paths"] == []
+
+
+def _record_skill_install(deployment: Path, destination: Path, version: str) -> None:
+    for skill in SKILL_NAMES:
+        (destination / skill).mkdir(parents=True)
+        record = InstallRecord(skill, deployment, version, "claude", "project", "2026-09-13T00:00:00Z")
+        (destination / skill / RECORD_FILENAME).write_text(format_install_record(record), encoding="utf-8")
+    registry = deployment / REGISTRY_PATH
+    registry.parent.mkdir(parents=True, exist_ok=True)
+    registry.write_text(
+        json.dumps({
+            "schema": REGISTRY_SCHEMA,
+            "installs": [{"destination": str(destination), "client": "claude", "scope": "project"}],
+        }),
+        encoding="utf-8",
+    )
+
+
+@pytest.mark.parametrize(("installed", "expected_ok"), [("3.0.0", True), ("2.9.0", False)], ids=["current", "stale"])
+def test_skill_installs_check_warns_only_about_stale_copies(
+    tmp_path: Path, installed: str, expected_ok: bool
+) -> None:
+    # Given a deployment at 3.0.0 that installed its skills into a project.
+    deployment = tmp_path / "deployment"
+    deployment.mkdir()
+    (deployment / "VERSION").write_text("3.0.0\n", encoding="utf-8")
+    _record_skill_install(deployment, tmp_path / "project/.claude/skills", installed)
+
+    # When the doctor check runs.
+    check = _skill_installs_doctor_check(_settings(deployment, kordoc=None))
+
+    # Then only a copy from another version fails the non-required check, with the fix.
+    assert check["name"] == "skill_installs" and check["required"] is False
+    assert check["ok"] is expected_ok
+    assert {item["state"] for item in check["details"]["installs"]} == {"current" if expected_ok else "stale"}
+    assert ("fix" in check["details"]) is not expected_ok
+
+
+def test_skill_installs_check_does_not_warn_about_a_removed_location(tmp_path: Path) -> None:
+    deployment = tmp_path / "deployment"
+    deployment.mkdir()
+    (deployment / "VERSION").write_text("3.0.0\n", encoding="utf-8")
+    destination = tmp_path / "project/.claude/skills"
+    _record_skill_install(deployment, destination, "2.9.0")
+    shutil.rmtree(tmp_path / "project")
+
+    check = _skill_installs_doctor_check(_settings(deployment, kordoc=None))
+
+    assert check["ok"] is True
+    assert {item["state"] for item in check["details"]["installs"]} == {"missing"}

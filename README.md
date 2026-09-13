@@ -302,11 +302,30 @@ graph projection에 직접 연결하지 말고 CLI/REST/MCP와 같은 service la
 Claude Code는 루트 `CLAUDE.md`를 읽고, 이 파일은 `AGENTS.md`를 import합니다.
 프로젝트 skill은 `.claude/skills/knowledge-fabric/SKILL.md`에 있습니다. 루트
 `.mcp.json`은 secret을 넣지 않고 선택형 stdio MCP adapter를 시작하며, AI 기반
-setup이 이 파일을 원자적으로 갱신해 host 경로용
+setup이 이 파일을 원자적으로 갱신해 절대 경로의 `scripts/mcp.sh`와 host 경로용
 `config/kip.host.generated.toml`을 선택합니다(container 경로용
 `config/kip.generated.toml`과 혼동하지 마세요). Tool 결과는 CLI/REST와 같은
 `kip.envelope.v1`이고 MCP metadata는 권한 계약이 아닙니다. 도구 목록과 adapter
 제약은 [`docs/APP_INTEGRATION.md`](docs/APP_INTEGRATION.md)에 있습니다.
+
+MCP client는 자신의 작업 디렉터리에서 서버를 시작하므로 상대 경로
+`scripts/mcp.sh`는 배포 루트 밖에서 실패합니다. 다른 프로젝트나 사용자 전체에
+KIP를 등록할 때는 `kip` launcher가 있으면 `kip mcp`를, 없으면 절대 경로
+`bash <배포 경로>/scripts/mcp.sh`를 등록하세요. 이전 setup이 쓴 상대 경로
+`.mcp.json`은 upgrade 뒤에도 그대로 남고, `kip doctor`가 `mcp_registration`
+경고와 절대 경로 교체안을 보여 줍니다(파일은 고치지 않습니다). Claude Code
+user/project scope, Codex, 일반 stdio client 등록 방법은
+[`docs/APP_INTEGRATION.md`](docs/APP_INTEGRATION.md#registering-kip-with-an-mcp-client)에
+있습니다.
+
+다른 프로젝트에서 skill을 쓰려면 배포 루트에서
+`./scripts/install-agent-files.sh`(사용자 전체) 또는
+`./scripts/install-agent-files.sh project <프로젝트 경로>`를 실행하세요.
+`--client codex`는 Codex용 `.agents/skills`에, `--client all`은 두 client에
+설치합니다. 설치된 사본은 자신이 설치된 배포를 기록하므로 여러 배포가 섞이지
+않고, `kip update`가 기록된 사본을 새 버전으로 갱신합니다. 삭제는
+`./scripts/uninstall-agent-files.sh`이며 이 배포가 설치한 사본만 지웁니다. 절차와
+이전 버전 사본 처리는 [`docs/OPERATIONS.md`](docs/OPERATIONS.md)에 있습니다.
 
 MCP client 실행 환경에 `KIP_WORKSPACE`, `KIP_PRINCIPAL_ID`, `KIP_ACL_SCOPES`를
 설정해 CLI/REST와 동일한 authorization context를 사용하세요. 검증된 reviewer가

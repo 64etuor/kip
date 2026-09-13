@@ -771,3 +771,31 @@ def test_a_relative_target_with_dot_segments_records_the_canonical_path(tmp_path
     assert result.returncode == 0, result.stderr
     launcher = tmp_path / "bin/kip"
     assert launcher.read_text() == _launcher_text(tmp_path / "install")
+
+
+def test_archive_upgrade_finishes_with_the_upgraded_trees_upgrade_script(tmp_path: Path) -> None:
+    # The running bash has already parsed the old finish_upgrade; the archive
+    # path must exec the new tree's `upgrade.sh --finish` instead (3.15.0 did
+    # not, so its archive upgrades never refreshed installed skills).
+    marker_script = (
+        b'#!/bin/bash\nprintf "%s\\n" "$*" >> "${0%/*}/../finish-marker"\n'
+        b'[[ "$1" == --finish ]] && exit 75\nexit 0\n'
+    )
+    new_kit = {**NEW_KIT, "scripts/upgrade.sh": marker_script}
+
+    finished = _deploy(tmp_path / "finish", "1.0.0", OLD_KIT)
+    archive = _make_kit(tmp_path / "finish/new", "1.1.0", new_kit)
+    dry = subprocess.run(["/bin/bash", str(finished / "scripts/upgrade.sh"), "--archive", str(archive), "--dry-run"], capture_output=True, text=True, check=False)
+    assert dry.returncode == 0, dry.stderr
+    assert not (finished / "finish-marker").exists()
+    result = subprocess.run(["/bin/bash", str(finished / "scripts/upgrade.sh"), "--archive", str(archive), "--check"], capture_output=True, text=True, check=False)
+    assert result.returncode == 75, result.stderr + result.stdout
+    assert (finished / "VERSION").read_text().strip() == "1.1.0"
+    assert (finished / "finish-marker").read_text() == "--finish --check\n"
+
+    unbootstrapped = _deploy(tmp_path / "no-bootstrap", "1.0.0", OLD_KIT)
+    archive = _make_kit(tmp_path / "no-bootstrap/new", "1.1.0", new_kit)
+    applied = subprocess.run(["/bin/bash", str(unbootstrapped / "scripts/upgrade.sh"), "--archive", str(archive), "--no-bootstrap"], capture_output=True, text=True, check=False)
+    assert applied.returncode == 0, applied.stderr
+    assert (unbootstrapped / "VERSION").read_text().strip() == "1.1.0"
+    assert not (unbootstrapped / "finish-marker").exists()

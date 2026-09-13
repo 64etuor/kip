@@ -38,6 +38,31 @@ def test_setup_cli_runs_before_runtime_configuration(
     assert payload["data"]["questions"][0]["id"] == "workspace"
 
 
+def test_setup_cli_defaults_to_the_deployment_the_launcher_exports(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    # Given `kip setup` started through the global launcher from another
+    # directory: `scripts/kip` exports the deployment as KIP_PROJECT_ROOT.
+    deployment = tmp_path / "deployment"
+    deployment.mkdir()
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.setenv("KIP_PROJECT_ROOT", str(deployment))
+    monkeypatch.setenv("KIP_CONFIG", str(deployment / "config/kip.toml"))
+    monkeypatch.chdir(elsewhere)
+
+    # When setup records an answer without --project-root.
+    result = CliRunner().invoke(
+        app, ["setup", "answer", "--question", "workspace", "--value", "acme-rnd"]
+    )
+
+    # Then the state lands in the deployment, not the working directory.
+    assert result.exit_code == 0, result.stdout
+    assert (deployment / ".kip/setup-state.json").is_file()
+    assert not (elsewhere / ".kip").exists()
+
+
 def test_setup_cli_answers_previews_plans_applies_and_verifies(
     tmp_path: Path,
 ) -> None:

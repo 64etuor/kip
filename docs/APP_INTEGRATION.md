@@ -195,6 +195,129 @@ a normal retrieval surface (`AGENTS.md`: "Ordinary retrieval does not
 authorize sync, re-index, or projection rebuilds"); use the CLI or the admin
 REST routes for those operations.
 
+## Registering KIP with an MCP client
+
+MCP gives a client the tools. The agent skills that teach an agent to use them
+(`knowledge-fabric`, `kip-setup`) are installed separately with
+`./scripts/install-agent-files.sh [personal|project DIR] [--client claude|codex|all]`;
+installed copies record their deployment and are refreshed by `kip update`
+(see [`OPERATIONS.md`](OPERATIONS.md)).
+
+An MCP client starts the stdio server from its own working directory, not from
+the KIP deployment, so a registration must not depend on that directory. Two
+forms work from anywhere:
+
+- **Launcher: `kip mcp`.** `scripts/install.sh` writes a `kip` launcher
+  (default `~/.local/bin/kip`) that opens the deployment it installed, or
+  `$KIP_HOME` when set. `kip mcp` serves the same tools as `scripts/mcp.sh`.
+  The client resolves `kip` on its own `PATH`; if it cannot, register the
+  launcher's absolute path in place of `kip`.
+- **Absolute path**, for a checkout without the launcher:
+  `bash /srv/kip/scripts/mcp.sh` (or `bash /srv/kip/scripts/kip mcp`). Both
+  load the deployment's `.env` and select `config/kip.host.generated.toml` when
+  setup generated it, otherwise `config/kip.toml`, so `KIP_CONFIG` is optional.
+  When you set it, give an absolute path.
+
+Replace `/srv/kip` with the deployment's absolute path. Stdout carries only the
+MCP protocol and logs go to stderr. Pass `KIP_WORKSPACE`, `KIP_PRINCIPAL_ID`
+and `KIP_ACL_SCOPES` (and `KIP_ROLES=admin` only for a verified reviewer) as
+environment entries, the same way as `KIP_CONFIG` below; root options such as
+`kip --workspace acme mcp` reach the server as those variables too.
+
+Setup writes the deployment's own `.mcp.json` in the absolute form. A
+`.mcp.json` from an earlier setup keeps `bash scripts/mcp.sh` with a relative
+`KIP_CONFIG`, because upgrades preserve the file, and it only works when the
+client starts in the deployment root. `kip doctor` reports that as the
+non-required `mcp_registration` warning, with the absolute entry in
+`details.replacement`. Doctor never rewrites the file: edit it by hand, or
+apply an approved setup plan again, which rewrites it.
+
+The commands below were checked against Claude Code 2.1.266 and codex-cli
+0.144.6 with a throwaway `HOME`, reading back the configuration each one wrote.
+
+### Claude Code
+
+User scope makes the server available in every project for this user (stored
+in `~/.claude.json`):
+
+```bash
+claude mcp add --scope user kip -- kip mcp
+
+# Without the launcher
+claude mcp add --scope user kip \
+  -e KIP_CONFIG=/srv/kip/config/kip.host.generated.toml \
+  -- bash /srv/kip/scripts/mcp.sh
+```
+
+Project scope writes the entry to `.mcp.json` in the current directory and
+shares it with everyone who opens that project. Run it in the project that
+should use KIP:
+
+```bash
+claude mcp add --scope project kip -- kip mcp
+```
+
+`claude mcp add` refuses a name that already exists in the target file
+(`MCP server kip already exists in .mcp.json`), which is what happens in a
+deployment root where setup already registered `kip`. Add `-e NAME=value` for
+each identity variable, and use `claude mcp get kip` to see the stored entry
+and whether it connects.
+
+### Codex
+
+`codex mcp add` has no scope option; it writes `~/.codex/config.toml`, so the
+server is available to every Codex session for this user:
+
+```bash
+codex mcp add kip -- kip mcp
+
+# Without the launcher
+codex mcp add kip --env KIP_CONFIG=/srv/kip/config/kip.host.generated.toml \
+  -- bash /srv/kip/scripts/mcp.sh
+```
+
+The second command writes:
+
+```toml
+[mcp_servers.kip]
+command = "bash"
+args = ["/srv/kip/scripts/mcp.sh"]
+
+[mcp_servers.kip.env]
+KIP_CONFIG = "/srv/kip/config/kip.host.generated.toml"
+```
+
+`codex mcp get kip` shows the stored entry.
+
+### Other stdio clients
+
+This is the `mcpServers` JSON shape of a Claude Code project `.mcp.json`, the
+file setup writes. Where another client keeps its server list, and whether it
+reads the same keys, is defined by that client's documentation; check it before
+copying the entry.
+
+```json
+{
+  "mcpServers": {
+    "kip": { "command": "kip", "args": ["mcp"] }
+  }
+}
+```
+
+Without the launcher:
+
+```json
+{
+  "mcpServers": {
+    "kip": {
+      "command": "bash",
+      "args": ["/srv/kip/scripts/mcp.sh"],
+      "env": { "KIP_CONFIG": "/srv/kip/config/kip.host.generated.toml" }
+    }
+  }
+}
+```
+
 ## Trusted identity
 
 ```text

@@ -8,7 +8,14 @@
 #   * the global `kip` launcher of a SECOND deployment this job also creates
 #     was not repointed at the deployment being updated,
 #   * no shell profile the job did not ask for was modified, including this
-#     machine's own.
+#     machine's own,
+#   * agent skills the previous release installed followed the upgrade: its
+#     legacy personal copy is adopted (by the one-time
+#     `install-agent-files.sh --refresh` when the previous release's own
+#     finish step predates the refresh, as 3.15.0's does on `--archive`), its
+#     record-less project copy still answers through the kept pointer, and
+#     `upgrade.sh --finish` refreshes a registered copy that went stale
+#     (ADR-067).
 #
 #   ./scripts/e2e-upgrade.sh                    # starts a throwaway PostgreSQL
 #   KIP_E2E_PREVIOUS_VERSION=3.13.1 ./scripts/e2e-upgrade.sh
@@ -37,7 +44,7 @@ while [[ $# -gt 0 ]]; do
     --keep) keep_work=1; shift ;;
     --archive) [[ $# -ge 2 ]] || e2e_fail "--archive needs a value"; archive="$2"; shift 2 ;;
     --work) [[ $# -ge 2 ]] || e2e_fail "--work needs a value"; work="$2"; shift 2 ;;
-    -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,28p' "$0"; exit 0 ;;
     *) e2e_fail "unknown option: $1" ;;
   esac
 done
@@ -230,6 +237,59 @@ owned_before="$work/owned.before"
   printf '%s var/e2e-sentinel.txt\n' "$(e2e_digest "$deployment_a/var/e2e-sentinel.txt")"
 } > "$owned_before"
 
+# ------------------------------------ skills the previous release installed
+# Planted with the PREVIOUS release's own installer, because what an upgrade
+# has to carry forward is whatever that release left on disk. Every release
+# from 3.5.1 to 3.15.0 ships a byte-identical installer that writes no install
+# record, only the global pointer ~/.config/kip/project-root, so a fallback to
+# any of them plants the same legacy install. A previous release that already
+# writes records (3.15.1 or later) is detected from what it wrote, not from
+# its version number, and asserted as a registered refresh instead.
+skills_check="$E2E_PROJECT_ROOT/tests/e2e/skill_installs.py"
+elsewhere="$home/elsewhere"
+legacy_project="$home/projects/legacy-app"
+personal_skills="$home/.claude/skills"
+project_skills="$legacy_project/.claude/skills"
+pointer="$home/.config/kip/project-root"
+mkdir -p "$elsewhere" "$legacy_project"
+
+# from_elsewhere COMMAND [ARG ...]: started from an unrelated directory with
+# the scrubbed environment and the throwaway HOME, as an agent would.
+from_elsewhere() {
+  ( cd "$elsewhere" && e2e_clean_env HOME="$home" SHELL=/bin/bash \
+      ${E2E_DOCKER_CONFIG[@]+"${E2E_DOCKER_CONFIG[@]}"} "$@" )
+}
+
+e2e_log "Installing agent skills with the previous release's own installer ($previous)"
+[[ -f "$deployment_a/scripts/install-agent-files.sh" ]] \
+  || e2e_fail "the previous release $previous ships no scripts/install-agent-files.sh (it first shipped in 3.5.1),
+  so there is no skill install for this upgrade to carry forward. Pass KIP_E2E_PREVIOUS_VERSION=3.5.1 or newer."
+status=0
+from_elsewhere "$deployment_a/scripts/install-agent-files.sh" personal > "$work/skills-previous-personal.out" 2>&1 || status=$?
+cat "$work/skills-previous-personal.out" >&2
+e2e_assert_status 0 "$status" "the $previous installer: install-agent-files.sh personal"
+status=0
+from_elsewhere "$deployment_a/scripts/install-agent-files.sh" project "$legacy_project" > "$work/skills-previous-project.out" 2>&1 || status=$?
+cat "$work/skills-previous-project.out" >&2
+e2e_assert_status 0 "$status" "the $previous installer: install-agent-files.sh project $legacy_project"
+
+if [[ -e "$personal_skills/knowledge-fabric/.kip-skill-install" ]]; then
+  previous_skills=recorded
+  "$E2E_PYTHON" "$skills_check" record "$personal_skills" --deployment "$deployment_a" --version "$previous"
+  "$E2E_PYTHON" "$skills_check" record "$project_skills" --deployment "$deployment_a" --version "$previous"
+  e2e_note "the $previous installer writes install records: asserting a registered refresh"
+else
+  previous_skills=legacy
+  "$E2E_PYTHON" "$skills_check" unrecorded "$personal_skills"
+  "$E2E_PYTHON" "$skills_check" unrecorded "$project_skills"
+  [[ "$(cat "$pointer" 2>/dev/null)" == "$deployment_a" ]] \
+    || e2e_fail "the $previous installer did not record $deployment_a in the legacy pointer $pointer"
+  [[ ! -e "$deployment_a/var/skill-installs.json" ]] \
+    || e2e_fail "the $previous installer already wrote a skill install registry"
+  e2e_note "the $previous installer left a legacy install: no records, the pointer names deployment A"
+fi
+pointer_before="$(e2e_digest "$pointer")"
+
 # ---------------------------------------------------------------- upgrade
 run_a() {
   e2e_clean_env HOME="$home" SHELL=/bin/bash \
@@ -267,6 +327,55 @@ e2e_assert_same_profiles "$work/throwaway-home.before" "$work/throwaway-home.aft
 e2e_assert_real_home_unchanged \
   || e2e_fail "the install or upgrade changed this machine's own kip launcher or shell profile"
 
+# ------------------------------------ the upgrade carried the skills forward
+e2e_log "The skill copies the previous release installed follow the upgrade (ADR-067)"
+if [[ "$previous_skills" == legacy ]]; then
+  # `kip update --archive` from a release without refresh_skills does not
+  # adopt: upgrade_package.py swaps files with os.replace, so the running
+  # previous upgrade.sh finishes with its own finish_upgrade, which predates
+  # the refresh (3.15.0 -> 3.15.1, measured). Only the download path runs the
+  # new tree's `upgrade.sh --finish`. What the release guarantees for an
+  # archive upgrade from such a release is the one-time refresh below; the
+  # state the archive step left is reported either way.
+  if [[ -e "$personal_skills/knowledge-fabric/.kip-skill-install" ]]; then
+    e2e_note "kip update --archive from $previous adopted the legacy personal copy itself"
+  else
+    e2e_note "kip update --archive from $previous did not adopt the legacy personal copy (its own finish step has no refresh); running the one-time refresh"
+  fi
+  status=0
+  from_elsewhere "$deployment_a/scripts/install-agent-files.sh" --refresh > "$work/skills-refresh.out" 2>&1 || status=$?
+  cat "$work/skills-refresh.out" >&2
+  e2e_assert_status 0 "$status" "one-time install-agent-files.sh --refresh after the archive upgrade"
+fi
+"$E2E_PYTHON" "$skills_check" record "$personal_skills" --deployment "$deployment_a" --version "$version" \
+  --client claude --scope personal
+if [[ "$previous_skills" == legacy ]]; then
+  e2e_note "adopted: the legacy personal copy now records $version"
+  [[ "$(e2e_digest "$pointer")" == "$pointer_before" ]] \
+    || e2e_fail "the upgrade changed the legacy pointer $pointer; record-less project copies still resolve through it"
+  e2e_note "unchanged: the legacy pointer $pointer"
+  # A 3.15.0 project copy left no trace an upgrade can find: it must be left
+  # alone and must still answer from deployment A through the pointer.
+  "$E2E_PYTHON" "$skills_check" unrecorded "$project_skills"
+  "$E2E_PYTHON" "$skills_check" registry "$deployment_a" --expect "$personal_skills"
+else
+  "$E2E_PYTHON" "$skills_check" record "$project_skills" --deployment "$deployment_a" --version "$version" \
+    --client claude --scope project
+  [[ ! -e "$pointer" ]] || e2e_fail "the upgrade wrote the legacy pointer $pointer"
+  "$E2E_PYTHON" "$skills_check" registry "$deployment_a" --expect "$personal_skills" --expect "$project_skills"
+fi
+for copy in "$personal_skills" "$project_skills"; do
+  status=0
+  from_elsewhere "$copy/knowledge-fabric/scripts/kip.sh" capabilities > "$work/copy-capabilities.json" || status=$?
+  e2e_assert_status 0 "$status" "$copy/knowledge-fabric/scripts/kip.sh capabilities from an unrelated directory"
+  "$E2E_PYTHON" "$E2E_PROJECT_ROOT/tests/e2e/kip_envelope.py" capabilities "$work/copy-capabilities.json" \
+    --repository postgresql --no-expect-semantic
+  status=0
+  from_elsewhere "$copy/knowledge-fabric/scripts/kip.sh" doctor > "$work/copy-doctor.json" || status=$?
+  e2e_assert_status 0 "$status" "$copy/knowledge-fabric/scripts/kip.sh doctor from an unrelated directory"
+  "$E2E_PYTHON" "$E2E_PROJECT_ROOT/tests/e2e/kip_envelope.py" doctor "$work/copy-doctor.json" --deployment "$deployment_a"
+done
+
 # The launcher defect lived in the download path (`--latest` / `--version`),
 # which reaches install.sh, not in `--archive`, which does not. Exercise it
 # too: the deployment is already current, so this is the cheap
@@ -298,4 +407,33 @@ run_a search "정산" --limit 5 > "$work/search.json" || status=$?
 e2e_assert_status 0 "$status" "kip search after the upgrade"
 "$E2E_PYTHON" "$E2E_PROJECT_ROOT/tests/e2e/kip_envelope.py" search "$work/search.json" --min-hits 2
 
-e2e_log "PASS: $previous upgrades to $version in place, and only package-owned files moved"
+# ----------------------------------------- a stale registered copy is refreshed
+# Nothing is bumped: one registered copy is made to look like an older install
+# left it, and the upgrade's own finish step has to notice and reinstall it.
+e2e_log "upgrade.sh --finish refreshes a registered copy that went stale"
+"$E2E_PYTHON" "$skills_check" set-version "$personal_skills" --skill knowledge-fabric --version 0.0.0-e2e-stale
+status=0
+run_a doctor > "$work/doctor-stale.json" || status=$?
+e2e_assert_status 0 "$status" "kip doctor with a stale registered copy"
+"$E2E_PYTHON" "$E2E_PROJECT_ROOT/tests/e2e/kip_envelope.py" doctor "$work/doctor-stale.json" \
+  --deployment "$deployment_a" --check-not-ok skill_installs
+status=0
+e2e_clean_env HOME="$home" SHELL=/bin/bash \
+  ${E2E_DOCKER_CONFIG[@]+"${E2E_DOCKER_CONFIG[@]}"} \
+  "$deployment_a/scripts/upgrade.sh" --finish > "$work/finish.out" 2>&1 || status=$?
+cat "$work/finish.out" >&2
+e2e_assert_status 0 "$status" "upgrade.sh --finish"
+"$E2E_PYTHON" "$skills_check" record "$personal_skills" --deployment "$deployment_a" --version "$version" \
+  --client claude --scope personal
+e2e_assert_contains "$work/finish.out" "Refreshed $personal_skills" "the finish step reports the refresh"
+status=0
+run_a doctor > "$work/doctor-refreshed.json" || status=$?
+e2e_assert_status 0 "$status" "kip doctor after the refresh"
+"$E2E_PYTHON" "$E2E_PROJECT_ROOT/tests/e2e/kip_envelope.py" doctor "$work/doctor-refreshed.json" \
+  --deployment "$deployment_a" --check-ok skill_installs
+[[ "$previous_skills" != legacy || "$(e2e_digest "$pointer")" == "$pointer_before" ]] \
+  || e2e_fail "the refresh changed the legacy pointer $pointer"
+[[ "$(e2e_digest "$launcher")" == "$launcher_before" ]] \
+  || e2e_fail "the skill refresh repointed the global launcher away from deployment B"
+
+e2e_log "PASS: $previous upgrades to $version in place, only package-owned files moved, and installed skills followed"

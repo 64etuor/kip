@@ -34,12 +34,17 @@ e2e_fail() { printf 'e2e: %s\n' "$*" >&2; exit 1; }
 #   PG*         libpq defaults (PGHOST, PGDATABASE, ...) a URL does not override;
 #   ZDOTDIR     where install.sh looks for a zsh profile;
 #   PYTHONPATH, VIRTUAL_ENV  this checkout's interpreter;
-#   BASH_ENV, ENV  startup files a child bash reads, which could re-export any of the above.
+#   BASH_ENV, ENV  startup files a child bash reads, which could re-export any of the above;
+#   CLAUDE_PROJECT_DIR  an installed skill's scripts/kip.sh walks up from it
+#               before reading its own install record, so a run started from an
+#               agent session inside a KIP checkout would answer from THAT
+#               checkout and its live database;
+#   CODEX_HOME  where Codex looks for its own state instead of HOME.
 e2e_clean_env() {
   local unsets=() name
   while IFS= read -r name; do
     case "$name" in
-      KIP_*|POSTGRES_*|COMPOSE_*|PG*|ZDOTDIR|PYTHONPATH|VIRTUAL_ENV|BASH_ENV|ENV) unsets+=(-u "$name") ;;
+      KIP_*|POSTGRES_*|COMPOSE_*|PG*|ZDOTDIR|PYTHONPATH|VIRTUAL_ENV|BASH_ENV|ENV|CLAUDE_PROJECT_DIR|CODEX_HOME) unsets+=(-u "$name") ;;
     esac
   done < <(compgen -e)
   env ${unsets[@]+"${unsets[@]}"} "$@"
@@ -115,11 +120,27 @@ e2e_real_home_paths() {
   done
 }
 
+# Directories an agent-skill install or uninstall writes (ADR-067): the KIP
+# skill trees for each client and the legacy global pointer. Hashed as whole
+# trees, so a run that installed, refreshed, adopted or removed a real copy
+# fails even when it put the same bytes back.
+e2e_real_home_trees() {
+  local skills name
+  for skills in .claude/skills .agents/skills; do
+    for name in knowledge-fabric kip-setup; do
+      printf '%s\n' "$E2E_REAL_HOME/$skills/$name"
+    done
+  done
+}
+
 e2e_real_home_digests() {
   local path
   while IFS= read -r path; do
     printf '%s %s\n' "$(e2e_digest "$path")" "$path"
-  done < <(e2e_real_home_paths)
+  done < <(e2e_real_home_paths; printf '%s\n' "$E2E_REAL_HOME/.config/kip/project-root")
+  while IFS= read -r path; do
+    printf '%s %s\n' "$(e2e_tree_digest "$path")" "$path"
+  done < <(e2e_real_home_trees)
 }
 
 e2e_assert_real_home_unchanged() {
@@ -390,6 +411,28 @@ e2e_digest() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum "$path" | awk '{print $1}'
   elif command -v shasum >/dev/null 2>&1; then shasum -a 256 "$path" | awk '{print $1}'
   else e2e_fail "sha256sum or shasum is required"; fi
+}
+
+e2e_tree_digest() {
+  # sha256 over every regular file's relative path and content under DIR, or
+  # "absent". Proves a directory this run planted and did not ask to change
+  # (a foreign skill of the same name) was left exactly as it was.
+  "${E2E_PYTHON:-python3}" - "$1" <<'PY'
+import hashlib
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+if not root.is_dir():
+    print("absent")
+    raise SystemExit(0)
+digest = hashlib.sha256()
+for path in sorted(item for item in root.rglob("*") if item.is_file() or item.is_symlink()):
+    digest.update(str(path.relative_to(root)).encode() + b"\0")
+    digest.update(b"link:" + str(path.readlink()).encode() if path.is_symlink() else path.read_bytes())
+    digest.update(b"\0")
+print(digest.hexdigest())
+PY
 }
 
 # The shell-profile files install.sh could choose on this platform, for the

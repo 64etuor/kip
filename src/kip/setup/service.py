@@ -473,7 +473,9 @@ class SetupService:
                 and compose == build_compose_payload(plan, project_root=self.project_root)
             )
             read_only_ok = _all_source_mounts_read_only(compose, plan)
-            mcp_ok = _mcp_uses_generated_config(mcp_value, plan)
+            mcp_ok = _mcp_uses_generated_config(
+                mcp_value, plan, project_root=self.project_root
+            )
         except (OSError, ValueError, TypeError, ValidationError, yaml.YAMLError):
             fingerprint_ok = False
             read_only_ok = False
@@ -539,22 +541,44 @@ def _all_source_mounts_read_only(
     return True
 
 
-def _mcp_uses_generated_config(value: object, plan: SetupPlan) -> bool:
+def _mcp_uses_generated_config(value: object, plan: SetupPlan, *, project_root: Path) -> bool:
+    # Setup before 3.15.1 wrote relative paths and upgrades preserve `.mcp.json`,
+    # so both forms select the generated config. `kip doctor` reports the
+    # relative form as `mcp_registration`; verify does not fail it.
     if not isinstance(value, dict):
         return False
     servers = value.get("mcpServers")
-    if not isinstance(servers, dict):
-        return False
-    server = servers.get("kip")
+    server = servers.get("kip") if isinstance(servers, dict) else None
     if not isinstance(server, dict):
         return False
-    environment = server.get("env")
-    return bool(
-        server.get("command") == "bash"
-        and server.get("args") == ["scripts/mcp.sh"]
-        and isinstance(environment, dict)
-        and environment.get("KIP_CONFIG") == "config/kip.host.generated.toml"
-        and environment.get("KIP_WORKSPACE") == plan.workspace
+    environment = server.get("env", {})
+    if not isinstance(environment, dict):
+        return False
+    command = server.get("command")
+    root = project_root.resolve()
+    if isinstance(command, str) and server.get("args") == ["mcp"] and (
+        command == "kip" or Path(command).resolve() == root / "scripts/kip"
+    ):
+        # The launcher form doctor suggests: `scripts/kip` selects the
+        # generated host config itself, so only a pinned root, config or
+        # workspace must still name this plan. A path to any other `kip`
+        # cannot be attributed to this deployment.
+        pinned_roots = {environment.get("KIP_PROJECT_ROOT"), environment.get("KIP_HOME")} - {None}
+        return (
+            all(isinstance(value, str) and Path(value).resolve() == root for value in pinned_roots)
+            and environment.get("KIP_WORKSPACE", plan.workspace) == plan.workspace
+            and environment.get("KIP_CONFIG") in {None, str(root / "config/kip.host.generated.toml")}
+        )
+    if environment.get("KIP_WORKSPACE") != plan.workspace:
+        return False
+    root = project_root.resolve()
+    forms = (
+        (["scripts/mcp.sh"], "config/kip.host.generated.toml"),
+        ([str(root / "scripts/mcp.sh")], str(root / "config/kip.host.generated.toml")),
+    )
+    return server.get("command") == "bash" and any(
+        server.get("args") == args and environment.get("KIP_CONFIG") == config
+        for args, config in forms
     )
 
 

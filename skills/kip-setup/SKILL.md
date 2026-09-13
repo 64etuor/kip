@@ -5,9 +5,16 @@ description: Install or configure a KIP deployment through its guided setup stat
 
 # KIP Guided Setup
 
-Run the state machine with `./scripts/kip` from the KIP repository. On a fresh
-clone run `./scripts/bootstrap.sh` first. Resume an interrupted configuration
-from inspect.
+Run the state machine through the deployment's `kip` wrapper. The steps write
+`./scripts/kip`, which works in the deployment directory. Elsewhere use the
+global `kip` launcher an installed deployment writes,
+`"$KIP_PROJECT_DIR/scripts/kip"`, or the sibling `knowledge-fabric` skill's
+`scripts/kip.sh`, which resolves the deployment named in this skill's
+`.kip-skill-install`. `kip setup` acts on the deployment whose `scripts/kip`,
+launcher or `kip.sh` you ran (an exported `KIP_PROJECT_ROOT` overrides it);
+pass `--project-root DIR` to target another directory. Run other
+`./scripts/*.sh` in the deployment directory. On a fresh clone run `./scripts/bootstrap.sh` first.
+Resume an interrupted configuration from inspect.
 
 1. Run `./scripts/kip setup inspect`. If incomplete, ask exactly one question:
    the returned `data.questions` item. Each question carries `prompt`,

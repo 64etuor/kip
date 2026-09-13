@@ -113,7 +113,7 @@ def _render_files(plan: SetupPlan, *, project_root: Path) -> dict[str, str]:
     config = build_config_payload(plan, container=True)
     host_config = build_config_payload(plan, container=False)
     compose = build_compose_payload(plan, project_root=project_root)
-    mcp = _mcp_payload(plan)
+    mcp = mcp_payload(plan, project_root=project_root)
     return {
         "config/kip.generated.toml": tomli_w.dumps(config),
         "config/kip.host.generated.toml": tomli_w.dumps(host_config),
@@ -254,14 +254,19 @@ def _add_roles_service(services: Any, *, project_root: Path) -> None:
         ) from exc
 
 
-def _mcp_payload(plan: SetupPlan) -> JsonObject:
+def mcp_payload(plan: SetupPlan, *, project_root: Path) -> JsonObject:
+    # Absolute paths: an MCP client starts the server from its own working
+    # directory, so a relative script or config only works when that happens
+    # to be the deployment root, and the entry cannot be copied into another
+    # project or registered at user scope.
+    root = project_root.resolve()
     return {
         "mcpServers": {
             "kip": {
                 "command": "bash",
-                "args": ["scripts/mcp.sh"],
+                "args": [str(root / "scripts/mcp.sh")],
                 "env": {
-                    "KIP_CONFIG": "config/kip.host.generated.toml",
+                    "KIP_CONFIG": str(root / "config/kip.host.generated.toml"),
                     "KIP_WORKSPACE": plan.workspace,
                 },
             }

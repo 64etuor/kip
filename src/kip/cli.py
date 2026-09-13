@@ -69,6 +69,7 @@ from kip.evaluation.runner import (
 )
 from kip.ids import new_id
 from kip.logging import configure_logging
+from kip.mcp_server import main as serve_mcp_stdio
 from kip.ontology import OntologyCatalog, validate_ontology
 from kip.ontology_discovery_release import RELEASE_JOURNAL_FILENAME
 from kip.ontology_migration import (
@@ -79,6 +80,7 @@ from kip.ontology_migration import (
 from kip.quality import load_experiment, load_quality_report, recommend
 from kip.settings import Settings
 from kip.setup_cli import setup_app
+from kip.skill_installs import STALE, skill_install_statuses
 
 # Command groups. Rich renders these as separate help panels; the same split is
 # spelled out in the root help text because Typer silently drops the panels when
@@ -132,7 +134,7 @@ interaction, export, evaluate, quality, telemetry. The telemetry group is
 mixed: `telemetry traces` only reads, but `telemetry prune` deletes stored
 query traces, so the whole group is listed here and never as read-only.
 
-Deployment and diagnostics: version, doctor, setup, update, api, worker."""
+Deployment and diagnostics: version, doctor, setup, update, api, worker, mcp."""
 
 app = typer.Typer(no_args_is_help=True, add_completion=False, help=_ROOT_HELP)
 sync_app = typer.Typer(no_args_is_help=True, help="Synchronize configured sources")
@@ -245,6 +247,27 @@ def root(
 ) -> None:
     if ctx.invoked_subcommand in {"setup", "update", "version"}:
         # Operator commands that must work without a database or a full container.
+        ctx.obj = None
+        return
+    if ctx.invoked_subcommand == "mcp":
+        # The MCP server loads its own settings and reads the request identity
+        # from the environment on every tool call, exactly as scripts/mcp.sh
+        # starts it. Options given on this command line reach it the same way;
+        # nothing may be printed before the protocol starts on stdout.
+        exported = {
+            "KIP_CONFIG": str(config) if _is_command_line_parameter(ctx, "config") else None,
+            "KIP_WORKSPACE": workspace if _is_command_line_parameter(ctx, "workspace") else None,
+            "KIP_PRINCIPAL_ID": principal if _is_command_line_parameter(ctx, "principal") else None,
+            "KIP_ACL_SCOPES": (
+                ",".join(acl_scope or []) if _is_command_line_parameter(ctx, "acl_scope")
+                else acl_scopes if _is_command_line_parameter(ctx, "acl_scopes") else None
+            ),
+            "KIP_ROLES": (
+                ",".join([*(role or []), *([roles] if roles else [])])
+                if role or _is_command_line_parameter(ctx, "roles") else None
+            ),
+        }
+        os.environ.update({name: value for name, value in exported.items() if value is not None})
         ctx.obj = None
         return
     try:
@@ -904,6 +927,123 @@ def update(
 
 
 @app.command(rich_help_panel=_DEPLOYMENT_PANEL)
+def mcp() -> None:
+    """Serve the stdio MCP adapter for this deployment from any directory.
+
+    Run it through the `kip` launcher or `scripts/kip`, which export the
+    deployment root and load its `.env`; with the launcher on PATH, an MCP
+    client entry of `kip mcp` needs no project path. Stdout carries only the MCP protocol; logs and startup
+    errors go to stderr. The server exposes the same tools as scripts/mcp.sh.
+    """
+    serve_mcp_stdio()
+
+
+def _mcp_registration_doctor_check(settings: Settings) -> dict[str, Any]:
+    """Warn when the deployment's `.mcp.json` only works from the deployment root.
+
+    Setup used to write `bash scripts/mcp.sh` with a relative KIP_CONFIG, and
+    upgrades preserve that file. An MCP client starts the server from its own
+    working directory, where the relative script does not exist. The file is
+    the operator's, so doctor reports the absolute replacement and never
+    rewrites it.
+    """
+    root = settings.project_root
+    path = root / ".mcp.json"
+    details: dict[str, Any] = {"path": str(path), "relative_paths": [], "reason": None}
+    try:
+        server = json.loads(path.read_text(encoding="utf-8"))["mcpServers"]["kip"]
+    except (OSError, ValueError, TypeError, KeyError):
+        server = None
+    if not isinstance(server, dict):
+        return {"name": "mcp_registration", "ok": True, "required": False, "details": details}
+
+    def absolute(value: str) -> str:
+        return os.path.normpath(root / value)
+
+    def relative_path(value: object) -> bool:
+        # Values with `$` or whitespace are client-expanded or shell snippets;
+        # rewriting them against the root would produce a broken replacement.
+        return (
+            isinstance(value, str) and "/" in value
+            and not any(character in value for character in "$ \t")
+            and not value.startswith(("-", "~")) and not Path(value).is_absolute()
+        )
+
+    replacement = dict(server)
+    relative: list[str] = []
+    command = server.get("command")
+    if relative_path(command):
+        relative.append(str(command))
+        replacement["command"] = absolute(str(command))
+    args = server.get("args")
+    if isinstance(args, list):
+        relative.extend(str(item) for item in args if relative_path(item))
+        replacement["args"] = [absolute(item) if relative_path(item) else item for item in args]
+    environment = server.get("env")
+    config = environment.get("KIP_CONFIG") if isinstance(environment, dict) else None
+    # A relative KIP_CONFIG alone is harmless: `common.sh` exports the
+    # deployment as KIP_PROJECT_ROOT and settings resolve it there. It only
+    # travels with a relative script, which is what fails elsewhere.
+    if relative and isinstance(environment, dict) and isinstance(config, str) and relative_path(config):
+        relative.append(config)
+        replacement["env"] = {**environment, "KIP_CONFIG": absolute(config)}
+    if not relative:
+        return {"name": "mcp_registration", "ok": True, "required": False, "details": details}
+    details.update({
+        "relative_paths": relative,
+        "reason": (
+            ".mcp.json registers kip with relative paths, so an MCP client started "
+            "outside the deployment root fails with 'No such file or directory'"
+        ),
+        "fix": (
+            f"Edit {path} by hand (doctor never rewrites it): set mcpServers.kip to "
+            "details.replacement, which uses absolute paths. With the kip launcher on "
+            "PATH, the entry {\"command\": \"kip\", \"args\": [\"mcp\"]} also works from "
+            "any directory."
+        ),
+        "replacement": replacement,
+    })
+    return {"name": "mcp_registration", "ok": False, "required": False, "details": details}
+
+
+def _skill_installs_doctor_check(settings: Settings) -> dict[str, Any]:
+    """Warn when an agent skill copy this deployment installed is out of date.
+
+    Only `stale` fails the check: a removed location or one another deployment
+    now owns is reported, but upgrades already skip those and doctor must not
+    warn forever about a project the operator deleted.
+    """
+    try:
+        statuses = skill_install_statuses(settings.project_root)
+    except ValueError as exc:
+        return {
+            "name": "skill_installs", "ok": False, "required": False,
+            "details": {"installs": [], "reason": str(exc)},
+        }
+    installs = [
+        {
+            "destination": str(status.destination),
+            "client": status.client,
+            "scope": status.scope,
+            "skill": status.skill,
+            "state": status.state,
+            "installed_version": status.installed_version,
+            "deployment_version": status.deployment_version,
+        }
+        for status in statuses
+    ]
+    stale = [item for item in installs if item["state"] == STALE]
+    details: dict[str, Any] = {"installs": installs, "reason": None}
+    if stale:
+        details["reason"] = (
+            "agent skill copies were installed from another KIP version and may "
+            "give agents outdated instructions"
+        )
+        details["fix"] = "./scripts/install-agent-files.sh --refresh"
+    return {"name": "skill_installs", "ok": not stale, "required": False, "details": details}
+
+
+@app.command(rich_help_panel=_DEPLOYMENT_PANEL)
 def doctor(ctx: typer.Context) -> None:
     """Check configuration, source mounts, storage, and adapter availability."""
 
@@ -1005,6 +1145,8 @@ def doctor(ctx: typer.Context) -> None:
                 },
             }
         )
+        checks.append(_mcp_registration_doctor_check(settings))
+        checks.append(_skill_installs_doctor_check(settings))
         required_failures = [item["name"] for item in checks if item["required"] and not item["ok"]]
         return {
             "healthy": not required_failures,

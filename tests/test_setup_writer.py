@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tomllib
 from pathlib import Path
 
@@ -70,8 +71,21 @@ def test_generated_mcp_uses_generated_config_without_secret_material(
     receipt = apply_setup_plan(plan, project_root=project_root)
 
     generated = (project_root / ".mcp.json").read_text(encoding="utf-8")
-    assert '"KIP_CONFIG": "config/kip.host.generated.toml"' in generated
-    assert '"KIP_WORKSPACE": "acme-rnd"' in generated
+    # Absolute paths: a client starts the server from its own working
+    # directory, and the same entry must work at user scope or in another project.
+    root = project_root.resolve()
+    assert json.loads(generated) == {
+        "mcpServers": {
+            "kip": {
+                "command": "bash",
+                "args": [str(root / "scripts/mcp.sh")],
+                "env": {
+                    "KIP_CONFIG": str(root / "config/kip.host.generated.toml"),
+                    "KIP_WORKSPACE": "acme-rnd",
+                },
+            }
+        }
+    }
     assert "KIP_OPENAI_API_KEY" not in generated
     assert ".mcp.json" in receipt.written_files
     assert ".mcp.json.previous" in receipt.previous_files

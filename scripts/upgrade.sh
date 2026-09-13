@@ -49,9 +49,21 @@ if [[ "$do_rollback" == 1 ]]; then
   if [[ -n "$rollback" ]]; then exec "$PY" "$SCRIPT_DIR/upgrade_package.py" --deployment "$PROJECT_ROOT" --rollback "$rollback"
   else exec "$PY" "$SCRIPT_DIR/upgrade_package.py" --deployment "$PROJECT_ROOT" --rollback; fi
 fi
+refresh_skills() {
+  # Re-install the skill copies this deployment recorded (var/skill-installs.json)
+  # so they carry the new version. A failed refresh is reported and never fails
+  # the upgrade; removed or foreign locations are skipped, never recreated.
+  [[ -f "$PROJECT_ROOT/scripts/install_agent_files.py" ]] || return 0
+  local py
+  if ! py="$(python_for_upgrade)" || ! "$py" "$PROJECT_ROOT/scripts/install_agent_files.py" --refresh; then
+    printf 'Warning: installed agent skills were not all refreshed (see above). Fix the location, then run ./scripts/install-agent-files.sh --refresh.\n' >&2
+  fi
+  return 0
+}
 finish_upgrade() {
   "$PROJECT_ROOT/scripts/bootstrap.sh" ${bootstrap_args[@]+"${bootstrap_args[@]}"}
   for arg in ${bootstrap_args[@]+"${bootstrap_args[@]}"}; do [[ "$arg" == "--check" ]] && exit 0; done
+  refresh_skills
   if ! "$PROJECT_ROOT/scripts/migrate.sh"; then
     printf 'Action required: migrations were not applied. Start the database (./scripts/app-up.sh --database-only) and run ./scripts/migrate.sh, then ./scripts/kip doctor.\n' >&2
     exit 75
@@ -86,5 +98,10 @@ upgrade_args=(--deployment "$PROJECT_ROOT" --archive "$archive")
 "$PY" "$SCRIPT_DIR/upgrade_package.py" "${upgrade_args[@]}"
 if [[ "$dry_run" == 1 || "$bootstrap" == 0 ]]; then exit 0; fi
 
-# The tree now holds the new package; finish with its own wrappers.
+# The tree now holds the new package. Finish with its own upgrade.sh: this
+# bash already parsed the old finish_upgrade, which may lack newer steps
+# (3.15.0 had no skill refresh). Exit codes pass through exec unchanged.
+if [[ -x "$SCRIPT_DIR/upgrade.sh" ]]; then
+  exec "$SCRIPT_DIR/upgrade.sh" --finish ${bootstrap_args[@]+"${bootstrap_args[@]}"}
+fi
 finish_upgrade

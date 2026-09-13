@@ -1,5 +1,6 @@
 import inspect
 import json
+import os
 import re
 import shutil
 from pathlib import Path
@@ -574,3 +575,60 @@ def test_allow_stale_help_says_what_it_relaxes_and_what_it_still_refuses() -> No
         assert "ACL or source scope denies the artifact" in text, command
         assert "marks source_changed_since_index true" in text, command
         assert "keeps source_verification sha256" in text, command
+
+
+_MCP_ENVIRONMENT = ("KIP_CONFIG", "KIP_WORKSPACE", "KIP_PRINCIPAL_ID", "KIP_ACL_SCOPES", "KIP_ROLES")
+
+
+def test_mcp_is_a_deployment_command_that_forwards_root_options_to_the_server(monkeypatch) -> None:
+    # `kip mcp` serves tools that change state, like `api`, so it sits with the
+    # deployment commands and never in the read-only retrieval prose.
+    panels = {
+        command.name or command.callback.__name__.replace("_", "-"): command.rich_help_panel
+        for command in app.registered_commands
+    }
+    assert panels["mcp"] == _DEPLOYMENT_PANEL
+    retrieval_prose = _ROOT_HELP.split("Operator commands change state")[0]
+    assert "mcp" not in retrieval_prose
+    assert "mcp" in _ROOT_HELP.split("Deployment and diagnostics:")[1]
+
+    served: list[dict[str, str | None]] = []
+    monkeypatch.setattr(
+        "kip.cli.serve_mcp_stdio",
+        lambda: served.append({name: os.environ.get(name) for name in _MCP_ENVIRONMENT}),
+    )
+    # `kip mcp` exports into the real process environment; give it a copy so
+    # the exported values vanish with the test (delenv records nothing for an
+    # absent key, so it could not undo them).
+    monkeypatch.setattr(os, "environ", dict(os.environ))
+    for name in _MCP_ENVIRONMENT:
+        os.environ.pop(name, None)
+
+    # The server reads its identity from the environment on every tool call,
+    # so root options must reach it there rather than being silently dropped.
+    forwarded = CliRunner().invoke(app, [
+        "--config", "/opt/kip/config/kip.host.generated.toml", "--workspace", "acme",
+        "--principal", "alice", "--acl-scope", "project:a", "--role", "admin", "mcp",
+    ])
+    assert forwarded.exit_code == 0, forwarded.output
+    # Stdout belongs to the MCP protocol: no envelope, no banner.
+    assert forwarded.stdout == ""
+
+    for name in _MCP_ENVIRONMENT:
+        os.environ.pop(name, None)
+    bare = CliRunner().invoke(app, ["mcp"])
+    assert bare.exit_code == 0, bare.output
+    assert bare.stdout == ""
+
+    assert served == [
+        {
+            "KIP_CONFIG": "/opt/kip/config/kip.host.generated.toml",
+            "KIP_WORKSPACE": "acme",
+            "KIP_PRINCIPAL_ID": "alice",
+            "KIP_ACL_SCOPES": "project:a",
+            "KIP_ROLES": "admin",
+        },
+        # Without options the CLI's own defaults (principal_local) never
+        # replace the server's, so the entry behaves exactly like scripts/mcp.sh.
+        dict.fromkeys(_MCP_ENVIRONMENT),
+    ]

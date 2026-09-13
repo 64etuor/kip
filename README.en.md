@@ -58,6 +58,9 @@ reciprocal-rank fusion, ADR-065) and degrades to lexical with a
 - Install and first index: [`docs/QUICKSTART.md`](docs/QUICKSTART.md)
 - Terms: [`docs/GLOSSARY.md`](docs/GLOSSARY.md)
 - Day-to-day operations: [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
+- Register KIP with Claude Code, Codex or another MCP client from any
+  directory (`kip mcp`, or the absolute `scripts/mcp.sh` path):
+  [`docs/APP_INTEGRATION.md`](docs/APP_INTEGRATION.md#registering-kip-with-an-mcp-client)
 - Deploy and upgrade: [`docs/DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md)
 - Readiness against approved goals:
   [`docs/PRODUCTION_DESIGN_ALIGNMENT.md`](docs/PRODUCTION_DESIGN_ALIGNMENT.md)

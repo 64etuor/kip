@@ -1,5 +1,101 @@
 # Changelog
 
+## 3.15.1 - 2026-09-13
+
+- KIP now works from outside its own folder. Registering the MCP server
+  and installing the skills both assumed the agent was started inside the
+  deployment, and failed silently anywhere else.
+  - Setup wrote the MCP entry as `bash scripts/mcp.sh` with a relative
+    `KIP_CONFIG`. An MCP client starts the server from its own working
+    directory, so the entry failed with `No such file or directory` in any
+    other project and could not be registered at user scope. Setup now
+    writes the deployment's absolute script and config paths.
+  - New `kip mcp` serves the MCP stdio server. With the global `kip`
+    launcher on `PATH`, `claude mcp add --scope user kip -- kip mcp` or
+    `codex mcp add kip -- kip mcp` registers KIP for every project. Root
+    options such as `--config` and `--workspace` reach the server as the
+    environment variables it reads. Nothing but the protocol is written to
+    stdout. `docs/APP_INTEGRATION.md` has a new section, "Registering KIP with
+    an MCP client". It gives the user-scope and project-scope commands for
+    Claude Code and the Codex command, each run against the real client, plus
+    the absolute-path form for a checkout without the launcher.
+  - An upgrade preserves `.mcp.json`, so an existing deployment keeps its
+    relative entry. `kip doctor` reports it as the non-required check
+    `mcp_registration`, with the absolute replacement entry, and never rewrites
+    the file. A fresh package install shows the same warning until setup
+    applies, because the shipped `.mcp.json` cannot know its install path.
+    That entry still works when the client is opened in the deployment folder.
+    `setup verify` accepts the relative entry, the absolute entry and the
+    launcher entry (`kip mcp`) when they serve this deployment's generated
+    config and workspace. A relative `KIP_CONFIG` next to an absolute script is
+    not flagged: `scripts/mcp.sh` resolves it against the deployment.
+  - Every skill install, personal or project, wrote one global pointer,
+    `~/.config/kip/project-root`, so a second deployment's install silently
+    repointed the first deployment's project copies. Each installed skill
+    directory now carries `.kip-skill-install` with its own deployment root
+    and `VERSION`, and the wrapper resolves through that record before the
+    legacy pointer. A record naming a deployment that no longer exists stops
+    with exit 2 instead of falling back. Installs no longer write the pointer.
+  - Installed copies went stale on upgrade, and nothing showed it. 3.14.0
+    rewrote the skills to stop unsupported freshness claims, so a stale copy
+    kept the defect. The deployment now lists where it installed skills in
+    `var/skill-installs.json`, and `kip update` (`upgrade.sh --finish`)
+    reinstalls every listed location that still carries this deployment's
+    record. A removed location, a location with one skill missing, another
+    deployment's copy or a same-named skill without a record is skipped and
+    reported, never created. Ownership is checked again under the install
+    lock, and an explicit install that replaces another deployment's copy
+    warns. The wrapper accepts only an absolute recorded deployment. A
+    registry that is not a valid v1 object is reported as malformed rather
+    than crashing `kip doctor`. A failed
+    refresh warns without failing the upgrade. An upgrade from 3.15.0 with
+    `kip update --archive` finishes with 3.15.0's own upgrade script, which
+    predates the refresh. Run `./scripts/install-agent-files.sh --refresh` once
+    after it. `kip update --latest` or `--version` finishes with the new
+    release's script. From 3.15.1, `--archive` hands off to the upgraded tree's
+    `upgrade.sh --finish` too, so later archive upgrades refresh without the
+    extra step. The first refreshing upgrade also adopts
+    a personal `~/.claude/skills` copy installed by 3.15.0 or earlier when the
+    legacy pointer names this deployment and both skills are KIP's. The pointer
+    is kept, so project copies from 3.15.0 or earlier keep resolving through
+    it. Those left no trace an upgrade can find; reinstall them to have them
+    refreshed. `kip doctor` reports out-of-date copies as the non-required
+    check `skill_installs`, with `./scripts/install-agent-files.sh --refresh`
+    as the fix.
+  - `install-agent-files.sh --client codex` installs into `.agents/skills`,
+    the location named by both Codex's "Build skills" documentation and its
+    shipped skills loader. `--client all` installs for Claude Code and Codex.
+    An install into the deployment itself is refused, because its
+    `.claude/skills` must stay byte-identical to `skills/`.
+  - `uninstall-agent-files.sh` removed any directory named `knowledge-fabric`
+    or `kip-setup` without checking who installed it, and left the pointer
+    behind. It now removes only directories carrying this deployment's record,
+    and the deployment's registry entry, and prints what it left and why. A
+    path that differs from the deployment only in letter case is recognised as
+    the deployment and refused. It never removes the legacy pointer, because
+    project copies from 3.15.0 or earlier still resolve through it. It prints
+    the command to remove the pointer once none remain.
+  - `kip setup` configured the working directory even when started through the
+    global launcher from another folder. It now defaults `--project-root` to
+    the deployment `scripts/kip` exports. The `kip-setup` skill no longer tells
+    agents to run from inside the KIP repository.
+  - `./scripts/e2e-install.sh` now runs from a directory outside the installed
+    deployment. It checks that `kip mcp`, started through the global launcher,
+    answers `initialize`, `tools/list` and `kip_capabilities` with nothing but
+    JSON-RPC on stdout. It installs the skills for both clients, personally and
+    into a project, and each copy must answer through its wrapper. `kip doctor`
+    must report them current, and uninstall must leave a planted foreign skill
+    untouched. `./scripts/e2e-upgrade.sh` plants skills with the previous
+    release's own installer. After the upgrade and the one-time refresh, it
+    checks that the personal copy was adopted and the pointer is unchanged,
+    and that the project copy still resolves. It then checks that
+    `upgrade.sh --finish` refreshes a stale record. The real-HOME guard now
+    also hashes the pointer and the KIP skill directories. The test environment
+    clears `CLAUDE_PROJECT_DIR` and `CODEX_HOME`: the skill wrapper reads the
+    first one before its own record, so a run started from an agent session
+    would otherwise have answered from that session's checkout.
+  - ADR-067 records these decisions.
+
 ## 3.15.0 - 2026-09-13
 
 - CI now exercises the shipped artifact, not only the source tree. The gate was

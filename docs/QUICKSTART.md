@@ -213,6 +213,13 @@ standalone Compose와 secret references를 함께 해석한다. 직접 base Comp
 API와 CLI는 같은 service layer를 호출한다. 호출하는 시스템이 MCP를 직접
 지원하는 경우가 아니면 애플리케이션 연동은 REST/OpenAPI를 쓴다.
 
+MCP client에 KIP를 등록할 때는 `kip` launcher가 있으면 `kip mcp`, 없으면 절대
+경로 `bash <배포 경로>/scripts/mcp.sh`를 쓴다. client는 자신의 작업
+디렉터리에서 서버를 시작하므로 상대 경로는 배포 루트 밖에서 실패한다. Claude
+Code와 Codex 등록 명령은
+[`APP_INTEGRATION.md`](APP_INTEGRATION.md#registering-kip-with-an-mcp-client)에
+있다.
+
 자체 애플리케이션 connector에서 변경을 밀어 넣는다.
 
 ```bash

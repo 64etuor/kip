@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, cast
@@ -34,12 +35,16 @@ class SetupCommandContext:
 @setup_app.callback()
 def setup_root(
     ctx: typer.Context,
-    project_root: Annotated[Path, typer.Option("--project-root")] = Path("."),
+    project_root: Annotated[Path | None, typer.Option("--project-root")] = None,
     state: Annotated[Path, typer.Option("--state")] = Path(
         ".kip/setup-state.json"
     ),
 ) -> None:
-    root = project_root.expanduser().resolve()
+    # `scripts/kip` (and the global launcher that execs it) exports the
+    # deployment as KIP_PROJECT_ROOT, so `kip setup` run from another directory
+    # still configures the deployment instead of the working directory.
+    selected = project_root or Path(os.environ.get("KIP_PROJECT_ROOT") or ".")
+    root = selected.expanduser().resolve()
     state_path = state if state.is_absolute() else root / state
     ctx.obj = SetupCommandContext(
         SetupService(project_root=root, state_path=state_path)

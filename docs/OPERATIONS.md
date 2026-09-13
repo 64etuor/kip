@@ -117,7 +117,11 @@ git 체크아웃은 `git pull`을 쓰라며 거부된다. `--latest`/`--version`
 추가분은 건드리지 않으며 `.mcp.json`은 보존된다. 교체·삭제된 파일과 `plan.json`은
 `var/upgrades/<id>/`에 남고 `./scripts/upgrade.sh --rollback [ID]`가 그 패키지 파일을
 되돌린다(설치된 버전이 해당 업그레이드의 대상 버전이 아니면 거부한다). 적용 뒤에는
-`./scripts/bootstrap.sh`, `./scripts/migrate.sh`, `./scripts/kip doctor`가 이어지며,
+`./scripts/bootstrap.sh`, `var/skill-installs.json`에 기록된 Skill 설치 위치의 재설치,
+`./scripts/migrate.sh`, `./scripts/kip doctor`가 이어진다. Skill 재설치는 지워졌거나
+다른 배포가 차지한 위치를 만들지 않고 건너뛰어 보고하며, 실패해도 경고만 남기고
+업그레이드를 계속한다(`--no-bootstrap`이면 나중에 `./scripts/install-agent-files.sh
+--refresh`, [Daily](#daily)의 portable skill 설명 참고). 이어지는 단계에서
 데이터베이스에 연결할 수 없으면 `Action required`와 함께 exit 75로 끝난다. 이때는
 `./scripts/app-up.sh --database-only`로 DB를 올린 뒤 `./scripts/migrate.sh`와
 `./scripts/kip doctor`를 실행한다. 마이그레이션이 포함된 업그레이드 뒤에는
@@ -210,14 +214,87 @@ there (for example a workspace holding only `sample-data`); with
 `KIP_REQUIRE_PRIVATE_GOLDEN=1` each of those conditions fails instead.
 
 Portable skill installation is `./scripts/install-agent-files.sh personal` or
-`./scripts/install-agent-files.sh project /path/to/project`. It replaces only
-the two bundled skills under `.claude/skills`, stages both before replacement,
-and rolls back handled failures. Other skill directories remain untouched.
-Symlink bundles are rejected. A machine interruption can leave
-`.claude/skills/.kip-install-*` containing previous bundles; preserve those
-until the installation is reconciled. The runtime pointer under
-`~/.config/kip/project-root` changes only after both replacements succeed.
-`KIP_PROJECT_DIR` overrides discovery and an invalid value is an error.
+`./scripts/install-agent-files.sh project /path/to/project`, with
+`--client claude` (default: `.claude/skills`), `--client codex`
+(`.agents/skills`) or `--client all`. Codex's
+[Build skills](https://learn.chatgpt.com/docs/build-skills) page lists
+`$HOME/.agents/skills` as the `USER` scope ("Use to curate skills relevant to a
+user that apply to any repository the user may work in.") and
+`$REPO_ROOT/.agents/skills` as a `REPO` scope. The `$CODEX_HOME/skills` paths
+in the codex-cli binary belong to its bundled `.system` skills; KIP does not
+install there. For an agent that reads neither
+location, point it at the installed `SKILL.md` files. The installer replaces
+only the two bundled skills, stages both before replacement and rolls back
+handled failures. Other skill directories remain untouched. Symlink bundles
+are rejected. A machine interruption can leave `<skills>/.kip-install-*`
+containing previous bundles; preserve those until the installation is
+reconciled. A project install into the deployment itself is refused: the
+deployment resolves itself by walking up, and its `.claude/skills` is the
+package-owned mirror of `skills/`. The check compares file identity, so a
+differently cased or symlinked spelling of the deployment is refused too, and
+refresh and uninstall never touch the deployment's own skills.
+
+Every installed skill directory carries `.kip-skill-install`, key=value lines
+`schema=kip.skill-install.v1`, `skill`, `deployment` (absolute root),
+`version` (the deployment's `VERSION`), `client`, `scope` and `installed_at`.
+The skill's `scripts/kip.sh` resolves `KIP_PROJECT_DIR`, then an enclosing KIP
+checkout, then that recorded deployment, so copies installed from different
+deployments never resolve to each other. A recorded deployment that is not an
+absolute path with `scripts/kip` stops with an error. Only copies without a record (installed by
+3.15.0 or earlier) still read `~/.config/kip/project-root`, which installs no
+longer write. `KIP_PROJECT_DIR` overrides discovery and an invalid value is an
+error.
+
+The deployment lists every location it installed into in
+`var/skill-installs.json` (`{"schema": "kip.skill-install-registry.v1",
+"installs": [{"destination", "client", "scope"}]}`); it is deployment-owned and
+survives upgrades. `kip.skill_installs.skill_install_statuses` reports each
+recorded copy as `current`, `stale`, `missing`, `other_deployment` or
+`unrecorded`. After bootstrap, `./scripts/upgrade.sh` (and so `kip update`)
+reinstalls every listed location where both skills still carry this
+deployment's record, and checks that again under the install lock. It skips
+and reports a location that was removed, is missing one skill, holds another
+deployment's copy or holds a same-named skill without a record, and never
+recreates a location or a skill. A failed refresh prints a warning and the
+upgrade continues. An explicit install over another deployment's copy warns and
+names that deployment. Refresh by hand with
+`./scripts/install-agent-files.sh --refresh`, also after an upgrade run with
+`--no-bootstrap`.
+
+An archive upgrade from 3.15.0 or earlier (`kip update --archive` or
+`upgrade.sh --archive`) finishes with the old `upgrade.sh` already running,
+which has no refresh, so it neither refreshes nor adopts. Run
+`./scripts/install-agent-files.sh --refresh` once afterwards; that run also
+performs the legacy adoption below. `kip update` with `--latest` or `--version`
+does both, because the installer finishes with the new tree's
+`upgrade.sh --finish`. From 3.15.1 on, the archive path also execs the
+upgraded tree's `upgrade.sh --finish`.
+
+Refresh also adopts the one install 3.15.0 and earlier left a trace of. The
+conditions are all of:
+
+- `~/.config/kip/project-root` names this deployment;
+- `~/.claude/skills/knowledge-fabric` and `kip-setup` are both real directories
+  without a record;
+- each `SKILL.md` declares its own `name:`.
+
+When they hold, refresh reinstalls that location with records, registers it,
+and reports it as adopted. It leaves the pointer in place, and so does
+uninstall. Project copies installed by 3.15.0 or earlier left no trace, so
+refresh never finds them. They keep resolving through the pointer but stay at
+their old version. Reinstall them with
+`./scripts/install-agent-files.sh project DIR` so they get a record and later
+upgrades refresh them.
+
+`./scripts/uninstall-agent-files.sh [personal | project DIR] [--client
+claude|codex|all]` checks every client location by default. It removes only
+skill directories whose record names this deployment, drops the location from
+the registry, and prints every path it removed or left with the reason. It
+never removes `~/.config/kip/project-root`: when the pointer names this
+deployment it prints the `rm` command to run once no copy installed by 3.15.0
+or earlier remains. A
+same-named skill without a record, including a copy installed by 3.15.0 or
+earlier, is left for you to remove by hand.
 
 ```bash
 ./scripts/doctor.sh

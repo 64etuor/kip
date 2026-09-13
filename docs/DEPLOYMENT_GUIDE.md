@@ -145,8 +145,12 @@ rollback을 다룬다.
 TOML, Compose, `.mcp.json`을 직접 편집하지 않는다. 셋업 state machine이
 컨테이너용 `config/kip.generated.toml`, 호스트 경로용
 `config/kip.host.generated.toml`, `compose.generated.yaml`, 그리고 호스트
-config를 선택하는 `.mcp.json`을 함께 쓴다. 기존 generated file은 apply 때
-`.previous`로 한 세대 보존되고, answer가 바뀐 stale plan은 쓰기 전에 거부된다.
+config를 선택하는 `.mcp.json`을 함께 쓴다. `.mcp.json`은 절대경로로
+쓰인다(`bash <root>/scripts/mcp.sh`와 절대경로 `KIP_CONFIG`). 전역 런처가 있는
+배포에서는 `kip mcp`가 어느 디렉터리에서든 MCP를 제공한다. client 등록 방법은
+[`APP_INTEGRATION.md`의 "Registering KIP with an MCP client"](APP_INTEGRATION.md#registering-kip-with-an-mcp-client)를
+따른다. 기존 generated file은 apply 때 `.previous`로 한 세대 보존되고, answer가
+바뀐 stale plan은 쓰기 전에 거부된다.
 
 host와 container의 source root는 동일한 canonical 절대경로다. Compose도
 그 경로 그대로 read-only mount하여 같은 DB의 근거 URI와 ACL snapshot이
@@ -198,10 +202,24 @@ envelope와 CLI exit code를 검사한다. 같은 검사를 로컬에서 그대�
 
 `AGENTS.md`의 작업별 경로에서 필요한 문서만 읽는다. Skill은 근거·권한·승인
 경계와 운영 주의점을 제공하며, 명령 인자는 `--help`와 MCP schema를 따른다.
-다른 프로젝트에 설치할 때는 `./scripts/install-agent-files.sh project DIR`을
-사용한다. 두 Skill 복사와 교체 중 처리 가능한 오류가 나면 이전 설치로
-복구하며, symlink 대상은 거부한다. `KIP_PROJECT_DIR`을 명시했다면 잘못된
-경로는 다른 KIP으로 대체되지 않고 오류가 된다.
+다른 프로젝트에 설치할 때는 `./scripts/install-agent-files.sh project DIR`을,
+개인 설치에는 `personal`을 사용한다. `--client claude`(기본, `.claude/skills`),
+`--client codex`(Codex 문서의 `.agents/skills`), `--client all` 중에서 고르고,
+두 위치를 읽지 않는 agent에는 설치된 `SKILL.md` 경로를 직접 알려 준다. 두
+Skill 복사와 교체 중 처리 가능한 오류가 나면 이전 설치로 복구하며, symlink
+대상과 배포 자신을 대상으로 한 project 설치는 거부한다. 설치된 Skill
+디렉터리마다 `.kip-skill-install`이 설치한 배포 경로와 `VERSION`을 기록하므로
+`scripts/kip.sh`는 `KIP_PROJECT_DIR`, 상위 KIP 체크아웃, 기록된 배포 순서로
+찾고, 서로 다른 배포에서 설치한 사본이 섞이지 않는다. 기록이 없는 3.15.0 이하
+사본만 `~/.config/kip/project-root`를 읽는다. `KIP_PROJECT_DIR`을 명시했다면
+잘못된 경로는 다른 KIP으로 대체되지 않고 오류가 된다. 설치 위치는 배포의
+`var/skill-installs.json`에 남아 업그레이드가 다시 설치하며(11.3),
+`./scripts/uninstall-agent-files.sh`는 이 배포의 기록이 있는 Skill만 지우고
+지운 것과 남긴 것을 이유와 함께 출력한다. `~/.config/kip/project-root`는 지우지
+않고 지울 명령만 안내한다. 대소문자나 symlink만 다른 배포 경로도 같은 파일로
+비교해 배포 자신으로 보고 설치를 거부하며, refresh와 uninstall도 배포 자신의
+Skill은 건드리지 않는다. 형식과 규칙은
+[`OPERATIONS.md`](OPERATIONS.md)에 있다.
 
 `./scripts/verify.sh`는 pytest·Ruff·mypy·pip-audit 중 하나라도 없으면 실패한다.
 `./scripts/bootstrap.sh`로 환경을 복구한 뒤 다시 실행한다. uv가 없어도
@@ -509,12 +527,18 @@ secret file, 배포, backup, restore drill 명령은 `docs/OPERATIONS.md`를 따
 | 출처 | `KIP_CONFIG` |
 |---|---|
 | 패키지 기본값 | `config/kip.toml` |
-| `setup apply` 산출물 | `config/kip.host.generated.toml` + `KIP_WORKSPACE` |
+| `setup apply` 산출물 | 절대경로 `<root>/config/kip.host.generated.toml` + `KIP_WORKSPACE`, 명령은 `bash <root>/scripts/mcp.sh` |
 
 패키지 버전으로 덮으면 MCP 서버가 배포의 생성 config 대신 패키지 기본값을 읽는다.
 실패하지 않고 다른 설정으로 동작하므로 증상이 늦게 드러난다. 업그레이드는
 배포의 `.mcp.json`을 보존하고, MCP 계약이 바뀐 릴리스에서만 `setup apply`를
-다시 실행해 재생성한다. 어느 경우에도 손으로 편집하지 않는다.
+다시 실행해 재생성한다. 어느 경우에도 손으로 편집하지 않는다. 그래서 이전
+setup이 쓴 상대경로 항목도 업그레이드 뒤 그대로 남는다. `kip doctor`는 이를
+필수가 아닌 `mcp_registration` 검사로 보고하며 바꿀 항목을 함께 보여 준다.
+전역 런처가 있는 배포에서는 `kip mcp`가 어느 디렉터리에서든 MCP를 제공한다.
+등록 명령은
+[`APP_INTEGRATION.md`의 "Registering KIP with an MCP client"](APP_INTEGRATION.md#registering-kip-with-an-mcp-client)에
+있다.
 
 ### 11.3 절차
 
@@ -554,7 +578,24 @@ kip update
    보존된다(11.2). 교체·삭제된 파일과 계획은
    `var/upgrades/<id>/`(`previous-package-files.tar.gz`, `plan.json`)에 남는다.
 4. 적용 후 `./scripts/bootstrap.sh`, `./scripts/migrate.sh`,
-   `./scripts/kip doctor`가 이어서 실행된다. 데이터베이스에 연결할 수 없으면
+   `./scripts/kip doctor`가 이어서 실행된다. bootstrap 바로 뒤에는
+   `var/skill-installs.json`에 기록된 Skill 설치 위치를 새 버전으로 다시
+   설치한다. 지워졌거나 Skill 하나가 빠졌거나 다른 배포의 사본, 기록 없는 같은 이름의 Skill이 있는
+   위치는 만들거나 덮지 않고 건너뛰어 보고하며, 재설치가 실패해도 경고만 남기고
+   업그레이드는 계속된다. 3.15.0 이하에서 설치한 개인 Skill은 한 번 채택한다.
+   조건은 `~/.config/kip/project-root`가 이 배포를 가리키고,
+   `~/.claude/skills`의 `knowledge-fabric`·`kip-setup`이 기록 없는 실제
+   디렉터리이며, 각 `SKILL.md`의 `name:`이 이름과 같은 경우다. 이때 기록과 함께
+   다시 설치해 registry에 넣고, 포인터는 그대로 둔다(uninstall도 지우지
+   않는다). 3.15.0 이하의 project 설치는 흔적이 없어 찾지 못한다. 그 사본은
+   포인터로 계속 배포를 찾지만 이전 버전에 머문다. 기록을 남겨 이후 업그레이드가
+   갱신하도록 `./scripts/install-agent-files.sh project DIR`로 다시 설치하기를
+   권장한다. 3.15.0 이하에서 `kip update --archive`나 `upgrade.sh --archive`로
+   올리면 이미 실행 중인 이전 `upgrade.sh`가 마무리하므로 재설치와 채택이 일어나지
+   않는다. 그 뒤 `./scripts/install-agent-files.sh --refresh`를 한 번 실행하면
+   채택까지 수행된다. `kip update`(`--latest`/`--version`)는 설치기가 새 트리의
+   `upgrade.sh --finish`를 실행하므로 둘 다 수행한다. 3.15.1부터는 `--archive`
+   경로도 새 트리의 `upgrade.sh --finish`를 실행한다. 데이터베이스에 연결할 수 없으면
    `Action required`와 함께 exit 75로 끝나므로 DB를 올린 뒤
    `./scripts/migrate.sh`와 `./scripts/kip doctor`를 직접 실행한다.
    `--no-bootstrap`은 파일만 적용한다.

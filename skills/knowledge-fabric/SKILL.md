@@ -114,5 +114,8 @@ the connected tool schema for current arguments.
 ## When the wrapper cannot find a deployment
 
 `scripts/kip.sh` resolves `KIP_PROJECT_DIR`, then the current repository, then
-`~/.config/kip/project-root`. An invalid explicit `KIP_PROJECT_DIR` stops
-instead of selecting another workspace: fix the path rather than unsetting it.
+the deployment this installed copy recorded in its `.kip-skill-install`, then
+the legacy `~/.config/kip/project-root` for copies without a record. An invalid
+`KIP_PROJECT_DIR` or a recorded deployment that no longer exists stops instead
+of selecting another workspace: fix the path or reinstall the skill from its
+deployment rather than unsetting it.

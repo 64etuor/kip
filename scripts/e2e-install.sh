@@ -6,7 +6,11 @@
 # exactly as an operator would (launcher and shell profile included, under a
 # throwaway HOME), bootstraps it, migrates against PostgreSQL, syncs the
 # bundled sample-data, and then asserts on the envelopes that `search`, `read`
-# and `xlsx-read` return through the installed `kip`.
+# and `xlsx-read` return through the installed `kip`. From an unrelated
+# directory it then drives `kip mcp` over stdio, installs the agent skills
+# personally for every client and into an unrelated project, reopens each copy
+# through its own wrapper, checks `kip doctor`'s skill_installs, and uninstalls
+# next to a same-named foreign skill (ADR-067).
 #
 #   ./scripts/e2e-install.sh                    # starts a throwaway PostgreSQL
 #   KIP_E2E_DATABASE_URL=postgresql://... ./scripts/e2e-install.sh
@@ -35,7 +39,7 @@ while [[ $# -gt 0 ]]; do
     --keep) keep_work=1; shift ;;
     --archive) [[ $# -ge 2 ]] || e2e_fail "--archive needs a value"; archive="$2"; shift 2 ;;
     --work) [[ $# -ge 2 ]] || e2e_fail "--work needs a value"; work="$2"; shift 2 ;;
-    -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,26p' "$0"; exit 0 ;;
     *) e2e_fail "unknown option: $1" ;;
   esac
 done
@@ -217,4 +221,106 @@ e2e_assert_status 3 "$status" "a typed validation error exits 3"
 status="$(e2e_capture "$work/usage.json" run_kip no-such-command)"
 e2e_assert_status 2 "$status" "an unknown command exits 2"
 
-e2e_log "PASS: the shipped $version package installs, bootstraps, migrates, syncs and answers"
+# ------------------------------------------- from outside the deployment
+# ADR-067. An MCP client and an installed skill start KIP from THEIR working
+# directory, never the deployment's, and 3.15.0 and earlier failed silently
+# there. Everything below starts from directories under the throwaway HOME
+# that have nothing to do with the deployment.
+elsewhere="$home/elsewhere"
+project="$home/projects/unrelated-app"
+mkdir -p "$elsewhere" "$project"
+skills_check="$E2E_PROJECT_ROOT/tests/e2e/skill_installs.py"
+personal_claude="$home/.claude/skills"
+personal_codex="$home/.agents/skills"
+project_claude="$project/.claude/skills"
+project_codex="$project/.agents/skills"
+
+# from_elsewhere COMMAND [ARG ...]: COMMAND started from the unrelated
+# directory with the scrubbed environment and the throwaway HOME.
+from_elsewhere() {
+  ( cd "$elsewhere" && e2e_clean_env HOME="$home" SHELL=/bin/bash "$@" )
+}
+
+e2e_log "kip mcp through the global launcher, from an unrelated directory"
+status=0
+from_elsewhere "$E2E_PYTHON" "$E2E_PROJECT_ROOT/tests/e2e/mcp_stdio_probe.py" \
+  --cwd "$elsewhere" --expect-version "$version" --expect-repository postgresql \
+  -- "$launcher" mcp || status=$?
+e2e_assert_status 0 "$status" "kip mcp answered initialize, tools/list and kip_capabilities, and wrote only JSON-RPC to stdout"
+
+e2e_log "Installing the agent skills for every client, personal and into an unrelated project"
+status=0
+from_elsewhere "$deployment/scripts/install-agent-files.sh" personal --client all \
+  > "$work/skills-personal.out" 2>&1 || status=$?
+cat "$work/skills-personal.out" >&2
+e2e_assert_status 0 "$status" "install-agent-files.sh personal --client all"
+status=0
+from_elsewhere "$deployment/scripts/install-agent-files.sh" project "$project" \
+  > "$work/skills-project.out" 2>&1 || status=$?
+cat "$work/skills-project.out" >&2
+e2e_assert_status 0 "$status" "install-agent-files.sh project $project"
+
+"$E2E_PYTHON" "$skills_check" record "$personal_claude" --deployment "$deployment" --version "$version" --client claude --scope personal
+"$E2E_PYTHON" "$skills_check" record "$personal_codex" --deployment "$deployment" --version "$version" --client codex --scope personal
+"$E2E_PYTHON" "$skills_check" record "$project_claude" --deployment "$deployment" --version "$version" --client claude --scope project
+"$E2E_PYTHON" "$skills_check" registry "$deployment" \
+  --expect "$personal_claude" --expect "$personal_codex" --expect "$project_claude"
+[[ ! -e "$home/.config/kip/project-root" ]] \
+  || e2e_fail "a $version skill install wrote the legacy global pointer $home/.config/kip/project-root"
+e2e_note "confirmed: no install wrote the legacy global pointer"
+
+# Each copy answers through its own wrapper. capabilities proves an ok answer
+# from the PostgreSQL this run migrated; doctor's loaded configuration is the
+# one envelope field that names WHICH deployment answered.
+for copy in "$personal_claude" "$personal_codex" "$project_claude"; do
+  wrapper="$copy/knowledge-fabric/scripts/kip.sh"
+  [[ -x "$wrapper" ]] || e2e_fail "the installed copy has no executable wrapper at $wrapper"
+  status=0
+  from_elsewhere "$wrapper" capabilities > "$work/copy-capabilities.json" || status=$?
+  e2e_assert_status 0 "$status" "$wrapper capabilities from an unrelated directory"
+  "$E2E_PYTHON" "$checker" capabilities "$work/copy-capabilities.json" \
+    --repository postgresql --no-expect-semantic ${allow[@]+"${allow[@]}"}
+  status=0
+  from_elsewhere "$wrapper" doctor > "$work/copy-doctor.json" || status=$?
+  e2e_assert_status 0 "$status" "$wrapper doctor from an unrelated directory"
+  "$E2E_PYTHON" "$checker" doctor "$work/copy-doctor.json" --deployment "$deployment"
+done
+
+e2e_log "kip doctor reports the installed copies"
+status=0
+from_elsewhere "$launcher" doctor > "$work/doctor.json" || status=$?
+e2e_assert_status 0 "$status" "kip doctor through the launcher from an unrelated directory"
+# Three locations, two skills each, all current.
+"$E2E_PYTHON" "$checker" doctor "$work/doctor.json" --deployment "$deployment" \
+  --check-ok skill_installs --skill-installs 6
+
+e2e_log "Uninstalling removes this deployment's copies and nothing else"
+# A same-named skill KIP never installed, next to this deployment's project
+# copy: `uninstall project DIR` covers every client by default, so it walks
+# straight into it.
+mkdir -p "$project_codex/knowledge-fabric"
+printf -- '---\nname: knowledge-fabric\ndescription: somebody else'"'"'s skill\n---\n' > "$project_codex/knowledge-fabric/SKILL.md"
+printf 'not KIP\n' > "$project_codex/knowledge-fabric/notes.txt"
+foreign_before="$(e2e_tree_digest "$project_codex/knowledge-fabric")"
+
+status=0
+from_elsewhere "$deployment/scripts/uninstall-agent-files.sh" personal > "$work/uninstall-personal.out" 2>&1 || status=$?
+cat "$work/uninstall-personal.out" >&2
+e2e_assert_status 0 "$status" "uninstall-agent-files.sh personal"
+"$E2E_PYTHON" "$skills_check" absent "$personal_claude"
+"$E2E_PYTHON" "$skills_check" absent "$personal_codex"
+"$E2E_PYTHON" "$skills_check" record "$project_claude" --deployment "$deployment" --version "$version"
+"$E2E_PYTHON" "$skills_check" registry "$deployment" --expect "$project_claude"
+
+status=0
+from_elsewhere "$deployment/scripts/uninstall-agent-files.sh" project "$project" > "$work/uninstall-project.out" 2>&1 || status=$?
+cat "$work/uninstall-project.out" >&2
+e2e_assert_status 0 "$status" "uninstall-agent-files.sh project $project"
+"$E2E_PYTHON" "$skills_check" absent "$project_claude"
+[[ "$(e2e_tree_digest "$project_codex/knowledge-fabric")" == "$foreign_before" ]] \
+  || e2e_fail "uninstall changed or removed $project_codex/knowledge-fabric, a same-named skill KIP never installed"
+e2e_assert_contains "$work/uninstall-project.out" "Left $project_codex/knowledge-fabric" \
+  "uninstall reports the foreign same-named skill it left"
+"$E2E_PYTHON" "$skills_check" registry "$deployment"
+
+e2e_log "PASS: the shipped $version package installs, bootstraps, migrates, syncs and answers, including over MCP and through installed skills from outside the deployment"

@@ -68,8 +68,11 @@ def test_verify_missing_tools_fails_before_running_checks(tmp_path: Path) -> Non
     assert not (tmp_path / "checks-ran").exists()
 
 
+@pytest.mark.parametrize("supplied_test_db", [False, True])
 @pytest.mark.parametrize("use_uv", [True, False])
-def test_verify_runs_every_gate_with_the_selected_environment(tmp_path: Path, use_uv: bool) -> None:
+def test_verify_runs_every_gate_with_the_selected_environment(
+    tmp_path: Path, use_uv: bool, supplied_test_db: bool
+) -> None:
     scripts = tmp_path / "scripts"
     scripts.mkdir()
     (tmp_path / "examples").mkdir()
@@ -89,16 +92,45 @@ def test_verify_runs_every_gate_with_the_selected_environment(tmp_path: Path, us
         'PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"\n'
         'python_cmd() { printf "%s\\n" "$PROJECT_ROOT/fake-python"; }\n'
     )
+    # verify.sh starts a throwaway PostgreSQL through e2e-common.sh when no test
+    # database is named; the stub records that instead of starting Docker.
+    (scripts / "e2e-common.sh").write_text(
+        'e2e_start_postgres() { printf "e2e_start_postgres\\n" >> "$E2E_PROJECT_ROOT/commands"; '
+        'E2E_DATABASE_URL="postgresql://throwaway/kip"; }\n'
+        'e2e_stop_postgres() { printf "e2e_stop_postgres\\n" >> "$E2E_PROJECT_ROOT/commands"; }\n'
+    )
     for name in ("fake-python", "uv") if use_uv else ("fake-python",):
         stub = tmp_path / name
-        stub.write_text('#!/bin/bash\nprintf "%s\\n" "$*" >> "${0%/*}/commands"\n')
+        stub.write_text(
+            '#!/bin/bash\nprintf "%s\\n" "$*" >> "${0%/*}/commands"\n'
+            'case "$*" in *"pytest"*) printf "test-db=%s\\n" "${KIP_TEST_POSTGRES_URL:-}" '
+            '>> "${0%/*}/commands" ;; esac\n'
+        )
         stub.chmod(0o755)
+    # Pin both variables the database block reads: CI sets GITHUB_ACTIONS, which
+    # would skip the block and let this test pass there while failing locally.
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in {"KIP_TEST_POSTGRES_URL", "GITHUB_ACTIONS"}
+    }
+    environment["PATH"] = f"{tmp_path}:/usr/bin:/bin"
+    if supplied_test_db:
+        environment["KIP_TEST_POSTGRES_URL"] = "postgresql://supplied/kip"
     result = subprocess.run(
         ["/bin/bash", str(scripts / "verify.sh")],
-        env={**os.environ, "PATH": f"{tmp_path}:/usr/bin:/bin"},
+        env=environment,
         capture_output=True, text=True, check=True,
     )
     commands = (tmp_path / "commands").read_text().splitlines()
+    if supplied_test_db:
+        assert "e2e_start_postgres" not in commands
+        assert "test-db=postgresql://supplied/kip" in commands
+    else:
+        assert commands.index("e2e_start_postgres") < commands.index(
+            "test-db=postgresql://throwaway/kip"
+        )
+        assert "e2e_stop_postgres" in commands
     prefix = "run --frozen python -m" if use_uv else "-m"
     assert commands.index("audit-kordoc") < commands.index(f"{prefix} ruff check src tests scripts")
     assert f"{prefix} ruff check src tests scripts" in commands

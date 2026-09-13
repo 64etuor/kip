@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import shutil
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -48,9 +47,10 @@ from kip.ids import new_id, stable_id
 from kip.ontology import OntologyCatalog
 from kip.ontology_migration import OntologyMigration
 from kip.settings import Settings
+from tests.environment import TEST_DATABASE_SKIP_REASON, TEST_POSTGRES_URL
 
-URL = os.environ.get("KIP_TEST_POSTGRES_URL") or os.environ.get("KIP_DATABASE_URL")
-pytestmark = pytest.mark.skipif(not URL, reason="PostgreSQL integration URL not configured")
+URL = TEST_POSTGRES_URL
+pytestmark = pytest.mark.skipif(not URL, reason=TEST_DATABASE_SKIP_REASON)
 
 
 def test_postgres_interactions_enforce_owner_scope_and_review_lifecycle(

@@ -95,6 +95,14 @@ services:
       # container must not inherit that, so pin production here. Consequence:
       # KIP_API_KEY must be set in .env (bootstrap_env.py generates one).
       KIP_ENV: production
+      # Same hazard, same fix: `.env` carries the HOST path KIP_CAS_PATH=./var/cas,
+      # which inside this container is /app/var/cas on the read-only root
+      # filesystem, and startup creates the CAS directory before running
+      # anything. The api and worker below already pin the container path; this
+      # service did not, so the plain app profile stopped at `migrate` with
+      # "Read-only file system: '/app/var/cas'". /data/cas exists in the image,
+      # so no volume is needed here - migrations never write CAS objects.
+      KIP_CAS_PATH: /data/cas
     command: ["migrate"]
     depends_on:
       postgres:

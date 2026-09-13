@@ -1,0 +1,127 @@
+name: Retrieval quality report
+description: A query that should have found a document did not, it ranked far too low, or an answer cited the wrong thing.
+title: "[retrieval] "
+labels: ["retrieval-quality"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Korean or English is fine. This is the report that makes KIP better, and it
+        is also the hardest one to act on without evidence, so the fields below ask
+        for the specific values a maintainer uses to tell the four common causes
+        apart: the document was never indexed, ACL or source scope filtered it, the
+        lexical candidate set never contained it, or ranking put it out of reach.
+
+        **Describe the document — do not paste it.** No bodies, no cell values, no
+        mail or Slack text. If the query itself is confidential, paraphrase it and
+        say that you did. Ids, hashes, scores, ranks and `meta.request_id` are safe.
+
+        Before filing, check the two answers that are not bugs: the document is
+        outside an enabled filesystem root or the principal's ACL scopes (then it is
+        correctly invisible), and a source that has changed since the last
+        `kip sync run` (then it is correctly not indexed yet).
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The `data.version` field of `kip version`.
+      placeholder: "X.Y.Z"
+    validations:
+      required: true
+  - type: dropdown
+    id: symptom
+    attributes:
+      label: What went wrong
+      options:
+        - The expected document was not returned at all
+        - It was returned but ranked far too low to be useful
+        - answer cited a unit that does not support the claim
+        - answer refused or fell back to extraction although the evidence was there
+        - The freshness verdict was wrong (source_verification / source_changed_since_index)
+    validations:
+      required: true
+  - type: textarea
+    id: query
+    attributes:
+      label: The exact call
+      description: |
+        Include `--mode` and `--limit`, and the principal or ACL scopes you queried
+        as if they are not the default. Mode matters: `lexical`, `vector`, `hybrid`
+        (the default since 3.12.0) and `reranked` select different candidate sets.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: capabilities
+    attributes:
+      label: Was semantic search actually active?
+      description: |
+        From `kip capabilities`: `semantic_search`, `semantic_search_configured`,
+        `semantic_projection_status` (`disabled` / `missing` / `shadow` / `active` /
+        `stale` / `incompatible`), `repository`, and `warnings`. A configured but
+        not-yet-`active` projection means the query ran lexical-only, which changes
+        the diagnosis completely.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: hits
+    attributes:
+      label: What you got back
+      description: |
+        For the top few hits, and for the expected document if it appeared at all:
+        `unit_id`, `score`, `evidence_role`, and from `metadata`:
+        `retrieval_channels`, `lexical_rank`, `rrf_score`, `rerank_score`,
+        `rerank_rank`, `rerank_model`, `is_latest`. Plus `meta.warnings` from the
+        same envelope — `semantic_degraded` there means the query silently fell back
+        to lexical. Redact titles that reveal private content.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: expected_document
+    attributes:
+      label: The document that should have been found
+      description: |
+        Do not paste it. Give `document_id` / `unit_id` if you have them, the format
+        (HWP/HWPX, PDF, PPTX, XLSX, Markdown/text, Slack, mail), roughly how large,
+        and **which part of it should have matched**: a title, a heading, body prose,
+        a table cell, a scanned page with no text layer, a footnote. A miss on a
+        scanned page is an extraction problem; a miss on a heading is a retrieval
+        problem, and they get fixed in different places.
+    validations:
+      required: true
+  - type: textarea
+    id: indexed
+    attributes:
+      label: How you know it is indexed and visible
+      description: |
+        For example: a `kip search` on a distinctive filename returns it,
+        `kip get document <id>` succeeds, or `kip read <unit_id>` opens the right
+        text. Say which one you used. Also state whether the document is under an
+        enabled filesystem root and within the ACL scopes of the principal you
+        queried as.
+    validations:
+      required: true
+  - type: textarea
+    id: scale
+    attributes:
+      label: Corpus scale
+      description: |
+        `content_units` and `lexical_units` from `kip status`. Scale changes lexical
+        behaviour: the common-term probe threshold is
+        `max(200, content_units * search.lexical_common_term_fraction)`, and it is
+        skipped entirely below roughly 400 units, so a small corpus and a large one
+        fail in different ways.
+      render: json
+    validations:
+      required: true
+  - type: checkboxes
+    id: repro
+    attributes:
+      label: Reproduction and follow-up
+      options:
+        - label: I checked whether this also happens on the bundled `sample-data/` corpus, and said so above if it does.
+        - label: I can contribute this as a golden case (`evaluation/golden/`, schema `kip.golden-dataset.v1`) so it becomes a regression test. See `evaluation/README.md` and `docs/RAG_EVALUATION.md`.
+        - label: I removed document contents, cell values and private paths from everything above.
+          required: true

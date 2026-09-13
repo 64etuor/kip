@@ -67,3 +67,15 @@ answer through direct database or index access; go through the CLI, REST or MCP
 surface. Ordinary retrieval does not authorise a sync, re-index or projection
 rebuild, and candidate review (approve, reject, revoke, promote) stays a human
 decision.
+
+## Database tests
+
+The PostgreSQL integration and contract tests connect only to the database
+named by `KIP_TEST_POSTGRES_URL`, never to the deployment database in `.env`,
+and the suite refuses a URL that names that database. When the variable is
+unset, `./scripts/verify.sh` starts a throwaway PostgreSQL container for the
+run and removes it afterwards, so a local gate never passes with those tests
+skipped. That needs Docker; without it the gate fails. A bare
+`./scripts/test.sh` run without the variable skips the database tests, so use
+it for quick iterations only and run the full gate before completion.
+

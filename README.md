@@ -1,5 +1,10 @@
 # KIP 지식 패브릭
 
+[![ci](https://github.com/64etuor/kip/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/64etuor/kip/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/64etuor/kip)](https://github.com/64etuor/kip/releases/latest)
+[![license](https://img.shields.io/github/license/64etuor/kip)](LICENSE)
+[![python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue)](pyproject.toml)
+
 **KIP은 NAS·HWP/HWPX·PDF·PPTX·XLSX·Slack·메일에 흩어진 사내 문서를 색인하고,
 답변마다 원문 위치(locator)를 함께 돌려주는 에이전트 우선 지식 검색 기반입니다.**
 
@@ -498,6 +503,9 @@ MIT이므로 표 fallback만 사라집니다. 실제 의무 판단은 법률 자
 바랍니다. 이 문서는 사실 목록이지 법률 자문이 아닙니다.
 
 권한 경계, database role, ACL 강제, 위협 모델은
-[`docs/SECURITY.md`](docs/SECURITY.md)에 있습니다. 기여 절차와 필수 gate는
+[`docs/SECURITY.md`](docs/SECURITY.md)에 있습니다. 취약점은 공개 이슈가 아니라
+[GitHub 비공개 보안 신고](https://github.com/64etuor/kip/security/advisories/new)로
+접수합니다. 신고 방법, 범위, 답변 기준은
+[`.github/SECURITY.md`](.github/SECURITY.md)에 있습니다. 기여 절차와 필수 gate는
 [`CONTRIBUTING.md`](CONTRIBUTING.md), 영어 요약은
 [`README.en.md`](README.en.md)를 참조하세요.

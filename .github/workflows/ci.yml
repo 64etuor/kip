@@ -17,6 +17,12 @@ concurrency:
 env:
   UV_VERSION: "0.12.12"
   UV_NO_PROGRESS: "1"
+  # Bounded retries for the package downloads every job makes (uv from PyPI,
+  # npm for the Kordoc runtime). The e2e scripts retry their own Docker Hub
+  # pulls and release-asset probes; see docs/OPERATIONS.md for what to do when
+  # a transient failure survives them.
+  UV_HTTP_RETRIES: "5"
+  NPM_CONFIG_FETCH_RETRIES: "5"
 
 jobs:
   quality:
@@ -44,6 +50,7 @@ jobs:
     env:
       KIP_CONFIG: config/kip.example.toml
       KIP_DATABASE_URL: postgresql://kip_owner:test-password@127.0.0.1:5432/kip
+      KIP_TEST_POSTGRES_URL: postgresql://kip_owner:test-password@127.0.0.1:5432/kip
       KIP_WORKSPACE: default
       KIP_ENV: test
       KIP_CAS_PATH: ${{ github.workspace }}/var/ci-cas
@@ -236,10 +243,244 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+
+  # Everything below exercises the SHIPPED ARTIFACT and the deployment it
+  # becomes, which is where 3.12.0 through 3.14.1 actually broke: the gate was
+  # green for every one of those releases. Each job states its measured
+  # runtime; the fast ones run on every push, the slow ones on the tag that
+  # publishes and on manual dispatch, and `publish` below depends on all of
+  # them so a red end-to-end check cannot publish.
+  #
+  # NOT gated: the offline model-runtime check (.github/workflows/semantic-runtime.yml,
+  # the 3.12.1 defect). It downloads 1.2 GB of weights, so `publish` does not
+  # require it and a tag publishes whether that workflow is green, red or was
+  # never run. Dispatching it before tagging is a manual release step.
+  #
+  # These jobs download from GitHub releases, Docker Hub, npm and PyPI. The
+  # downloads retry, but a failure that outlasts the retries still fails the job
+  # and skips `publish`. The remedy is "Re-run failed jobs" on that tag's run,
+  # which re-runs `publish` after them; do not move or recreate the tag.
+  #
+  # The scripts are the entry point, not the YAML: `./scripts/e2e-install.sh`,
+  # `./scripts/e2e-upgrade.sh`, `./scripts/e2e-db-roles.sh` and
+  # `./scripts/e2e-semantic.sh` run the identical check on a developer machine.
+  # Each starts and removes its own throwaway PostgreSQL container, so no job
+  # here needs a service container and the local and CI runs are the same run.
+
+  # Runtime: 6-8 minutes expected on ubuntu-latest, where the locked
+  # environment, the Kordoc runtime and the Korean OCR models download cold.
+  # Measured at 1m17s on a developer machine with warm caches.
+  # On every push: a defect that only appears once the published package is
+  # installed is exactly the class this repository kept shipping, and it is
+  # visible thirty seconds after installing.
+  installer-e2e:
+    name: installer end-to-end
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      # Builds the package archive, serves it from a local release mirror,
+      # installs it with scripts/install.sh into a clean directory under a
+      # throwaway HOME (so the runner's own shell profile is never touched),
+      # bootstraps it, migrates, syncs the bundled sample-data, and asserts on
+      # the search / read / xlsx-read envelopes and on the CLI exit codes.
+      - name: Install the shipped package and exercise it
+        run: ./scripts/e2e-install.sh
+
+  # Runtime: 2-3 minutes, nearly all of it the locked-environment install; the
+  # check itself measured 5s and downloads no model (a stub runtime stands in
+  # for Infinity). On every push: 3.12.2 lost a release to a runtime that
+  # served another model and answered HTTP 200 anyway.
+  semantic-served-model:
+    name: semantic served-model guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      # The check drives this checkout's CLI against a stub runtime, so the
+      # locked environment has to exist before it runs.
+      - name: Install the locked environment
+        run: >-
+          uv sync --frozen
+          --extra postgres
+          --extra api
+          --extra identity
+          --extra extractors
+          --extra mcp
+          --extra dev
+
+      - name: A runtime serving another model cannot embed queries
+        run: ./scripts/e2e-semantic.sh --mode served-model
+
+  # Runtime: 4-6 minutes, nearly all of it the locked-environment install; the
+  # check itself measured 10s. On every push: the roles, the row level security they
+  # exist to make effective, and the backup that 3.13.0 found could be silently
+  # empty are all cheap to prove against a throwaway PostgreSQL.
+  # The second step renders compose.production.yaml and constructs the identity
+  # its api, worker and migrate services would build at start-up (3.13.0
+  # shipped that file with an identity mode the code rejects). It boots nothing.
+  # NOT covered by this job: that the api and worker CONTAINERS are the ones
+  # using those roles, and that any API container boots. The compose-roles job
+  # below boots compose.yaml; nothing in CI boots compose.production.yaml.
+  database-roles:
+    name: database roles and row level security
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install the locked environment
+        run: >-
+          uv sync --frozen
+          --extra postgres
+          --extra api
+          --extra identity
+          --extra extractors
+          --extra mcp
+          --extra dev
+
+      - name: Roles, cross-workspace isolation, backup and restore
+        run: ./scripts/e2e-db-roles.sh --mode database
+
+      - name: compose.production.yaml constructs the identity the code implements
+        run: ./scripts/e2e-db-roles.sh --mode production-config
+
+  # Runtime: 10-14 minutes, dominated by the runtime image build (measured
+  # 9-10 minutes cold, 19s against a warm image cache). Tag and manual
+  # dispatch only: it is the slowest check and its value is at release time.
+  # It boots compose.yaml plus deploy/compose.roles.yaml - the application
+  # profile ./scripts/app-up.sh starts, with api_key identity from .env - and
+  # proves what the database-roles job cannot: that this API answers /readyz
+  # and that the api and worker backends really are kip_api and kip_worker
+  # rather than the bootstrap superuser. It does NOT start
+  # compose.production.yaml (proxy_jwt, secrets, pinned images); that file's
+  # identity configuration is checked, without booting, by the database-roles
+  # job's production-config step.
+  compose-roles:
+    name: compose stack roles
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Bring up the Compose application profile and check its roles
+        run: ./scripts/e2e-db-roles.sh --mode compose
+
+  # Runtime: 10-14 minutes expected (two installs, two bootstraps of a locked
+  # environment, two upgrades, all downloading cold); measured 1m19s on a
+  # developer machine with warm caches. Tag and manual dispatch only.
+  #
+  # This job NEEDS NETWORK ACCESS to this repository's published release
+  # assets: it installs the previous published release from
+  # https://github.com/<owner>/<repo>/releases/download and upgrades it to the
+  # candidate. It does not skip when that is unreachable - it fails, and says
+  # which tags it tried. An upgrade check that silently skips is worse than no
+  # upgrade check, and the silent-skip is how 3.12.1's launcher defect reached
+  # a live deployment.
+  upgrade-e2e:
+    name: upgrade end-to-end
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      # fetch-depth 0: the job picks the previous published release from this
+      # repository's own tags, newest first, skipping tags whose release was
+      # never published.
+      - name: Check out source with tags
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Upgrade the previous published release to this candidate
+        run: ./scripts/e2e-upgrade.sh
+
   publish:
     name: publish immutable release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [quality, distribution]
+    needs:
+      - quality
+      - distribution
+      - installer-e2e
+      - semantic-served-model
+      - database-roles
+      - compose-roles
+      - upgrade-e2e
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -268,6 +509,9 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
+      # Everything this step checks must hold BEFORE anything is published: an
+      # immutable image and its attestations cannot be withdrawn, so a tag
+      # whose CHANGELOG section is missing has to fail here, not after.
       - name: Validate tag and image name
         id: release
         shell: bash
@@ -276,6 +520,14 @@ jobs:
           version="$(tr -d '[:space:]' < VERSION)"
           test "${GITHUB_REF_NAME}" = "v${version}"
           image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          # AGENTS.md and CONTRIBUTING.md require a CHANGELOG entry for every
+          # behaviour, contract, configuration or deployment change, so a tag
+          # with no section is an incomplete release. Fail; do not fall back to
+          # a bare release body.
+          if ! ./scripts/changelog-section.sh "$version" > "$RUNNER_TEMP/changelog-section.md"; then
+            echo "::error file=CHANGELOG.md::CHANGELOG.md has no '## $version' section. Every release needs one; add it, retag, and publish again." >&2
+            exit 1
+          fi
           {
             echo "version=${version}"
             echo "image=${image}"
@@ -378,7 +630,17 @@ jobs:
           version="${{ steps.release.outputs.version }}"
           notes="$(mktemp)"
           trap 'rm -f "$notes"' EXIT
-          cat > "$notes" <<NOTES
+          # The section this tag's CHANGELOG entry holds, extracted and
+          # validated by the "Validate tag and image name" step above, so every
+          # release says what changed in it instead of repeating fixed text.
+          # A release body caps at 125,000 characters; scripts/changelog-section.sh
+          # refuses a section large enough to approach that, before publishing.
+          {
+            printf '## What changed in %s\n\n' "$version"
+            cat "$RUNNER_TEMP/changelog-section.md"
+            printf '\n---\n\n'
+          } > "$notes"
+          cat >> "$notes" <<NOTES
           Container image: \`ghcr.io/${{ github.repository }}:$version\`
 
           ### Install (one command)
@@ -404,7 +666,7 @@ jobs:
           \`THIRD-PARTY-NOTICES.md\` before redistributing or offering KIP as a
           network service.
 
-          Full changes are in \`CHANGELOG.md\`.
+          Full history: https://github.com/${{ github.repository }}/blob/v$version/CHANGELOG.md
           NOTES
           assets=(
             "dist/kip-$version.zip"

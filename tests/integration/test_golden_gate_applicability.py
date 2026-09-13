@@ -8,9 +8,11 @@ from pathlib import Path
 
 import pytest
 
-URL = os.environ.get("KIP_TEST_POSTGRES_URL") or os.environ.get("KIP_DATABASE_URL")
+from tests.environment import TEST_DATABASE_SKIP_REASON, TEST_POSTGRES_URL
+
+URL = TEST_POSTGRES_URL
 ROOT = Path(__file__).resolve().parents[2]
-pytestmark = pytest.mark.skipif(not URL, reason="PostgreSQL integration URL not configured")
+pytestmark = pytest.mark.skipif(not URL, reason=TEST_DATABASE_SKIP_REASON)
 
 
 def test_private_gate_skips_or_fails_closed_over_an_unrelated_indexed_corpus() -> None:

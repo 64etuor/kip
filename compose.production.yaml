@@ -143,6 +143,16 @@ services:
       KIP_DATABASE_URL_FILE: /run/secrets/migrate_database_url
       KIP_CONFIG: /app/config/kip.container.toml
       KIP_ENV: production
+      # Every process builds the full container, which constructs the identity
+      # resolver even when it serves no requests. Without these, the container
+      # config falls back to api_key mode, and KIP_ENV=production refuses a
+      # missing KIP_API_KEY, so this service aborted before doing any work.
+      # The JWT client fetches signing keys only when a token arrives, so no
+      # network access to the issuer is needed at startup.
+      KIP_IDENTITY_MODE: proxy_jwt
+      KIP_JWT_ISSUER: ${KIP_JWT_ISSUER:?set the trusted JWT issuer}
+      KIP_JWT_AUDIENCE: ${KIP_JWT_AUDIENCE:?set the trusted JWT audience}
+      KIP_JWT_JWKS_URL: ${KIP_JWT_JWKS_URL:?set the trusted JWKS URL}
     secrets:
       - migrate_database_url
     command: ["migrate"]
@@ -275,6 +285,16 @@ services:
       KIP_DATABASE_URL_FILE: /run/secrets/worker_database_url
       KIP_CONFIG: /app/config/kip.container.toml
       KIP_ENV: production
+      # Every process builds the full container, which constructs the identity
+      # resolver even when it serves no requests. Without these, the container
+      # config falls back to api_key mode, and KIP_ENV=production refuses a
+      # missing KIP_API_KEY, so this service aborted before doing any work.
+      # The JWT client fetches signing keys only when a token arrives, so no
+      # network access to the issuer is needed at startup.
+      KIP_IDENTITY_MODE: proxy_jwt
+      KIP_JWT_ISSUER: ${KIP_JWT_ISSUER:?set the trusted JWT issuer}
+      KIP_JWT_AUDIENCE: ${KIP_JWT_AUDIENCE:?set the trusted JWT audience}
+      KIP_JWT_JWKS_URL: ${KIP_JWT_JWKS_URL:?set the trusted JWKS URL}
       KIP_CAS_PATH: /data/cas
     secrets:
       - worker_database_url

@@ -1,0 +1,81 @@
+name: Feature or change proposal
+description: Propose new behaviour, or a change to behaviour that is already specified.
+title: "[proposal] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Korean or English is fine.
+
+        KIP has a written design: `docs/PRD.md` states the product intent,
+        `docs/TRD.md` the technical shape, and `docs/adr/` records the decisions
+        that are already settled and why. A proposal is much easier to accept when
+        it says which of those it extends and which it contradicts. Contradicting
+        one is allowed — it just needs to be deliberate.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you were trying to do and where you got stuck. Concrete beats abstract.
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: What happens today, and where that is written down
+      description: |
+        The current behaviour, plus the document that specifies it if there is one:
+        a `docs/PRD.md` or `docs/TRD.md` section, an ADR number, a CLI `--help`
+        line, or the OpenAPI operation. Write "not specified anywhere I could find"
+        if that is the answer — that is useful too.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What should happen instead
+    validations:
+      required: true
+  - type: checkboxes
+    id: surfaces
+    attributes:
+      label: Surfaces this would touch
+      description: CLI, REST and MCP share one application service layer, so a behaviour change usually lands on all three.
+      options:
+        - label: CLI
+        - label: REST / OpenAPI contract
+        - label: MCP tools
+        - label: Python SDK (sdk/)
+        - label: Ingestion, connectors or parsers
+        - label: Ontology, candidates or graph
+        - label: Storage, migrations or projections
+        - label: Packaging, install or upgrade
+        - label: Documentation only
+  - type: checkboxes
+    id: contract
+    attributes:
+      label: Known consequences
+      description: Tick what you think applies. Getting one wrong costs nothing; hiding one costs a release.
+      options:
+        - label: Changes a `kip.envelope.v1` field or the meaning of one
+        - label: Changes a public ID format, an MCP tool name, or an MCP argument
+        - label: Needs a new migration (existing migrations are append-only and are never edited)
+        - label: Changes ACL, source-scope or egress behaviour
+        - label: Is an architecture decision and would need an ADR
+        - label: None of the above — purely additive
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: How we would know it works
+      description: |
+        The evidence that would close this: a test, a golden case and the metric it
+        should move, a `kip doctor` check, a documented command whose output changes.
+        "It feels better" is not evidence the gate can check.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Including existing commands or configuration that nearly do this, and why they fall short.

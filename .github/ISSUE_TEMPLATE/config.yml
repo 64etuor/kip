@@ -1,0 +1,13 @@
+# Blank issues stay on: this project has no Discussions tab and no chat, so a
+# plain question or a one-line documentation fix needs somewhere to go.
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/64etuor/kip/security/advisories/new
+    about: Report privately through GitHub Security Advisories, never as a public issue. The policy is in .github/SECURITY.md.
+  - name: A command failed and you have not read the runbook yet
+    url: https://github.com/64etuor/kip/blob/main/docs/TROUBLESHOOTING.md
+    about: Known failures with their cause and the exact recovery command. Check here before filing a bug.
+  - name: Installing, upgrading, or connecting a source
+    url: https://github.com/64etuor/kip/blob/main/docs/DEPLOYMENT_GUIDE.md
+    about: Deployment guide, plus QUICKSTART for the first index and OPERATIONS for day-to-day.

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -35,7 +34,9 @@ from kip.ports.repository import RepositoryPort
 # Same env-guarded pattern as tests/integration/test_postgres_repository.py:
 # skip the postgres side cleanly when no integration database is configured,
 # while the memory side always runs.
-URL = os.environ.get("KIP_TEST_POSTGRES_URL") or os.environ.get("KIP_DATABASE_URL")
+from tests.environment import TEST_DATABASE_SKIP_REASON, TEST_POSTGRES_URL
+
+URL = TEST_POSTGRES_URL
 MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "migrations"
 
 
@@ -200,7 +201,7 @@ def harness(request: pytest.FixtureRequest) -> Iterator[Harness]:
         return
 
     if not URL:
-        pytest.skip("PostgreSQL integration URL not configured")
+        pytest.skip(TEST_DATABASE_SKIP_REASON)
     pytest.importorskip("psycopg")
     workspace = "test_" + uuid.uuid4().hex[:12]
     repository = PostgresRepository(str(URL))

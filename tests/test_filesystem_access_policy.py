@@ -29,9 +29,10 @@ def scoped_container(test_container, request, monkeypatch):
     if request.param == "memory":
         yield test_container
         return
-    url = os.environ.get("KIP_TEST_POSTGRES_URL") or os.environ.get("KIP_DATABASE_URL")
-    if not url:
-        pytest.skip("PostgreSQL integration URL not configured")
+    # `postgres_database_url` is the explicit opt-in: the pinned profile sets
+    # KIP_DATABASE_URL=memory:// so nothing reaches a real database by
+    # accident, and this fixture hands back the URL the run was launched with.
+    url = request.getfixturevalue("postgres_database_url")
     import psycopg
     from psycopg import sql
 

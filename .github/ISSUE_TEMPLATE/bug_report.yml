@@ -1,0 +1,98 @@
+name: Bug report
+description: A command, endpoint or MCP tool failed, or did something other than what it documents.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Korean or English is fine.
+
+        **Do not paste**: document, message or mail bodies, workbook cell values,
+        `.env` contents, database URLs, tokens, or a query you cannot make public.
+        KIP output contains real filesystem paths — `kip doctor` prints your config,
+        CAS and source-root paths, and `source_uri` is a real `file://` URI. Replace
+        them with `<path>`. Ids (`unit_...`, `ldoc_...`, `art_...`), hashes, error
+        codes and `meta.request_id` carry no content and are safe to share.
+
+        If it also happens on the bundled `sample-data/` corpus
+        (`kip sync run --source sample`), say so — that is a case a maintainer can
+        reproduce exactly.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The `data.version` field of `kip version`. From a git checkout, add the commit.
+      placeholder: "X.Y.Z"
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      description: CLI, REST and MCP share one application service layer, so this narrows where the fault is.
+      options:
+        - CLI (kip ...)
+        - REST adapter (kip api)
+        - MCP (stdio tool from an agent)
+        - Python SDK (sdk/)
+        - Installer, upgrade or bootstrap (install.sh, kip update, scripts/bootstrap.sh)
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How this deployment was installed
+      options:
+        - Release package (install.sh or kip-<version>.zip)
+        - Git checkout (./scripts/bootstrap.sh)
+        - Container image (ghcr.io/64etuor/kip)
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: What you ran
+      description: The exact command, HTTP request or MCP tool call, including every flag. Redact paths.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: envelope
+    attributes:
+      label: The envelope you got back
+      description: |
+        Every surface returns `kip.envelope.v1`. Paste the whole envelope if it is
+        small; otherwise `ok`, `error.code`, `error.message`, `meta.request_id` and
+        `meta.warnings`. `meta.warnings` is where a degraded deployment announces
+        itself, so include it even when it is empty.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+      description: If a document says otherwise, name it — the file and the sentence.
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: kip doctor
+      description: |
+        Deployment, upgrade, "nothing is indexed" and "search returns nothing at
+        all" problems only. Paste `summary`, `healthy`, `required_failures` and the
+        `checks` entries that are not `ok`, with the paths in `details` redacted.
+        Skip this for a wrong result from an otherwise healthy deployment.
+      render: json
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Before submitting
+      options:
+        - label: I removed source contents, credentials and private paths from everything above.
+          required: true
+        - label: This is not a security vulnerability. (Those go to the private advisory form, not here.)
+          required: true

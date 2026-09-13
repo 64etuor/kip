@@ -435,6 +435,146 @@ Do not deploy a `local/kip` candidate reference. Record the release archive
 SHA-256, GHCR digest, attestation verification, migration result, and rollback
 digest in the change record.
 
+### End-to-end checks on the release path
+
+The gate (`./scripts/verify.sh`, and the `quality` and `distribution` jobs)
+tests the source tree. It passed for every release from 3.12.0 to 3.14.1, and
+roughly half of those releases still shipped a defect that appeared the moment
+a human installed the package and ran it. The jobs below test the shipped
+artifact and the deployment it becomes instead. Each one has a script in
+`scripts/` that runs the identical check locally; the workflow calls that
+script and nothing else, so a failure can be reproduced without a runner. Every
+script starts and removes its own throwaway PostgreSQL container and its own
+work tree, and never touches an existing deployment, its database, its model
+runtime or any shell profile. Every install, `kip`, Compose and backup command a script starts runs with the
+inherited `KIP_*`, `POSTGRES_*`, `COMPOSE_*`, `PG*`, `ZDOTDIR`, `PYTHONPATH` and
+`VIRTUAL_ENV` variables removed, so an exported `KIP_BIN_DIR`, `KIP_API_PORT`
+or `KIP_NAS_PATH` cannot redirect the launcher, a port or a mount. Installs
+also pass `--bin-dir` under the throwaway `HOME`. Independently, each script
+hashes this machine's `~/.local/bin/kip`, `$KIP_BIN_DIR/kip` and the bash and
+zsh profile files (including those under `ZDOTDIR`) before it writes anything,
+and fails if any of them changed by the time it exits. A
+`KIP_E2E_DATABASE_URL` that names the database `kip` on the default local host
+and port, or the same host, port and database as the checkout's `.env`
+`KIP_DATABASE_URL`, is refused.
+
+| Check | Runs | Runtime in CI | Local command (measured) |
+| --- | --- | --- | --- |
+| Installer end-to-end | every push | 6-8 min | `./scripts/e2e-install.sh` (1m17s warm) |
+| Semantic served-model guard | every push | 2-3 min | `./scripts/e2e-semantic.sh --mode served-model` (5s) |
+| Database roles and RLS | every push | 4-6 min | `./scripts/e2e-db-roles.sh --mode database` (16s) |
+| Production Compose identity | every push (same job) | seconds | `./scripts/e2e-db-roles.sh --mode production-config` (1s) |
+| Compose stack roles | tag, manual dispatch | 10-14 min | `./scripts/e2e-db-roles.sh --mode compose` (9-10 min cold, 19s warm) |
+| Upgrade end-to-end | tag, manual dispatch | 10-14 min | `./scripts/e2e-upgrade.sh` (1m19s warm) |
+| Offline model runtime | weekly, manual dispatch | 20-30 min (estimated) | `./scripts/e2e-semantic.sh --mode offline-runtime` |
+
+The CI column is what a cold `ubuntu-latest` runner pays: the locked
+environment, the Kordoc runtime and the Korean OCR models download on every
+job, which is most of the cost. The local column is what the check itself
+takes once those caches exist. The offline model runtime is the one row whose
+number is an estimate; it downloads 1.2 GB of weights and has not yet had a
+full run.
+
+What each one asserts:
+
+- **Installer end-to-end** builds the package archive the release publishes,
+  serves it from a local release mirror, and runs
+  [`scripts/install.sh`](../scripts/install.sh) against it into a clean
+  directory with a throwaway `HOME`, so the launcher and the shell-profile
+  block are exercised without touching the runner's own profile. It then
+  bootstraps, migrates, syncs the bundled `sample-data`, and asserts the
+  envelopes: `ok` is true, every hit carries a `locator` and a `source_uri`,
+  `read` reports `source_verification` and a three-valued
+  `source_changed_since_index`, `xlsx-read` returns the workbook's own numbers
+  with `source_verification: sha256`, and `meta.warnings` is empty. Any warning
+  the release does not declare in the script's allowlist fails the job. It also
+  asserts the exit codes `docs/TRD.md` 29.4 publishes: 4 for a typed
+  `NotFoundError`, 3 for a typed validation error, 2 for a usage error.
+- **Semantic served-model guard** starts
+  [`tests/e2e/wrong_model_runtime.py`](../tests/e2e/wrong_model_runtime.py), a
+  stub that advertises one model on `GET /models` and answers `POST
+  /embeddings` with HTTP 200 for any name, which is what Infinity does. It
+  asserts `kip doctor` names the mismatch, default-mode search degrades with
+  `semantic_degraded` rather than embedding against the wrong model, and an
+  explicit `--mode vector` fails.
+- **Database roles and RLS** migrates a throwaway PostgreSQL, applies
+  [`deploy/sql/roles.sql.template`](../deploy/sql/roles.sql.template) the way
+  `deploy/apply-roles.sh` does, and asserts that `kip_api`, `kip_worker` and
+  `kip_reviewer` are neither superusers nor `BYPASSRLS` while `kip_backup` is;
+  that a `kip_api` session in one workspace finds nothing from another through
+  the application, and in raw SQL reads no row of the other workspace from any
+  table that forces row level security (what migration 0028 applies) and has a
+  `workspace_id` column (the list is read from the catalog, so a table a later
+  migration adds is covered); that it cannot set `row_security = off`; and that
+  a backup taken as `kip_backup` is a real dump that `scripts/restore.sh` loads
+  back with the same row counts.
+- **Production Compose identity** renders
+  [`compose.production.yaml`](../compose.production.yaml) with
+  `docker compose config` (placeholder image references, JWT settings and
+  secret files; the identity mode is the file's own) and runs the `api`,
+  `worker` and `migrate` services' resolved environment through
+  `Settings.load()` and the identity construction in `src/kip/container.py`,
+  which each of those processes performs before anything else. 3.13.0 shipped
+  that file with an identity mode the code rejects; this check fails on that
+  and proves it can by requiring the mode 3.13.0 shipped (`jwt`) to be
+  rejected. It does **not** boot `compose.production.yaml`: no container
+  starts, no real secret is read, no JWKS issuer is contacted and no `/readyz`
+  is asked. Nothing in CI boots that file.
+- **Compose stack roles** installs the candidate package and brings up
+  `compose.yaml` plus `deploy/compose.roles.yaml` — the application profile
+  `./scripts/app-up.sh` starts, with `api_key` identity from `.env` — under its
+  own Compose project name, ports and volumes. It asserts that this API answers
+  `/readyz` and that the `api` and `worker` backends in `pg_stat_activity` are
+  the non-superuser `kip_api` and `kip_worker` logins. It is not
+  `compose.production.yaml`; see the check above for what is known about that
+  file.
+- **Upgrade end-to-end** installs the previous published release, creates a
+  *second* deployment whose global `kip` launcher is the current one, then runs
+  `kip update --archive` on the first. It asserts the version moved, `.env`,
+  `config/kip.toml`, `.mcp.json` and `var/` survived byte for byte, the second
+  deployment's launcher was not repointed, and no shell profile changed — then
+  repeats the launcher assertions for the download update path
+  (`kip update --version`), which is where that defect lived. It needs network
+  access to this repository's published release assets and **fails, with the
+  tags it tried, rather than skipping** when it cannot reach them.
+- **Offline model runtime** is the only check that downloads the pinned
+  weights, so it is a separate weekly and manually dispatched workflow
+  ([`.github/workflows/semantic-runtime.yml`](../.github/workflows/semantic-runtime.yml))
+  rather than a push job pretending to cover it. It bootstraps a throwaway
+  deployment with semantic search on and starts the runtime with the Hugging
+  Face hub forced offline.
+
+`publish` depends on every check in the table except the last, so a red result
+in any of them stops the tag from publishing.
+
+**The offline model runtime does not gate publishing.** `publish` does not
+require the `semantic-runtime` workflow, so a tag publishes whether that
+workflow is green, red or was never run for the tagged commit, and nothing
+enforces the step below. **Before tagging**, dispatch it from the Actions tab
+(or run `./scripts/e2e-semantic.sh --mode offline-runtime` on a machine with
+8 GiB of free memory) and confirm it is green; nothing else proves that a fresh
+install can start its model runtime without the network.
+
+**Transient network failures.** The jobs that gate `publish` download from
+GitHub releases (the previous release for the upgrade check), Docker Hub (the
+PostgreSQL image and the runtime image's base layers), npm (the Kordoc runtime)
+and PyPI through uv. Those downloads retry with backoff: the workflow sets
+`UV_HTTP_RETRIES` and `NPM_CONFIG_FETCH_RETRIES`, the scripts retry the
+PostgreSQL image pull and the Compose pull and build, and the upgrade check
+retries its release-asset probe. The probe falls back to an older tag only
+when the host answers HTTP 404, meaning that tag was never published. Any other
+answer (no route, a timeout, a 5xx, a 403 rate limit) fails the job instead of
+upgrading from the wrong release. A failure that outlasts the retries leaves
+the tag's run with a failed job and a skipped `publish`. The remedy is **Re-run
+failed jobs** on that tag's workflow run, which re-runs the failed jobs and
+then `publish`. Do not delete, move or recreate the tag.
+
+The tag also needs its own `CHANGELOG.md` section. The publish job extracts it
+with [`scripts/changelog-section.sh`](../scripts/changelog-section.sh) and puts
+it at the top of the GitHub release body, before anything is pushed: a version
+with no section fails the tag rather than publishing an immutable image first.
+Check it locally with `./scripts/changelog-section.sh "$(tr -d '[:space:]' < VERSION)"`.
+
 ## Backup
 
 로컬/개발 설치에서는 별도 설정 없이 그대로 실행하면 됩니다. `.env`의

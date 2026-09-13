@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import uuid
 from pathlib import Path
 
@@ -10,9 +9,10 @@ from kip.adapters.repository.postgres import PostgresRepository
 from kip.container import build_container
 from kip.domain.models import AnswerRequest
 from kip.settings import Settings
+from tests.environment import TEST_DATABASE_SKIP_REASON, TEST_POSTGRES_URL
 
-URL = os.environ.get("KIP_TEST_POSTGRES_URL") or os.environ.get("KIP_DATABASE_URL")
-pytestmark = pytest.mark.skipif(not URL, reason="PostgreSQL integration URL not configured")
+URL = TEST_POSTGRES_URL
+pytestmark = pytest.mark.skipif(not URL, reason=TEST_DATABASE_SKIP_REASON)
 
 
 def test_filename_ambiguity_uses_allowed_documents_before_limit(tmp_path: Path):

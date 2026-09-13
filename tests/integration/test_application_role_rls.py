@@ -15,7 +15,6 @@ idempotent. Only the throwaway database and the throwaway login are removed.
 
 from __future__ import annotations
 
-import os
 import uuid
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
@@ -23,9 +22,10 @@ from urllib.parse import urlsplit, urlunsplit
 import pytest
 
 from kip.adapters.repository.postgres import PostgresRepository
+from tests.environment import TEST_DATABASE_SKIP_REASON, TEST_POSTGRES_URL
 
-URL = os.environ.get("KIP_TEST_POSTGRES_URL") or os.environ.get("KIP_DATABASE_URL")
-pytestmark = pytest.mark.skipif(not URL, reason="PostgreSQL integration URL not configured")
+URL = TEST_POSTGRES_URL
+pytestmark = pytest.mark.skipif(not URL, reason=TEST_DATABASE_SKIP_REASON)
 
 ROOT = Path(__file__).resolve().parents[2]
 ROLES_TEMPLATE = ROOT / "deploy/sql/roles.sql.template"

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import uuid
 from collections.abc import Sequence
 from pathlib import Path
@@ -21,9 +20,10 @@ from kip.domain.models import (
 from kip.errors import ValidationError
 from kip.ids import new_id, stable_id
 from kip.settings import Settings
+from tests.environment import TEST_DATABASE_SKIP_REASON, TEST_POSTGRES_URL
 
-URL = os.environ.get("KIP_TEST_POSTGRES_URL") or os.environ.get("KIP_DATABASE_URL")
-pytestmark = pytest.mark.skipif(not URL, reason="PostgreSQL integration URL not configured")
+URL = TEST_POSTGRES_URL
+pytestmark = pytest.mark.skipif(not URL, reason=TEST_DATABASE_SKIP_REASON)
 
 
 class FixtureEmbedding:

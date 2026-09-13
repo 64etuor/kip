@@ -1,5 +1,121 @@
 # Agent quality evidence
 
+## A test pins the environment it depends on
+
+A test may not read configuration, a database, a project root or terminal
+settings from the shell that launched it. Everything a test's result depends
+on is either pinned by `tests/environment.py` for the whole suite or set by
+the test itself.
+
+This rule is written from two failures on 2026-09-13. Both releases were
+tagged on a green local gate and both failed CI, and neither involved a defect
+in shipped code:
+
+- **3.13.0.** Four tests wrote a configuration file under a temporary
+  directory and set `KIP_PROJECT_ROOT`. CI exports `KIP_CONFIG` for the whole
+  `quality` job, so `Settings.load()` read the repository's configuration
+  instead of the file under test. They passed locally only because the
+  developer's `.env` pointed `KIP_CONFIG` at a relative path that happened to
+  resolve inside the temporary root.
+- **3.14.0.** Three tests matched phrases in `--help` output. CI renders help
+  on an 80 column terminal with colour forced on, which puts escape sequences
+  inside words and wraps sentences mid-phrase.
+
+### What the suite pins
+
+`tests/conftest.py` applies `tests/environment.py:ci_environment()` to every
+test through an autouse fixture, and pins the terminal at import time, before
+Typer caches its colour switches.
+
+| Pinned | Value | Why |
+| --- | --- | --- |
+| `KIP_CONFIG`, `KIP_WORKSPACE`, `KIP_ENV` | Copied verbatim from the `quality` job | Parity with CI |
+| `KIP_DATABASE_URL` | `memory://` | An ordinary test gets the memory repository whatever `.env` names |
+| `KIP_CAS_PATH` | Per-session temporary directory | A run never writes into a checkout or a deployment |
+| `KIP_PROJECT_ROOT` | The repository root | A relative `KIP_CONFIG` resolves the same wherever pytest is started |
+| Every other `KIP_*` | Removed | CI exports none of them; a sourced `.env` exports a dozen |
+| `COLUMNS`, `LINES` | `80`, `24` | The width CI renders at |
+| `FORCE_COLOR` | `1` | CI's `GITHUB_ACTIONS` makes Typer force colour; this is the portable spelling |
+| `TERM`, `NO_COLOR`, `PY_COLORS`, `CLICOLOR*`, `TERMINAL_WIDTH` | Removed | Nothing may quietly turn colour back off |
+
+`repository_config` is the explicit way to name the shipped configuration by
+absolute path.
+
+### Which database a test may use
+
+A test that needs PostgreSQL uses only `KIP_TEST_POSTGRES_URL`, through the
+`postgres_database_url` fixture or the `tests/environment.py:TEST_POSTGRES_URL`
+constant the integration and contract modules import. When the variable is
+unset those tests skip. Nothing falls back to `KIP_DATABASE_URL`: on a
+developer machine `.env` points that at the live deployment, and these tests
+create and delete workspaces, roles and migrations. The collection refuses to
+start when `KIP_TEST_POSTGRES_URL` names the same server and database as
+`KIP_DATABASE_URL`, except on a GitHub Actions runner, where both name the
+service container created for the job. CI's `quality` job exports both, and
+`tests/test_environment_parity.py` fails if it stops exporting the test URL,
+because every real-database test would then skip without a failure.
+
+Before 3.15.0 the fallback was real. A developer run with a deployment `.env`
+and no `KIP_TEST_POSTGRES_URL` ran these tests against the live database. They
+removed the workspaces they created, but a search in a workspace the test had
+not created left that workspace behind. A read-only check of this machine's
+live `kip` database on 2026-09-13 found `not-this-workspace` (from
+`tests/test_filename_discovery.py`) with 170 `audit.query_traces` rows, dated
+2026-09-09 to 2026-09-13.
+
+The rule covers tests that ask for a database. It does not police a test that
+builds its own `postgresql://` URL. Such a URL must point at a closed port or
+an invalid host, as `tests/test_postgres_unreachable.py` does, or name a
+repository that is never opened.
+
+### What the guard catches, and what it does not
+
+After each test, the autouse fixture fails the test for any of three things:
+
+- leaving the process environment changed;
+- pinning one variable of a coupled group and inheriting another, for example
+  setting `KIP_PROJECT_ROOT` while inheriting `KIP_CONFIG`, which is exactly
+  the 3.13.0 shape;
+- reading a `KIP_*` or terminal variable that the developer's shell exports,
+  CI does not, and `KNOWN_ABSENT_AMBIENT_KEYS` does not list with a reason.
+
+`tests/test_environment_parity.py` fails in five cases:
+
+- the workflow's `KIP_*` exports drift from the profile;
+- a `KIP_*` name that could reach the test shell is neither pinned nor listed
+  with a reason. It collects the names from `src/kip`,
+  `config/kip.example.toml`, `.env.example`, the bootstrap scripts, and the
+  `*_FILE` twin of each secret;
+- the terminal pin stops reaching Typer;
+- `--help` renders differently at 80 columns with colour than at 200 columns
+  without;
+- a test reads a database URL from the environment.
+
+What the pin guarantees: every `KIP_*` and terminal variable a test reads has
+the same value in CI and locally, whatever `.env` or the shell exports. For a
+variable the profile does not set, that value is "absent". A read the guard
+reports is therefore a new dependency to account for, not a divergence that
+has already happened. The first version of this guard, caught in review
+before 3.15.0 was tagged, failed 16 CLI tests for any `.env` copied from
+`.env.example`, which exports `KIP_ROLES=`, while CI stayed green. Bootstrap's `KIP_SEMANTIC=off` did the same to the setup planner tests.
+The name collection exists so that such a variable is classified when it is
+added, not when a developer's gate goes red.
+
+What it does not guarantee:
+
+- It sees only `os.environ` reads made while a test runs. A value captured at
+  import time is invisible to it, and so is a name that exists only in a
+  developer's own shell and in no file the collection reads.
+- It does not cover state outside environment variables: the working
+  directory, the clock, the locale, installed binaries, network reachability,
+  file system case sensitivity, or what a subprocess started with an explicit
+  `env` inherits.
+- It cannot tell a read that changes a result from one that does not.
+- `KNOWN_ABSENT_AMBIENT_KEYS` is a reviewed list: a variable put there wrongly
+  is not re-examined.
+- The skip set differs between runs: a run without `KIP_TEST_POSTGRES_URL`
+  skips the real-database tests that CI runs.
+
 ## 3.7.1 source-binding regression checks
 
 The review of 3.7.0 reproduced three service defects: a named document could

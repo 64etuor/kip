@@ -1,5 +1,10 @@
 # KIP Knowledge Fabric
 
+[![ci](https://github.com/64etuor/kip/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/64etuor/kip/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/64etuor/kip)](https://github.com/64etuor/kip/releases/latest)
+[![license](https://img.shields.io/github/license/64etuor/kip)](LICENSE)
+[![python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue)](pyproject.toml)
+
 **KIP indexes company documents scattered across NAS, HWP/HWPX, PDF, PPTX,
 XLSX, Slack and mail, and returns the exact source locator with every answer.**
 The Korean front door is [`README.md`](README.md).
@@ -57,7 +62,8 @@ reciprocal-rank fusion, ADR-065) and degrades to lexical with a
 - Readiness against approved goals:
   [`docs/PRODUCTION_DESIGN_ALIGNMENT.md`](docs/PRODUCTION_DESIGN_ALIGNMENT.md)
 - Retrieval evidence: [`docs/RAG_EVALUATION.md`](docs/RAG_EVALUATION.md)
-- Security: [`docs/SECURITY.md`](docs/SECURITY.md) ·
+- Security design: [`docs/SECURITY.md`](docs/SECURITY.md) ·
+  Reporting a vulnerability: [`.github/SECURITY.md`](.github/SECURITY.md) ·
   Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md) ·
   Licence: MIT, see [`LICENSE`](LICENSE) and
   [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) (two copyleft components)

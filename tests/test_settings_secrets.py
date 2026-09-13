@@ -10,6 +10,11 @@ from kip.settings import Settings
 
 def _base_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("KIP_PROJECT_ROOT", str(tmp_path))
+    # Naming the config file is not optional once the project root moves: CI
+    # exports KIP_CONFIG for the whole job, so a test that only repoints the
+    # root loads whatever that variable happens to name. These tests want no
+    # config at all, so they name a file that is not there.
+    monkeypatch.setenv("KIP_CONFIG", str(tmp_path / "config/kip.toml"))
     monkeypatch.setenv("KIP_ENV", "test")
     monkeypatch.delenv("KIP_DATABASE_URL", raising=False)
     monkeypatch.delenv("KIP_DATABASE_URL_FILE", raising=False)

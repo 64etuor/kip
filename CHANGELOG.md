@@ -1,5 +1,153 @@
 # Changelog
 
+## 3.15.0 - 2026-09-13
+
+- CI now exercises the shipped artifact, not only the source tree. The gate was
+  green for every release from 3.12.0 to 3.14.1 and roughly half of those still
+  shipped a defect that appeared the moment a human installed the package and
+  ran it. Six new CI checks and one scheduled workflow close most of that
+  gap, each with a script in
+  `scripts/` that runs the identical check locally so a red job can be
+  reproduced without a runner. Each works in its own throwaway PostgreSQL
+  container or Compose project and work tree. Every install, `kip`, Compose and backup command runs with
+  inherited `KIP_*`, `POSTGRES_*`, `COMPOSE_*` and `PG*` variables removed,
+  installs pass an explicit `--bin-dir`, the real HOME's `kip` launcher and
+  shell profiles are hashed before any write and checked again on exit, and a
+  `KIP_E2E_DATABASE_URL` naming a live deployment database is refused.
+  - `./scripts/e2e-install.sh` (CI: every push) builds the package archive the
+    release publishes, serves it from a local release mirror, installs it with
+    `scripts/install.sh` into a clean directory under a throwaway `HOME` so the
+    global launcher and the shell-profile block are exercised without touching
+    the runner's own profile, bootstraps, migrates, syncs the bundled
+    `sample-data`, and asserts the `search`, `read` and `xlsx-read` envelopes
+    (`ok`, a `locator` and `source_uri` per hit, `source_verification` and the
+    three-valued `source_changed_since_index`, the workbook's own cell values)
+    plus the exit codes `docs/TRD.md` 29.4 publishes. Any `meta.warnings` entry
+    the release does not declare fails the job.
+  - `./scripts/e2e-upgrade.sh` (CI: tag and manual dispatch) installs the
+    previous published release, creates a second deployment that owns the
+    global `kip` launcher, upgrades the first with `kip update --archive`, and
+    asserts the version moved, the deployment-owned files survived byte for
+    byte, the second deployment's launcher was not repointed and no shell
+    profile changed - then repeats the launcher assertions for the download
+    update path where that defect actually lived. It falls back to an older
+    tag only when a release asset answers HTTP 404, retries any other network
+    error, and then fails naming the tags it tried; it never skips.
+  - `./scripts/e2e-db-roles.sh --mode database` (CI: every push) proves the
+    3.13.0 claim at the database: `kip_api`, `kip_worker` and `kip_reviewer`
+    are neither superusers nor `BYPASSRLS` while `kip_backup` is; a `kip_api`
+    session reads nothing from another workspace through the application, and
+    nothing in raw SQL from any of the 34 tables that force row level security
+    and carry a `workspace_id`, and cannot set `row_security = off`; and a
+    backup taken as
+    `kip_backup` is a real dump that `scripts/restore.sh` loads back with the
+    same canonical row counts.
+  - `./scripts/e2e-db-roles.sh --mode compose` (CI: tag and manual dispatch)
+    boots `compose.yaml` with `deploy/compose.roles.yaml` the way
+    `./scripts/app-up.sh` does, under its own project name, ports and volumes,
+    with API-key identity, and asserts the API answers `/readyz` and that the
+    `api` and `worker` backends really are the non-superuser logins. It does
+    not boot `compose.production.yaml`.
+  - `./scripts/e2e-db-roles.sh --mode production-config` (CI: every push)
+    renders `compose.production.yaml` with its migration profile and runs the
+    resolved environment of `api`, `worker` and `migrate` through the real
+    settings and identity construction, with an invalid identity mode on `api`
+    as a control that must be rejected. It does not boot images, secrets or a
+    JWKS endpoint. It found the worker and migrate defect described below.
+  - `./scripts/e2e-semantic.sh --mode served-model` (CI: every push) stands a
+    stub runtime in for Infinity that advertises one model and answers
+    `POST /embeddings` with HTTP 200 for any name, and asserts `kip doctor`
+    names the mismatch, default-mode search degrades with `semantic_degraded`
+    instead of embedding against the wrong model, and an explicit
+    `--mode vector` fails.
+  - `./scripts/e2e-semantic.sh --mode offline-runtime` downloads the pinned
+    1.2 GB snapshot and starts the runtime with the model hub forced offline.
+    That cost does not belong on a push, so it is a weekly and manually
+    dispatched workflow (`.github/workflows/semantic-runtime.yml`) rather than
+    a push job pretending to cover it; `docs/OPERATIONS.md` lists dispatching
+    it as a step before tagging.
+  The tag `publish` job depends on every check above except the offline model
+  runtime, which is weekly and dispatched rather than gated, so an install
+  that cannot start its runtime offline can still publish unless someone
+  dispatches that workflow first. These jobs download from GitHub releases,
+  Docker Hub, npm and uv with bounded retries and a time limit on each
+  attempt, and skip pulling an image that is already present; when one still fails for a
+  network reason, re-run the failed jobs on the tag's run instead of moving
+  the tag.
+- The Compose application profile could not start. `compose.yaml`'s `migrate`
+  service takes `env_file: .env`, which carries the HOST path
+  `KIP_CAS_PATH=./var/cas`; inside the container that is `/app/var/cas` on the
+  read-only root filesystem, and startup creates the CAS directory before it
+  runs anything, so `./scripts/app-up.sh` (and any
+  `docker compose --profile app up`) stopped at `migrate` with
+  `OSError: [Errno 30] Read-only file system: '/app/var/cas'`. The `api` and
+  `worker` services already pinned `KIP_CAS_PATH: /data/cas` against exactly
+  this hazard and `migrate` did not. It does now. The defect is older than
+  this release: `migrate` has taken `env_file: .env` on a read-only root
+  filesystem without that pin since at least 3.9.0, and `.env.example` has
+  shipped the relative `KIP_CAS_PATH=./var/cas` for as long, so the app profile
+  could not start on any deployment configured from the example. Deployments
+  that only ran `./scripts/app-up.sh --database-only` never reached the
+  container. After `kip update`, run `./scripts/app-up.sh` once to start the
+  application profile. `compose.production.yaml` was
+  never affected: it passes credentials as secrets and has no `env_file`, so
+  its migrate service used the container config's `/data/cas`, which exists in
+  the image. Found by the new compose-roles check on its first real run.
+- Each GitHub release carries its own notes. The publish job extracted the same
+  fixed body every time, so a visitor could not see what changed in a release
+  without opening `CHANGELOG.md`. `scripts/changelog-section.sh` now extracts
+  the section for the tag's version - matched on the version field alone, so no
+  release date has to be predicted - and the body opens with it under
+  `## What changed in <version>`, above the existing image, install, upgrade and
+  licensing block. The extraction runs in the tag-validation step, before any
+  image or attestation is published: a version with no `CHANGELOG.md` section
+  fails the tag rather than publishing first and explaining later.
+
+- The repository now has the community files a visitor expects, each written
+  for this project rather than copied: issue forms for bugs, retrieval-quality
+  reports and change proposals that ask for the envelope's `request_id`,
+  `meta.warnings`, `kip capabilities` and `kip doctor` output and say what must
+  never be pasted; a pull request template that points at the completion gate;
+  a vulnerability reporting policy in `.github/SECURITY.md` that links the
+  operational `docs/SECURITY.md` instead of repeating it; a code of conduct; an
+  `.editorconfig` matching the linters; and README badges for CI, the latest
+  release and the licence. `.github/` ships inside the package archive, so the
+  new files are link-checked with the rest of the documentation.
+
+- The test suite runs the same way on a developer machine and in CI. Two
+  releases in this series were tagged on a green local gate and then failed CI
+  because tests inherited the shell that launched them: 3.13.0 read the
+  repository config through an exported `KIP_CONFIG`, and 3.14.0 matched help
+  text that CI renders on a narrow, coloured terminal. `tests/conftest.py` now
+  starts every test from the environment CI exports, with `COLUMNS=80` and
+  colour forced on, and fails a test that reads a `KIP_*` or terminal variable
+  it did not pin. A parity test ties that profile to `.github/workflows/ci.yml`,
+  and every `KIP_*` name the code and bootstrap read must be pinned or listed
+  with a reason, so a new variable cannot quietly reopen the gap.
+- Tests that need a real database now use only `KIP_TEST_POSTGRES_URL` and skip
+  without it; they no longer fall back to `KIP_DATABASE_URL`, and the suite
+  refuses to start when the test URL names the deployment's own database
+  outside CI. Before this change a local run could write into the database
+  `.env` points at: `tests/test_filename_discovery.py` searched as a workspace
+  it never created, which left a `not-this-workspace` workspace and its query
+  traces in a live deployment. CI exports `KIP_TEST_POSTGRES_URL` for its
+  service database. When the variable is unset, `./scripts/verify.sh` starts a throwaway
+  PostgreSQL container for the run, so a local gate cannot pass with the
+  database tests skipped; without Docker the gate fails.
+
+- The production Compose worker and migrate services could not start.
+  Every KIP process builds the full container, which constructs the identity
+  resolver even when the process serves no requests. `compose.production.yaml`
+  set `KIP_IDENTITY_MODE: proxy_jwt` only on `api`, so `worker` and `migrate`
+  fell back to API-key mode, and `KIP_ENV=production` refuses that mode without
+  `KIP_API_KEY`: both aborted with "API-key identity mode requires KIP_API_KEY"
+  before doing any work. They now carry the same identity mode and JWT
+  settings as `api`, which a production operator already supplies. The JWT
+  client fetches signing keys only when a token arrives, so neither service
+  needs to reach the issuer at startup. The new production-configuration check
+  found this by resolving each service's environment into the real identity
+  construction.
+
 ## 3.14.1 - 2026-09-13
 
 - Three CLI help tests added in 3.14.0 matched phrases against terminal

@@ -431,6 +431,9 @@ def test_update_and_version_commands_work_without_a_database(tmp_path, monkeypat
     (tmp_path / "scripts").mkdir()
     (tmp_path / "scripts/upgrade.sh").write_text("#!/bin/sh\n")
     monkeypatch.setenv("KIP_PROJECT_ROOT", str(tmp_path))
+    # Moving the project root moves where a relative KIP_CONFIG resolves, so
+    # the config file is named here rather than inherited.
+    monkeypatch.setenv("KIP_CONFIG", str(ROOT / "config/kip.example.toml"))
     calls: list[list[str]] = []
 
     def fake_run(arguments, check=False):

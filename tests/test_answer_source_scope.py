@@ -1,4 +1,3 @@
-import os
 import uuid
 from copy import deepcopy
 from dataclasses import replace
@@ -62,12 +61,10 @@ def test_question_endings_are_not_required_evidence_terms(test_container, query)
 
 
 @pytest.fixture
-def postgres_container(test_container):
+def postgres_container(test_container, postgres_database_url):
     import psycopg
 
-    url = os.environ.get('KIP_TEST_POSTGRES_URL') or os.environ.get('KIP_DATABASE_URL')
-    if not url:
-        pytest.skip('PostgreSQL not configured')
+    url = postgres_database_url
     workspace = 'review_' + uuid.uuid4().hex[:12]
     raw = deepcopy(test_container.settings.raw)
     raw['sources']['filesystem'][0]['acl_scope'] = f'workspace:{workspace}'

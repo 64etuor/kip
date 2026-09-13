@@ -185,6 +185,15 @@ groups로 실행하며 apply 시 해당 host membership을 확인한다. 다른
 
 자동화가 CLI JSON을 읽을 때는 `contracts/`의 현재 schema를 사용한다. 명령마다 `data`가 배열인지 객체인지 추정해 임의의 `jq` 경로를 만들지 말고, versioned envelope와 command contract를 기준으로 파싱한다.
 
+이 설치 경로는 이제 자동화가 매 push마다 검증한다. CI의 `installer end-to-end`
+job은 릴리스가 게시하는 패키지 아카이브를 빌드해 로컬 릴리스 미러에서 받아
+`scripts/install.sh`로 빈 디렉터리에 설치하고(전역 런처와 셸 프로필 블록 포함,
+단 throwaway `HOME`을 써서 실행 기계의 프로필은 건드리지 않는다), bootstrap과
+migrate를 거쳐 번들된 `sample-data`를 sync한 뒤 `search`·`read`·`xlsx-read`
+envelope와 CLI exit code를 검사한다. 같은 검사를 로컬에서 그대로 돌리려면
+`./scripts/e2e-install.sh`를 실행한다(throwaway PostgreSQL 컨테이너를 직접
+띄우고 끝나면 지운다). 자세한 목록은 `docs/OPERATIONS.md`의 릴리스 절차에 있다.
+
 ## 3. AI agent 변경 계약
 
 `AGENTS.md`의 작업별 경로에서 필요한 문서만 읽는다. Skill은 근거·권한·승인
@@ -556,6 +565,17 @@ kip update
 
 버전을 낮추는 아카이브, git 체크아웃(`git pull`로 갱신한다), digest나 manifest가
 맞지 않는 아카이브는 거부된다.
+
+이 업그레이드 경로도 자동화가 검증한다. CI의 `upgrade end-to-end` job은 tag와
+수동 dispatch에서 직전에 게시된 릴리스를 실제로 설치한 뒤 후보 빌드로
+`kip update --archive`를 실행하고, 버전이 올라갔는지, 배포 소유 파일(`.env`,
+`config/kip.toml`, `.mcp.json`, `var/`)이 바이트 단위로 보존됐는지, 같은 기계에
+있는 *다른* 배포의 전역 `kip` 런처가 다시 가리키도록 바뀌지 않았는지, 요청하지
+않은 셸 프로필이 수정되지 않았는지를 확인한다. 3.12.1이 고친 결함이 살던
+다운로드 경로(`kip update --version`)에 대해서도 같은 런처·프로필 검사를
+반복한다. 로컬에서는 `./scripts/e2e-upgrade.sh`로 동일하게 실행한다. 이 검사는
+게시된 릴리스 자산에 네트워크로 접근해야 하며, 접근할 수 없으면 조용히
+건너뛰지 않고 시도한 tag를 밝히며 실패한다.
 
 ### 11.4 받은 패키지의 출처 확인
 

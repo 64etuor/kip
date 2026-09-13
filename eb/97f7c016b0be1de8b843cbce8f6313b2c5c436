@@ -1,0 +1,221 @@
+skills/kip-setup/SKILL.md
+  s_16a999dee6ecf2::t_f02629148b67db 8-12,17
+  s_16a999dee6ecf2::t_805c35ed8b8e7b 13-16
+docs/QUICKSTART.md
+  s_16a999dee6ecf2::t_abdaba04911d62 216-222
+tests/e2e/skill_installs.py
+  s_16a999dee6ecf2::t_a2f31d175c5c18 1-165
+src/kip/skill_installs.py
+  s_16a999dee6ecf2::t_ceff4466f14ca1 129-151
+  s_16a999dee6ecf2::t_b5e08113cef200 178-180,187
+  s_16a999dee6ecf2::t_dca0d486457c1b 1-17,19-128,152-177,181-186,188-232
+  s_16a999dee6ecf2::t_7f40eebe94b311 18
+contracts/openapi.yaml
+  s_16a999dee6ecf2::t_6f89ceaf13581c 6
+src/kip/cli.py
+  s_16a999dee6ecf2::t_515b98a869c119 987
+  s_16a999dee6ecf2::t_fb321934408762 265-268
+  s_16a999dee6ecf2::t_205d5bcdf3b9c0 72
+  s_16a999dee6ecf2::t_395551208ccbc2 930-932,936-963,966-967,969-983,988-1008
+  s_16a999dee6ecf2::t_c91a2777fc458c 984-986
+  s_16a999dee6ecf2::t_d23c87e33c5ad3 83
+  s_16a999dee6ecf2::t_1cf26b4b231697 1148
+  s_16a999dee6ecf2::t_7f6482d407dcd0 252-264,269-272
+  s_16a999dee6ecf2::t_1e5b508d4f74b9 1149
+  s_16a999dee6ecf2::t_39afa67dd74502 964-965,968
+  s_16a999dee6ecf2::t_5254f13a8b3450 1009-1045
+  s_16a999dee6ecf2::t_b44b6a2032e405 137
+  s_16a999dee6ecf2::t_43606538778e86 933-935
+  s_16a999dee6ecf2::t_cb3b941184ffc9 929
+tests/test_cli_surface.py
+  s_16a999dee6ecf2::t_12802ebf5592f6 600-603,605
+  s_16a999dee6ecf2::t_ddaa32c55f6ea1 3,578-599,604,606-617,619-634
+  s_16a999dee6ecf2::t_e3b8adb83702ed 618
+docs/adr/ADR-067-location-independent-mcp-and-skill-installs.md
+  s_16a999dee6ecf2::t_b866ee3bf4df06 69-74
+  s_16a999dee6ecf2::t_82fc5957cfdced 61-63
+  s_16a999dee6ecf2::t_056dd3e0f46f86 88-89
+  s_16a999dee6ecf2::t_247d342f126186 1-60,64-68,75-84,90-92
+  s_16a999dee6ecf2::t_4dde3979bdc3a2 85-87
+src/kip/__init__.py
+  s_16a999dee6ecf2::t_6b72dd5bbf0987 3
+tests/test_install_and_upgrade.py
+  s_16a999dee6ecf2::t_0379c37334e713 774-801
+scripts/uninstall-agent-files.sh
+  s_16a999dee6ecf2::t_9eb2d6a04d073f 2-4,6-9
+tests/environment.py
+  s_16a999dee6ecf2::t_2707cef6d31153 174-177
+docs/DEPLOYMENT_GUIDE.md
+  s_16a999dee6ecf2::t_85480649be7f11 581-582,584
+  s_16a999dee6ecf2::t_93043b7dbbf90c 593-594,597-598
+  s_16a999dee6ecf2::t_61492e45660ddb 583
+  s_16a999dee6ecf2::t_ae58b7e05bef23 530,535-541
+  s_16a999dee6ecf2::t_735a655dcf02a0 589-590
+  s_16a999dee6ecf2::t_2d5c805089e3c3 218-221
+  s_16a999dee6ecf2::t_bae46256168408 595-596
+  s_16a999dee6ecf2::t_92ee6ecf67a952 591-592
+  s_16a999dee6ecf2::t_fb33dc70ff54ce 148-153
+  s_16a999dee6ecf2::t_3fffb5faf0c433 585-588
+  s_16a999dee6ecf2::t_298a6e2a63b926 205-217,222
+contracts/openapi.json
+  s_16a999dee6ecf2::t_6f89ceaf13581c 1065
+tests/test_cli_doctor.py
+  s_16a999dee6ecf2::t_849b1c4b46c0d8 17
+  s_16a999dee6ecf2::t_ddaa32c55f6ea1 13-16,18-19,23-24,33,585-631,634-649,661-683
+  s_16a999dee6ecf2::t_09bdfa51cf70ae 684-733
+  s_16a999dee6ecf2::t_8f25cb810eeab5 25-32
+  s_16a999dee6ecf2::t_a3dcf3e009821c 4
+  s_16a999dee6ecf2::t_5e37fc81f7ad70 650-660
+  s_16a999dee6ecf2::t_017488cad129b5 632-633
+docs/TRD.md
+  s_16a999dee6ecf2::t_1874b38985d3c0 3991-3995
+  s_16a999dee6ecf2::t_8ee9cd3bf984a9 3957-3959,3965-3972,3974-3978,3989-3990,3996,4001-4004
+  s_16a999dee6ecf2::t_bf809495f10390 3997-4000
+  s_16a999dee6ecf2::t_19a3eab20481bd 3985-3988
+  s_16a999dee6ecf2::t_81e46d2fd8ec25 3973
+  s_16a999dee6ecf2::t_9d96a772602c1e 3960-3964
+  s_16a999dee6ecf2::t_79c0f4123e9112 3979-3984
+CHANGELOG.md
+  s_16a999dee6ecf2::t_fed4e99ef2a0e7 28-31
+  s_16a999dee6ecf2::t_1065fcbf0e6914 3-27,98
+  s_16a999dee6ecf2::t_a88139f08fe3b8 32-43,58-72,78-81,97
+  s_16a999dee6ecf2::t_bab12f101bba5c 44-50
+  s_16a999dee6ecf2::t_f93b94d80ac722 73-77
+  s_16a999dee6ecf2::t_1327aca67d00cd 55-57
+  s_16a999dee6ecf2::t_606f4a648e6de5 82-96
+  s_16a999dee6ecf2::t_4ba9eb49fbf4fe 51-54
+scripts/e2e-upgrade.sh
+  s_16a999dee6ecf2::t_91b9631b96c60e 11-12,47
+  s_16a999dee6ecf2::t_2379aebb54240b 13-18
+  s_16a999dee6ecf2::t_4a4225162a5c97 331-349
+  s_16a999dee6ecf2::t_5c482673620614 240-292
+  s_16a999dee6ecf2::t_4f41bd655acd73 410-439
+  s_16a999dee6ecf2::t_9bc20441ce10f5 330,350-378
+tests/test_mcp_stdio_entrypoints.py
+  s_16a999dee6ecf2::t_c6d8ad7e1bc324 1-141
+tests/e2e/test_e2e_helpers.py
+  s_16a999dee6ecf2::t_e95a1ea36fa870 1-234
+src/kip/setup/service.py
+  s_16a999dee6ecf2::t_e87457eb6ec7dc 476-478
+  s_16a999dee6ecf2::t_be45b9a82acf06 554-557,562,571-572
+  s_16a999dee6ecf2::t_2181612309e55b 558-561,563-570
+  s_16a999dee6ecf2::t_e220459d81c555 544-547,551,573,575-576,578-581
+  s_16a999dee6ecf2::t_1da025fdf0cf71 574,577
+docs/OPERATIONS.md
+  s_16a999dee6ecf2::t_e371909ef07039 292-295
+  s_16a999dee6ecf2::t_7fb03fab9adacc 242-243
+  s_16a999dee6ecf2::t_716a92c755db53 217-218,226-232,236-241,244-253,257,272,289-291,296-297
+  s_16a999dee6ecf2::t_3788a26127144c 264-266,270-271
+  s_16a999dee6ecf2::t_4db8dfb3a65c43 273-281,288
+  s_16a999dee6ecf2::t_c1642465d41d89 284-287
+  s_16a999dee6ecf2::t_708599de51ab9a 219-225
+  s_16a999dee6ecf2::t_4a792078d955e5 254-256,258-263,267-269
+  s_16a999dee6ecf2::t_710e86e8f5273f 120-124
+  s_16a999dee6ecf2::t_556a51ba4a4545 282-283
+  s_16a999dee6ecf2::t_c85c9bf756f8f1 233-235
+scripts/e2e-common.sh
+  s_16a999dee6ecf2::t_c613f0ae4739c1 123-135,140-143
+  s_16a999dee6ecf2::t_58a991e9d57ce7 416-437
+  s_16a999dee6ecf2::t_94529e7daa1c45 37-42,47
+tests/test_setup_verify.py
+  s_16a999dee6ecf2::t_b21cbd03f8e967 3
+  s_16a999dee6ecf2::t_565e1e5e70c0e1 107-109
+  s_16a999dee6ecf2::t_a33c43de05de8f 113-114
+  s_16a999dee6ecf2::t_4e96b17e41dd65 99-106,110-112,115-144
+  s_16a999dee6ecf2::t_95727a5320bc85 61-98
+tests/test_setup_writer.py
+  s_16a999dee6ecf2::t_f59fe6fca2955b 3
+  s_16a999dee6ecf2::t_9eaca625f7efdf 74-88
+tests/test_skill_installs.py
+  s_16a999dee6ecf2::t_493d3da4a48945 21,24,94-120
+  s_16a999dee6ecf2::t_fc0576352d373d 1-20,22-23,25-93
+src/kip/setup_cli.py
+  s_16a999dee6ecf2::t_155dba2b3e0589 3
+  s_16a999dee6ecf2::t_915fe1e1ff6544 38,43-47
+tests/e2e/kip_envelope.py
+  s_16a999dee6ecf2::t_2aa0b2bf7d65ea 374-381
+  s_16a999dee6ecf2::t_155404ab179a31 319-320
+  s_16a999dee6ecf2::t_3c4ba474073a92 288-318,321-322
+tests/e2e/mcp_stdio_probe.py
+  s_16a999dee6ecf2::t_7b994ff5159c3a 1-196
+tests/test_setup_cli.py
+  s_16a999dee6ecf2::t_2b76d3d4f09e9c 52
+  s_16a999dee6ecf2::t_376943da90f0d8 41-51,53-65
+scripts/e2e-install.sh
+  s_16a999dee6ecf2::t_b0a10ce2779ba6 224-325
+  s_16a999dee6ecf2::t_6f9fe14a014e54 9-13
+  s_16a999dee6ecf2::t_4ade6c72b24fb8 326
+  s_7e5cadccd66cbf::t_8340643172a141 42
+skills/knowledge-fabric/SKILL.md
+  s_16a999dee6ecf2::t_3633950fabaee1 117-121
+README.md
+  s_16a999dee6ecf2::t_f42f06bf58fa8f 321-329
+  s_16a999dee6ecf2::t_815e5113197a57 305,311-319
+  s_16a999dee6ecf2::t_c61cdca9af235d 320
+scripts/upgrade.sh
+  s_16a999dee6ecf2::t_3f853e66c0cae6 52-62
+  s_16a999dee6ecf2::t_e9bc385b6ce22c 66
+  s_16a999dee6ecf2::t_1798474a089690 101-106
+pyproject.toml
+  s_16a999dee6ecf2::t_6b72dd5bbf0987 7
+src/kip/setup/writer.py
+  s_16a999dee6ecf2::t_6daeb214c7c77c 257-262,267,269
+  s_16a999dee6ecf2::t_143b06f7a9a5be 116
+docs/APP_INTEGRATION.md
+  s_16a999dee6ecf2::t_3f8e643e0a052d 200-205
+  s_16a999dee6ecf2::t_31e732efea7984 198-199,206-320
+tests/test_skill_installation.py
+  s_16a999dee6ecf2::t_493d3da4a48945 294-295,400-427,429-513,515-527
+  s_16a999dee6ecf2::t_c00aeb090f5c6f 3-5,18-20,23-24,29-31,34-35,38,42-47,51,54,56,59-61,64-66,69-72,74-75,79,84,92,102-103,105-293,296-310
+  s_16a999dee6ecf2::t_2aaef43fd4bb46 10-15
+  s_16a999dee6ecf2::t_17bda634a66f76 311-343,345-361,379-399,428,514
+  s_16a999dee6ecf2::t_7f3269633b1f8e 344,362-378
+  s_16a999dee6ecf2::t_e5de5841bb5f30 528-544
+scripts/install_agent_files.py
+  s_16a999dee6ecf2::t_30fe3131199b49 207
+  s_16a999dee6ecf2::t_b7b07a5ec13324 153-167,170-171,173,180-206,209-213,226-229
+  s_16a999dee6ecf2::t_c312d5065f80d0 345
+  s_16a999dee6ecf2::t_0b2fcc8d63321f 1-11,20-22,25-43,45-58,75-77,89-90,92,95,113-114,118-119,123-129,137,149-152,216,218-225,230-233,237-239,242-245,250-252,254-261,263,267-270,274-295,301,312-330,334-335,337-340,342-344,346-347,349-350,352-356,358-370,373
+  s_16a999dee6ecf2::t_c3495b94533c2e 16,44,61-67,70-74,78,93-94,98-110,168-169,172,174-179,208,214-215,217,234-236,240-241,246-249,253,262,264-266,296-300,302-311,351,357,371-372
+  s_16a999dee6ecf2::t_02fe782706e94c 271-273
+  s_16a999dee6ecf2::t_be0493fbacf525 59-60,96-97
+README.en.md
+  s_16a999dee6ecf2::t_a6725421ba2869 61-63
+VERSION
+  s_16a999dee6ecf2::t_6b72dd5bbf0987 1
+skills/knowledge-fabric/scripts/kip.sh
+  s_16a999dee6ecf2::t_b0ca4b028d478e 29
+  s_16a999dee6ecf2::t_486112f6261c27 4-5,23-28,30-38
+.claude/skills/kip-setup/SKILL.md
+  s_16a999dee6ecf2::t_963c54c32908d4 8-17
+.claude/skills/knowledge-fabric/SKILL.md
+  s_16a999dee6ecf2::t_65f28cd831aca2 117-121
+.claude/skills/knowledge-fabric/scripts/kip.sh
+  s_16a999dee6ecf2::t_da6ca483c75ef5 4-5,23-38
+uv.lock
+  s_16a999dee6ecf2::t_b9059df6c3ef55 767
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "eb97f7c016b0be1de8b843cbce8f6313b2c5c436",
+  "prompts": {},
+  "sessions": {
+    "s_16a999dee6ecf2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b9abc8ac-2c56-4e22-a7c7-3deb16f779f3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_7e5cadccd66cbf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ab62ba68167dbdfff",
+        "model": "unknown"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

@@ -468,10 +468,17 @@ def test_update_and_version_commands_work_without_a_database(tmp_path, monkeypat
 
 
 def _help(*command: str) -> str:
-    """`--help` text with Rich's panel borders and line wrapping removed."""
-    result = CliRunner().invoke(app, [*command, "--help"], env=_env())
+    """`--help` text with Rich's colour, panel borders and wrapping removed.
+
+    CI renders this on a narrow terminal with colour on, which puts escape
+    sequences inside words and wraps sentences mid-phrase. Normalising here
+    keeps these tests about what the help says, not how a terminal drew it.
+    """
+    environment = {**_env(), "COLUMNS": "200", "TERM": "dumb", "NO_COLOR": "1"}
+    result = CliRunner().invoke(app, [*command, "--help"], env=environment)
     assert result.exit_code == 0, result.stdout
-    unboxed = re.sub(r"[\u2500-\u257f]", " ", result.stdout)
+    uncoloured = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
+    unboxed = re.sub(r"[\u2500-\u257f]", " ", uncoloured)
     return re.sub(r"\s+", " ", unboxed)
 
 

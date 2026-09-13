@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.14.1 - 2026-09-13
+
+- Three CLI help tests added in 3.14.0 matched phrases against terminal
+  output. CI renders help on a narrow terminal with colour on, which puts
+  escape sequences inside words and wraps sentences mid-phrase, so they failed
+  there while passing locally. They now normalise the output before asserting.
+  No shipped behaviour changed. The 3.14.0 tag failed this gate and published
+  no release.
+
 ## 3.14.0 - 2026-09-13
 
 - `source_changed_since_index` no longer reports "changed" when nothing was

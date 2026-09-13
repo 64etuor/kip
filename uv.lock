@@ -764,7 +764,7 @@ wheels = [
 
 [[package]]
 name = "kip-knowledge-fabric"
-version = "3.14.0"
+version = "3.14.1"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },

@@ -147,7 +147,7 @@ echo "$FAKE_PGREP_PID"
 """
 _FAKE_DOCKER = r"""#!/bin/bash
 printf 'docker %s\n' "$*" >> "$FAKE_TRACE"
-case " $* " in *" ps "*) printf '%s' "${FAKE_MODELS_CONTAINER:-}" ;; esac
+case " $* " in *" compose "*" ps "*) printf '%s' "${FAKE_MODELS_CONTAINER:-}" ;; esac
 """
 _FAKE_UNAME = r"""#!/bin/bash
 if [[ "${1:-}" == -m && -n "${FAKE_ARCH:-}" ]]; then echo "$FAKE_ARCH"; exit 0; fi

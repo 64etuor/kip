@@ -39,6 +39,36 @@ container는 lexical 검색(`semantic_degraded`)으로 동작한다. RAM이 8 Gi
 일치해야 하며 external DB는 별도 변수의 secret reference를 선택한다. 모든
 서비스와 host CLI가 같은 DB를 사용하는지 receipt/readiness로 확인한다.
 
+**한 machine에 배포가 둘이면 `COMPOSE_PROJECT_NAME`.** Compose는 container와
+volume을 디렉터리가 아니라 project 이름으로 묶는다. 모든 배포의 `compose.yaml`과
+setup이 만든 `compose.generated.yaml`은 project 이름이 `kip`이다. 저장소 checkout이
+돌고 있는 machine에 설치기로 두 번째 배포를 만들면, 새 배포의 `.env`에
+`COMPOSE_PROJECT_NAME=<고유 이름>`을 넣어야 자기 container와 volume
+(`<이름>_kip_pgdata`, `<이름>_kip_cas`, `<이름>_kip_models`)을 갖고 빈 DB로 시작한다.
+데이터가 이미 있는 배포에는 넣지 않는다. 이름이 바뀌면 기존 volume을 찾지 못한다.
+project 이름만으로는 두 배포를 함께 띄울 수 없다. host port가 겹치기 때문이다. 새 배포의
+`.env`에 비어 있는 `KIP_POSTGRES_PORT`와 `KIP_API_PORT`를 넣고, 같은 파일의
+`KIP_DATABASE_URL` port를 `KIP_POSTGRES_PORT`와 같게 고친다. model runtime은 machine당
+하나이므로 `KIP_SEMANTIC_PORT`는 바꾸지 않고 이미 떠 있는 runtime을 함께 쓴다
+([Model runtime](#model-runtime)).
+`app-up.sh`(`--database-only`, `--down` 포함), `dev-up.sh`/`dev-down.sh`, 그리고
+backup/restore/ops-report가 host `psql`/`pg_dump`/`pg_restore` 없이 쓰는
+`docker compose exec` fallback은 Compose를 부르기 전에 project를 검사한다. 이름은
+`COMPOSE_PROJECT_NAME`, 없으면 선택된 Compose 파일의 `name:`이다(`$` 보간이 든 `name:`은
+해석하지 않고 `COMPOSE_PROJECT_NAME`을 요구하며 거부한다). 이 이름의 container가
+`com.docker.compose.project.working_dir` label 기준으로 다른 디렉터리(같은 파일 시스템
+항목인지 비교하므로 symlink·대소문자 차이는 같은 디렉터리, 사라진 경로는 다른 디렉터리)에서
+만들어졌으면 그 경로와 해결책을 출력하고 exit 2로 멈춘다. backup은 partial 폴더를 만들기
+전에 멈춘다. 같은 배포를
+다른 경로로 옮긴 경우라면 `KIP_COMPOSE_ADOPT=1 ./scripts/app-up.sh --down`을 한 번
+실행하거나 옛 위치에서 `docker compose -p kip down`을 실행한 뒤 다시 시작한다. 두
+방법 모두 volume은 남는다. Docker에 질의할 수 없으면 검사를 건너뛰고 이어지는
+Compose 명령이 오류를 보고한다. `./scripts/doctor.sh`는 같은 검사를 필수 항목으로
+보여 주고, Docker에 질의할 수 없으면 실패로 세지 않고 `[not checked]`로 표시한다.
+`./scripts/ops-report.sh`는 host `psql` 없이 거부되면 DB 검사를 "database unreachable"이
+아닌 `compose_project` 실패("compose project shared")로 보고한다. 다른 배포가 `down`으로 container를 지우고 volume만 남긴 경우는 감지하지
+못한다. volume에는 working_dir label이 없다.
+
 Guided source는 host의 canonical 절대경로 그대로 container에 mount한다.
 두 config의 source root가 같아야 공유 DB의 URI/ACL snapshot도 일치한다.
 이전 split-path plan은 재생성·apply 후 명시적으로 sync한다. runtime 보호

@@ -485,6 +485,40 @@ def test_installer_writes_a_global_launcher_and_an_idempotent_shell_profile_bloc
     assert (home / ".zshrc").read_text() == rc
 
 
+@pytest.mark.parametrize(("target_name", "bin_name"), [("install", "bin"), ("My KIP", "my bin")], ids=["plain", "spaces"])
+def test_installer_prints_agent_connection_commands_with_the_launcher_absolute_path(
+    tmp_path: Path, target_name: str, bin_name: str
+) -> None:
+    # Given a package whose bootstrap and verification succeed.
+    files = {
+        "README.md": b"# kit\n",
+        **_kit_scripts(),
+        "scripts/verify-package.sh": b"#!/bin/sh\nexit 0\n",
+    }
+    _, env = _release_files(tmp_path, "9.9.9", files)
+    target = tmp_path / target_name
+    bin_dir = tmp_path / bin_name
+
+    # When the installer finishes a full install.
+    result = subprocess.run(
+        ["/bin/bash", str(ROOT / "scripts/install.sh"), str(target), "--no-shell-profile", "--bin-dir", str(bin_dir)],
+        env=env, capture_output=True, text=True, check=False,
+    )
+
+    # Then an agent can connect itself from the output alone: the running
+    # client does not see the new PATH, so the launcher is named absolutely.
+    assert result.returncode == 0, result.stderr
+    # Pasted into a shell, each line must split into exactly these arguments,
+    # including for paths that contain spaces.
+    lines = {line.strip().split(" ", 1)[0]: shlex.split(line) for line in result.stdout.splitlines()
+             if "mcp add" in line or "install-agent-files.sh" in line}
+    launcher = str(bin_dir / "kip")
+    assert lines["claude"] == ["claude", "mcp", "add", "--scope", "user", "kip", "--", launcher, "mcp"]
+    assert lines["codex"] == ["codex", "mcp", "add", "kip", "--", launcher, "mcp"]
+    skills = next(argv for key, argv in lines.items() if key not in {"claude", "codex"})
+    assert skills == [str(target.resolve() / "scripts/install-agent-files.sh"), "personal", "--client", "all"]
+
+
 def test_upgrade_reads_legacy_manifest_name_and_installer_falls_back_to_legacy_asset(tmp_path: Path) -> None:
     deployment = _deploy(tmp_path, "1.0.0", OLD_KIT)
     legacy = deployment / "STARTER-KIT-MANIFEST.json"

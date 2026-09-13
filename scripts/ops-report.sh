@@ -49,7 +49,15 @@ FAILED_JOBS_JSON="$("$KIP_CLI" jobs list --status failed --limit 1000 2>/dev/nul
 DATABASE_URL="$("$PY" "$SCRIPT_DIR/secret_value.py" KIP_DATABASE_URL 2>/dev/null || true)"
 OLDEST_QUEUED_SECONDS=""
 SYNC_ROW=""
-if [[ -n "$DATABASE_URL" ]]; then
+# Without a host psql the probes run inside the Compose `postgres`. Check the
+# project once: another deployment's database must be neither reported nor
+# mistaken for an unreachable one.
+COMPOSE_PROJECT_REFUSAL=""
+if [[ -n "$DATABASE_URL" ]] && ! command -v "${PSQL:-psql}" >/dev/null 2>&1 && command -v docker >/dev/null 2>&1; then
+  COMPOSE_PROJECT_REFUSAL="$(kip_compose_project_guard compose.yaml 2>&1)" || true
+  [[ -z "$COMPOSE_PROJECT_REFUSAL" ]] || printf '%s\n' "$COMPOSE_PROJECT_REFUSAL" >&2
+fi
+if [[ -n "$DATABASE_URL" && -z "$COMPOSE_PROJECT_REFUSAL" ]]; then
   OLDEST_QUEUED_SECONDS="$(postgres_query "$DATABASE_URL" \
     "SELECT COALESCE(extract(epoch FROM now() - min(created_at))::bigint, -1) FROM jobs.queue WHERE status = 'queued'" \
     2>/dev/null | tr -d '[:space:]' || true)"
@@ -102,6 +110,7 @@ set +e
 FAILED_JOBS_JSON="$FAILED_JOBS_JSON" \
 OLDEST_QUEUED_SECONDS="$OLDEST_QUEUED_SECONDS" \
 SYNC_ROW="$SYNC_ROW" \
+COMPOSE_PROJECT_REFUSAL="$COMPOSE_PROJECT_REFUSAL" \
 VAR_DF="$VAR_DF" \
 DOCKER_ROOT="$DOCKER_ROOT" \
 DOCKER_DF="$DOCKER_DF" \
@@ -152,11 +161,18 @@ else:
     record("failed_jobs", count == 0, {"count": count},
            f"{count} failed job(s) in the queue" if count else None)
 
+# compose project ---------------------------------------------------------------
+refusal = os.environ["COMPOSE_PROJECT_REFUSAL"].strip()
+database_error = "compose project shared" if refusal else "database unreachable"
+if refusal:
+    record("compose_project", False, {"error": "compose project shared", "message": refusal},
+           "compose project shared: " + refusal.splitlines()[0].removeprefix("error: "))
+
 # oldest queued job -----------------------------------------------------------
 raw = os.environ["OLDEST_QUEUED_SECONDS"]
 if raw in ("", None):
-    record("queue_age", False, {"oldest_seconds": None, "error": "database unreachable"},
-           "queue-age check unavailable (database unreachable)")
+    record("queue_age", False, {"oldest_seconds": None, "error": database_error},
+           f"queue-age check unavailable ({database_error})")
 else:
     age = int(raw)
     if age < 0:
@@ -169,8 +185,8 @@ else:
 # last sync progress ----------------------------------------------------------
 raw = os.environ["SYNC_ROW"]
 if not raw:
-    record("last_sync", False, {"error": "database unreachable"},
-           "last-sync check unavailable (database unreachable)")
+    record("last_sync", False, {"error": database_error},
+           f"last-sync check unavailable ({database_error})")
 else:
     age_raw, _, stamp = raw.partition("|")
     age = int(age_raw)

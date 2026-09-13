@@ -28,12 +28,20 @@ fi
 
 if [[ -f compose.generated.yaml && -f config/kip.generated.toml ]]; then
   using_generated=1
+  compose_file=compose.generated.yaml
 elif [[ -e compose.generated.yaml || -e config/kip.generated.toml ]]; then
   echo "error: incomplete generated setup; regenerate and apply a setup plan." >&2
   exit 1
 else
   using_generated=0
+  compose_file=compose.yaml
 fi
+
+# Every mode below runs Compose, --database-only and --down included: refuse
+# another deployment's containers and volumes before touching them.
+case "${1:-}" in
+  ""|--database-only|--down) kip_compose_project_guard "$compose_file" || exit $? ;;
+esac
 
 run_compose() {
   if [[ "$using_generated" == "1" ]]; then

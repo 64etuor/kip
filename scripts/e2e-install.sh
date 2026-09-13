@@ -103,8 +103,17 @@ e2e_clean_env \
   KIP_RELEASE_BASE_URL="file://$mirror" \
   KIP_SEMANTIC=off \
   bash "$E2E_PROJECT_ROOT/scripts/install.sh" "$deployment" \
-    --version "$version" --without-docker --bin-dir "$home/.local/bin" || status=$?
+    --version "$version" --without-docker --bin-dir "$home/.local/bin" > "$work/install.out" 2>&1 || status=$?
+cat "$work/install.out"
 e2e_assert_status 0 "$status" "scripts/install.sh completed"
+# An agent reads these lines to connect itself; they must name the launcher
+# by absolute path because a running client does not see the new PATH.
+e2e_assert_contains "$work/install.out" "claude mcp add --scope user kip -- '$home/.local/bin/kip' mcp" \
+  "the installer prints the Claude Code registration with the launcher's absolute path"
+e2e_assert_contains "$work/install.out" "codex mcp add kip -- '$home/.local/bin/kip' mcp" \
+  "the installer prints the Codex registration with the launcher's absolute path"
+e2e_assert_contains "$work/install.out" "'$deployment/scripts/install-agent-files.sh' personal --client all" \
+  "the installer prints the skill install command"
 
 [[ -f "$deployment/VERSION" ]] || e2e_fail "no VERSION in the installed deployment"
 [[ "$(tr -d '[:space:]' < "$deployment/VERSION")" == "$version" ]] \

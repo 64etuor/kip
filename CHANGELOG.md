@@ -1,5 +1,49 @@
 # Changelog
 
+## 3.15.2 - 2026-09-13
+
+- An agent asked to install KIP from the repository URL can now finish the job
+  it was asked for. Before, the documented path ended at setup and a smoke
+  search: nothing told the agent to connect KIP to the client it runs in, so
+  it could report success with no MCP server registered and no skills
+  installed.
+  - The `kip-setup` skill has a "Connect agents" step. It registers MCP at
+    user scope for Claude Code or Codex by the launcher's absolute path,
+    installs the skills, and asks the user to restart the client. It runs
+    only with the user's consent, because it writes the client's
+    configuration.
+  - The installer's final message prints the same commands with the launcher's
+    absolute path, shell-quoted so a path with spaces survives being pasted.
+    A client that is already running does not see the `PATH` the profile
+    block adds, so a bare `kip mcp` registration could fail to start until the
+    client restarts.
+  - README.md and README.en.md give a request to hand an agent. It names the
+    installer, the setup skill and its "Connect agents" step.
+  - `./scripts/e2e-install.sh` asserts the printed commands name the launcher
+    by absolute path.
+- Two KIP deployments on one machine no longer silently share Compose
+  containers and volumes. `compose.yaml`, and the Compose file setup
+  generates from it, are named `kip`. Every deployment therefore used the
+  same project and its `kip_kip_pgdata` volume. A second install started with
+  `app-up.sh --database-only` migrated and synced into the first deployment's
+  database. `app-up.sh`, `dev-up.sh`, `dev-down.sh`, and the Compose fallback
+  that `backup.sh` and `restore.sh` use without host PostgreSQL tools now
+  refuse, with exit code 2, a project whose containers were created from
+  another directory. The comparison is by directory identity, so a symlink
+  or a different letter case of this deployment still passes. `backup.sh`
+  checks before creating its partial directory. `ops-report.sh` reports a
+  distinct `compose_project` failure instead of "database unreachable".
+  `scripts/doctor.sh` has a new required check, reported as `not checked`
+  when Docker cannot be queried. A `name:` that uses interpolation is
+  refused, because KIP does not resolve it. The refusal names the other
+  directory and gives the fixes. For a separate deployment, the new
+  deployment's `.env` needs `COMPOSE_PROJECT_NAME` plus free `KIP_POSTGRES_PORT`
+  and `KIP_API_PORT`, with the matching port in `KIP_DATABASE_URL`; the model
+  runtime stays one per machine. For a deployment that moved, run
+  `KIP_COMPOSE_ADOPT=1 ./scripts/app-up.sh --down` once. Project and volume
+  names are unchanged, so existing data stays attached. The guard cannot see
+  volumes left behind after `docker compose down`.
+
 ## 3.15.1 - 2026-09-13
 
 - KIP now works from outside its own folder. Registering the MCP server

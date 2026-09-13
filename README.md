@@ -18,6 +18,14 @@ curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh | 
 cd ~/kip && ./scripts/app-up.sh --database-only   # 번들 PostgreSQL 준비
 ```
 
+Claude Code나 Codex에 아래 문장을 전달하면 설치, 셋업, 에이전트 연결까지
+진행합니다. 색인할 폴더, Docker 설치, plan 승인, client 설정 변경은 에이전트가
+먼저 묻습니다.
+
+> https://github.com/64etuor/kip README의 설치 명령으로 KIP를 설치하고,
+> `skills/kip-setup/SKILL.md` 절차대로 셋업한 뒤 그 skill의 "Connect agents"
+> 단계로 이 에이전트에 MCP와 skill을 연결해줘.
+
 ## 첫 질의
 
 그다음은 두 명령입니다. 패키지에 포함된 `sample-data/`를 색인하고 검색합니다.

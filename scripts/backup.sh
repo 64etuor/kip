@@ -58,6 +58,11 @@ if [[ -e "$FINAL" || -e "$PARTIAL" ]]; then
   printf '%s\n' "backup output already exists" >&2
   exit 2
 fi
+# Without host clients the dump runs inside the Compose `postgres`: refuse
+# another deployment's before a partial folder is left behind.
+if ! command -v "${PSQL:-psql}" >/dev/null 2>&1 || ! command -v "${PG_DUMP:-pg_dump}" >/dev/null 2>&1; then
+  kip_compose_project_guard compose.yaml || exit $?
+fi
 mkdir -m 700 "$PARTIAL"
 COMPLETE=0
 mark_failed() {

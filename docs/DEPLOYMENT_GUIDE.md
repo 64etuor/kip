@@ -130,6 +130,15 @@ rollback을 다룬다.
    모든 row level security 정책을 우회하므로 migration 전용이다. host CLI와
    MCP, 그리고 `migrate`는 여전히 `KIP_DATABASE_URL`의 owner로 동작한다
    (docs/SECURITY.md "Database roles").
+   같은 machine에 KIP 배포가 이미 있으면(저장소 checkout과 한 줄 설치기 배포 등)
+   이 단계 전에 새(두 번째) 배포의 `.env`에 `COMPOSE_PROJECT_NAME=<고유 이름>`을 넣는다.
+   모든 배포의 Compose project 이름이 `kip`이라, 넣지 않으면 두 배포가 container와
+   DB volume을 공유한다. 두 배포를 함께 띄우려면 새 배포의 `.env`에 비어 있는
+   `KIP_POSTGRES_PORT`와 `KIP_API_PORT`도 넣고 `KIP_DATABASE_URL`의 port를
+   `KIP_POSTGRES_PORT`에 맞춘다. model runtime은 machine당 하나이므로
+   `KIP_SEMANTIC_PORT`는 그대로 두어 이미 떠 있는 runtime을 함께 쓴다. `app-up.sh`는 다른 디렉터리에서 만든 같은 project의
+   container를 발견하면 그 경로와 해결책을 출력하고 exit 2로 멈춘다
+   (docs/OPERATIONS.md "자주 하는 작업").
 8. receipt의 `next_steps`에 나온 승인된 source 이름으로 먼저
    `sync run --source SOURCE --dry-run`을 실행해 범위와 건수를 확인한다.
    사용자 폴더만 설정했다면 `sample` source가 있다고 가정하지 않는다.

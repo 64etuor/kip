@@ -51,6 +51,22 @@ downloads; a local generation choice still needs a separately verified service.
 `sync_schedule` is declarative metadata; a scheduler must be installed separately.
 A missing evaluation dataset means installation-ready, not production-ready.
 
+## Connect agents
+
+Setup does not connect the agent the user works in. After the smoke search,
+offer these steps and run them only with consent, because they write the
+user's client configuration:
+
+1. Register MCP by the launcher's absolute path (a running client does not see
+   the PATH the installer added): `claude mcp add --scope user kip -- KIP mcp`
+   or `codex mcp add kip -- KIP mcp`, where `KIP` is the launcher path the
+   installer printed (default `~/.local/bin/kip`, expanded). Without a launcher
+   use `DEPLOYMENT/scripts/kip mcp`.
+2. Install skills: `DEPLOYMENT/scripts/install-agent-files.sh personal --client all`,
+   or `project DIR` for one project.
+3. Tell the user to restart the client; `claude mcp get kip` or
+   `codex mcp get kip` shows the stored entry.
+
 ## Never bypass the state machine
 
 Never edit TOML, Compose, `.mcp.json`, setup state, or plans to bypass the state

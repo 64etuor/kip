@@ -386,11 +386,20 @@ fi
 for arg in ${bootstrap_args[@]+"${bootstrap_args[@]}"}; do [[ "$arg" == "--check" ]] && exit 0; done
 # Full manifest verification needs the project environment; run it once it exists.
 ./scripts/verify-package.sh "$work/$archive_name" >/dev/null
+# An already running agent client does not see the PATH the profile block
+# adds, so the connection commands name the launcher by its absolute path.
+# Quoted so a path with spaces survives being pasted into a shell.
+if launcher_opens_target; then kip_command="$(shell_quote "$bin_dir/kip")"; else kip_command="$(shell_quote "$target/scripts/kip")"; fi
+quoted_agent_files="$(shell_quote "$target/scripts/install-agent-files.sh")"
 cat <<NEXT
 KIP $version is ready in $target.
 $launcher_hint
 Next:
   kip setup inspect                    # guided deployment (ask your agent: "KIP을 셋업해줘")
   $target/scripts/app-up.sh --database-only   # or: local sample with the bundled database
+Connect an agent from any directory (writes that client's user configuration):
+  claude mcp add --scope user kip -- $kip_command mcp
+  codex mcp add kip -- $kip_command mcp
+  $quoted_agent_files personal --client all
 Update later with: kip update   (or rerun this installer on the same directory)
 NEXT

@@ -66,6 +66,21 @@ required "configuration ($KIP_CONFIG)" \
   test -f "$KIP_CONFIG"
 optional "Docker" docker version
 if command -v docker >/dev/null 2>&1; then
+  # Not `required`: an unreachable Docker is "not checked", not a failure; the
+  # container checks below already report it.
+  compose_label="Compose project not shared with another deployment"
+  compose_status=0
+  compose_detail="$(kip_compose_project_check 2>&1)" || compose_status=$?
+  case "$compose_status" in
+    0) printf '[ok] %s\n' "$compose_label" ;;
+    3) printf '[not checked] %s (Docker could not be queried)\n' "$compose_label" ;;
+    *)
+      printf '[required missing] %s\n' "$compose_label"
+      printf '  detail: %s\n' "$(printf '%s\n' "$compose_detail" | head -n 1)"
+      printf '  fix: %s\n' "a separate deployment: set COMPOSE_PROJECT_NAME=<unique-name>, free KIP_POSTGRES_PORT and KIP_API_PORT, and the matching port in KIP_DATABASE_URL in the new deployment's .env; the same deployment moved: run KIP_COMPOSE_ADOPT=1 ./scripts/app-up.sh --down once, then start again (docs/OPERATIONS.md)"
+      fail=1
+      ;;
+  esac
   optional "PostgreSQL container" docker compose exec -T postgres pg_isready -U "${POSTGRES_USER:-kip_owner}" -d "${POSTGRES_DB:-kip}"
 fi
 required "Node 20.9+ for Kordoc OCR" \

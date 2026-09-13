@@ -10,6 +10,8 @@ postgres_dump() {
     return
   fi
   if command -v docker >/dev/null 2>&1; then
+    # The Compose fallback must not open another deployment's PostgreSQL.
+    kip_compose_project_guard || return $?
     docker compose exec -T -e "PGOPTIONS=${PGOPTIONS:-}" postgres \
       pg_dump --format=custom "$@" "$database_url" > "$output"
     return
@@ -35,6 +37,7 @@ postgres_query_file() {
     return
   fi
   if command -v docker >/dev/null 2>&1; then
+    kip_compose_project_guard || return $?
     docker compose exec -T -e "PGOPTIONS=${PGOPTIONS:-}" postgres psql \
       "$database_url" \
       --no-psqlrc \
@@ -64,6 +67,7 @@ postgres_query() {
     return
   fi
   if command -v docker >/dev/null 2>&1; then
+    kip_compose_project_guard || return $?
     docker compose exec -T -e "PGOPTIONS=${PGOPTIONS:-}" postgres psql \
       "$database_url" \
       --no-psqlrc \
@@ -87,6 +91,7 @@ postgres_restore() {
     return
   fi
   if command -v docker >/dev/null 2>&1; then
+    kip_compose_project_guard || return $?
     docker compose exec -T -e "PGOPTIONS=${PGOPTIONS:-}" postgres \
       pg_restore "$@" --dbname "$database_url" < "$dump"
     return

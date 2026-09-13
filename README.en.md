@@ -16,6 +16,14 @@ kip sync run --source sample
 kip search "참여율 변경 승인" --limit 1
 ```
 
+To let Claude Code or Codex do it, give it this request. The agent asks before
+choosing folders to index, installing Docker, approving the plan or changing
+the client's configuration.
+
+> Install KIP with the installer command in the https://github.com/64etuor/kip
+> README, set it up following `skills/kip-setup/SKILL.md`, then connect this
+> agent with that skill's "Connect agents" steps.
+
 A real response from that run against the bundled `sample-data/`, abridged to
 the fields below with ids and hashes shortened. [`README.md`](README.md) shows
 the full envelope.

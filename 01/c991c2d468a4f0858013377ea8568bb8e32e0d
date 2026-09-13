@@ -1,0 +1,266 @@
+contracts/openapi.yaml
+  s_16a999dee6ecf2::t_b89948cc4da2eb 6
+src/kip/__init__.py
+  s_16a999dee6ecf2::t_b89948cc4da2eb 3
+docs/DEPLOYMENT_GUIDE.md
+  s_16a999dee6ecf2::t_5fe8fa24b989c7 188-196,569-578
+  s_16a999dee6ecf2::t_37b68b661e4954 579
+tests/e2e/production_identity.py
+  s_16a999dee6ecf2::t_6565830fafc262 1-13,18-19,22-44,47-49,51-73,75-100,143-150,154,156-159
+  s_16a999dee6ecf2::t_070e596000e18b 14-17,20-21,45-46,50,74,101-142,151-153,155
+scripts/e2e-semantic.sh
+  s_16a999dee6ecf2::t_c564788ef1a812 85
+  s_16a999dee6ecf2::t_b5df00311f34eb 201-203
+  s_16a999dee6ecf2::t_42d8ff0b9874b7 1-4,6-12,15-23,30-52,54-66,71-84,86-119,128-200,204-234
+  s_16a999dee6ecf2::t_18009770cc1d9b 5,13-14,24-29,53
+  s_16a999dee6ecf2::t_3b03ceaa5c78b6 120-127
+  s_d39760598992a3::t_0fc5298d29ddc6 67-70
+.github/workflows/ci.yml
+  s_16a999dee6ecf2::t_ea6efa4db08235 246-253,264-269,273-305,310-331,344-346,349-350,354,357-391,397,406-431,435-472,476-483
+  s_16a999dee6ecf2::t_7f4f984840dcdd 398-405
+  s_16a999dee6ecf2::t_06b99d414320e9 392-394
+  s_16a999dee6ecf2::t_4114fffa62f3a9 352-353
+  s_16a999dee6ecf2::t_c0b1bf3d68dcea 270-272,306-309,347-348,395-396,432-434
+  s_16a999dee6ecf2::t_6fa94f53e831c1 332-343
+  s_16a999dee6ecf2::t_577f13c2cae269 351,355-356
+  s_16a999dee6ecf2::t_723a4ec28d1268 512-514,523-530,633-643,669
+  s_16a999dee6ecf2::t_e35b548f8de1f7 53
+  s_16a999dee6ecf2::t_90a90be788c348 20-25
+  s_16a999dee6ecf2::t_d071e5e0653b4a 254-263
+.github/ISSUE_TEMPLATE/bug_report.yml
+  s_16a999dee6ecf2::t_a2476c4d8b3615 1-25,27-98
+  s_16a999dee6ecf2::t_d4ef3a007393cd 26
+docs/AGENT_QUALITY.md
+  s_16a999dee6ecf2::t_59f6f16e3d074b 98-100
+  s_16a999dee6ecf2::t_76a803a75e29ae 33,41-42,44-70,72-97,101-104,106-117
+  s_16a999dee6ecf2::t_cf0cfb420f1d5f 3-32,34-40,43,71,105,118
+tests/test_settings_secrets.py
+  s_16a999dee6ecf2::t_b5c6ad08017dc5 13-17
+CHANGELOG.md
+  s_16a999dee6ecf2::t_e02c5c7c210332 10-11,13-16,33-35,39-42,46-56,69-72,75-76
+  s_16a999dee6ecf2::t_20ef63ee830bf4 106-116
+  s_16a999dee6ecf2::t_3411a2b84f50dc 77-84,93-95
+  s_16a999dee6ecf2::t_b89948cc4da2eb 3
+  s_16a999dee6ecf2::t_412b7f1b220199 8-9
+  s_16a999dee6ecf2::t_9cb8706ac9dbbe 73-74
+  s_16a999dee6ecf2::t_ac4d0b9006154a 117-133,137
+  s_16a999dee6ecf2::t_a67b95f1fa89d2 12
+  s_16a999dee6ecf2::t_1d6b37687058f0 138-150
+  s_16a999dee6ecf2::t_e8b1b3ce343bf1 4-7,17-32,36-38,43-45,57-68,96-105
+  s_16a999dee6ecf2::t_483f21e750da93 85-92
+  s_16a999dee6ecf2::t_eb749b2bca6cd9 134-136
+.github/ISSUE_TEMPLATE/retrieval_quality.yml
+  s_16a999dee6ecf2::t_d4ef3a007393cd 28
+  s_16a999dee6ecf2::t_feac0a96ba3d79 1-27,29-127
+tests/e2e/wrong_model_runtime.py
+  s_16a999dee6ecf2::t_2c61fccbb35feb 1-30,32-41,44-48,50-116
+  s_16a999dee6ecf2::t_4d2248ed0bdfa3 31,42-43,49
+scripts/e2e-upgrade.sh
+  s_16a999dee6ecf2::t_91056cd2461762 198-206
+  s_16a999dee6ecf2::t_5ea1bf288f45c2 66
+  s_16a999dee6ecf2::t_6a25f9ec9d9f88 1-20,25-39,41-53,58-65,67-76,79-94,96-97,123-125,127-134,138-140,143-150,153-165,171-176,178-187,189-197,207-211,223-233,239-266,269-276,278-301
+  s_16a999dee6ecf2::t_df855ee22c05e6 98-122,126,135-137,141-142
+  s_16a999dee6ecf2::t_a16e65ba806690 151-152
+  s_16a999dee6ecf2::t_40ed4d85e01e67 77-78,95
+  s_16a999dee6ecf2::t_a70d43675e93c5 212-222
+  s_16a999dee6ecf2::t_18009770cc1d9b 21-24,40
+  s_16a999dee6ecf2::t_26c5aa279e7710 188
+  s_16a999dee6ecf2::t_160fd66a457f82 234-238,277
+  s_16a999dee6ecf2::t_11adb067ffa33c 267-268
+  s_16a999dee6ecf2::t_a757999f1706cb 166-170,177
+  s_16a999dee6ecf2::t_1bdb74322c1dae 54-57
+tests/integration/test_backup_role_dump.py
+  s_16a999dee6ecf2::t_9a12b8517337a1 32
+  s_16a999dee6ecf2::t_fc00788ecb0ec4 34-35
+tests/e2e/test_changelog_section.py
+  s_16a999dee6ecf2::t_5d14e45249dd68 1-36,45-46,50-100
+  s_16a999dee6ecf2::t_fc6fde6e9e9b1c 37-44,47-49
+tests/contract/test_repository_behavior_parity.py
+  s_16a999dee6ecf2::t_fc00788ecb0ec4 39,204
+  s_16a999dee6ecf2::t_9a12b8517337a1 37-38
+tests/test_filesystem_access_policy.py
+  s_16a999dee6ecf2::t_b5c6ad08017dc5 32-35
+tests/test_cli_surface.py
+  s_16a999dee6ecf2::t_b5c6ad08017dc5 434-436
+.github/ISSUE_TEMPLATE/config.yml
+  s_16a999dee6ecf2::t_756e29c70b004c 1-13
+scripts/e2e-db-roles.sh
+  s_16a999dee6ecf2::t_c6b1bc000d1d99 100,104,114
+  s_16a999dee6ecf2::t_9cb8706ac9dbbe 305,307,414-423
+  s_16a999dee6ecf2::t_5d325e46ca6043 97-99,101-103,106
+  s_16a999dee6ecf2::t_d43a75d7af5428 191-195
+  s_16a999dee6ecf2::t_6aa025b57d9851 2-3,5,14-18,23,26-27,32-38,41-44,47-48,53
+  s_16a999dee6ecf2::t_c86e6167b35758 1,4,6,10-13,19-22,24,45-46,49-52,54-69,71-73,75-77,80-87,92-96,105,107-113,115-121,123-128,131-135,176-177,180-181,184-186,190,196-197,199,203-216,223-225,227-229,231-233,235,238,258,300-302,308-312,314-331,333-339,351-374,389-390,397-401,427-428,430-447,466,468,470-477
+  s_16a999dee6ecf2::t_a3dd2f5d54dc2f 147-149,151-153,168-169,178,313,332
+  s_16a999dee6ecf2::t_3634cb097ebb86 393-396
+  s_16a999dee6ecf2::t_160fd66a457f82 429
+  s_16a999dee6ecf2::t_7b0f48bd85b697 448-465
+  s_16a999dee6ecf2::t_b3881c31f0d288 387,478-505,507-508,510-511,515,517-524
+  s_16a999dee6ecf2::t_855a83424540cc 187-189
+  s_16a999dee6ecf2::t_54625ddacba078 402-413,424-426
+  s_16a999dee6ecf2::t_dd6f6ea78db567 74
+  s_16a999dee6ecf2::t_97d07bbf363336 70,78-79
+  s_16a999dee6ecf2::t_073ee686d8b5bd 28-31
+  s_16a999dee6ecf2::t_843df4ed51779c 252-253,255-256,260-298
+  s_16a999dee6ecf2::t_9e68312038eaf5 122
+  s_16a999dee6ecf2::t_eedcdd54f38a77 506,509,512-514,516
+  s_16a999dee6ecf2::t_18009770cc1d9b 7-9,39-40
+  s_16a999dee6ecf2::t_b12d7ffdfd7dd0 25
+  s_16a999dee6ecf2::t_94084c0dc5f586 88-91,129-130,136-146,150,154-167,170-175,179,182-183,198,200-202,217-222,226,230,234,236-237,239-251,254,257,259,299,303-304,306,340-350,375-386,388,391-392,467,469
+tests/integration/test_filename_answer_scope.py
+  s_16a999dee6ecf2::t_9a12b8517337a1 12
+  s_16a999dee6ecf2::t_fc00788ecb0ec4 14-15
+tests/integration/test_postgres_semantic_projection.py
+  s_16a999dee6ecf2::t_9a12b8517337a1 23
+  s_16a999dee6ecf2::t_fc00788ecb0ec4 25-26
+tests/integration/test_rls_force.py
+  s_16a999dee6ecf2::t_9a12b8517337a1 23
+  s_16a999dee6ecf2::t_fc00788ecb0ec4 25-26
+tests/integration/test_golden_gate_applicability.py
+  s_16a999dee6ecf2::t_9a12b8517337a1 11-12
+  s_16a999dee6ecf2::t_fc00788ecb0ec4 13,15
+compose.yaml
+  s_16a999dee6ecf2::t_cb59119d60bd85 98-105
+.github/PULL_REQUEST_TEMPLATE.md
+  s_16a999dee6ecf2::t_1d1a06dc1e17a1 1-31
+pyproject.toml
+  s_16a999dee6ecf2::t_b89948cc4da2eb 7
+contracts/openapi.json
+  s_16a999dee6ecf2::t_b89948cc4da2eb 1065
+README.md
+  s_16a999dee6ecf2::t_d20e0413f35a8a 506-509
+  s_16a999dee6ecf2::t_fbaa4346ee0a2b 3-7
+.github/SECURITY.md
+  s_16a999dee6ecf2::t_0150faa2367192 1-126
+scripts/e2e-install.sh
+  s_16a999dee6ecf2::t_f7980be6517269 1-14,19-37,39-50,55-62,64-70,73-91,95-101,103-121,124-127,131-134,136-139,141-144,146-172,174-177,179-183,185-189,191-192,194-197,199-208,210-212,214-216,218-220
+  s_16a999dee6ecf2::t_18009770cc1d9b 15-18,38
+  s_16a999dee6ecf2::t_a16e65ba806690 71-72
+  s_16a999dee6ecf2::t_89b57cf9ec612f 92-94,102
+  s_16a999dee6ecf2::t_67e615a7677ea5 63
+  s_16a999dee6ecf2::t_7076c889861b14 122-123
+  s_16a999dee6ecf2::t_e1ae5f0530d73a 135,140,145,173,178,184,190,193,198,209,213,217
+  s_16a999dee6ecf2::t_3634cb097ebb86 128-130
+  s_d39760598992a3::t_1c0bc555c8d62c 51-54
+.github/workflows/semantic-runtime.yml
+  s_16a999dee6ecf2::t_60f699f36fe7de 1-16,21-79
+  s_16a999dee6ecf2::t_ac6e3473735e27 17-20
+tests/e2e/kip_envelope.py
+  s_16a999dee6ecf2::t_27d9136a4f39a4 1-246,248-250,252-254,257,276,286-322,328-329,337-353
+  s_16a999dee6ecf2::t_451cf2ee877ec7 247,251,255-256,258-275,277-285,323-327,330-336
+tests/test_environment_parity.py
+  s_16a999dee6ecf2::t_16d1178419d422 21,25,28,30,45,62,150-265,267-270,272,274-300
+  s_16a999dee6ecf2::t_bf23ec6acc6eaf 266,271,273
+  s_16a999dee6ecf2::t_4ebe3ad44cdc56 14,33-42
+  s_16a999dee6ecf2::t_257597bcfa6c9b 1-13,15-20,22-24,26-27,29,31-32,43-44,46-61,63-149
+VERSION
+  s_16a999dee6ecf2::t_b89948cc4da2eb 1
+tests/integration/test_application_role_rls.py
+  s_16a999dee6ecf2::t_9a12b8517337a1 25
+  s_16a999dee6ecf2::t_fc00788ecb0ec4 27-28
+tests/integration/test_postgres_repository.py
+  s_16a999dee6ecf2::t_fc00788ecb0ec4 52-53
+  s_16a999dee6ecf2::t_9a12b8517337a1 50
+.github/CODE_OF_CONDUCT.md
+  s_16a999dee6ecf2::t_a0cc0547d7e650 65-72
+  s_16a999dee6ecf2::t_50d71a2ab3d6ed 73
+  s_16a999dee6ecf2::t_23ea9e9c745159 1-64,74-144
+docs/OPERATIONS.md
+  s_16a999dee6ecf2::t_7632043ca7d554 438-448,460,462,477-503,531-546,549,556,571-577
+  s_16a999dee6ecf2::t_c002b4005f6aa3 547-548,550-555,557-570
+  s_16a999dee6ecf2::t_a67b95f1fa89d2 449
+  s_16a999dee6ecf2::t_5b74313f7a3d80 450-459
+  s_16a999dee6ecf2::t_938ea506d122d8 504-530
+  s_16a999dee6ecf2::t_b12d7ffdfd7dd0 466
+  s_16a999dee6ecf2::t_fce4cfa43ff9a7 461,463-464,467-476
+  s_16a999dee6ecf2::t_eb0343879acbf9 465
+tests/test_agent_runtime_scripts.py
+  s_16a999dee6ecf2::t_f71846a9ea7e07 71,73-75,95-101,104-108,110-119,122,126-133
+.editorconfig
+  s_16a999dee6ecf2::t_4354c99879fd68 1-21
+tests/conftest.py
+  s_16a999dee6ecf2::t_5793bd30ebdc57 69,88-89
+  s_16a999dee6ecf2::t_f6e33088e58902 138,141-144,146-149
+  s_16a999dee6ecf2::t_c774f11dc67725 1-11,14-15,20-21,24-68,70-87,90-137,140,145
+  s_16a999dee6ecf2::t_368ae0bd52d2e2 22-23
+  s_16a999dee6ecf2::t_395a7a010aa63e 139
+scripts/e2e-common.sh
+  s_16a999dee6ecf2::t_a67b95f1fa89d2 36-37,42
+  s_16a999dee6ecf2::t_1d886833cb1906 177-181,184,187-189,203,205,278-291,293-294,299-304,307,322,326,331-334
+  s_16a999dee6ecf2::t_5058d735abaa56 190-193,195-197
+  s_16a999dee6ecf2::t_327aeba46222b2 201,212
+  s_16a999dee6ecf2::t_a70d43675e93c5 15-20
+  s_16a999dee6ecf2::t_9cb8706ac9dbbe 52-68,70-77,80,82
+  s_16a999dee6ecf2::t_8a2ab0f73b5f32 1-14,21-23,38-39,134-135,148-176,182-183,185-186,194,198-200,202,204,206-211,213-220,266-270,273-277,335-336,384-388,390-399,402-440
+  s_16a999dee6ecf2::t_02dfb4c7892b5c 25-35,40-41,43-51,78-79,81,83-133
+  s_16a999dee6ecf2::t_6733c63142a388 144
+  s_16a999dee6ecf2::t_160fd66a457f82 136-143,145-147
+  s_16a999dee6ecf2::t_e7ede0752ad895 24,323-325,328-330
+  s_16a999dee6ecf2::t_3634cb097ebb86 357-383
+  s_16a999dee6ecf2::t_5c3bb936de3230 389
+  s_16a999dee6ecf2::t_adc81ba3f63992 400-401
+  s_16a999dee6ecf2::t_39c689f047b434 221-265
+  s_16a999dee6ecf2::t_00765270615834 441-444
+  s_16a999dee6ecf2::t_191fe5c123166e 271
+  s_16a999dee6ecf2::t_a16e65ba806690 337-356
+  s_16a999dee6ecf2::t_9e68312038eaf5 272
+  s_d39760598992a3::t_ebcaf9c696d120 69,292,295-298,305-306,308-321,327
+.github/ISSUE_TEMPLATE/change_proposal.yml
+  s_16a999dee6ecf2::t_98aab3c6c4f75e 1-81
+tests/integration/test_postgres_discovery_snippets.py
+  s_16a999dee6ecf2::t_9a12b8517337a1 14
+  s_16a999dee6ecf2::t_fc00788ecb0ec4 16-17
+scripts/changelog-section.sh
+  s_16a999dee6ecf2::t_6989473b27592e 1-77
+tests/environment.py
+  s_16a999dee6ecf2::t_556406a1744f83 371
+  s_16a999dee6ecf2::t_76ec22d1180c2e 1-15,20-25,27-28,30-66,70-84,96-98,100-106,111-114,262-274,276-354,358-370,372-390,392-406
+  s_16a999dee6ecf2::t_0a29e77916f494 355-357
+  s_16a999dee6ecf2::t_78316a5c55e6d4 67-69
+  s_16a999dee6ecf2::t_2140657c0eeb7e 391
+  s_16a999dee6ecf2::t_86893b862007b0 16-19
+  s_16a999dee6ecf2::t_d5ba19ee8670dc 29,224,237-244
+  s_16a999dee6ecf2::t_7be0835cd376f7 115-150,152-204,206-215,217-223,225-226,228-236,245-260
+  s_16a999dee6ecf2::t_02205d0c2bb612 26
+  s_16a999dee6ecf2::t_b0249b66615124 227
+  s_16a999dee6ecf2::t_4c382a287470ce 261
+  s_16a999dee6ecf2::t_5a9d6a726586a1 107-110
+  s_16a999dee6ecf2::t_34034f101cb364 85-95,99,151,205,216,275
+tests/test_answer_source_scope.py
+  s_16a999dee6ecf2::t_b5c6ad08017dc5 64,67
+README.en.md
+  s_16a999dee6ecf2::t_fbaa4346ee0a2b 3-7
+  s_16a999dee6ecf2::t_d20e0413f35a8a 65-66
+compose.production.yaml
+  s_16a999dee6ecf2::t_bc70089ee13326 146-155,288-297
+scripts/verify.sh
+  s_d39760598992a3::t_f2a15ff1d83cc3 27-43
+uv.lock
+  s_16a999dee6ecf2::t_d8ca15499f9f6d 767
+CONTRIBUTING.md
+  s_16a999dee6ecf2::t_f61e79925d5bc8 70-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "01c991c2d468a4f0858013377ea8568bb8e32e0d",
+  "prompts": {},
+  "sessions": {
+    "s_16a999dee6ecf2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b9abc8ac-2c56-4e22-a7c7-3deb16f779f3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    },
+    "s_d39760598992a3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a09553-7f8e-79b0-b6f5-f2445e682bac",
+        "model": "gpt-5.6-terra"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

@@ -1,0 +1,33 @@
+contracts/openapi.json
+  s_16a999dee6ecf2::t_f650c23a249e6b 1065
+CHANGELOG.md
+  s_16a999dee6ecf2::t_f650c23a249e6b 3-11
+VERSION
+  s_16a999dee6ecf2::t_f650c23a249e6b 1
+pyproject.toml
+  s_16a999dee6ecf2::t_f650c23a249e6b 7
+tests/test_cli_surface.py
+  s_16a999dee6ecf2::t_9730aa8ccde555 471-478,480-481
+contracts/openapi.yaml
+  s_16a999dee6ecf2::t_f650c23a249e6b 6
+src/kip/__init__.py
+  s_16a999dee6ecf2::t_f650c23a249e6b 3
+uv.lock
+  s_16a999dee6ecf2::t_f4e5f1b4524d07 767
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "185cc2d5a16d1519ca5d2775a5d3acbd34d22ff2",
+  "prompts": {},
+  "sessions": {
+    "s_16a999dee6ecf2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b9abc8ac-2c56-4e22-a7c7-3deb16f779f3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

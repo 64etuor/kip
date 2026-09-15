@@ -224,10 +224,21 @@ e2e_start_postgres() {
     ${mounts[@]+"${mounts[@]}"} \
     "$image" >/dev/null
   E2E_POSTGRES_PORT="$port"
+  # Probe over TCP and require three consecutive answers. The image's first
+  # start runs initdb against a temporary server that listens only on the Unix
+  # socket and then restarts; a socket probe could pass in that window, and
+  # the host's first connection then failed with "server closed the
+  # connection unexpectedly" (3.15.4 tag CI).
   attempt=0
-  until docker exec "$name" pg_isready -U kip_owner -d kip >/dev/null 2>&1; do
+  local ready=0
+  until (( ready >= 3 )); do
+    if docker exec "$name" pg_isready -h 127.0.0.1 -p 5432 -U kip_owner -d kip >/dev/null 2>&1; then
+      ready=$((ready + 1))
+    else
+      ready=0
+    fi
     attempt=$((attempt + 1))
-    (( attempt < 60 )) || e2e_fail "throwaway PostgreSQL $name never became ready"
+    (( attempt < 90 )) || e2e_fail "throwaway PostgreSQL $name never became ready"
     sleep 1
   done
   E2E_DATABASE_URL="postgresql://kip_owner:test-password@127.0.0.1:$port/kip"

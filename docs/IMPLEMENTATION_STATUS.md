@@ -481,7 +481,7 @@ without starting Docker, and no API/worker image is built. Full `app-up.sh` and
 `next_steps` and `limitations`.
 
 The Kordoc npm graph is locked in `requirements/kordoc/` (kordoc 4.13.1 exact
-since 3.11.0, `adm-zip` 0.6.0, `sharp` 0.35.4). The host installer (root
+since 3.11.0, `adm-zip` 0.6.1 since 3.15.4, `sharp` 0.35.4). The host installer (root
 `var/kordoc-4.13.1-r2`) and the Dockerfile stage install it with `npm ci
 --omit=dev --ignore-scripts --no-audit`, and `./scripts/audit-kordoc.sh`
 rejects lock/manifest drift before running `npm audit --package-lock-only
@@ -490,10 +490,10 @@ runs in the installer, the image build, CI, `make audit`, and
 `./scripts/verify.sh`. Node 20.9+ is required. sharp GHSA-rgj7-g3m4-5g8c is
 fixed by 0.35.4.
 
-Remaining limits: the moderate adm-zip advisory GHSA-vwc7-r8mq-g2x9 has no
-patched release and stays in the graph — `--ignore-scripts` only stops the
-supported CPU installation path from executing the ONNX install-time
-extraction hook. Semantic retrieval is unchanged and still opt-in; the Korean
+The moderate adm-zip advisory GHSA-vwc7-r8mq-g2x9 (0.5.9-0.6.0) is closed by the
+0.6.1 override in 3.15.4, and the audit reports no findings; `--ignore-scripts`
+had already kept the ONNX install-time extraction hook that used it from
+running. Remaining limits: semantic retrieval is unchanged and still opt-in; the Korean
 and filename changes are lexical and do not prove general recall. No new
 answer-quality evaluation of external generation models has been run, so the
 adherence gaps recorded in the audit below are not re-measured.

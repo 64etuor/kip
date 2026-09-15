@@ -30,7 +30,8 @@ cp "$manifest_dir/package.json" "$manifest_dir/package-lock.json" "$install_root
 (
   cd "$install_root"
   # CPU binaries are bundled. Do not run ONNX's additional-binary extraction
-  # hook (adm-zip has an unresolved destination-symlink advisory).
+  # hook: install scripts stay off even though the adm-zip 0.6.1 override
+  # closes its destination-symlink advisory.
   npm ci --omit=dev --ignore-scripts --no-audit
 )
 

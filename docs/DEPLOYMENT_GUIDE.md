@@ -131,12 +131,19 @@ rollback을 다룬다.
    MCP, 그리고 `migrate`는 여전히 `KIP_DATABASE_URL`의 owner로 동작한다
    (docs/SECURITY.md "Database roles").
    같은 machine에 KIP 배포가 이미 있으면(저장소 checkout과 한 줄 설치기 배포 등)
-   이 단계 전에 새(두 번째) 배포의 `.env`에 `COMPOSE_PROJECT_NAME=<고유 이름>`을 넣는다.
-   모든 배포의 Compose project 이름이 `kip`이라, 넣지 않으면 두 배포가 container와
-   DB volume을 공유한다. 두 배포를 함께 띄우려면 새 배포의 `.env`에 비어 있는
-   `KIP_POSTGRES_PORT`와 `KIP_API_PORT`도 넣고 `KIP_DATABASE_URL`의 port를
-   `KIP_POSTGRES_PORT`에 맞춘다. model runtime은 machine당 하나이므로
-   `KIP_SEMANTIC_PORT`는 그대로 두어 이미 떠 있는 runtime을 함께 쓴다. `app-up.sh`는 다른 디렉터리에서 만든 같은 project의
+   새(두 번째) 배포에는 고유한 `COMPOSE_PROJECT_NAME`과 비어 있는 `KIP_POSTGRES_PORT`,
+   `KIP_API_PORT`가 필요하다. 모든 배포의 Compose project 이름이 `kip`이라, 없으면 두
+   배포가 container와 DB volume을 공유한다. `./scripts/bootstrap.sh`는 `.env`를 새로 만들
+   때 export된 값을 그대로 쓴다(이미 사용 중인 port도 유지). `COMPOSE_PROJECT_NAME`이
+   export되지 않았으면 매번 다른 디렉터리의 `kip` container, container 없이 남은 `kip`
+   volume, 사용 중인 PostgreSQL/API port를 검사하고, 하나라도 있으면 `kip-<디렉터리>`와
+   55432·18080 이상의 빈 port를 골라 `KIP_DATABASE_URL`·`KIP_BACKUP_DATABASE_URL` port까지
+   맞추고 출력한다. 운영자는 출력된 값만 확인한다. 이 디렉터리의 container가 있는데
+   `.env`만 없으면 bootstrap은 아무것도 쓰지 않고 exit 75로 멈추므로, 백업한 `.env`를
+   복원한다. 기존 `.env`는 바꾸지 않으므로 그때는 이 값을 직접 넣는다. model
+   runtime은 machine당 하나이므로 `KIP_SEMANTIC_PORT`는 그대로 두어 이미 떠 있는
+   runtime을 함께 쓴다. `setup verify`의 `runtime_readiness` 항목
+   `compose_project_isolation`이 남은 충돌을 app-up 전에 보고한다. `app-up.sh`는 다른 디렉터리에서 만든 같은 project의
    container를 발견하면 그 경로와 해결책을 출력하고 exit 2로 멈춘다
    (docs/OPERATIONS.md "자주 하는 작업").
 8. receipt의 `next_steps`에 나온 승인된 source 이름으로 먼저
@@ -300,10 +307,12 @@ AI는 정상 검색 중 sync, re-index, embedding rebuild 또는 graph rebuild�
 - Kordoc binary와 OCR model cache는 source ZIP에 넣지 않는다. Node.js 20.9+가
   필요하며, 인터넷 연결 bootstrap이 격리된 `var/kordoc-4.13.1-r2`에
   `requirements/kordoc`의 manifest/lock을 그대로 `npm ci --omit=dev
-  --ignore-scripts`로 설치한다(`adm-zip` 0.6.0, `sharp` 0.35.4). 설치·이미지
+  --ignore-scripts`로 설치한다(`adm-zip` 0.6.1, `sharp` 0.35.4). 설치·이미지
   빌드·CI·`verify.sh`가 `./scripts/audit-kordoc.sh`로 lock drift와 high 이상
-  advisory를 검사하므로 registry 접근이 필요하다. 남아 있는 moderate `adm-zip`
-  advisory는 [알려진 의존성 문제](SECURITY.md#dependency-safety)에서 확인한다.
+  advisory를 검사하므로 registry 접근이 필요하다. moderate `adm-zip` advisory
+  (GHSA-vwc7-r8mq-g2x9)는 `adm-zip`을 0.6.1로 올리는 override로 해소되어 `npm audit`
+  결과는 0건이다. `--ignore-scripts` 설치라 그 이전에도 해당 경로에 도달할 수 없었다
+  ([알려진 의존성 문제](SECURITY.md#dependency-safety)).
 - OCR 운영 전 low-text PDF, 깨진 Korean font map, screenshot형 PPTX,
   중복 이미지, 대형 이미지, 실패/timeout 표본을 shadow extraction으로
   검증하고 원본 hash와 locator fidelity를 확인한다.

@@ -187,6 +187,10 @@ KNOWN_ABSENT_AMBIENT_KEYS: Mapping[str, str] = MappingProxyType(
         "KIP_BACKUP_DATABASE_URL": _DEPLOYMENT_ONLY,
         "KIP_BACKUP_DB_PASSWORD": _DEPLOYMENT_ONLY,
         "KIP_BACKUP_PATH": _DEPLOYMENT_ONLY,
+        "KIP_COMPOSE_ADOPT": (
+            "an operator's one-time override of the Compose project guard in "
+            "scripts/common.sh; setup verify only names it in a fix message"
+        ),
         "KIP_CONTAINER_DATABASE_URL": _DEPLOYMENT_ONLY,
         "KIP_EMBEDDING_DIMENSIONS": _DEPLOYMENT_ONLY,
         "KIP_EMBEDDING_MODEL": _DEPLOYMENT_ONLY,

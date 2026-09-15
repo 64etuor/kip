@@ -766,9 +766,9 @@ pillow==12.3.0 \
     --hash=sha256:fe3cca2e4e8a592be0f269a1ca4835c25199d9f3ce815c8491048f785b0a0198 \
     --hash=sha256:ffd0c5368496f41b0944be820fcb7a838aa6e623d250b01acf2643939c3f99d7
     # via sentence-transformers
-posthog==7.51.0 \
-    --hash=sha256:1b063af326864abd037c632e175e657619f99f085aefbd58f1e92f369e144185 \
-    --hash=sha256:6ca2609341bab52990f97ce49ed820b8908b92da4411f657408ec39201bc56c9
+posthog==7.53.0 \
+    --hash=sha256:38223a8769b9db7ab906d32f5b87c4cde534cc91b30f1dcfa4443577819e068c \
+    --hash=sha256:ca9176334cf0c7799fe5518f7b9dc02d3f2f709a859da4332f14b3586b9d4554
     # via infinity-emb
 prometheus-client==0.26.0 \
     --hash=sha256:04a91bcf94e2cf74a44a1a874d651a2e853ed354b6e822f3b7487751465d5c2b \
@@ -1346,9 +1346,9 @@ torch==2.14.0 \
     # via
     #   infinity-emb
     #   sentence-transformers
-tqdm==4.70.0 \
-    --hash=sha256:55b0b0dbd97462d06ebee91e4dac24ed4d4702be82b24f07e6c1d27e08cea220 \
-    --hash=sha256:7f585706bfddbdebf89daac705b2dfcc16890130727d3197ca62c732b4310953
+tqdm==4.70.1 \
+    --hash=sha256:c293e525e6fef9c20e8728fd4612df02a0aa31bb5fe91ecd93e123b1b7bffa73 \
+    --hash=sha256:cefd0eca11b2a37a3aee776544d4f4ae913f02688135b5556b8788dfa474afc4
     # via
     #   huggingface-hub
     #   sentence-transformers

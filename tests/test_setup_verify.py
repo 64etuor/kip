@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
+import re
+import shutil
+import sys
 from pathlib import Path
 
 import pytest
@@ -21,6 +25,8 @@ from kip.setup.planner import build_setup_plan
 from kip.setup.service import SetupService
 from kip.setup.writer import apply_setup_plan
 from tests.setup_support import prepare_setup_project
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_verify_reports_runtime_readiness_without_failing_config_checks(
@@ -230,6 +236,175 @@ def test_egress_gate_matches_runtime_resolvable_secret_schemes() -> None:
     assert evaluate_egress(policy("env:KIP_OPENAI_API_KEY"), evidence).allowed
     assert evaluate_egress(policy("file:/run/secrets/model-key"), evidence).allowed
     assert not evaluate_egress(policy("keychain:kip/openai"), evidence).allowed
+
+
+def _applied_project(tmp_path: Path) -> tuple[Path, SetupService, object]:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    state = tmp_path / "state.json"
+    answers = _complete_answers(tmp_path)
+    state.write_text(answers.model_dump_json(), encoding="utf-8")
+    plan = build_setup_plan(answers, project_root=project_root)
+    apply_setup_plan(plan, project_root=project_root)
+    return project_root, SetupService(project_root=project_root, state_path=state), plan
+
+
+def _stub_docker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, ps_output: str, ps_exit: int = 0,
+    volumes_output: str = "", listening: set[int],
+) -> None:
+    binary = tmp_path / "bin"
+    binary.mkdir()
+    docker = binary / "docker"
+    docker.write_text(
+        f"#!{sys.executable}\nimport sys\n"
+        "if sys.argv[1:2] == ['ps']:\n"
+        f"    sys.stdout.write({ps_output!r})\n"
+        f"    raise SystemExit({ps_exit})\n"
+        "if sys.argv[1:3] == ['volume', 'ls']:\n"
+        f"    sys.stdout.write({volumes_output!r})\n"
+    )
+    docker.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{binary}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.setattr("kip.setup.service._port_listening", lambda port: port in listening)
+    for name in ("COMPOSE_PROJECT_NAME", "KIP_POSTGRES_PORT", "KIP_API_PORT"):
+        monkeypatch.delenv(name, raising=False)
+
+
+def _isolation(receipt: object) -> object:
+    [check] = [item for item in receipt.runtime_readiness if item.name == "compose_project_isolation"]
+    return check
+
+
+def test_verify_fails_readiness_when_another_deployment_owns_the_project_and_port(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given the running first deployment's containers under the default project.
+    project_root, service, plan = _applied_project(tmp_path)
+    other = tmp_path / "first-deployment"
+    other.mkdir()
+    _stub_docker(tmp_path, monkeypatch, listening={5432}, ps_output=(
+        f"kip\t{other}\t127.0.0.1:5432->5432/tcp\n"
+        f"kip\t{other}\t\n"
+        "\t\t0.0.0.0:7997->7997/tcp\n"
+    ), volumes_output="kip\tkip_kip_pgdata\n")
+
+    receipt = service.verify(plan)
+
+    check = _isolation(receipt)
+    assert check.ok is False
+    root = project_root.resolve()
+    assert check.detail == (
+        f'Docker Compose project "kip" already has containers from {other}; '
+        f'127.0.0.1:5432 (KIP_POSTGRES_PORT) is held by a container of Compose project "kip" at {other}. '
+        f"Before ./scripts/app-up.sh: set a unique COMPOSE_PROJECT_NAME in {root / '.env'} for a new, "
+        "empty database, or, if this is the same deployment moved from another directory, run "
+        "KIP_COMPOSE_ADOPT=1 ./scripts/app-up.sh --down once; set a free KIP_POSTGRES_PORT and the "
+        "same port in KIP_DATABASE_URL and KIP_BACKUP_DATABASE_URL. Leave KIP_SEMANTIC_PORT on the "
+        "running model runtime (docs/OPERATIONS.md)"
+    )
+    # Runtime readiness never decides the configuration verdict.
+    assert receipt.verified is True
+
+
+def test_verify_reads_env_like_common_sh_and_scopes_the_api_port_to_the_app_profile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given a .env with the `export`, quoting and inline comments common.sh accepts.
+    project_root, service, plan = _applied_project(tmp_path)
+    (project_root / "scripts").mkdir()
+    shutil.copy2(ROOT / "scripts/load_dotenv.py", project_root / "scripts/load_dotenv.py")
+    (project_root / ".env").write_text(
+        "# second deployment\n"
+        "export COMPOSE_PROJECT_NAME=kip-second # chosen by bootstrap\n"
+        "KIP_POSTGRES_PORT='55433'\n"
+        'KIP_API_PORT="18081"\n',
+        encoding="utf-8",
+    )
+    other = tmp_path / "first-deployment"
+    other.mkdir()
+    # The first deployment's project, volumes and ports are not this one's concern.
+    _stub_docker(tmp_path, monkeypatch, listening={5432, 8080, 18081}, ps_output=(
+        f"kip\t{other}\t127.0.0.1:5432->5432/tcp\n"
+    ), volumes_output="kip\tkip_kip_pgdata\n")
+
+    check = _isolation(service.verify(plan))
+
+    assert check.ok is False
+    assert check.detail == (
+        "127.0.0.1:18081 (KIP_API_PORT) is held by a process that is not this deployment's "
+        "container. Before ./scripts/app-up.sh: only the app profile publishes the API "
+        "(./scripts/app-up.sh without --database-only), so before starting it set a free "
+        "KIP_API_PORT. Leave KIP_SEMANTIC_PORT on the running model runtime (docs/OPERATIONS.md)"
+    )
+
+
+def test_verify_passes_readiness_for_this_deployments_own_containers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_root, service, plan = _applied_project(tmp_path)
+    alias = tmp_path / "alias"
+    alias.symlink_to(project_root, target_is_directory=True)
+    _stub_docker(tmp_path, monkeypatch, listening={5432}, ps_output=(
+        f"kip\t{alias}\t127.0.0.1:5432->5432/tcp\n"
+        "other\t/srv/other\t127.0.0.1:18080-18090->8080-8090/tcp\n"
+    ), volumes_output="kip\tkip_kip_pgdata\nkip\tkip_kip_cas\n")
+
+    check = _isolation(service.verify(plan))
+
+    assert check.ok is True
+    assert check.detail == 'Compose project "kip" and 127.0.0.1:5432/8080 belong to this deployment or are free'
+
+
+def test_verify_fails_readiness_for_project_volumes_it_cannot_attribute(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given a first deployment stopped with `app-up.sh --down`: volumes, no containers.
+    _, service, plan = _applied_project(tmp_path)
+    _stub_docker(tmp_path, monkeypatch, listening=set(), ps_output="",
+                 volumes_output="kip\tkip_kip_pgdata\nkip\tkip_kip_cas\nother\tother_data\n")
+
+    check = _isolation(service.verify(plan))
+
+    assert check.ok is False
+    assert check.detail.startswith(
+        'Docker Compose project "kip" has volumes (kip_kip_cas, kip_kip_pgdata) but no containers, '
+        "and Docker does not record which directory created them; unless this deployment created "
+        "them and was stopped with ./scripts/app-up.sh --down, they hold another deployment's "
+        "database, which this deployment's password cannot open. Before ./scripts/app-up.sh: set "
+        "a unique COMPOSE_PROJECT_NAME"
+    )
+
+
+def test_verify_fails_readiness_for_a_project_name_it_cannot_resolve(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_root, service, plan = _applied_project(tmp_path)
+    generated = project_root / "compose.generated.yaml"
+    generated.write_text(
+        re.sub(r"^name: kip$", "name: ${STACK_NAME:-kip}", generated.read_text(), flags=re.MULTILINE)
+    )
+    _stub_docker(tmp_path, monkeypatch, listening=set(), ps_output="")
+
+    check = _isolation(service.verify(plan))
+
+    assert check.ok is False
+    assert check.detail == (
+        "compose.generated.yaml sets the Compose project name by interpolation "
+        "(name: ${STACK_NAME:-kip}), which setup verify does not resolve; set "
+        f"COMPOSE_PROJECT_NAME in {project_root.resolve() / '.env'} to the resolved name"
+    )
+
+
+def test_verify_marks_isolation_not_checked_when_docker_cannot_be_queried(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, service, plan = _applied_project(tmp_path)
+    _stub_docker(tmp_path, monkeypatch, listening={5432, 8080}, ps_output="", ps_exit=1)
+
+    check = _isolation(service.verify(plan))
+
+    assert (check.ok, check.detail) == (True, "not checked: Docker could not be queried")
 
 
 def _complete_answers(tmp_path: Path) -> SetupAnswers:

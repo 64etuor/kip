@@ -184,7 +184,7 @@ fingerprint 또는 database secret ref가 `config/kip.generated.toml`과 다른 
 발견한 경우입니다. 두 파일을 손으로 맞추지 말고 setup으로 plan을 다시 생성해
 승인·apply한 뒤 명령을 다시 실행하세요.
 
-### `docker build`가 `resolve image config for docker-image://docker.io/docker/dockerfile:1.18@sha256:…`에서 멈춤
+### `docker build`가 `resolve image config for docker-image://docker.io/docker/dockerfile:1.27@sha256:…`에서 멈춤
 Dockerfile 첫 줄의 digest 고정 frontend를 BuildKit이 registry에 digest로
 조회하는 단계입니다. Docker Desktop 내장 proxy(`http.docker.internal:3128`)
 환경에서 이 HEAD 요청만 응답 없이 멈추는 사례가 있었습니다. 같은 digest의
@@ -192,10 +192,26 @@ Dockerfile 첫 줄의 digest 고정 frontend를 BuildKit이 registry에 digest�
 값과 같은지 확인한 뒤 다시 빌드하세요. 고정된 digest를 지우거나 바꾸지 않습니다.
 
 ```bash
-docker pull docker/dockerfile:1.18
-docker image inspect docker/dockerfile:1.18 --format '{{index .RepoDigests 0}}'
+docker pull docker/dockerfile:1.27
+docker image inspect docker/dockerfile:1.27 --format '{{index .RepoDigests 0}}'
 # Dockerfile의 # syntax= 줄과 같은 sha256이어야 합니다
 ```
+
+### 의미 검색 중 `different vector dimensions` 오류 또는 갑작스러운 recall 저하
+번들 `pgvector/pgvector` 0.8.2에는 sync의 INSERT와 VACUUM이 겹칠 때 HNSW
+index가 손상될 수 있는 알려진 문제가 있습니다(0.8.3-0.8.4 수정, 남은 race는
+0.8.7 예정). 증상은 검색이나 autovacuum 중의 `different vector dimensions`
+오류, 또는 같은 질의의 hybrid 결과가 갑자기 lexical 수준으로 떨어지는
+것입니다. embedding 표는 원본에서 다시 만들 수 있는 projection이므로 canonical
+데이터는 영향을 받지 않습니다. 복구는 projection을 다시 만드는 것입니다.
+
+```bash
+./scripts/kip projection rebuild --name semantic
+```
+
+DB 관리자가 index만 다시 만들 때는 migration owner로
+`REINDEX INDEX CONCURRENTLY search.embeddings_1024_hnsw_cosine_idx;`
+(1536 차원 projection은 `search.embeddings_1536_hnsw_cosine_idx`)를 실행합니다.
 
 ### `dependency_unavailable: PostgreSQL is not reachable at …`
 데이터베이스가 떠 있지 않거나 `KIP_DATABASE_URL`이 다른 곳을 가리킵니다. 몇 초

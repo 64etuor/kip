@@ -82,6 +82,42 @@ def test_common_selects_approved_host_settings_after_apply(tmp_path: Path) -> No
     ]
 
 
+def test_bootstrap_workspace_values_in_env_never_reach_an_applied_deployment(tmp_path: Path) -> None:
+    # Given the `.env` bootstrap wrote before setup chose workspace acme-rnd:
+    # KIP_WORKSPACE, KIP_ACL_SCOPES and KIP_API_ACL_SCOPES still say `default`.
+    import tomllib
+
+    project = _project(tmp_path)
+    dotenv = (project / ".env").read_bytes()
+    assert b"KIP_WORKSPACE=default\n" in dotenv and b"KIP_API_ACL_SCOPES=workspace:default\n" in dotenv
+    plan = build_setup_plan(complete_setup_answers(tmp_path), project_root=project)
+    apply_setup_plan(plan, project_root=project)
+
+    # Apply writes generated files only; `.env` stays the operator's.
+    assert (project / ".env").read_bytes() == dotenv
+    # The host CLI and MCP (scripts/kip, scripts/mcp.sh) load .env through common.sh.
+    result = subprocess.run(
+        ["bash", "-c", 'source "$1/scripts/common.sh"; "$2" -c "$3"', "handoff",
+         str(project), sys.executable,
+         "from kip.settings import Settings; import json,os; s=Settings.load(); "
+         "print(json.dumps([s.workspace,list(s.identity_api_key_acl_scopes),"
+         "[os.environ.get(k) for k in ('KIP_WORKSPACE','KIP_ACL_SCOPES','KIP_API_ACL_SCOPES')]]))"],
+        cwd=project, env={**_clean_environment(), "PYTHONPATH": str(ROOT / "src")},
+        capture_output=True, text=True, check=True,
+    )
+    host = tomllib.loads((project / "config/kip.host.generated.toml").read_text(encoding="utf-8"))
+    assert json.loads(result.stdout) == [
+        "acme-rnd", host.get("identity", {}).get("api_key", {}).get("acl_scopes", []), [None, None, None],
+    ]
+    # The containers read no .env at all: the generated project sets them itself.
+    services = yaml.safe_load((project / "compose.generated.yaml").read_text(encoding="utf-8"))["services"]
+    for name in ("api", "worker", "migrate"):
+        assert "env_file" not in services[name]
+        assert services[name]["environment"]["KIP_WORKSPACE"] == "acme-rnd"
+        assert services[name]["environment"]["KIP_API_ACL_SCOPES"] == "workspace:acme-rnd"
+    assert json.loads((project / ".mcp.json").read_text())["mcpServers"]["kip"]["env"]["KIP_WORKSPACE"] == "acme-rnd"
+
+
 def test_common_preserves_explicit_config_and_environment(tmp_path: Path) -> None:
     project = _project(tmp_path)
     plan = build_setup_plan(complete_setup_answers(tmp_path), project_root=project)

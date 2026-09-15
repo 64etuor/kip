@@ -358,7 +358,7 @@ What is checked and what is not:
 - The host installer and the image build stage share one npm manifest and lock
   (`requirements/kordoc/`) and install it with `npm ci --omit=dev
   --ignore-scripts --no-audit`, so both roots resolve the same graph: kordoc
-  4.13.1 with `adm-zip` overridden to 0.6.0 and `sharp` to 0.35.4, including
+  4.13.1 with `adm-zip` overridden to 0.6.1 and `sharp` to 0.35.4, including
   nested copies. Node.js 20.9+ is required. Dependency lifecycle scripts are
   disabled, so no package install hook executes during setup or build. The
   source ZIP carries only this installer policy, never the downloaded binary or
@@ -402,11 +402,13 @@ membership. Administrator credentials are entered only in the native terminal/UI
 - 3.11.0 raises kordoc from 4.8.0 to 4.13.1 with the same overrides; the lock
   change is only the kordoc package itself. The npm advisory set is unchanged
   (only the known moderate adm-zip chain) and `--audit-level=high` passes.
-- The adm-zip advisory has no patched release and remains in the graph. Its
-  identified path is ONNX's install-time extraction hook, which
-  `--ignore-scripts` prevents the supported CPU installation path from
-  executing; the advisory itself is not removed. Custom GPU or source-build
-  npm workflows are outside this validated runtime.
+- The adm-zip override moves from 0.6.0 to 0.6.1, which blocks extraction
+  through symlinks inside the target; GHSA-vwc7-r8mq-g2x9 covers 0.5.9-0.6.0,
+  so `npm audit` now reports no findings. The lock change is only the adm-zip
+  package. Its only caller is ONNX's install-time extraction hook, which
+  `--ignore-scripts` already kept the supported CPU installation path from
+  executing. Custom GPU or source-build npm workflows are outside this
+  validated runtime.
 - The production image installs only hash-locked `requirements/runtime.txt`.
   A contract test requires every core project dependency to appear in that
   lock, preventing a wheel-only dependency from being absent at runtime.

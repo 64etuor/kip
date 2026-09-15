@@ -177,7 +177,7 @@ def test_bootstrap_and_container_bake_the_same_pinned_kordoc_runtime() -> None:
     # Then both default runtimes install 4.13.1 and prewarm Korean OCR models.
     assert bootstrap_installer in bootstrap
     assert manifest["dependencies"] == {"kordoc": "4.13.1"}
-    assert manifest["overrides"] == {"adm-zip": "0.6.0", "sharp": "0.35.4"}
+    assert manifest["overrides"] == {"adm-zip": "0.6.1", "sharp": "0.35.4"}
     assert "COPY requirements/kordoc/package.json requirements/kordoc/package-lock.json" in dockerfile
     assert "npm ci --omit=dev --ignore-scripts --no-audit" in dockerfile
     assert "RUN /opt/scripts/audit-kordoc.sh" in dockerfile

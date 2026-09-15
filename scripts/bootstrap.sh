@@ -26,7 +26,14 @@ if [[ ! -d .venv ]]; then
   uv venv --python "$PYTHON_BIN" "$PROJECT_ROOT/.venv"
 fi
 if [[ ! -f .env ]]; then
-  "$(python_cmd)" "$SCRIPT_DIR/bootstrap_env.py" "$PROJECT_ROOT"
+  # A new .env keeps exported COMPOSE_PROJECT_NAME, KIP_POSTGRES_PORT and
+  # KIP_API_PORT. Without an exported project name, bootstrap_env.py reads the
+  # Compose containers, volumes and default ports on this machine: it chooses
+  # its own project name and free ports when another project or a busy port
+  # collides, and stops (75) when this directory's containers exist but .env
+  # is gone. It needs port and volume ownership, which kip_compose_project_check
+  # does not report, so it queries Docker itself.
+  "$(python_cmd)" "$SCRIPT_DIR/bootstrap_env.py" "$PROJECT_ROOT" --detect-existing-deployment
 fi
 created_config=0
 if [[ ! -f config/kip.toml ]]; then

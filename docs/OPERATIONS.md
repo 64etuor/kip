@@ -41,16 +41,45 @@ container는 lexical 검색(`semantic_degraded`)으로 동작한다. RAM이 8 Gi
 
 **한 machine에 배포가 둘이면 `COMPOSE_PROJECT_NAME`.** Compose는 container와
 volume을 디렉터리가 아니라 project 이름으로 묶는다. 모든 배포의 `compose.yaml`과
-setup이 만든 `compose.generated.yaml`은 project 이름이 `kip`이다. 저장소 checkout이
-돌고 있는 machine에 설치기로 두 번째 배포를 만들면, 새 배포의 `.env`에
-`COMPOSE_PROJECT_NAME=<고유 이름>`을 넣어야 자기 container와 volume
+setup이 만든 `compose.generated.yaml`은 project 이름이 `kip`이다. 두 번째 배포는
+`.env`에 `COMPOSE_PROJECT_NAME=<고유 이름>`이 있어야 자기 container와 volume
 (`<이름>_kip_pgdata`, `<이름>_kip_cas`, `<이름>_kip_models`)을 갖고 빈 DB로 시작한다.
-데이터가 이미 있는 배포에는 넣지 않는다. 이름이 바뀌면 기존 volume을 찾지 못한다.
-project 이름만으로는 두 배포를 함께 띄울 수 없다. host port가 겹치기 때문이다. 새 배포의
-`.env`에 비어 있는 `KIP_POSTGRES_PORT`와 `KIP_API_PORT`를 넣고, 같은 파일의
-`KIP_DATABASE_URL` port를 `KIP_POSTGRES_PORT`와 같게 고친다. model runtime은 machine당
-하나이므로 `KIP_SEMANTIC_PORT`는 바꾸지 않고 이미 떠 있는 runtime을 함께 쓴다
-([Model runtime](#model-runtime)).
+함께 띄우려면 비어 있는 `KIP_POSTGRES_PORT`와 `KIP_API_PORT`, 그리고 같은 port를 쓰는
+`KIP_DATABASE_URL`과 `KIP_BACKUP_DATABASE_URL`도 필요하다. 데이터가 이미 있는 배포에는
+project 이름을 넣지 않는다. 이름이 바뀌면 기존 volume을 찾지 못한다. model runtime은
+machine당 하나이므로 `KIP_SEMANTIC_PORT`는 바꾸지 않고 이미 떠 있는 runtime을 함께
+쓴다([Model runtime](#model-runtime)).
+
+`./scripts/bootstrap.sh`는 `.env`를 새로 만들 때만 이 값을 정한다. export된
+`COMPOSE_PROJECT_NAME`, `KIP_POSTGRES_PORT`, `KIP_API_PORT`는 그대로 쓰고(이미 사용 중인
+port라도 유지한다) 두 DB URL의 port를 `KIP_POSTGRES_PORT`에 맞춘다(port가 1–65535 정수가
+아니면 멈춘다). `COMPOSE_PROJECT_NAME`이 export되지 않았으면 매번 `docker ps --all`,
+`docker volume ls`와 `127.0.0.1`의 PostgreSQL/API port(export된 값, 없으면 5432/8080)를
+검사한다.
+
+- 이 디렉터리에서 만든 container가 있으면 `.env`만 사라진 기존 배포다. 새 무작위 비밀번호로는
+  기존 DB volume을 열 수 없으므로 아무것도 쓰지 않고 `Action required`와 함께 exit 75로
+  멈춘다. 백업한 `.env`를 복원한 뒤 다시 실행한다.
+- 다른 디렉터리에서 만든 `kip` project container, container 없이 남은 `kip` project
+  volume(`app-up.sh --down`으로 멈춘 배포), 또는 사용 중인 port가 있으면 배포 디렉터리 이름으로
+  만든 `kip-<디렉터리>`와 55432·18080 이상의 첫 빈 port를 `.env`에 쓰고 무엇을 왜 골랐는지
+  출력한다. container나 volume이 이미 있는 이름이면 `-2`, `-3`…을 붙이고, 100개가 모두
+  쓰였으면 멈춘다. Docker는 volume을 만든 디렉터리를 기록하지 않으므로 volume만 있을 때는
+  그렇게 말하고, 그 volume이 이 배포의 것이면 `.env`를 복원하라고 안내한다.
+- "another KIP deployment"라고 하는 것은 다른 디렉터리의 `kip` container를 Compose label로
+  확인했을 때뿐이다. label 없이 사용 중인 port는 "already in use"라고만 한다.
+
+새 `.env`에는 아직 데이터가 없으므로 이 선택은 안전하다. 기존 `.env`는 고치지 않고, Docker에
+질의할 수 없고 port도 비어 있으면 아무것도 바꾸지 않는다. 기존 `.env`의 충돌은
+`./scripts/kip setup verify`의 `runtime_readiness` 항목 `compose_project_isolation`이
+app-up 전에 보고한다. `.env`는 `scripts/load_dotenv.py`로 `common.sh`와 같은 규칙(`export`,
+따옴표, 줄 끝 주석)으로 읽는다. effective project에 다른 디렉터리의 container가 있거나,
+container 없이 volume만 있거나(어느 디렉터리 것인지 알 수 없다고 말한다), `.env`의
+PostgreSQL/API port를 이 배포의 container가 아닌 process가 잡고 있으면 실패하고 고칠 값을
+알려 준다. API port 충돌은 app profile(`--database-only` 없는 `./scripts/app-up.sh`)에만
+해당한다. Compose 파일의 `name:`이 `$` 보간이거나 파일을 읽을 수 없어도 실패한다. Docker
+질의는 10초 timeout이며, 질의할 수 없으면 `not checked`로 표시하고 실패로 세지 않는다.
+config 검사인 `verified`에는 영향이 없다.
 `app-up.sh`(`--database-only`, `--down` 포함), `dev-up.sh`/`dev-down.sh`, 그리고
 backup/restore/ops-report가 host `psql`/`pg_dump`/`pg_restore` 없이 쓰는
 `docker compose exec` fallback은 Compose를 부르기 전에 project를 검사한다. 이름은
@@ -1572,7 +1601,7 @@ older runtime. The installer downloads into the ignored versioned runtime
 root. Both copy `requirements/kordoc/package.json` and its lock and run
 `npm ci --omit=dev --ignore-scripts --no-audit`, so the host and the image
 install the identical graph: kordoc 4.13.1 with transitive `adm-zip` overridden
-to 0.6.0 and `sharp` to 0.35.4. Kordoc binaries and model caches are never part
+to 0.6.1 and `sharp` to 0.35.4. Kordoc binaries and model caches are never part
 of the source package ZIP.
 
 `./scripts/audit-kordoc.sh` gates that graph. It first rejects lock/manifest
@@ -1582,11 +1611,11 @@ override versions in every nested copy), then runs
 network error exits nonzero and fails the gate; it is not a skip. The audit runs
 inside `install-kordoc.sh`, in the Docker kordoc stage, in CI (Python 3.12 leg),
 in `make audit`, and in `./scripts/verify.sh`, so it needs registry access
-during setup, verification, and builds — never during retrieval. The moderate
-`adm-zip` advisory GHSA-vwc7-r8mq-g2x9 is still in the graph with no patched
-release; `--ignore-scripts` means the ONNX install-time extraction hook that
-used it is not executed by the supported CPU installation path, but the advisory
-is not removed. See [dependency safety](SECURITY.md#dependency-safety).
+during setup, verification, and builds — never during retrieval. The
+`adm-zip` 0.6.1 override closes the moderate advisory GHSA-vwc7-r8mq-g2x9
+(0.5.9-0.6.0), so the audit reports no findings. Its only caller was ONNX's
+install-time extraction hook, which `--ignore-scripts` already kept from
+running. See [dependency safety](SECURITY.md#dependency-safety).
 
 Existing deployments are not rewritten. `kip update` reruns bootstrap, which
 installs the new runtime, and an `expected_version` of `4.8.0` or `4.7.3`

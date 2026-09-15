@@ -1,5 +1,92 @@
 # Changelog
 
+## 3.15.4 - 2026-09-15
+
+- A second deployment on one machine no longer needs a hand-edited `.env`.
+  Two agents installed KIP from the repository URL beside a running
+  deployment. Both finished, but both had to rewrite the new `.env`: bootstrap
+  wrote the ports `5432` and `8080` and no project name, even though the
+  environment exported other values.
+  - When bootstrap creates `.env`, it now writes the exported
+    `COMPOSE_PROJECT_NAME`, `KIP_POSTGRES_PORT` and `KIP_API_PORT`. The port
+    also goes into `KIP_DATABASE_URL` and `KIP_BACKUP_DATABASE_URL`. A port
+    outside 1-65535, or a project name Compose would reject, stops bootstrap
+    before anything is written.
+  - When `COMPOSE_PROJECT_NAME` is not exported, bootstrap checks for a
+    collision before choosing values. It looks for containers or volumes of
+    the `kip` project, and for listeners on the PostgreSQL or API port. If it
+    finds one, it chooses the values itself and prints them: `kip-<directory>`
+    for the project, trying at most 100 names (the plain name, then `-2` to
+    `-100`), and the first free ports at or above 55432 and 18080. The new
+    `.env` holds no data yet, so this is safe. A plain listener is reported
+    as "already in use". "Another KIP deployment" is claimed only when Compose
+    labels prove it. An exported port is kept even when it is busy. An
+    existing `.env` keeps its project name and ports: bootstrap still appends
+    missing role credentials, as before, but never rewrites these values.
+    `KIP_SEMANTIC_PORT` stays on the one model runtime per machine.
+  - If this directory's own containers exist but `.env` is missing, bootstrap
+    writes nothing and exits 75. A new `.env` would carry a new random
+    database password that cannot open the existing volume, so it asks for
+    `.env` to be restored from backup.
+  - Volumes of the `kip` project with no containers, such as those left by a
+    deployment stopped with `app-up.sh --down`, count as a collision.
+    Bootstrap chooses new values and adds a hint: Docker does not record which
+    directory created a volume, so these may be this deployment's own, and
+    then `.env` should be restored instead. Volumes of a derived project,
+    such as `kip-second`, are not recognised this way.
+  - `setup verify` has a new `runtime_readiness` check,
+    `compose_project_isolation`. It fails with the fix for each problem it
+    finds:
+    - another directory's containers in this Compose project;
+    - project volumes it cannot attribute to a directory;
+    - a PostgreSQL or API port held by something other than this
+      deployment's container (the API port matters only for the app profile);
+    - a `name:` it cannot resolve, or a Compose file it cannot read.
+
+    Here a port published by this deployment's own container is not a
+    collision. It reads `.env` with the same rules as `scripts/common.sh`.
+    When the Docker CLI is missing the check is omitted, and when Docker
+    cannot be queried it reports `not checked`. `verified` is unchanged.
+  - The `kip-setup` skill now asks the agent only to confirm the printed
+    values. `.env` still shows `KIP_WORKSPACE=default` after setup, but this is
+    not a defect: once setup has generated its config, the host CLI, MCP and
+    containers ignore those keys. A test now pins that behaviour.
+- Dependency refresh. Nothing below changes stored data, search results or
+  contracts.
+  - Security: the Kordoc npm graph now overrides `adm-zip` to 0.6.1, which
+    closes GHSA-vwc7-r8mq-g2x9, so `npm audit` reports no findings. The
+    advisory was never reachable, because installs run with
+    `--ignore-scripts`. Kordoc stays at 4.13.1 and the lock change is only
+    adm-zip, so OCR and parser output are unchanged and nothing needs
+    re-extraction. Bootstrap reinstalls the Kordoc runtime from the lock on
+    every run, so `kip update` brings existing deployments to 0.6.1.
+  - Python: patch and minor updates inside the existing bounds, among them
+    click 8.5.0, uvicorn 0.53.0, pydantic 2.13.5, psycopg 3.3.5, typer
+    0.27.2, PyJWT 2.14.0, cryptography 50.0.1, lxml 6.1.3 and ruff 0.16.7.
+    `uv.lock` and `requirements/runtime.txt` are regenerated. The semantic
+    runtime lock takes posthog 7.53.0 and tqdm 4.70.1. Infinity 0.0.77, torch
+    2.14.0 and the model revisions are unchanged, so vectors and the
+    projection identity are unchanged.
+  - Images and CI: `python:3.12-slim` moves to 3.12.14,
+    `node:22-trixie-slim` to its rebuilt digest, the Dockerfile syntax to
+    1.27, and `astral-sh/setup-uv` to v10.1.0.
+  - Not updated: `pgvector/pgvector` stays at 0.8.2. KIP uses HNSW, and
+    0.8.3-0.8.4 fix HNSW index corruption when VACUUM runs alongside INSERT.
+    A further INSERT/VACUUM race (pgvector #1010) is fixed only in the
+    unreleased 0.8.7, so the target is 0.8.7, not 0.8.6. The embeddings are a
+    rebuildable projection, so `kip projection rebuild --name semantic` or a
+    `REINDEX` recovers a damaged index without touching canonical data.
+    `docs/TROUBLESHOOTING.md` now describes the symptoms and the recovery.
+    But `restore.sh` recreates
+    the extension at the server's default version, and restore verification
+    requires matching extension versions, so an existing volume at 0.8.2
+    restored onto a 0.8.6 server would fail that check. The upgrade needs an
+    `ALTER EXTENSION vector UPDATE` migration and a restore drill first.
+    Kordoc's other transitive packages are mostly major versions, and
+    ADR-064 requires measured re-extraction before the OCR graph changes. uv
+    0.12.14, released today with changed exit codes, and Docker Desktop
+    4.91.0 are deferred.
+
 ## 3.15.3 - 2026-09-14
 
 - A fresh agent was given only the repository URL and asked to install KIP,

@@ -35,12 +35,21 @@ Resume an interrupted configuration from inspect.
 
 ## After apply
 
-Setup is configuration-only. If another KIP deployment already runs on this
-machine (`app-up.sh` refuses naming another directory, or port 5432 is taken),
-do not start or stop its stack. With consent, set in this deployment's `.env`:
-a unique `COMPOSE_PROJECT_NAME`, free `KIP_POSTGRES_PORT` and `KIP_API_PORT`,
-and the same port in `KIP_DATABASE_URL` and `KIP_BACKUP_DATABASE_URL`; keep one
-model runtime per machine. Then follow the receipt's `next_steps` within the
+Setup is configuration-only. Never start or stop another deployment's stack.
+When bootstrap creates `.env` it keeps exported `KIP_POSTGRES_PORT` and
+`KIP_API_PORT` (even if in use) and an exported `COMPOSE_PROJECT_NAME`. Without
+an exported project name it checks the `kip` project and the PostgreSQL and API
+ports; if another directory's containers, unattributed volumes, or a busy port
+collide, it chooses a project name and free ports and prints them. Only confirm
+the printed values with the user; if it mentions volumes that may be this
+deployment's own, ask whether `.env` should be restored instead. If it stops
+because this directory's containers exist but `.env` is missing, ask the user to
+restore `.env` from backup. An existing `.env` keeps its project name and
+ports: if `runtime_readiness` fails `compose_project_isolation` or
+`app-up.sh` refuses naming another directory, set those values (and the same
+port in `KIP_DATABASE_URL` and `KIP_BACKUP_DATABASE_URL`) with consent. Keep
+one model runtime per machine.
+Then follow the receipt's `next_steps` within the
 authorized setup: `./scripts/app-up.sh --database-only` (database readiness and
 migration for CLI/MCP; only the database credential is required and no
 API/worker image is built; it also starts an installed model runtime), source

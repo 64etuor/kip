@@ -2,12 +2,36 @@
 """Create a private local dotenv once; never replace deployment credentials."""
 from __future__ import annotations
 
+import argparse
 import os
+import re
 import secrets
+import shutil
+import socket
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
 from urllib.parse import quote, urlsplit, urlunsplit
+
+# Host ports compose.yaml publishes by default, and where a second deployment on
+# the same machine starts looking for free ones. KIP_SEMANTIC_PORT is left
+# alone: every deployment on a machine shares one model runtime.
+DEFAULT_PORTS = {"KIP_POSTGRES_PORT": 5432, "KIP_API_PORT": 8080}
+AUTOMATIC_PORT_FLOORS = {"KIP_POSTGRES_PORT": 55432, "KIP_API_PORT": 18080}
+DEFAULT_COMPOSE_PROJECT = "kip"
+COMPOSE_PROJECT_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+PROJECT_NAME_CANDIDATES = 100
+COMPOSE_PS_FORMAT = (
+    '{{.Label "com.docker.compose.project"}}\t'
+    '{{.Label "com.docker.compose.project.working_dir"}}\t{{.Ports}}'
+)
+# Compose labels a volume with its project, never with the directory that
+# created it, so a volume is attributed only through its project's containers.
+COMPOSE_VOLUME_FORMAT = '{{.Label "com.docker.compose.project"}}\t{{.Name}}'
+# scripts/prerequisites.py's "Action required" status, which bootstrap.sh
+# passes through: the operator must act before bootstrap can continue.
+EXIT_ACTION_REQUIRED = 75
 
 # Credentials the Compose application roles need. An upgraded deployment keeps
 # its own .env, so these are appended when missing: without them every
@@ -115,13 +139,287 @@ def _append_application_role_credentials(root: Path, target: Path) -> bool:
     return True
 
 
-def main() -> int:
-    root = Path(sys.argv[1])
+def _exported_port(name: str) -> int | None:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return None
+    if not (raw.isascii() and raw.isdigit() and 1 <= int(raw) <= 65535):
+        raise SystemExit(
+            f"error: {name}={os.environ[name]!r} is not a port; export an integer "
+            "from 1 to 65535 or unset it, then rerun ./scripts/bootstrap.sh"
+        )
+    return int(raw)
+
+
+def _exported_project_name() -> str | None:
+    raw = os.environ.get("COMPOSE_PROJECT_NAME", "")
+    if not raw:
+        return None
+    if not COMPOSE_PROJECT_NAME_PATTERN.fullmatch(raw):
+        raise SystemExit(
+            f"error: COMPOSE_PROJECT_NAME={raw!r} is not a Docker Compose project name; "
+            "use lowercase letters, digits, '-' and '_', starting with a letter or digit, "
+            "then rerun ./scripts/bootstrap.sh"
+        )
+    return raw
+
+
+def _listening(port: int) -> bool:
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+            return True
+    except OSError:
+        return False
+
+
+def _docker_rows(docker: str, arguments: list[str], fields: int) -> list[list[str]] | None:
+    """Tab-separated `docker ... --format` rows, or None when Docker cannot be queried."""
+    try:
+        completed = subprocess.run(
+            [docker, *arguments], capture_output=True, text=True, timeout=10, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if completed.returncode != 0:
+        return None
+    rows = []
+    for line in completed.stdout.splitlines():
+        if line.strip():
+            cells = line.split("\t", fields - 1)
+            rows.append(cells + [""] * (fields - len(cells)))
+    return rows
+
+
+def _docker_state() -> tuple[list[list[str]] | None, list[list[str]] | None]:
+    """Compose containers (project, working dir, ports) and volumes (project, name)."""
+    docker = shutil.which("docker")
+    if docker is None:
+        return None, None
+    # Separate queries: a failed `ps` must not hide the volumes.
+    return (
+        _docker_rows(docker, ["ps", "--all", "--format", COMPOSE_PS_FORMAT], 3),
+        _docker_rows(docker, ["volume", "ls", "--format", COMPOSE_VOLUME_FORMAT], 2),
+    )
+
+
+def _same_directory(value: str, root: Path) -> bool:
+    # A symlinked or differently cased spelling of this directory matches.
+    try:
+        return bool(value) and os.path.samefile(value, root)
+    except OSError:
+        return False
+
+
+def _publishes(published: str, port: int) -> bool:
+    return any(
+        int(first) <= port <= int(last or first)
+        for first, last in re.findall(r":(\d+)(?:-(\d+))?->", published)
+    )
+
+
+def _directory_project_name(root: Path, used: set[str]) -> str:
+    base = re.sub(r"[^a-z0-9_-]+", "-", root.resolve().name.lower())
+    base = re.sub(r"-{2,}", "-", base).strip("-_")
+    stem = base if base.startswith("kip-") else f"kip-{base}" if base else "kip-deployment"
+    # Two deployment directories can share a basename, and a name whose
+    # volumes survive would hand this deployment another password's database.
+    for index in range(1, PROJECT_NAME_CANDIDATES + 1):
+        candidate = stem if index == 1 else f"{stem}-{index}"
+        if candidate not in used:
+            return candidate
+    raise SystemExit(
+        f"error: Docker Compose projects {stem} through {stem}-{PROJECT_NAME_CANDIDATES} all have "
+        "containers or volumes on this machine; export COMPOSE_PROJECT_NAME=<unique-name> and "
+        "rerun ./scripts/bootstrap.sh"
+    )
+
+
+def _free_port(floor: int, taken: set[int]) -> int:
+    for port in range(floor, 65536):
+        if port not in taken and not _listening(port):
+            return port
+    raise SystemExit(f"error: no free port at or above {floor} on 127.0.0.1")
+
+
+def _refuse_missing_env(root: Path, projects: list[str], volumes: list[list[str]] | None) -> None:
+    names = ", ".join(f'"{project}"' for project in projects)
+    subject = f"project {names} has" if len(projects) == 1 else f"projects {names} have"
+    owned = sorted(volume for project, volume in volumes or [] if project in projects)
+    also = f" and volumes {', '.join(owned)}" if owned else ""
+    print(
+        f"Action required: this deployment's database already exists, but {root / '.env'} is missing.\n"
+        f"Docker Compose {subject} containers created from {root}{also}.\n"
+        "A new .env would carry a new random database password, which cannot open the existing "
+        "database volume.\n"
+        f"Restore {root / '.env'} from backup, then rerun ./scripts/bootstrap.sh. Nothing was written.",
+        file=sys.stderr,
+    )
+    raise SystemExit(EXIT_ACTION_REQUIRED)
+
+
+def _deployment_values(
+    root: Path, *, detect: bool,
+) -> tuple[dict[str, tuple[str, str]], str, list[str]]:
+    """The project name and ports a new .env carries, each with its reason.
+
+    Exported values always win, including a port that is already in use.
+    When no project name is exported and bootstrap asked for detection,
+    another project's containers or volumes, or a busy port, make this
+    deployment choose its own. Returns the values, what was found, and notes.
+    """
+    ports = {name: _exported_port(name) for name in DEFAULT_PORTS}
+    values = {name: (str(port), "exported") for name, port in ports.items() if port is not None}
+    exported_name = _exported_project_name()
+    if exported_name is not None:
+        values["COMPOSE_PROJECT_NAME"] = (exported_name, "exported")
+        return values, "", []
+    if not detect:
+        return values, "", []
+    containers, volumes = _docker_state()
+    own = sorted({
+        project for project, directory, _ in containers or []
+        if project and _same_directory(directory, root)
+    })
+    if own:
+        # This directory's stack exists and only .env is gone: new values
+        # would silently point the CLI and MCP at a new, empty database.
+        _refuse_missing_env(root, own, volumes)
+    found: list[str] = []
+    notes: list[str] = []
+    others = sorted({
+        directory for project, directory, _ in containers or []
+        if project == DEFAULT_COMPOSE_PROJECT and directory
+    })
+    if others:
+        found.append(
+            f'Docker Compose project "{DEFAULT_COMPOSE_PROJECT}" has containers from {", ".join(others)}'
+        )
+    unattributed = sorted(
+        volume for project, volume in volumes or [] if project == DEFAULT_COMPOSE_PROJECT
+    )
+    if unattributed and not others:
+        found.append(
+            f'Docker Compose project "{DEFAULT_COMPOSE_PROJECT}" has volumes '
+            f"({', '.join(unattributed)}) but no containers, and Docker does not record which "
+            "directory created them"
+        )
+        notes.append(
+            "If those volumes are this deployment's own database (stopped with "
+            "./scripts/app-up.sh --down), do not use these values: restore its .env from backup."
+        )
+    for name, default in DEFAULT_PORTS.items():
+        port = ports[name] or default
+        if not _listening(port):
+            continue
+        if ports[name] is not None:
+            values[name] = (str(port), "exported, although already in use")
+        holder = next(
+            ((project, directory) for project, directory, published in containers or []
+             if project and _publishes(published, port)),
+            None,
+        )
+        if holder is None:
+            found.append(f"127.0.0.1:{port} ({name}) is already in use")
+        else:
+            found.append(
+                f'127.0.0.1:{port} ({name}) is published by Docker Compose project "{holder[0]}" '
+                f"at {holder[1]}"
+            )
+    if not found:
+        return values, "", []
+    header = (
+        "Another KIP deployment is on this machine" if others
+        else "The default Docker Compose project or host ports are taken on this machine"
+    )
+    used = {project for project, _, _ in containers or []} | {project for project, _ in volumes or []}
+    values["COMPOSE_PROJECT_NAME"] = (
+        _directory_project_name(root, used), "derived from the deployment directory",
+    )
+    taken = {port for port in ports.values() if port is not None}
+    for name, floor in AUTOMATIC_PORT_FLOORS.items():
+        if ports[name] is None:
+            port = _free_port(floor, taken)
+            taken.add(port)
+            values[name] = (str(port), f"first free port at or above {floor}")
+    return values, f"{header}: {'; '.join(found)}.", notes
+
+
+def _with_port(url: str, port: int) -> str:
+    parts = urlsplit(url)
+    if parts.scheme not in {"postgresql", "postgres"} or not parts.hostname:
+        return url
+    userinfo, at, _ = parts.netloc.rpartition("@")
+    host = f"[{parts.hostname}]" if ":" in parts.hostname else parts.hostname
+    location = f"{userinfo}{at}{host}:{port}"
+    return urlunsplit((parts.scheme, location, parts.path, parts.query, parts.fragment))
+
+
+def _with_values(text: str, values: dict[str, tuple[str, str]]) -> str:
+    for name in DEFAULT_PORTS:
+        if name in values:
+            text, count = re.subn(
+                rf"^{name}=.*$", lambda _, name=name: f"{name}={values[name][0]}",
+                text, flags=re.MULTILINE,
+            )
+            if count != 1:
+                raise SystemExit(f"error: .env.example must assign {name} exactly once")
+    if "KIP_POSTGRES_PORT" in values:
+        port = int(values["KIP_POSTGRES_PORT"][0])
+        text = re.sub(
+            r"^KIP_DATABASE_URL=(.*)$",
+            lambda match: f"KIP_DATABASE_URL={_with_port(match.group(1), port)}",
+            text, flags=re.MULTILINE,
+        )
+    if "COMPOSE_PROJECT_NAME" in values:
+        text = (
+            "# Docker Compose project: this deployment's own containers and volumes.\n"
+            f"COMPOSE_PROJECT_NAME={values['COMPOSE_PROJECT_NAME'][0]}\n\n" + text
+        )
+    return text
+
+
+def _report_values(values: dict[str, tuple[str, str]], found: str, notes: list[str]) -> None:
+    if not values:
+        return
+    if found:
+        print(
+            found + "\nThis .env is new and has no data yet, so bootstrap chose values that do "
+            "not collide:",
+            file=sys.stderr,
+        )
+    else:
+        print("Bootstrap wrote the exported values into the new .env:", file=sys.stderr)
+    for name in ("COMPOSE_PROJECT_NAME", *DEFAULT_PORTS):
+        if name in values:
+            value, reason = values[name]
+            also = " (also in KIP_DATABASE_URL and KIP_BACKUP_DATABASE_URL)" if name == "KIP_POSTGRES_PORT" else ""
+            print(f"  {name}={value}{also} [{reason}]", file=sys.stderr)
+    if found:
+        print(
+            "Confirm these values before ./scripts/app-up.sh. KIP_SEMANTIC_PORT is unchanged: "
+            "the machine keeps one model runtime.",
+            file=sys.stderr,
+        )
+    for note in notes:
+        print(note, file=sys.stderr)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("root", type=Path)
+    parser.add_argument(
+        "--detect-existing-deployment", action="store_true",
+        help="unless COMPOSE_PROJECT_NAME is exported, check Docker and the default ports and "
+        "choose a project name and free ports on a collision",
+    )
+    arguments = parser.parse_args(argv)
+    root: Path = arguments.root
     target = root / ".env"
     if target.exists() or target.is_symlink():
         if target.is_file():
             _append_application_role_credentials(root, target)
         return 0
+    values, found, notes = _deployment_values(root, detect=arguments.detect_existing_deployment)
     text = (root / ".env.example").read_text(encoding="utf-8")
     # One fresh secret per placeholder, not per occurrence: a placeholder that
     # appears both as a variable and inside a URL must keep the same value.
@@ -134,12 +432,15 @@ def main() -> int:
         "replace-with-the-backup-role-database-password",
     ):
         text = text.replace(placeholder, secrets.token_hex(32))
+    text = _with_values(text, values)
     if not _write_private(root, target, text):
         return 0
     print("Created private .env with random local database and API credentials.", file=sys.stderr)
     # The backup URL carries a password, so .env.example cannot ship it; derive
-    # it here from the freshly generated owner URL and kip_backup password.
+    # it here from the freshly generated owner URL and kip_backup password,
+    # which already carries the chosen PostgreSQL port.
     _append_application_role_credentials(root, target)
+    _report_values(values, found, notes)
     return 0
 
 

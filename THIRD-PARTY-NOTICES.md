@@ -45,9 +45,9 @@ LGPL's own notice and relinking obligations.
 
 | Component | Version | License |
 | --- | --- | --- |
-| pydantic | 2.13.4 | MIT |
+| pydantic | 2.13.5 | MIT |
 | psutil | 7.2.2 | BSD-3-Clause |
-| typer | 0.27.1 | MIT |
+| typer | 0.27.2 | MIT |
 | PyYAML | 6.0.3 | MIT |
 | tomli-w | 1.2.0 | MIT |
 | httpx | 0.28.1 | BSD-3-Clause |
@@ -57,11 +57,11 @@ LGPL's own notice and relinking obligations.
 
 | Component | Version | License | Extra |
 | --- | --- | --- | --- |
-| psycopg | 3.3.4 | **LGPL-3.0-only** | `postgres` |
+| psycopg | 3.3.5 | **LGPL-3.0-only** | `postgres` |
 | psycopg-pool | 3.3.1 | **LGPL-3.0-only** | `postgres` |
 | fastapi | 0.141.1 | MIT | `api` |
-| uvicorn | 0.52.3 | BSD-3-Clause | `api` |
-| PyJWT | 2.13.0 | MIT | `identity` |
+| uvicorn | 0.53.0 | BSD-3-Clause | `api` |
+| PyJWT | 2.14.0 | MIT | `identity` |
 | openpyxl | 3.1.5 | MIT | `extractors` |
 | pdf-inspector | 1.19.0 | MIT | `extractors` |
 | PyMuPDF | 1.28.2 | **AGPL-3.0 or Artifex commercial** | `extractors` |

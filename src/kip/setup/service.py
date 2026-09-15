@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import tomllib
@@ -217,6 +219,7 @@ class SetupService:
         )
         if docker_cli:
             checks.append(_docker_daemon_check(docker_cli))
+            checks.append(_compose_isolation_check(docker_cli, self.project_root))
         checks.append(_database_secret_check(plan))
         if plan.identity_mode == "api_key":
             for name, reference in (
@@ -603,6 +606,214 @@ def _docker_daemon_check(docker_cli: str) -> SetupCheck:
             "./scripts/app-up.sh"
         ),
     )
+
+
+_COMPOSE_PS_FORMAT = (
+    '{{.Label "com.docker.compose.project"}}\t'
+    '{{.Label "com.docker.compose.project.working_dir"}}\t{{.Ports}}'
+)
+# Compose labels a volume with its project but not with the directory that
+# created it, so a volume is attributed only through its project's containers.
+_COMPOSE_VOLUME_FORMAT = '{{.Label "com.docker.compose.project"}}\t{{.Name}}'
+
+
+def _compose_isolation_check(docker_cli: str, project_root: Path) -> SetupCheck:
+    """Whether this deployment's Compose project and host ports are its own.
+
+    Compose keys containers and volumes by project name, and every deployment's
+    Compose file names its project `kip`, so a second deployment reuses the
+    first one's database unless its `.env` says otherwise. `app-up.sh` refuses
+    a shared project; this reports it, another deployment's stopped volumes,
+    and a taken port, before that.
+    """
+    name = "compose_project_isolation"
+    root = project_root.resolve()
+    dotenv_path = root / ".env"
+    try:
+        dotenv = _dotenv_assignments(root)
+    except ValueError as exc:
+        return SetupCheck(
+            name=name, ok=False,
+            detail=f"cannot read {dotenv_path} the way scripts/common.sh does: {exc}",
+        )
+
+    def setting(key: str) -> str:
+        # scripts/common.sh exports .env beneath the caller's own exports.
+        return os.environ.get(key) or dotenv.get(key, "")
+
+    project = setting("COMPOSE_PROJECT_NAME")
+    if not project:
+        project, problem = _compose_file_project(root)
+        if problem:
+            return SetupCheck(name=name, ok=False, detail=problem)
+    ports: dict[str, int] = {}
+    for key, default in (("KIP_POSTGRES_PORT", "5432"), ("KIP_API_PORT", "8080")):
+        value = setting(key) or default
+        if not (value.isascii() and value.isdigit() and 1 <= int(value) <= 65535):
+            return SetupCheck(
+                name=name, ok=False,
+                detail=f"{key}={value!r} is not a port; set an integer from 1 to 65535 in {dotenv_path}",
+            )
+        ports[key] = int(value)
+    containers = _docker_rows(docker_cli, ["ps", "--all", "--format", _COMPOSE_PS_FORMAT], 3)
+    if containers is None:
+        return SetupCheck(name=name, ok=True, detail="not checked: Docker could not be queried")
+    volumes = _docker_rows(docker_cli, ["volume", "ls", "--format", _COMPOSE_VOLUME_FORMAT], 2) or []
+    problems: list[str] = []
+    fixes: list[str] = []
+    mine = any(
+        label == project and _same_directory(directory, root) for label, directory, _ in containers
+    )
+    others = sorted({
+        directory for label, directory, _ in containers
+        if label == project and directory and not _same_directory(directory, root)
+    })
+    project_volumes = sorted(volume for label, volume in volumes if label == project)
+    if others:
+        problems.append(
+            f'Docker Compose project "{project}" already has containers from {", ".join(others)}'
+        )
+    elif project_volumes and not mine:
+        problems.append(
+            f'Docker Compose project "{project}" has volumes ({", ".join(project_volumes)}) but no '
+            "containers, and Docker does not record which directory created them; unless this "
+            "deployment created them and was stopped with ./scripts/app-up.sh --down, they hold "
+            "another deployment's database, which this deployment's password cannot open"
+        )
+    if problems:
+        fixes.append(
+            f"set a unique COMPOSE_PROJECT_NAME in {dotenv_path} for a new, empty database, or, if "
+            "this is the same deployment moved from another directory, run KIP_COMPOSE_ADOPT=1 "
+            "./scripts/app-up.sh --down once"
+        )
+    for key, port in ports.items():
+        if not _port_listening(port):
+            continue
+        holders = [(label, directory) for label, directory, published in containers
+                   if _publishes(published, port)]
+        if any(label == project and _same_directory(directory, root) for label, directory in holders):
+            continue
+        holder = next(
+            (f'a container of Compose project "{label}" at {directory}'
+             for label, directory in holders if label),
+            "a Docker container outside Compose" if holders
+            else "a process that is not this deployment's container",
+        )
+        problems.append(f"127.0.0.1:{port} ({key}) is held by {holder}")
+        if key == "KIP_POSTGRES_PORT":
+            fixes.append(
+                "set a free KIP_POSTGRES_PORT and the same port in KIP_DATABASE_URL and "
+                "KIP_BACKUP_DATABASE_URL"
+            )
+        else:
+            fixes.append(
+                "only the app profile publishes the API (./scripts/app-up.sh without "
+                "--database-only), so before starting it set a free KIP_API_PORT"
+            )
+    if not problems:
+        return SetupCheck(
+            name=name, ok=True,
+            detail=(
+                f'Compose project "{project}" and 127.0.0.1:{ports["KIP_POSTGRES_PORT"]}/'
+                f'{ports["KIP_API_PORT"]} belong to this deployment or are free'
+            ),
+        )
+    return SetupCheck(
+        name=name, ok=False,
+        detail=(
+            "; ".join(problems) + ". Before ./scripts/app-up.sh: " + "; ".join(fixes)
+            + ". Leave KIP_SEMANTIC_PORT on the running model runtime (docs/OPERATIONS.md)"
+        ),
+    )
+
+
+def _docker_rows(docker_cli: str, arguments: list[str], fields: int) -> list[list[str]] | None:
+    """Tab-separated `docker ... --format` rows, or None when Docker cannot be queried."""
+    try:
+        completed = subprocess.run(
+            [docker_cli, *arguments], capture_output=True, text=True, timeout=10, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if completed.returncode != 0:
+        return None
+    rows = []
+    for line in completed.stdout.splitlines():
+        if line.strip():
+            cells = line.split("\t", fields - 1)
+            rows.append(cells + [""] * (fields - len(cells)))
+    return rows
+
+
+def _dotenv_assignments(root: Path) -> dict[str, str]:
+    """`.env` read by the deployment's own scripts/load_dotenv.py, as common.sh reads it."""
+    path = root / ".env"
+    if not path.is_file():
+        return {}
+    loader = root / "scripts/load_dotenv.py"
+    spec = importlib.util.spec_from_file_location("kip_deployment_load_dotenv", loader)
+    if not loader.is_file() or spec is None or spec.loader is None:
+        raise ValueError(f"{loader} is missing")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+        return dict(module.parse_dotenv(path))
+    except (OSError, SyntaxError, UnicodeError, ValueError) as exc:
+        raise ValueError(str(exc)) from exc
+
+
+def _compose_file_project(root: Path) -> tuple[str, str]:
+    """The project name Compose resolves without COMPOSE_PROJECT_NAME, or a problem."""
+    # The Compose file app-up.sh selects: generated after setup apply.
+    for filename in ("compose.generated.yaml", "compose.yaml"):
+        path = root / filename
+        if not path.is_file():
+            continue
+        try:
+            document = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, yaml.YAMLError) as exc:
+            document, error = None, f"{exc.__class__.__name__}"
+        else:
+            error = "" if isinstance(document, dict) else "not a Compose mapping"
+        if error:
+            return "", (
+                f"cannot read the Compose project name from {path} ({error}); fix the file or "
+                f"set COMPOSE_PROJECT_NAME in {root / '.env'}"
+            )
+        assert isinstance(document, dict)
+        value = document.get("name")
+        if isinstance(value, str) and "$" in value:
+            return "", (
+                f"{filename} sets the Compose project name by interpolation (name: {value}), "
+                f"which setup verify does not resolve; set COMPOSE_PROJECT_NAME in {root / '.env'} "
+                "to the resolved name"
+            )
+        if isinstance(value, str) and value:
+            return value, ""
+        break
+    return re.sub(r"[^a-z0-9_-]", "", root.name.lower()).lstrip("_-"), ""
+
+
+def _same_directory(value: str, root: Path) -> bool:
+    try:
+        return bool(value) and os.path.samefile(value, root)
+    except OSError:
+        return False
+
+
+def _publishes(published: str, port: int) -> bool:
+    return any(
+        int(first) <= port <= int(last or first)
+        for first, last in re.findall(r":(\d+)(?:-(\d+))?->", published)
+    )
+
+
+def _port_listening(port: int) -> bool:
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+            return True
+    except OSError:
+        return False
 
 
 def _database_secret_check(plan: SetupPlan) -> SetupCheck:

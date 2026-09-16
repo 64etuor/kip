@@ -4,7 +4,7 @@ This is the current readiness inventory, not the target architecture. The
 target-to-current matrix and ordered gap register live in
 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`.
 
-## 2026-09-16 comma ACL last line and agent retrieval CX (3.15.5)
+## 2026-09-16 comma ACL last line and agent retrieval CX (3.15.6)
 
 A single ACL scope with a comma is rejected at every entrance that used to
 split it: JWT groups and scope claims, configured API-key/source/connector

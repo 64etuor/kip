@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.15.6 - 2026-09-16
+
+- Installer and upgrade end-to-end tests set `KIP_POSTGRES_PORT` and both
+  database URLs to the throwaway PostgreSQL. 3.15.5's port guard refused
+  `kip migrate` when bootstrap left 5432 in `.env` and only the URL named
+  the throwaway port.
+
 ## 3.15.5 - 2026-09-16
 
 - PostgreSQL moves from `pgvector/pgvector` 0.8.2 to 0.8.6, pinned by digest

@@ -253,7 +253,7 @@ schema 식별자)도 게시하므로 3.9.x의 업그레이더도 그대로 적�
 새 트리의 `upgrade.sh --finish`로 bootstrap·migrate·doctor를 이어간다. 또 3.10.0 이전 릴리스를 `--version`으로 고정하면 최신
 설치기가 예전 자산 이름으로 되돌아가 받는다.
 
-**PostgreSQL 이미지 pin(3.16.0, pgvector 0.8.6).** `.env`의 `KIP_POSTGRES_IMAGE`는
+**PostgreSQL 이미지 pin(3.15.5, pgvector 0.8.6).** `.env`의 `KIP_POSTGRES_IMAGE`는
 `compose.yaml` 기본값보다 우선한다. 업그레이드 마무리 단계와 `./scripts/bootstrap.sh`는
 기존 `.env`의 값이 KIP이 이전에 배포한 pin(`pgvector/pgvector:0.8.2-pg18-trixie`, digest
 포함 여부 무관)과 정확히 같을 때만 그 한 줄을 현재 `.env.example` 값으로 바꾸고, 바뀐 값을
@@ -262,7 +262,7 @@ schema 식별자)도 게시하므로 3.9.x의 업그레이더도 그대로 적�
 권한, 가능한 경우 소유자, 줄바꿈은 유지한다. 임시 파일로 교체하므로 hard link는 분리되고, `.env`를 쓸
 수 없으면 경고만 내고 계속한다. 다른 값은 그대로 두고 현재 pin을 적은 경고를 내므로 직접 고친다.
 `--check`는 쓰지 않고 `Would update …`만 출력한다. `upgrade.sh --archive ZIP --dry-run`의 미리보기는
-3.16.0 이후 릴리스에서 올릴 때만 나온다. 3.15.x 배포의 dry run은 자신의 이전 `upgrade.sh`가
+3.15.5 이후 릴리스에서 올릴 때만 나온다. 3.15.4 및 이전 배포의 dry run은 자신의 이전 `upgrade.sh`가
 실행하므로, `.env`의 `KIP_POSTGRES_IMAGE`를 패키지의 `.env.example`과 직접 비교한다. 실제 교체는
 새 스크립트로 실행되는 마무리(`--finish`) 단계에서 일어난다. 그 뒤 `./scripts/app-up.sh`가 새 이미지로 같은 volume의
 PostgreSQL을 다시 시작하고, `./scripts/migrate.sh`가 migration 0029와 매 migrate 단계의

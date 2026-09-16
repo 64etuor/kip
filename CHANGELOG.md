@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.16.0 - 2026-09-15
+## 3.15.5 - 2026-09-16
 
 - PostgreSQL moves from `pgvector/pgvector` 0.8.2 to 0.8.6, pinned by digest
   (ADR-068). 0.8.6 includes the 0.8.3-0.8.4 fixes for HNSW index corruption

@@ -29,7 +29,7 @@ from kip.domain.file_references import (
     filename_key,
     looks_like_file_request,
 )
-from kip.domain.identity import AclSnapshot
+from kip.domain.identity import AclSnapshot, session_acl_scopes_value, session_roles_value
 from kip.domain.knowledge import (
     AUTO_APPROVE_POLICY_PRINCIPAL,
     EntityCandidate,
@@ -58,6 +58,7 @@ from kip.domain.models import (
     IngestResult,
     JobRecord,
     LogicalDocument,
+    MigrationReport,
     RequestContext,
     SearchHit,
     SearchRequest,
@@ -78,6 +79,10 @@ from kip.errors import (
 )
 from kip.ids import new_id, stable_id
 from kip.ontology import FALLBACK_EVIDENCE_REQUIRED_PREDICATES
+
+# The post-migration extension update waits at most this long for a lock held
+# by another session, such as a concurrent migrate.
+_EXTENSION_UPDATE_LOCK_TIMEOUT_MS = 5000
 
 _REVIEW_RISK_ORDER_SQL = (
     "CASE review_risk WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END"
@@ -326,8 +331,8 @@ class PostgresDatabase:
                             str(self.statement_timeout_ms),
                             context.workspace,
                             context.principal_id,
-                            ",".join(context.acl_scopes),
-                            ",".join(sorted(set(context.roles))),
+                            session_acl_scopes_value(context.acl_scopes),
+                            session_roles_value(context.roles),
                         ),
                     )
                 else:
@@ -351,7 +356,27 @@ class PostgresDatabase:
             cursor.execute("SELECT 1")
             cursor.fetchone()
 
-    def migrate(self, migrations_dir: Path) -> list[str]:
+    def extension_versions(self, name: str) -> tuple[str | None, str | None]:
+        """`(pg_extension.extversion, pg_available_extensions.default_version)`.
+
+        Each side is looked up on its own, so an extension installed in the
+        database whose files the server no longer has is `(installed, None)`,
+        one the server ships but the database lacks is `(None, default)`, and
+        one that is neither is `(None, None)`.
+        """
+        with self._connection() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT (SELECT extversion FROM pg_extension WHERE extname = %s) AS extversion,"
+                " (SELECT default_version FROM pg_available_extensions WHERE name = %s)"
+                " AS default_version",
+                (name, name),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None, None
+        return row["extversion"], row["default_version"]
+
+    def migrate(self, migrations_dir: Path) -> MigrationReport:
         import psycopg
         from psycopg.rows import dict_row
 
@@ -388,7 +413,87 @@ class PostgresDatabase:
                         (version, checksum),
                     )
                 applied.append(path.name)
-        return applied
+            extension_updates, warnings = self._update_vector_extension(connection)
+        return MigrationReport(
+            applied=applied, extension_updates=extension_updates, warnings=warnings
+        )
+
+    @staticmethod
+    def _update_vector_extension(
+        connection: Connection[DictRow],
+    ) -> tuple[dict[str, dict[str, str]], list[str]]:
+        """Bring pgvector's catalog version up to the library the server runs.
+
+        Runs on every migrate, after the migration files and outside the
+        ledger. A volume keeps its extversion when the image changes, and
+        migration 0029 is recorded once: when code migrated while the old image
+        was still running, only this step updates the catalog later. The
+        migration files are committed by now, so it never fails the migrate;
+        what it cannot do becomes an operator warning.
+        """
+        import psycopg
+
+        def read_versions() -> Any:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT installed.extversion, available.default_version, current_user AS role"
+                    " FROM pg_extension AS installed"
+                    " JOIN pg_available_extensions AS available ON available.name = installed.extname"
+                    " WHERE installed.extname = 'vector'"
+                )
+                return cursor.fetchone()
+
+        try:
+            row = read_versions()
+        except psycopg.Error as error:
+            return {}, [
+                "could not read the vector extension version after migrating "
+                f"({error.diag.message_primary or type(error).__name__}); run ./scripts/kip migrate again."
+            ]
+        if row is None or row["default_version"] is None or row["extversion"] == row["default_version"]:
+            return {}, []
+        installed, default = row["extversion"], row["default_version"]
+        try:
+            with connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT set_config('lock_timeout', %s, true)",
+                    (f"{_EXTENSION_UPDATE_LOCK_TIMEOUT_MS}ms",),
+                )
+                cursor.execute("ALTER EXTENSION vector UPDATE")
+        except psycopg.errors.InsufficientPrivilege:
+            return {}, [
+                f"extension vector is at {installed} but this server ships {default}, and the "
+                f"migration role {row['role']} does not own the extension, so it was not updated. "
+                "Run ALTER EXTENSION vector UPDATE; in this database as the extension owner, "
+                "then ./scripts/kip migrate again."
+            ]
+        except psycopg.errors.InvalidParameterValue as error:
+            return {}, [
+                f"extension vector is at {installed} but this server ships {default} and cannot "
+                f"update it ({error.diag.message_primary}): the PostgreSQL image is older than "
+                "this database. Run the pgvector image this release pins."
+            ]
+        except psycopg.Error as error:
+            # A lock timeout while another session holds the extension, or
+            # "tuple concurrently updated" when a concurrent migrate committed
+            # the same update first. Report nothing if the catalog is current.
+            try:
+                current = read_versions()
+            except psycopg.Error:
+                current = None
+            if current is not None and current["extversion"] == default:
+                return {}, []
+            return {}, [
+                f"extension vector is at {installed} but this server ships {default}, and "
+                "ALTER EXTENSION vector UPDATE did not complete "
+                f"({error.diag.message_primary or type(error).__name__}), for example because "
+                "another session held the extension. Run ./scripts/kip migrate again."
+            ]
+        try:
+            updated = read_versions()
+        except psycopg.Error:
+            updated = None
+        return {"vector": {"from": installed, "to": updated["extversion"] if updated else default}}, []
 
     def _ensure_workspace_and_principal(
         self,

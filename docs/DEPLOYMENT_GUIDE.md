@@ -134,18 +134,30 @@ rollback을 다룬다.
    새(두 번째) 배포에는 고유한 `COMPOSE_PROJECT_NAME`과 비어 있는 `KIP_POSTGRES_PORT`,
    `KIP_API_PORT`가 필요하다. 모든 배포의 Compose project 이름이 `kip`이라, 없으면 두
    배포가 container와 DB volume을 공유한다. `./scripts/bootstrap.sh`는 `.env`를 새로 만들
-   때 export된 값을 그대로 쓴다(이미 사용 중인 port도 유지). `COMPOSE_PROJECT_NAME`이
+   때 export된 값을 그대로 쓴다(이미 사용 중인 port도 유지). export되지 않은 PostgreSQL/API
+   port가 사용 중이면 `COMPOSE_PROJECT_NAME`만 export했어도 빈 port를 고른다. `COMPOSE_PROJECT_NAME`이
    export되지 않았으면 매번 다른 디렉터리의 `kip` container, container 없이 남은 `kip`
    volume, 사용 중인 PostgreSQL/API port를 검사하고, 하나라도 있으면 `kip-<디렉터리>`와
    55432·18080 이상의 빈 port를 골라 `KIP_DATABASE_URL`·`KIP_BACKUP_DATABASE_URL` port까지
    맞추고 출력한다. 운영자는 출력된 값만 확인한다. 이 디렉터리의 container가 있는데
    `.env`만 없으면 bootstrap은 아무것도 쓰지 않고 exit 75로 멈추므로, 백업한 `.env`를
-   복원한다. 기존 `.env`는 바꾸지 않으므로 그때는 이 값을 직접 넣는다. model
+   복원한다. container 없이 bootstrap이 이 디렉터리에 붙이는 이름(`kip-<디렉터리>`,
+   `-2`…`-100`)의 volume만 남아 있어도(`--down`으로 멈춘 배포) volume 이름을 출력하고
+   같은 방법으로 멈춘다. `kip-foo-2`는 `foo-2` 디렉터리의 이름이기도 해서 그 경우는 다른 배포의
+   volume일 수 있다고 함께 출력한다. 그 volume이 다른 배포의 것일 때만 다른 `COMPOSE_PROJECT_NAME`을
+   export하고, 복원할 `.env`가 없는 잔여 volume은 `docker volume inspect`로 확인한 뒤 필요 없을 때만
+   출력된 `docker volume rm` 명령으로 지운다. 기존 `.env`는 바꾸지 않으므로 그때는 이 값을 직접 넣는다. model
    runtime은 machine당 하나이므로 `KIP_SEMANTIC_PORT`는 그대로 두어 이미 떠 있는
    runtime을 함께 쓴다. `setup verify`의 `runtime_readiness` 항목
    `compose_project_isolation`이 남은 충돌을 app-up 전에 보고한다. `app-up.sh`는 다른 디렉터리에서 만든 같은 project의
    container를 발견하면 그 경로와 해결책을 출력하고 exit 2로 멈춘다
-   (docs/OPERATIONS.md "자주 하는 작업").
+   (docs/OPERATIONS.md "자주 하는 작업"). plain 배포에서 `KIP_DATABASE_URL`이나
+   `KIP_BACKUP_DATABASE_URL`(비어 있으면 `_FILE`)이 loopback인데 port가 `.env`의
+   `KIP_POSTGRES_PORT`와 다르면 `app-up.sh`, `migrate.sh`, `scripts/kip`(doctor·setup·version·
+   `--help` 제외), `mcp.sh`, `backup.sh`가 exit 2로 멈춘다. 외부 DB host와 `KIP_POSTGRES_PORT`가 없는
+   환경은 검사하지 않는다. `restore.sh`는 격리된 복원 대상이 다른 port에 있는 것이 정상이라 검사하지
+   않고, 대상에 대한 `kip` 호출은 override로 실행한다. 일부러 별도 로컬 PostgreSQL을 쓰면
+   `KIP_DATABASE_PORT_CHECK=off`를 `.env`에 둔다. 규칙 전체는 docs/OPERATIONS.md "DB URL port 검사".
 8. receipt의 `next_steps`에 나온 승인된 source 이름으로 먼저
    `sync run --source SOURCE --dry-run`을 실행해 범위와 건수를 확인한다.
    사용자 폴더만 설정했다면 `sample` source가 있다고 가정하지 않는다.
@@ -778,3 +790,43 @@ security 정책을 우회한다. 따라서 migration 0028이 34개 테이블에 
   `KIP_API_DATABASE_URL_FILE`/`KIP_WORKER_DATABASE_URL_FILE`이 그 login을
   가리키게 한다. 백업 login은 그룹 membership이 아니라 `BYPASSRLS` 속성을 직접
   가져야 한다.
+
+### 11.9 3.16.0 PostgreSQL 이미지(pgvector 0.8.6) 올리기
+
+3.16.0의 `compose.yaml` 기본 PostgreSQL 이미지는 digest로 고정한
+`pgvector/pgvector:0.8.6-pg18-trixie`다. 기존 배포의 `.env`에는 예전 `.env.example`이 쓴
+`KIP_POSTGRES_IMAGE=pgvector/pgvector:0.8.2-pg18-trixie`(digest가 붙었거나 없는 형태)가 남아
+있다. 이 값이 compose 기본값보다 우선하므로, 그대로 두면 업그레이드해도 새 이미지를 받지 않는다.
+
+1. `kip update`(`./scripts/upgrade.sh`의 마무리 단계)와 `./scripts/bootstrap.sh`는 기존
+   `.env`의 `KIP_POSTGRES_IMAGE`가 KIP이 이전 릴리스에서 배포한 값과 정확히 같을 때만 그 한
+   줄을 현재 `.env.example` 값으로 바꾼다. `Updated KIP_POSTGRES_IMAGE in <.env>: <이전> ->
+   <새 값>`을 출력하고, 다른 줄, 파일 권한, 가능한 경우 소유자, 줄바꿈은 그대로 둔다. `export`,
+   따옴표, 줄 끝 주석도 유지한다. 임시 파일로 교체하므로 hard link는 분리되고, `.env`를 쓸 수 없으면
+   경고만 내고 계속한다. 실행 중인 PostgreSQL container는 4단계의 `./scripts/app-up.sh`까지 이전
+   이미지로 남으며, 업그레이드 마무리 요약이 이를 다시 알린다. `.env`에 이 줄이 없으면 compose 기본값을 쓰므로 바꿀 것이 없다.
+2. `--check`는 `.env`를 쓰지 않고 `Would update …`만 출력한다. `./scripts/upgrade.sh --archive ZIP
+   --dry-run`의 미리보기(패키지 안의 `.env.example`과 비교)는 3.16.0 이후 릴리스에서 올릴 때만
+   나온다. 3.15.x 배포의 dry run은 자신의 이전 `upgrade.sh`가 실행해 이 단계가 없으므로,
+   `.env`의 `KIP_POSTGRES_IMAGE`를 패키지의 `.env.example`과 직접 비교한다. 실제 교체는 새 스크립트로
+   실행되는 마무리(`--finish`) 단계에서 일어난다. `--latest`/`--version`의 `--dry-run`은 설치기가
+   처리하므로 이 줄을 미리 보여 주지 않는다.
+3. KIP이 배포하지 않은 값(사설 registry 미러 등)은 바꾸지 않는다. 대신 현재 pin을 적은
+   경고를 낸다. 같은 이미지를 `.env`의 `KIP_POSTGRES_IMAGE`에 직접 넣은 뒤 다음 단계를
+   진행한다. 한 줄 이상 있거나 `.env`가 symlink여도 바꾸지 않고 경고한다.
+4. `./scripts/app-up.sh`(또는 `--database-only`)가 새 이미지를 받아 같은 volume으로
+   PostgreSQL을 다시 만든다. 데이터는 volume에 그대로 남는다.
+5. PostgreSQL이 새 이미지로 뜬 뒤 `./scripts/migrate.sh`(`kip migrate`)를 실행한다.
+   `--database-only`는 이를 포함한다. migration `0029_vector_extension_update`와, catalog가
+   서버보다 오래되면 매 migrate마다 도는 단계가 `ALTER EXTENSION vector UPDATE`로
+   `pg_extension.extversion`을 0.8.6으로 올린다. 업그레이드 마무리의 migrate는 아직 이전
+   이미지에서 돌므로 이 단계는 app-up 뒤에 한 번 더 필요하다.
+6. HNSW index는 on-disk 형식이 같아 REINDEX가 필요 없다. 다만 0.8.2에서 sync와 삭제가
+   잦았던 배포는 업그레이드 뒤 한 번
+   `REINDEX INDEX CONCURRENTLY search.embeddings_1024_hnsw_cosine_idx;`를 실행한다(1536
+   projection을 쓰면 `search.embeddings_1536_hnsw_cosine_idx`도). 이유와 증상은
+   `docs/TROUBLESHOOTING.md`에 있다.
+7. 0.8.2에서 받은 백업은 0.8.6 서버에 복원된다. restore 검증은 `vector`가 같은 0.8 line의
+   더 새 patch로 복원된 경우만 받아들여 `extension_updates`에 기록한다. extension 구성이 다르거나,
+   다른 extension의 버전이 바뀌었거나, 버전이 내려갔거나, 다른 minor/major line이면 여전히
+   실패한다.

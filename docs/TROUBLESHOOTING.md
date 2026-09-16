@@ -16,7 +16,8 @@
 ./scripts/kip status    # 실제로 몇 건이 색인되어 있는지 보여줍니다
 ```
 
-`doctor` 출력에서 `"ok": false`인 항목의 `reason`이 다음에 할 일입니다.
+`doctor` 출력에서 `"ok": false`인 항목의 `checks[].details.reason`과
+`details.fix`가 다음에 할 일입니다. 영어 에이전트는 `summary_en`을 읽으세요.
 
 ---
 
@@ -198,12 +199,14 @@ docker image inspect docker/dockerfile:1.27 --format '{{index .RepoDigests 0}}'
 ```
 
 ### 의미 검색 중 `different vector dimensions` 오류 또는 갑작스러운 recall 저하
-번들 `pgvector/pgvector` 0.8.2에는 sync의 INSERT와 VACUUM이 겹칠 때 HNSW
-index가 손상될 수 있는 알려진 문제가 있습니다(0.8.3-0.8.4 수정, 남은 race는
-0.8.7 예정). 증상은 검색이나 autovacuum 중의 `different vector dimensions`
-오류, 또는 같은 질의의 hybrid 결과가 갑자기 lexical 수준으로 떨어지는
-것입니다. embedding 표는 원본에서 다시 만들 수 있는 projection이므로 canonical
-데이터는 영향을 받지 않습니다. 복구는 projection을 다시 만드는 것입니다.
+`pgvector/pgvector` 0.8.2 이하에서는 sync의 INSERT와 VACUUM이 겹칠 때 HNSW
+index가 손상될 수 있습니다. 0.8.3-0.8.4가 이를 고쳤고, 번들 이미지는 이제
+0.8.6입니다. 남은 INSERT/VACUUM race(pgvector #1010, 이웃 중복으로 recall만
+떨어지고 오류는 없음)는 아직 출시되지 않은 0.8.7에서 고쳐집니다. 증상은 검색이나
+autovacuum 중의 `different vector dimensions` 오류, 또는 같은 질의의 hybrid
+결과가 갑자기 lexical 수준으로 떨어지는 것입니다. embedding 표는 원본에서 다시
+만들 수 있는 projection이므로 canonical 데이터는 영향을 받지 않습니다. 복구는
+projection을 다시 만드는 것입니다.
 
 ```bash
 ./scripts/kip projection rebuild --name semantic
@@ -212,6 +215,39 @@ index가 손상될 수 있는 알려진 문제가 있습니다(0.8.3-0.8.4 수�
 DB 관리자가 index만 다시 만들 때는 migration owner로
 `REINDEX INDEX CONCURRENTLY search.embeddings_1024_hnsw_cosine_idx;`
 (1536 차원 projection은 `search.embeddings_1536_hnsw_cosine_idx`)를 실행합니다.
+
+새 이미지는 서버가 재시작할 때 고친 library를 읽으므로 index 형식은 그대로이고
+REINDEX 없이 동작합니다. 다만 업그레이드 **전에** 이미 생긴 손상은 남습니다.
+0.8.2에서 sync와 삭제가 잦았던 deployment는 업그레이드 뒤 한 번 위 REINDEX를
+실행해 두는 것을 권장합니다. migration은 이 작업을 하지 않습니다. 트랜잭션
+안에서는 `CONCURRENTLY`를 쓸 수 없고, 일반 REINDEX는 그동안 쓰기와 index 검색을
+막기 때문입니다.
+
+extension 버전은 다음으로 확인합니다. 두 값이 같아야 합니다.
+
+```sql
+SELECT e.extversion, a.default_version
+FROM pg_extension e JOIN pg_available_extensions a ON a.name = e.extname
+WHERE e.extname = 'vector';
+```
+
+`extversion`이 더 낮으면 `./scripts/kip migrate`를 실행합니다(`kip doctor`의
+`postgres_extensions` 점검도 `outdated`로 알려 줍니다). migration
+`0029_vector_extension_update`와, migrate를 실행할 때마다 도는 확장 갱신 단계가
+`ALTER EXTENSION vector UPDATE`를 실행하고 그 결과를 `data.extension_updates`에
+보고합니다. migration role이 extension 소유자가 아니면(외부 관리형 PostgreSQL 등)
+migrate는 실패하지 않고 catalog를 그대로 둔 채 `meta.warnings`에 안내를 남깁니다.
+그때는 extension 소유자가 그 데이터베이스에서 `ALTER EXTENSION vector UPDATE;`를
+실행한 뒤 migrate를 다시 실행하세요. 같은 방식으로 실패 없이 경고만 남기는 경우가
+두 가지 더 있습니다. `PostgreSQL image is older than this database`는 catalog가
+이미지보다 새 버전이라는 뜻이므로 이 release가 고정한 pgvector 이미지로
+실행합니다. `did not complete`는 동시에 실행된 migrate 같은 다른 세션이 extension을
+잡고 있었다는 뜻이므로 migrate를 다시 실행합니다.
+
+0.8.2 시절 백업을 0.8.6 서버에 복원하면 `pg_restore`가 extension을 서버 기본
+버전으로 만듭니다. 복원 검증은 `vector`에 한해 같은 0.8 계열의 더 새 patch
+버전을 허용하고, 그 차이를 `database-comparison.json`의 `extension_updates`에
+남깁니다. 그 밖의 extension 차이는 계속 실패합니다.
 
 ### `dependency_unavailable: PostgreSQL is not reachable at …`
 데이터베이스가 떠 있지 않거나 `KIP_DATABASE_URL`이 다른 곳을 가리킵니다. 몇 초
@@ -265,9 +301,11 @@ search를 쓰면 embedding model snapshot 약 1.2GB(`var/model-cache`, reranker�
    ```bash
    ./scripts/kip status    # data.content_units 가 0이면 아직 색인 전입니다
    ```
-   0이면 먼저 수집을 실행하세요: `./scripts/kip sync run --source 소스이름`
-   (쓸 수 있는 소스 이름은 `./scripts/kip doctor` 출력의
-   `filesystem_source:이름` 점검 항목에서 확인할 수 있습니다).
+   `content_units`가 0이면 이 배포는 아직 색인되지 않은 것입니다. 운영자가
+   `./scripts/kip sync run --source 소스이름`을 실행합니다(소스 이름은
+   `kip doctor`의 `filesystem_source:이름` 항목). 검색 한 건이 비었다고
+   에이전트가 sync 하면 안 됩니다. `meta.warnings`에 `semantic_disabled`가
+   있으면 lexical 전용 배포이므로 다른 철자·식별자로 다시 검색하세요.
 
 2. **그 단어가 실제로 색인에 있는가**
    ```bash
@@ -398,6 +436,10 @@ Reference 설정에서는 모든 filesystem parser가 파일 하나당 fresh chi
 | `kordoc_ocr_resolvable` | OCR이 켜져 있는데 `kordoc` 실행 파일을 찾지 못했습니다. `./scripts/install-kordoc.sh`를 실행하거나, 스캔 문서가 없다면 설정에서 `parsers.ocr.kordoc.enabled = false`로 끄세요. 끄지 않으면 이미지가 든 PDF/PPTX가 `partial`로 처리됩니다. |
 | `ontology_adaptive_discovery_writable` | 새 용어 제안 기능이 켜져 있는데 `ontology/` 폴더에 쓸 수 없습니다. 컨테이너라면 그 폴더가 쓰기 가능하게 연결(마운트)되어야 합니다. |
 | `ontology_pending_release_journal` | 이전 작업이 중단된 흔적이 남아 있습니다. 다음 실행 때 자동 복구되며, 계속 남아 있으면 파일 권한을 확인하세요. |
+| `mcp_registration` | `.mcp.json`이 상대 경로라 배포 루트 밖에서 MCP가 시작되지 않습니다. `details.fix`의 절대 경로로 고치거나, 설치기가 출력한 런처로 `claude mcp add --scope user kip -- '/abs/path/kip' mcp`를 실행하세요. 필수는 아닙니다. |
+| `skill_installs` | 이 배포가 설치한 에이전트 skill 사본이 오래됐습니다. `./scripts/install-agent-files.sh --refresh`. 필수는 아닙니다. |
+| `postgres_extensions` | `vector` 카탈로그와 서버 pgvector 버전이 다릅니다. `outdated`면 `./scripts/kip migrate`, `newer_than_server`면 마이그레이션 때 쓴 이미지로 되돌리세요. `unknown_version`은 순서를 매길 수 없는 버전입니다. 필수는 아닙니다. |
+| `database_url_port` | 루프백 `KIP_DATABASE_URL`/`KIP_BACKUP_DATABASE_URL` 포트가 `KIP_POSTGRES_PORT`와 다르거나 연결될 수 없는 포트입니다. `.env`에서 포트를 맞추거나, 의도적으로 다른 로컬 PostgreSQL이면 `KIP_DATABASE_PORT_CHECK=off`. |
 
 ---
 
@@ -414,6 +456,8 @@ Reference 설정에서는 모든 filesystem parser가 파일 하나당 fresh chi
 | `dependency_unavailable` | 외부 구성요소 없음 | 임베딩 서버나 선택 기능이 꺼져 있습니다. `--mode`로 `vector`, `hybrid`, `reranked`를 명시한 요청은 lexical로 대체되지 않고 실패하므로, runtime을 켜거나(`./scripts/semantic-server.sh start`) mode를 생략해 기본 fallback을 쓰세요. |
 | `configuration_error` | 설정값 오류 | 메시지가 어떤 설정 키가 잘못됐는지 알려줍니다. |
 | `parser_error` | 파일을 읽지 못함 | 3장 표를 보세요. |
+| `internal_error` | 검색·조회 실행이 깨짐 | `meta.warnings`에 `search_failed`가 있으면 재시도할 수 있습니다(보통 statement timeout). 같은 질의를 최대 두 번, 그래도 실패하면 질의를 좁히세요. |
+| `source_unavailable` | 원본을 읽지 못함 | 마운트·권한·클라우드 placeholder. 재시도 후 운영자에게 보고하세요. 검색 실패는 자료가 없다는 뜻이 아닙니다. |
 
 ### 자주 겪는 경우: `forbidden`
 온톨로지 후보 승인/거절, 사실 철회, 관계 채굴, 엔티티 생성은 관리자 전용입니다.

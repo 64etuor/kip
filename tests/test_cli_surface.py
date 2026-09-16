@@ -632,3 +632,44 @@ def test_mcp_is_a_deployment_command_that_forwards_root_options_to_the_server(mo
         # replace the server's, so the entry behaves exactly like scripts/mcp.sh.
         dict.fromkeys(_MCP_ENVIRONMENT),
     ]
+
+
+def test_acl_scope_with_a_comma_is_rejected_before_mcp_or_the_runtime_starts(monkeypatch) -> None:
+    # The scope list is comma-separated through KIP_ACL_SCOPES, the REST header
+    # and the PostgreSQL session, so "group:a,b" would silently become two scopes.
+    served: list[str | None] = []
+    monkeypatch.setattr("kip.cli.serve_mcp_stdio", lambda: served.append(os.environ.get("KIP_ACL_SCOPES")))
+    monkeypatch.setattr(os, "environ", dict(os.environ))
+    os.environ.pop("KIP_ACL_SCOPES", None)
+
+    rejected = CliRunner().invoke(app, ["--acl-scope", "project:a", "--acl-scope", "group:a,b", "mcp"])
+
+    assert rejected.exit_code == 3
+    assert rejected.stdout == ""
+    error = json.loads(rejected.stderr)["error"]
+    assert error["code"] == "validation_error"
+    assert "'group:a,b' contains a comma" in error["message"]
+    assert served == [] and "KIP_ACL_SCOPES" not in os.environ
+
+    def no_container(*args, **kwargs):
+        raise AssertionError("the runtime must not start with an ambiguous scope")
+
+    monkeypatch.setattr("kip.cli.build_container", no_container)
+    runtime = CliRunner().invoke(app, ["--acl-scope", "group:a,b", "search", "q"])
+    assert runtime.exit_code == 3
+    assert "contains a comma" in runtime.stderr
+
+
+def test_role_with_a_comma_is_rejected_before_the_runtime_starts(monkeypatch) -> None:
+    def no_container(*args, **kwargs):
+        raise AssertionError("the runtime must not start with an ambiguous role")
+
+    monkeypatch.setattr("kip.cli.build_container", no_container)
+    rejected = CliRunner().invoke(app, ["--role", "x,admin", "search", "q"])
+
+    assert rejected.exit_code == 3
+    assert rejected.stdout == ""
+    error = json.loads(rejected.stderr)["error"]
+    assert error["code"] == "validation_error"
+    assert "'x,admin' contains a comma" in error["message"]
+    assert "role cannot" in error["message"]

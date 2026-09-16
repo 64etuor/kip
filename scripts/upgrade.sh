@@ -22,6 +22,7 @@ python_for_upgrade() {
   else printf 'upgrade.sh: python3 is required (run ./scripts/bootstrap.sh first)\n' >&2; exit 69; fi
 }
 
+postgres_image_refreshed=0
 archive=""; dry_run=0; bootstrap=1; rollback=""; do_rollback=0; version=""; latest=0; finish=0
 bootstrap_args=()
 while [[ $# -gt 0 ]]; do
@@ -60,12 +61,35 @@ refresh_skills() {
   fi
   return 0
 }
+refresh_postgres_image() {
+  # An .env from an earlier release keeps the PostgreSQL image pin KIP shipped
+  # then, which overrides compose.yaml's newer default. bootstrap_env.py
+  # replaces only such a value (arguments: --dry-run, --example ZIP) and keeps a
+  # custom image with a warning. A failure is reported and never fails the upgrade.
+  [[ -f "$PROJECT_ROOT/.env" && -f "$SCRIPT_DIR/bootstrap_env.py" ]] || return 0
+  local pattern='^[[:space:]]*(export[[:space:]]+)?KIP_POSTGRES_IMAGE[[:space:]]*=' before after
+  before="$(grep -E "$pattern" "$PROJECT_ROOT/.env" || true)"
+  if ! "$PY" "$SCRIPT_DIR/bootstrap_env.py" "$PROJECT_ROOT" --refresh-postgres-image "$@"; then
+    printf 'Warning: KIP_POSTGRES_IMAGE in .env was not checked (see above). Compare it with .env.example.\n' >&2
+  fi
+  after="$(grep -E "$pattern" "$PROJECT_ROOT/.env" || true)"
+  [[ "$before" == "$after" ]] || postgres_image_refreshed=1
+  return 0
+}
+postgres_image_note() {
+  [[ "$postgres_image_refreshed" == 1 ]] || return 0
+  printf 'KIP_POSTGRES_IMAGE changed in .env: the running PostgreSQL container keeps the old image until ./scripts/app-up.sh (or --database-only) recreates it; then run ./scripts/migrate.sh to update the vector extension.\n'
+}
 finish_upgrade() {
+  local check_only=0 arg
+  for arg in ${bootstrap_args[@]+"${bootstrap_args[@]}"}; do [[ "$arg" == "--check" ]] && check_only=1; done
+  if [[ "$check_only" == 1 ]]; then refresh_postgres_image --dry-run; else refresh_postgres_image; fi
   "$PROJECT_ROOT/scripts/bootstrap.sh" ${bootstrap_args[@]+"${bootstrap_args[@]}"}
-  for arg in ${bootstrap_args[@]+"${bootstrap_args[@]}"}; do [[ "$arg" == "--check" ]] && exit 0; done
+  [[ "$check_only" == 0 ]] || exit 0
   refresh_skills
   if ! "$PROJECT_ROOT/scripts/migrate.sh"; then
     printf 'Action required: migrations were not applied. Start the database (./scripts/app-up.sh --database-only) and run ./scripts/migrate.sh, then ./scripts/kip doctor.\n' >&2
+    postgres_image_note >&2
     exit 75
   fi
   if "$PROJECT_ROOT/scripts/kip" doctor >/dev/null 2>&1; then
@@ -73,6 +97,7 @@ finish_upgrade() {
   else
     printf 'Upgrade applied and migrated; ./scripts/kip doctor reported issues, run it for details.\n' >&2
   fi
+  postgres_image_note
 }
 
 if [[ "$finish" == 1 ]]; then
@@ -96,7 +121,8 @@ fi
 upgrade_args=(--deployment "$PROJECT_ROOT" --archive "$archive")
 [[ "$dry_run" == 1 ]] && upgrade_args+=(--dry-run)
 "$PY" "$SCRIPT_DIR/upgrade_package.py" "${upgrade_args[@]}"
-if [[ "$dry_run" == 1 || "$bootstrap" == 0 ]]; then exit 0; fi
+if [[ "$dry_run" == 1 ]]; then refresh_postgres_image --dry-run --example "$archive"; exit 0; fi
+if [[ "$bootstrap" == 0 ]]; then exit 0; fi
 
 # The tree now holds the new package. Finish with its own upgrade.sh: this
 # bash already parsed the old finish_upgrade, which may lack newer steps

@@ -7,9 +7,55 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from kip.domain.identity import comma_acl_scopes_error
 from kip.errors import ConfigurationError
 
 _MAX_SECRET_BYTES = 64 * 1024
+
+
+def _reject_comma_acl_scopes_in_config(raw: dict[str, Any]) -> None:
+    """Fail closed when a configured scope would split in the database session.
+
+    List forms such as `KIP_API_ACL_SCOPES=a,b` still separate on commas.
+    A single TOML array element, filesystem source scope, or connector-policy
+    scope that itself holds a comma is rejected here, before identity adapters
+    or ingestion see it.
+    """
+    api_scopes = _deep_get(raw, "identity.api_key.acl_scopes", []) or []
+    if isinstance(api_scopes, list):
+        error = comma_acl_scopes_error(
+            (str(item) for item in api_scopes),
+            subject="identity.api_key.acl_scopes",
+        )
+        if error is not None:
+            raise ConfigurationError(error)
+    sources = _deep_get(raw, "sources.filesystem", []) or []
+    if isinstance(sources, list):
+        for source in sources:
+            if not isinstance(source, dict) or not isinstance(source.get("acl_scope"), str):
+                continue
+            name = str(source.get("name") or "unnamed")
+            error = comma_acl_scopes_error(
+                [source["acl_scope"]],
+                subject=f"sources.filesystem {name!r} acl_scope",
+            )
+            if error is not None:
+                raise ConfigurationError(error)
+    policies = _deep_get(raw, "sources.connector_policies", []) or []
+    if isinstance(policies, list):
+        for policy in policies:
+            if not isinstance(policy, dict):
+                continue
+            scopes = policy.get("acl_scopes") or []
+            if not isinstance(scopes, list):
+                continue
+            name = str(policy.get("name") or "unnamed")
+            error = comma_acl_scopes_error(
+                (str(item) for item in scopes),
+                subject=f"sources.connector_policies {name!r} acl_scopes",
+            )
+            if error is not None:
+                raise ConfigurationError(error)
 
 
 def _deep_get(data: dict[str, Any], path: str, default: Any = None) -> Any:
@@ -412,6 +458,8 @@ class Settings:
         admin_key_env = str(
             _deep_get(raw, "identity.api_key.admin_key_env", "KIP_ADMIN_KEY")
         )
+
+        _reject_comma_acl_scopes_in_config(raw)
 
         return cls(
             project_root=root,

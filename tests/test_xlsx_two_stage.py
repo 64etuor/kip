@@ -3,12 +3,13 @@ from __future__ import annotations
 import hashlib
 import zipfile
 from datetime import date
+from itertools import pairwise
 from pathlib import Path
 
 import pytest
 from openpyxl import Workbook
 
-from kip.adapters.parsers.xlsx import XlsxShallowParser, read_xlsx_range
+from kip.adapters.parsers.xlsx import XlsxShallowParser, _split_text_spans, read_xlsx_range
 from kip.domain.models import SearchRequest
 from kip.errors import ValidationError
 
@@ -119,9 +120,34 @@ def test_xlsx_shallow_parser_chunks_large_sheet_units(tmp_path):
     assert extraction.status == "succeeded"
     assert len(units) > 1
     assert all(len(unit.body) <= 80 for unit in units)
+    overlapping_bodies = sum(
+        1
+        for previous, current in pairwise(units)
+        if previous.body[-8:] in current.body
+    )
+    assert overlapping_bodies >= 1
     assert "고유 증거 항목 001" in "\n".join(unit.body for unit in units)
     assert all(unit.locator.type == "xlsx_sheet" for unit in units)
     assert [unit.ordinal for unit in units] == list(range(len(units)))
+    naive = 0
+    for index, unit in enumerate(units):
+        start = unit.locator.data["char_start"]
+        end = unit.locator.data["char_end"]
+        assert end == start + len(unit.body)
+        if index:
+            assert start < naive
+            assert start < units[index - 1].locator.data["char_end"]
+        naive += len(unit.body)
+
+
+def test_xlsx_split_text_spans_report_true_offsets() -> None:
+    text = "\n".join(f"고유 증거 항목 {row:03d}" for row in range(1, 31))
+    spans = _split_text_spans(text, 80)
+
+    assert len(spans) > 1
+    for start, chunk in spans:
+        assert text[start : start + len(chunk)] == chunk
+    assert spans[1][0] < spans[0][0] + len(spans[0][1])
 
 
 def test_xlsx_deep_read_preserves_cell_semantics_and_source_bytes(tmp_path: Path) -> None:

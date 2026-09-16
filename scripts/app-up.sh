@@ -78,34 +78,7 @@ case "${1:-}" in
     else
       # setup_compose.py checks this for generated deployments. A plain one
       # whose URL still names another deployment's port would migrate there.
-      # Parsed like setup_compose.py, so query strings, encoded passwords
-      # and ::1 behave the same on both paths.
-      "$(python_cmd)" - <<'PY' || exit 2
-import os
-import sys
-from urllib.parse import urlsplit
-
-published_text = os.environ.get("KIP_POSTGRES_PORT") or "5432"
-try:
-    published = int(published_text)
-except ValueError:
-    sys.exit(f"error: KIP_POSTGRES_PORT={published_text!r} is not a port number")
-for name in ("KIP_DATABASE_URL", "KIP_BACKUP_DATABASE_URL"):
-    value = os.environ.get(name)
-    if not value:
-        continue
-    try:
-        parts = urlsplit(value)
-        host, port = (parts.hostname or "").lower(), parts.port or 5432
-    except ValueError:
-        continue
-    if host in {"localhost", "127.0.0.1", "::1"} and port != published:
-        sys.exit(
-            f"error: {name} uses port {port}, but this deployment publishes PostgreSQL on {published} "
-            f"(KIP_POSTGRES_PORT); another deployment may own port {port}. Set the same port in "
-            "KIP_DATABASE_URL and KIP_BACKUP_DATABASE_URL in .env."
-        )
-PY
+      kip_database_port_check || exit $?
       docker compose -f compose.yaml up -d --wait --wait-timeout 60 postgres
       "$SCRIPT_DIR/migrate.sh"
       # The application roles belong to the database, not to the app profile:
@@ -140,6 +113,7 @@ esac
 if [[ "$using_generated" == "1" ]]; then
   echo "Using approved standalone setup: compose.generated.yaml"
 else
+  kip_database_port_check || exit $?
   cat >&2 <<'EOF'
 notice: no generated setup override found (compose.generated.yaml and
 config/kip.generated.toml). Starting the plain app profile with the baked-in

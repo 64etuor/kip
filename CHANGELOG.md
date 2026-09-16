@@ -1,5 +1,160 @@
 # Changelog
 
+## 3.16.0 - 2026-09-15
+
+- PostgreSQL moves from `pgvector/pgvector` 0.8.2 to 0.8.6, pinned by digest
+  (ADR-068). 0.8.6 includes the 0.8.3-0.8.4 fixes for HNSW index corruption
+  when VACUUM runs alongside INSERT; KIP uses HNSW under sync churn. One more
+  INSERT/VACUUM race (pgvector #1010) is fixed only in the unreleased 0.8.7.
+  - Migration `0029_vector_extension_update` runs `ALTER EXTENSION vector
+    UPDATE` when the catalog is older than the server. It never reindexes: the
+    fix is in the library and the index format is unchanged. A migration runs
+    only once, so if code migrated before the image changed it would have been
+    recorded as a no-op. Every `kip migrate` therefore also runs the same
+    idempotent update after pending migrations, even when none are pending,
+    and reports it in `data.extension_updates` (for example `{"vector":
+    {"from": "0.8.2", "to": "0.8.6"}}`). `data.applied` is unchanged. Neither
+    migration 0029 nor this step fails a migrate. Three cases leave the catalog
+    alone and exit 0 with one `meta.warnings` entry giving the fix: the
+    migration role does not own the extension (as when a DBA pre-created it on
+    external PostgreSQL), the image is older than the catalog, or another
+    session holds the extension past a 5-second lock timeout. A real throwaway volume went through
+    each stage: migrated on 0.8.2, image switched, the second migrate updated
+    the catalog, and a third changed nothing.
+  - Restore verification accepts a `vector` extension restored at a newer
+    0.8.x patch than the backup, because `pg_restore` recreates it at the
+    server's default version, and records the difference as
+    `extension_updates`. Every other extension difference still fails.
+    Backups taken at 0.8.2 restore onto the new image. 3.15.4's comparison
+    rejected them.
+  - Throwaway containers verified four paths: a fresh migrate, a 0.8.2 volume
+    moved to the 0.8.6 image with HNSW queries still matching exact order,
+    backups from before and after the update restored and verified, and
+    `e2e-db-roles.sh --mode database`.
+  - `docs/TROUBLESHOOTING.md` describes the corruption symptoms and the
+    recovery: `kip projection rebuild --name semantic`, or `REINDEX INDEX
+    CONCURRENTLY` once after heavy churn on 0.8.2.
+  - Existing deployments get the new image. `.env.example` has always set
+    `KIP_POSTGRES_IMAGE`, and an existing `.env` overrides the Compose
+    default, so updating KIP alone never pulled the new image. `kip update`
+    (`upgrade.sh --finish`) and `bootstrap.sh` now rewrite that line when its
+    value is one KIP itself shipped: the 0.8.2 tag, with or without its
+    digest. They write the current pin, change only that line and keep the
+    file mode. A test checks this list against git history, so a later pin
+    bump cannot forget the outgoing value. A custom image is kept, with a
+    warning naming the current pin. `--check` and `upgrade.sh --archive ZIP
+    --dry-run` only report. The upgrade's own migrate still runs on the old
+    image. The next `./scripts/app-up.sh --database-only` pulls 0.8.6,
+    restarts PostgreSQL on the same volume and migrates, and that migrate
+    updates the extension (`docs/DEPLOYMENT_GUIDE.md` 11.9).
+- Setup and install fixes from the 3.15.4 agent install test:
+  - Both READMEs and the quickstart show the version-pinned installer command
+    beside the latest-release command. The agent request now asks the agent to
+    report the version `scripts/kip version` prints.
+  - `setup plan` lists `replaced_files`: existing files that apply will
+    overwrite, such as the package's `.mcp.json`. They are shown before
+    approval. The apply receipt adds `replaced_files` entries with
+    `previous_copy` and `original_copy`, plus a `summary` line. Apply now keeps
+    `FILE.original`, the earliest copy, written once and never overwritten,
+    beside `FILE.previous`, so a second apply no longer loses the package's
+    original file. Plans written before this change still verify.
+  - The `source_ownership` question now says bundled sample data is `company`.
+    The sample is fictional company documents, and `company` defaults
+    classification to `restricted`, which keeps it outside remote-model
+    egress. No new option was added, because any other default would either
+    loosen egress or duplicate `company`.
+  - With semantic search turned off, `kip doctor` reports `semantic_search` as
+    `state: disabled_by_configuration` and names the configuration value that
+    disabled it (`search.semantic_enabled`). The summary says lexical search is
+    the intended mode. Existing keys are unchanged.
+  - An ACL scope containing a comma is now rejected. Scopes are
+    comma-separated in `KIP_ACL_SCOPES`, the `X-KIP-ACL-Scopes` header and the
+    database session, so such a scope silently became several scopes and could
+    widen access. The check applies wherever a single scope comes in:
+    - root `--acl-scope` (exit 3, including `kip mcp`);
+    - `kip ontology entity-create --acl-scope` and its REST and MCP equivalents;
+    - connector events;
+    - JWT scope claims and group names;
+    - configured source, connector-policy and API-key scopes;
+    - evaluation datasets;
+    - the repository session itself, as a final fail-closed check.
+
+    List forms such as `--acl-scopes a,b` and the header still separate on
+    commas. Setup rejects a comma in a source `acl_scope` when you answer the
+    question. A saved state that already holds one is no longer complete, and
+    inspect, plan, apply and verify flag it, including through a new
+    `source_acl_scopes` check. JWT group names and scope claims, configured
+    API-key/source/connector-policy scopes, evaluation datasets, RequestContext
+    and the PostgreSQL session GUC (`session_acl_scopes_value`) now reject a
+    comma too. The sibling `kip.roles` GUC is split the same way
+    (`kip.current_is_admin()` is `'admin' = ANY(...)`), so `--role` and
+    `session_roles_value` reject a comma inside one role before
+    `set_config('kip.roles', ...)`. `workspace:`, `group:` and `project:`
+    scopes without a comma keep working.
+- Agent and retrieval CX:
+  - Search and context report `semantic_disabled` in `meta.warnings` when
+    semantic search is off by configuration, so a paraphrase miss is not
+    treated as absence.
+  - `kip setup preset sample` fills remaining questions with bundled
+    `sample-data` defaults. Plan approval is still required.
+  - MCP `kip_doctor` is the same read-only payload as `kip doctor`, with
+    `summary_en` beside the Korean `summary`. Daily-path instructions name
+    seven retrieval tools plus doctor; ontology review still needs an explicit
+    human decision.
+  - Context packs keep the head and tail of a long unit around an explicit
+    marker instead of cutting only from the start. `body_truncated` means that
+    shape; it is not a leading prefix and cannot prove absence. XLSX shallow
+    units overlap like HWP, and chunk locators use the real span offsets.
+    A Korean+English query splitter exists as `_codeswitch_expansion` but is
+    not on the default lexical path: injecting it dropped private-gate lexical
+    recall below 0.84.
+- Remaining guard gaps:
+  - `migrate.sh`, `mcp.sh`, `backup.sh` and `scripts/kip` (except
+    `doctor`, `setup`, `version` and help) now apply the same check as
+    `app-up.sh`. They refuse, with exit code 2, a loopback `KIP_DATABASE_URL` or
+    `KIP_BACKUP_DATABASE_URL` whose port differs from `KIP_POSTGRES_PORT`.
+    Before, only `app-up.sh --database-only` checked, so running migrations,
+    sync, MCP or a backup directly could reach another deployment's database.
+    `restore.sh` does not run that guard on its nested kip calls: it sets
+    `KIP_DATABASE_PORT_CHECK=off` so a restore onto a separate local PostgreSQL
+    still works. The bash preflight is 0.07 ms per call. The Python CLI and
+    `kip-mcp` console scripts apply the same refuse (exit 2) so
+    `.venv/bin/kip migrate` and `python -m kip.cli migrate` cannot walk around
+    the wrapper. A test holds bash URL parsing to `urlsplit` on 28 URLs. It
+    applies only when `KIP_POSTGRES_PORT` is set, which every bootstrapped
+    `.env` does. It skips external hosts and generated deployments, which
+    `setup_compose.py` already checks. `KIP_DATABASE_PORT_CHECK=off` disables
+    it for a deliberately separate local PostgreSQL. `scripts/kip` finds the
+    subcommand after root options, so `kip --config FILE doctor` and
+    `kip --workspace=X setup` stay exempt, as does `--help` anywhere.
+    `kip doctor` reports the same mismatch as the `database_url_port` check,
+    which is required only when the port check applies, and reads
+    `KIP_DATABASE_URL_FILE` / `KIP_BACKUP_DATABASE_URL_FILE` when the env var
+    is empty, the way the bash guard does.
+  - `kip doctor` also has a new non-required `postgres_extensions` check. It
+    compares the `vector` catalog version with the server's pgvector through
+    a new `extension_versions` operations port. `outdated` points to
+    `./scripts/kip migrate`. `newer_than_server` means the database runs on an
+    older image than the one it was migrated with. `installed_but_unavailable`
+    means the database has `vector` but the server has no pgvector.
+    `unknown_version` covers a version that cannot be ordered, such as
+    `0.8.7-dev`, instead of wrongly advising a migrate. The memory repository
+    reports `not_applicable`, and a failed query reports `not_checked`.
+    `database_url_port` also fails a URL whose port is not a number from 1 to
+    65535, because such a URL can never connect.
+  - Bootstrap now also recognises volumes of the project name it would derive
+    for this directory (`kip-<directory>`, `-2` to `-100`). If they exist
+    without `.env` and no other directory's containers own that name, it names
+    the volumes, writes nothing and exits 75. Exporting `COMPOSE_PROJECT_NAME`
+    skips the check.
+  - uv moves from 0.12.12 to 0.12.14 in bootstrap and CI, with every platform
+    hash checked against the published digest. uv 0.12.14 exits 1 for
+    expected failures and 2 for operational ones. No KIP script or workflow
+    tests for a specific code, and both codes stop bootstrap, so old and new uv
+    behave the same.
+  - The Docker Desktop pin moves from 4.90.0 to 4.91.0 (Compose 5.5.1, Engine
+    29.8.0), with both DMGs hashed.
+
 ## 3.15.4 - 2026-09-15
 
 - A second deployment on one machine no longer needs a hand-edited `.env`.

@@ -5,6 +5,7 @@ from enum import StrEnum
 from typing import assert_never
 
 from kip.domain.egress import DataClassification
+from kip.domain.identity import comma_acl_scopes_error
 from kip.domain.models import (
     Artifact,
     ConnectorEvent,
@@ -70,6 +71,10 @@ class EventIngestionWorkflow:
             context.workspace,
             f"{event.connector_name}:{event.external_id}",
         )
+        # The event's scopes join the request's scopes in the database session.
+        comma_error = comma_acl_scopes_error(event.acl_scopes, subject="connector event acl_scope")
+        if comma_error is not None:
+            raise ValidationError(comma_error)
         snapshot = event.acl_snapshot
         if snapshot is None:
             raise ValidationError("connector event requires an ACL snapshot")

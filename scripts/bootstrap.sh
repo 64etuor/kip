@@ -27,13 +27,19 @@ if [[ ! -d .venv ]]; then
 fi
 if [[ ! -f .env ]]; then
   # A new .env keeps exported COMPOSE_PROJECT_NAME, KIP_POSTGRES_PORT and
-  # KIP_API_PORT. Without an exported project name, bootstrap_env.py reads the
-  # Compose containers, volumes and default ports on this machine: it chooses
-  # its own project name and free ports when another project or a busy port
-  # collides, and stops (75) when this directory's containers exist but .env
-  # is gone. It needs port and volume ownership, which kip_compose_project_check
+  # KIP_API_PORT, and replaces a default port that is taken. Without an
+  # exported project name, bootstrap_env.py also reads the Compose containers
+  # and volumes on this machine: it chooses its own project name and free ports
+  # when another project or a busy port collides, and stops (75) when this directory's containers, or volumes of a
+  # project name it would derive for this directory, exist but .env is gone.
+  # It needs port and volume ownership, which kip_compose_project_check
   # does not report, so it queries Docker itself.
   "$(python_cmd)" "$SCRIPT_DIR/bootstrap_env.py" "$PROJECT_ROOT" --detect-existing-deployment
+else
+  # An .env from an earlier release keeps the PostgreSQL image KIP shipped
+  # then, which overrides compose.yaml's newer default. Only such a value is
+  # replaced; a custom image is kept with a warning.
+  "$(python_cmd)" "$SCRIPT_DIR/bootstrap_env.py" "$PROJECT_ROOT" --refresh-postgres-image
 fi
 created_config=0
 if [[ ! -f config/kip.toml ]]; then

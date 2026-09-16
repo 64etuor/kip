@@ -3,12 +3,14 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Literal, Self
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from kip.domain.identity import ACL_SCOPE_COMMA_REASON
 from kip.domain.json_types import JsonObject
 from kip.errors import ValidationError
 from kip.setup.paths import canonical_source_root
@@ -304,6 +306,10 @@ class SetupPlan(StrictModel):
     interaction_memory_mode: Literal["disabled", "explicit_consent"]
     ontology_reviewers: list[str]
     generated_files: list[str]
+    # Generated files that already exist when the plan is made, so approving
+    # the plan approves replacing them; apply keeps each old copy as
+    # `FILE.previous`. None on plans written before the field existed.
+    replaced_files: list[str] | None = None
     warnings: list[str] = Field(default_factory=list)
     runtime_uid: int | None = Field(default=None, ge=1)
     runtime_gid: int | None = Field(default=None, ge=1)
@@ -319,6 +325,8 @@ class SetupPlan(StrictModel):
             excluded_fields.add("relation_mining_mode")
         if self.semantic_search is None:
             excluded_fields.add("semantic_search")
+        if self.replaced_files is None:
+            excluded_fields.add("replaced_files")
         if self.runtime_uid is None:
             excluded_fields.add("runtime_uid")
         if self.runtime_gid is None:
@@ -340,11 +348,33 @@ class SetupPlan(StrictModel):
             raise ValidationError("setup plan fingerprint does not match its contents")
 
 
+def comma_acl_scope_error(sources: Iterable[tuple[str, str]], *, fix: str) -> str | None:
+    """Explain every (source name, acl_scope) pair whose scope holds a comma."""
+    bad = [f"{name}: {scope!r}" for name, scope in sources if "," in scope]
+    if not bad:
+        return None
+    return (
+        f"filesystem source acl_scope contains a comma ({', '.join(bad)}), and an ACL "
+        f"scope cannot: {ACL_SCOPE_COMMA_REASON}. {fix}"
+    )
+
+
+class ReplacedFile(StrictModel):
+    file: str
+    # The copy this apply replaced; overwritten by the next apply.
+    previous_copy: str
+    # The earliest known copy, written once and never overwritten.
+    original_copy: str | None = None
+
+
 class SetupApplyReceipt(StrictModel):
     schema_version: Literal["kip.setup-apply.v1"] = "kip.setup-apply.v1"
     plan_fingerprint: str
     written_files: list[str]
     previous_files: list[str]
+    replaced_files: list[ReplacedFile] = Field(default_factory=list)
+    # One plain sentence naming each replaced file and its previous copy.
+    summary: str = ""
 
 
 class SetupCheck(StrictModel):

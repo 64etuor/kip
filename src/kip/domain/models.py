@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from kip.domain.egress import DataClassification, EgressDecision
 from kip.domain.generation import GeneratedClaim, GenerationUsage, ModelRevision
-from kip.domain.identity import AclSnapshot
+from kip.domain.identity import AclSnapshot, comma_acl_scopes_error, comma_roles_error
 from kip.domain.knowledge import (
     CandidateEvidence,
     EntityCandidate,
@@ -28,6 +28,22 @@ class RequestContext(StrictModel):
     request_id: str | None = None
     acl_snapshot: AclSnapshot | None = None
     roles: list[str] = Field(default_factory=list)
+
+    @field_validator("acl_scopes")
+    @classmethod
+    def acl_scopes_are_comma_free(cls, scopes: list[str]) -> list[str]:
+        error = comma_acl_scopes_error(scopes, subject="acl_scope")
+        if error is not None:
+            raise ValueError(error)
+        return scopes
+
+    @field_validator("roles")
+    @classmethod
+    def roles_are_comma_free(cls, roles: list[str]) -> list[str]:
+        error = comma_roles_error(roles, subject="role")
+        if error is not None:
+            raise ValueError(error)
+        return roles
 
 
 class EnvelopeMeta(StrictModel):
@@ -255,7 +271,11 @@ class ContextItem(StrictModel):
         default="unavailable", description="How freshness was checked: stat (indexed size and mtime still matched, no new digest), sha256 (the live source was re-hashed), or unavailable (the source could not be read, so source_changed_since_index is null)."
     )
     body_truncated: bool = Field(
-        default=False, description="When true, body is only the leading portion of the evidence unit."
+        default=False,
+        description=(
+            "When true, body is the head and tail of the evidence unit around an "
+            "explicit marker; the middle is missing. A truncated body cannot prove absence."
+        ),
     )
 
 
@@ -605,6 +625,15 @@ class Capabilities(StrictModel):
     parsers: dict[str, str]
     connectors: dict[str, str]
     warnings: list[str] = Field(default_factory=list)
+
+
+class MigrationReport(StrictModel):
+    applied: list[str] = Field(default_factory=list)
+    # {"vector": {"from": "0.8.2", "to": "0.8.6"}}: extension catalogs brought
+    # up to the server's default version after the migration files.
+    extension_updates: dict[str, dict[str, str]] = Field(default_factory=dict)
+    # Operator guidance for the envelope's meta.warnings, not part of `data`.
+    warnings: list[str] = Field(default_factory=list, exclude=True)
 
 
 class StatusReport(StrictModel):

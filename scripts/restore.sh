@@ -83,6 +83,12 @@ postgres_query_file \
   export KIP_DATABASE_STATEMENT_TIMEOUT_MS="${KIP_RESTORE_STATEMENT_TIMEOUT_MS:-300000}"
   export KIP_CAS_PATH="$TARGET_CAS"
   export KIP_SKIP_DOTENV=1
+  # These calls deliberately target the restore database, usually a separate
+  # server on another local port, while KIP_POSTGRES_PORT is still exported
+  # from this deployment's .env. The deployment port guard in scripts/kip
+  # would refuse them; the target was already required to differ from
+  # KIP_DATABASE_URL, to be empty and to be confirmed.
+  export KIP_DATABASE_PORT_CHECK=off
   "$KIP_CLI" migrate > "$EVIDENCE_ROOT/migrate.json"
   "$KIP_CLI" projection rebuild --name lexical > "$EVIDENCE_ROOT/rebuild-lexical.json"
   postgres_query "$TARGET_URL" "ANALYZE;" > "$EVIDENCE_ROOT/analyze.txt"

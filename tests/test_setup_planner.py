@@ -217,3 +217,41 @@ def _complete_answers(tmp_path: Path) -> SetupAnswers:
         interaction_memory_mode="explicit_consent",
         ontology_reviewers=["knowledge-owner@example.invalid"],
     )
+
+
+def test_setup_plan_lists_existing_generated_files_it_will_replace(tmp_path: Path) -> None:
+    # Given a package deployment that ships its own .mcp.json
+    answers = _complete_answers(tmp_path)
+    (tmp_path / ".mcp.json").write_text('{"mcpServers": {}}\n', encoding="utf-8")
+
+    # When the plan is made
+    plan = build_setup_plan(answers, project_root=tmp_path)
+
+    # Then approving the plan approves replacing that file
+    assert plan.replaced_files == [".mcp.json"]
+    assert build_setup_plan(answers, project_root=tmp_path / "company-docs").replaced_files == []
+
+
+def test_legacy_setup_plan_without_replaced_files_keeps_its_fingerprint(tmp_path: Path) -> None:
+    # Given a v1 plan persisted before replaced_files was added
+    payload = build_setup_plan(_complete_answers(tmp_path), project_root=tmp_path).model_dump(mode="json")
+    payload.pop("replaced_files")
+    fingerprint_payload = {key: value for key, value in payload.items() if key != "plan_fingerprint"}
+    payload["plan_fingerprint"] = hashlib.sha256(
+        json.dumps(fingerprint_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+    # When/Then the additive field is absent, its historical fingerprint stays valid
+    SetupPlan.model_validate(payload).verify_fingerprint()
+
+
+def test_source_ownership_question_says_what_bundled_sample_data_is() -> None:
+    from kip.setup.planner import _QUESTIONS
+
+    question = _QUESTIONS["source_ownership"]
+
+    # The choices stay company/personal: sample data needs no weaker option.
+    assert question.choices == ["company", "personal"]
+    assert question.example == "company"
+    assert "sample-data" in question.why and "company" in question.why
+    assert "restricted" in question.why

@@ -3,6 +3,38 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=common.sh
 source "$SCRIPT_DIR/common.sh"
+# doctor reports the mismatch and setup repairs the deployment, so both run,
+# as does help anywhere. The subcommand follows the root options of
+# src/kip/cli.py, each of which takes a value (--opt VALUE or --opt=VALUE).
+kip_subcommand=""
+kip_skip_value=0
+kip_after_dashes=0
+for kip_arg in "$@"; do
+  if [[ "$kip_skip_value" == 1 ]]; then
+    kip_skip_value=0
+    continue
+  fi
+  # After "--" every argument is positional, so a later --help is a value.
+  if [[ "$kip_after_dashes" == 1 ]]; then
+    [[ -n "$kip_subcommand" ]] || kip_subcommand="$kip_arg"
+    break
+  fi
+  case "$kip_arg" in
+    --) kip_after_dashes=1; [[ -z "$kip_subcommand" ]] || break; continue ;;
+    --help|-h) kip_subcommand=--help; break ;;
+  esac
+  [[ -z "$kip_subcommand" ]] || continue
+  case "$kip_arg" in
+    --config|--workspace|--principal|--acl-scope|--acl-scopes|--role|--roles) kip_skip_value=1 ;;
+    --config=*|--workspace=*|--principal=*|--acl-scope=*|--acl-scopes=*|--role=*|--roles=*) ;;
+    *) kip_subcommand="$kip_arg" ;;
+  esac
+done
+case "$kip_subcommand" in
+  doctor|setup|version|--help|"") ;;
+  *) kip_database_port_check || exit $? ;;
+esac
+unset kip_after_dashes kip_arg kip_skip_value kip_subcommand
 PY="$(python_cmd)"
 if [[ ! -x "$PROJECT_ROOT/.venv/bin/python" ]] && ! "$PY" -c 'import kip.cli' >/dev/null 2>&1; then
   # A deployment installed with --no-bootstrap (or an interrupted bootstrap)

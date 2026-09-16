@@ -11,18 +11,28 @@ The Korean front door is [`README.md`](README.md).
 
 ```bash
 curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh | bash
-cd ~/kip && ./scripts/app-up.sh --database-only
-kip sync run --source sample
-kip search "참여율 변경 승인" --limit 1
+cd ~/kip && ./scripts/kip version
+./scripts/kip setup inspect          # or: setup preset sample
+./scripts/app-up.sh --database-only
 ```
 
-To let Claude Code or Codex do it, give it this request. The agent asks before
-choosing folders to index, installing Docker, approving the plan or changing
-the client's configuration.
+The first command installs the latest release. To pin a version, pass the
+location and a version from the [release list](https://github.com/64etuor/kip/releases):
 
-> Install KIP with the installer command in the https://github.com/64etuor/kip
-> README, set it up following `skills/kip-setup/SKILL.md`, then connect this
-> agent with that skill's "Connect agents" steps.
+```bash
+curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh | bash -s -- ~/kip --version X.Y.Z
+```
+
+To let Claude Code or Codex do it, give it this request. It installs the latest
+release and reports the exact version it installed. The agent asks before
+choosing folders to index, installing Docker, approving the plan or changing
+the client's configuration. To pin a version, add "pinned to version X.Y.Z".
+
+> Install the latest KIP release with the installer command in the
+> https://github.com/64etuor/kip README and tell me the exact version that
+> `scripts/kip version` in the installed directory prints. Then set it up
+> following `skills/kip-setup/SKILL.md` and connect this agent with that
+> skill's "Connect agents" steps.
 
 A real response from that run against the bundled `sample-data/`, abridged to
 the fields below with ids and hashes shortened. [`README.md`](README.md) shows

@@ -3,6 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
+# A backup URL on another deployment's port would dump that database.
+kip_database_port_check || exit $?
 source "$SCRIPT_DIR/postgres-tools.sh"
 cd "$PROJECT_ROOT"
 umask 077

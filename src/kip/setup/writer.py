@@ -14,7 +14,7 @@ from pydantic import TypeAdapter
 from kip.domain.json_types import JsonObject, JsonValue
 from kip.errors import ConflictError, ValidationError
 from kip.setup.config_payload import build_config_payload
-from kip.setup.models import SetupApplyReceipt, SetupPlan
+from kip.setup.models import ReplacedFile, SetupApplyReceipt, SetupPlan, comma_acl_scope_error
 from kip.setup.paths import canonical_managed_path, validate_container_source_target
 
 _JSON_OBJECT: TypeAdapter[JsonObject] = TypeAdapter(JsonObject)
@@ -60,6 +60,12 @@ def apply_setup_plan(
         raise ConflictError("apply setup as the non-root user and group recorded in the plan, or regenerate the plan")
     if not set(plan.runtime_supplementary_gids).issubset(os.getgroups()):
         raise ConflictError("the applying user no longer belongs to the plan's supplementary groups; restore membership or regenerate the plan")
+    comma_error = comma_acl_scope_error(
+        ((source.name, source.acl_scope) for source in plan.sources),
+        fix="Re-answer filesystem_sources with comma-free scopes, then make and approve a new plan",
+    )
+    if comma_error is not None:
+        raise ConflictError(comma_error)
     for source in plan.sources:
         if source.host_root != source.target_root:
             raise ConflictError("setup plan uses different host and container source paths; regenerate the plan")
@@ -88,21 +94,64 @@ def apply_setup_plan(
     backup_path.mkdir(parents=True, mode=0o700, exist_ok=True)
     written: list[str] = []
     previous: list[str] = []
+    replaced: list[ReplacedFile] = []
     for relative, content in files.items():
         target = (project_root / relative).resolve()
         if not target.is_relative_to(project_root.resolve()):
             raise ConflictError(f"generated path escapes project root: {relative}")
         if target.exists():
             backup = target.with_name(f"{target.name}.previous")
+            original = target.with_name(f"{target.name}.original")
+            if not original.exists():
+                # Written once: the earliest copy we still hold. A `.previous`
+                # left by an earlier apply predates the current file, so it
+                # (e.g. the package's own `.mcp.json`) is the one to keep.
+                _atomic_copy(backup if backup.exists() else target, original)
             _atomic_copy(target, backup)
             previous.append(str(backup.relative_to(project_root)))
+            replaced.append(ReplacedFile(
+                file=relative,
+                previous_copy=previous[-1],
+                original_copy=str(original.relative_to(project_root)),
+            ))
         _atomic_write(target, content)
         written.append(str(target.relative_to(project_root)))
     return SetupApplyReceipt(
         plan_fingerprint=plan.plan_fingerprint,
         written_files=written,
         previous_files=previous,
+        replaced_files=replaced,
+        summary=_apply_summary(plan, written, replaced, project_root=project_root),
     )
+
+
+def _apply_summary(
+    plan: SetupPlan,
+    written: list[str],
+    replaced: list[ReplacedFile],
+    *,
+    project_root: Path,
+) -> str:
+    wrote = f"Wrote {len(written)} generated files in {project_root.resolve()}."
+    if not replaced:
+        return f"{wrote} No existing file was replaced."
+    pairs = "; ".join(
+        f"{item.file} (previous copy: {item.previous_copy}; original copy: {item.original_copy})"
+        for item in replaced
+    )
+    text = (
+        f"{wrote} Replaced {len(replaced)} existing file(s) and kept copies beside "
+        "each: FILE.previous is the copy this apply replaced, FILE.original the "
+        f"earliest copy, written once and never overwritten: {pairs}."
+    )
+    if plan.replaced_files is not None:
+        unlisted = [item.file for item in replaced if item.file not in plan.replaced_files]
+        if unlisted:
+            text += (
+                " Not in the plan's replaced_files because they did not exist when "
+                f"the plan was made: {', '.join(unlisted)}."
+            )
+    return text
 
 
 def atomic_write_json(path: Path, content: str) -> None:

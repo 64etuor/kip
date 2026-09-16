@@ -448,3 +448,27 @@ def _complete_answers(tmp_path: Path) -> SetupAnswers:
         interaction_memory_mode="explicit_consent",
         ontology_reviewers=["knowledge-owner@example.invalid"],
     )
+
+
+def test_verify_fails_an_applied_plan_whose_source_acl_scope_has_a_comma(tmp_path: Path) -> None:
+    from kip.setup.planner import build_setup_plan as _build
+    from kip.setup.service import SetupService as _Service
+    from kip.setup.writer import apply_setup_plan as _apply
+    from tests.setup_support import complete_setup_answers as _answers
+
+    project_root = tmp_path / "project"
+    plan = _build(_answers(tmp_path), project_root=project_root)
+    _apply(plan, project_root=project_root)
+    source = plan.sources[0].model_copy(update={"acl_scope": "group:a,b"})
+    legacy = plan.model_copy(update={"sources": [source]})
+    legacy = legacy.model_copy(update={"plan_fingerprint": legacy.calculate_fingerprint()})
+
+    receipt = _Service(project_root=project_root, state_path=tmp_path / "state.json").verify(legacy)
+
+    [check] = [item for item in receipt.checks if item.name == "source_acl_scopes"]
+    assert check.ok is False and receipt.verified is False
+    assert "contains a comma (company-docs: 'group:a,b')" in check.detail
+    assert check.detail.endswith("then make, approve and apply a new plan")
+    [clean] = [item for item in _Service(project_root=project_root, state_path=tmp_path / "state.json").verify(plan).checks
+               if item.name == "source_acl_scopes"]
+    assert clean.ok is True and clean.detail == "every source acl_scope is comma-free"

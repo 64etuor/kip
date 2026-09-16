@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import re
 import secrets
@@ -11,6 +12,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import zipfile
 from pathlib import Path
 from urllib.parse import quote, urlsplit, urlunsplit
 
@@ -32,6 +34,18 @@ COMPOSE_VOLUME_FORMAT = '{{.Label "com.docker.compose.project"}}\t{{.Name}}'
 # scripts/prerequisites.py's "Action required" status, which bootstrap.sh
 # passes through: the operator must act before bootstrap can continue.
 EXIT_ACTION_REQUIRED = 75
+
+# Every KIP_POSTGRES_IMAGE value an earlier release shipped in .env.example or
+# as the compose.yaml default (`git log -p -- .env.example compose.yaml`). An
+# existing .env holding one was written by KIP, not chosen by the operator, and
+# it overrides compose.yaml's newer default, so it is replaced with the current
+# pin. Add the outgoing value whenever the pin changes; tests/test_bootstrap_env.py
+# compares this set with the git history.
+SHIPPED_POSTGRES_IMAGES = frozenset({
+    "pgvector/pgvector:0.8.2-pg18-trixie",
+    "pgvector/pgvector:0.8.2-pg18-trixie@sha256:b7337db8fe39d12fe8ecb0003c72680f24479813a744b43154eee6f2eab5a5f3",
+})
+POSTGRES_IMAGE_LINE = re.compile(r"^(\s*(?:export\s+)?KIP_POSTGRES_IMAGE\s*=)(.*?)(\r?\n)?$")
 
 # Credentials the Compose application roles need. An upgraded deployment keeps
 # its own .env, so these are appended when missing: without them every
@@ -62,6 +76,36 @@ def _write_private(root: Path, target: Path, text: str) -> bool:
     return True
 
 
+def _replace_file(root: Path, target: Path, data: bytes) -> OSError | None:
+    """Replace `target` with `data` through a renamed temporary file.
+
+    The mode is kept, and the owner and group where the process may set them.
+    The rename splits a hard link: other names keep the previous content.
+    Returns the error instead of raising when the file cannot be replaced.
+    """
+    temporary: Path | None = None
+    try:
+        status = target.stat()
+        descriptor, temporary_name = tempfile.mkstemp(prefix=".env.update-", dir=root)
+        temporary = Path(temporary_name)
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary, status.st_mode & 0o777)
+        # only root may give a file away; the new file keeps this user's ids
+        with contextlib.suppress(OSError):
+            os.chown(temporary, status.st_uid, status.st_gid)
+        os.replace(temporary, target)
+    except BaseException as error:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+        if isinstance(error, OSError):
+            return error
+        raise
+    return None
+
+
 def _assignments(text: str) -> dict[str, str]:
     values: dict[str, str] = {}
     for line in text.splitlines():
@@ -88,7 +132,9 @@ def _backup_url(database_url: str, password: str) -> str | None:
 
 
 def _append_application_role_credentials(root: Path, target: Path) -> bool:
-    text = target.read_text(encoding="utf-8")
+    raw = target.read_bytes()
+    text = raw.decode("utf-8")
+    newline = "\r\n" if b"\r\n" in raw else "\n"
     present = _assignments(text)
     added: list[str] = []
     passwords: dict[str, str] = {}
@@ -113,22 +159,13 @@ def _append_application_role_credentials(root: Path, target: Path) -> bool:
         "# worker containers stop using the owner; backup keeps BYPASSRLS because",
         "# it must read every workspace. Existing values are never replaced.",
     ]
-    updated = text if text.endswith("\n") else text + "\n"
-    updated += "\n".join(header + added) + "\n"
-    mode = target.stat().st_mode & 0o777
-    descriptor, temporary_name = tempfile.mkstemp(prefix=".env.append-", dir=root)
-    temporary = Path(temporary_name)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            handle.write(updated)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.chmod(temporary, mode)
-        os.replace(temporary, target)
-    except BaseException:
-        temporary.unlink(missing_ok=True)
-        raise
+    updated = text if text.endswith("\n") else text + newline
+    updated += newline.join(header + added) + newline
     names = ", ".join(entry.split("=", 1)[0] for entry in added)
+    error = _replace_file(root, target, updated.encode("utf-8"))
+    if error is not None:
+        print(f"Warning: could not add {names} to {target} ({error.strerror or error}); add them by hand.", file=sys.stderr)
+        return False
     print(f"Added {names} to .env for the non-owner application roles.", file=sys.stderr)
     if not backup_url_added and "KIP_BACKUP_DATABASE_URL" not in present:
         print(
@@ -137,6 +174,97 @@ def _append_application_role_credentials(root: Path, target: Path) -> bool:
             file=sys.stderr,
         )
     return True
+
+
+def _dotenv_value(raw: str) -> str:
+    """A dotenv value as scripts/load_dotenv.py reads it: quotes or a " #" comment removed."""
+    value = raw.strip()
+    if value[:1] in {"'", '"'}:
+        end = value.find(value[0], 1)
+        return value[1:end] if end > 0 else value
+    comment = value.find(" #")
+    return value[:comment].rstrip() if comment >= 0 else value
+
+
+def _example_postgres_image(source: Path) -> str | None:
+    """KIP_POSTGRES_IMAGE in an .env.example, or in the one inside a package ZIP."""
+    try:
+        if zipfile.is_zipfile(source):
+            with zipfile.ZipFile(source) as archive:
+                names = [
+                    name for name in archive.namelist()
+                    if name == ".env.example" or (name.count("/") == 1 and name.endswith("/.env.example"))
+                ]
+                if len(names) != 1:
+                    return None
+                text = archive.read(names[0]).decode("utf-8")
+        else:
+            text = source.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError, zipfile.BadZipFile):
+        return None
+    for line in text.splitlines():
+        match = POSTGRES_IMAGE_LINE.match(line)
+        if match:
+            return _dotenv_value(match.group(2)) or None
+    return None
+
+
+def _refresh_postgres_image(root: Path, target: Path, example: Path, *, write: bool) -> None:
+    """Replace a KIP-shipped KIP_POSTGRES_IMAGE in an existing .env with the current pin."""
+    current = _example_postgres_image(example)
+    if current is None:
+        return
+    text = target.read_bytes().decode("utf-8")
+    lines = text.splitlines(keepends=True)
+    found = [(index, match) for index, line in enumerate(lines) if (match := POSTGRES_IMAGE_LINE.match(line))]
+    if not found:
+        return  # compose.yaml's default applies
+    if len(found) > 1:
+        print(
+            f"Warning: {target} assigns KIP_POSTGRES_IMAGE {len(found)} times, so it was left unchanged. "
+            f"This release pins {current}; keep one KIP_POSTGRES_IMAGE line.",
+            file=sys.stderr,
+        )
+        return
+    index, match = found[0]
+    value = _dotenv_value(match.group(2))
+    if value == current:
+        return
+    installed = _example_postgres_image(root / ".env.example")
+    if value not in SHIPPED_POSTGRES_IMAGES and value != installed:
+        print(
+            f"Warning: {target} sets KIP_POSTGRES_IMAGE={value}, which is not an image KIP shipped, so it "
+            f"was left unchanged. This release pins {current}. To use it, set KIP_POSTGRES_IMAGE={current} "
+            "in .env (or the same image from your registry), then run ./scripts/app-up.sh and "
+            "./scripts/migrate.sh.",
+            file=sys.stderr,
+        )
+        return
+    if not write:
+        print(f"Would update KIP_POSTGRES_IMAGE in {target}: {value} -> {current}. Nothing was written.", file=sys.stderr)
+        return
+    if target.is_symlink():
+        print(
+            f"Warning: {target} is a symlink, so KIP_POSTGRES_IMAGE={value} was left unchanged. "
+            f"Set KIP_POSTGRES_IMAGE={current} in the file it points to.",
+            file=sys.stderr,
+        )
+        return
+    lines[index] = match.group(1) + match.group(2).replace(value, current, 1) + (match.group(3) or "")
+    error = _replace_file(root, target, "".join(lines).encode("utf-8"))
+    if error is not None:
+        print(
+            f"Warning: could not update KIP_POSTGRES_IMAGE in {target} ({error.strerror or error}); "
+            f"set KIP_POSTGRES_IMAGE={current} there by hand.",
+            file=sys.stderr,
+        )
+        return
+    print(
+        f"Updated KIP_POSTGRES_IMAGE in {target}: {value} -> {current}. The running PostgreSQL container "
+        "keeps the old image until the next ./scripts/app-up.sh, which pulls the new one and restarts "
+        "PostgreSQL on the same volume; ./scripts/migrate.sh then updates the vector extension.",
+        file=sys.stderr,
+    )
 
 
 def _exported_port(name: str) -> int | None:
@@ -217,10 +345,20 @@ def _publishes(published: str, port: int) -> bool:
     )
 
 
-def _directory_project_name(root: Path, used: set[str]) -> str:
+def _directory_project_stem(root: Path) -> str:
     base = re.sub(r"[^a-z0-9_-]+", "-", root.resolve().name.lower())
     base = re.sub(r"-{2,}", "-", base).strip("-_")
-    stem = base if base.startswith("kip-") else f"kip-{base}" if base else "kip-deployment"
+    return base if base.startswith("kip-") else f"kip-{base}" if base else "kip-deployment"
+
+
+def _derived_project_names(root: Path) -> set[str]:
+    """Every name `_directory_project_name` can give a deployment in `root`."""
+    stem = _directory_project_stem(root)
+    return {stem, *(f"{stem}-{index}" for index in range(2, PROJECT_NAME_CANDIDATES + 1))}
+
+
+def _directory_project_name(root: Path, used: set[str]) -> str:
+    stem = _directory_project_stem(root)
     # Two deployment directories can share a basename, and a name whose
     # volumes survive would hand this deployment another password's database.
     for index in range(1, PROJECT_NAME_CANDIDATES + 1):
@@ -257,25 +395,58 @@ def _refuse_missing_env(root: Path, projects: list[str], volumes: list[list[str]
     raise SystemExit(EXIT_ACTION_REQUIRED)
 
 
+def _refuse_derived_volumes(root: Path, projects: list[str], volumes: list[list[str]]) -> None:
+    names = ", ".join(f'"{project}"' for project in projects)
+    subject = f"project {names} has" if len(projects) == 1 else f"projects {names} have"
+    owned = sorted(volume for project, volume in volumes if project in projects)
+    listed = " ".join(owned)
+    stem = _directory_project_stem(root)
+    # kip-foo-2 is the second name for a directory "foo" and the first name
+    # for a directory "foo-2", so such volumes cannot be attributed.
+    ambiguous = "".join(
+        f'A deployment in a directory named "{project.removeprefix("kip-")}" is also named "{project}", '
+        "so those volumes may belong to it instead.\n"
+        for project in projects if project != stem
+    )
+    print(
+        f"Action required: this deployment's database may already exist, but {root / '.env'} is missing.\n"
+        f"Docker Compose {subject} volumes {', '.join(owned)} but no containers. Bootstrap names a "
+        f'deployment in {root} "{stem}" (or "{stem}-N" when that name is taken), so they may be this '
+        "deployment's database, stopped with ./scripts/app-up.sh --down.\n"
+        f"{ambiguous}"
+        "A new .env would carry a new random database password, which cannot open that volume, or "
+        "another project name with an empty database. Nothing was written.\n"
+        f"- This deployment's database: restore {root / '.env'} from backup, then rerun ./scripts/bootstrap.sh.\n"
+        "- Another deployment's volumes: export COMPOSE_PROJECT_NAME=<unique-name> (not one of these "
+        "names) and rerun ./scripts/bootstrap.sh; it still chooses free ports when the defaults are taken.\n"
+        f"- Leftovers with no .env to restore: inspect them with docker volume inspect {listed}; once their "
+        f"data is not needed, remove them with docker volume rm {listed} and rerun ./scripts/bootstrap.sh.",
+        file=sys.stderr,
+    )
+    raise SystemExit(EXIT_ACTION_REQUIRED)
+
+
 def _deployment_values(
     root: Path, *, detect: bool,
 ) -> tuple[dict[str, tuple[str, str]], str, list[str]]:
     """The project name and ports a new .env carries, each with its reason.
 
     Exported values always win, including a port that is already in use.
-    When no project name is exported and bootstrap asked for detection,
-    another project's containers or volumes, or a busy port, make this
-    deployment choose its own. Returns the values, what was found, and notes.
+    When bootstrap asked for detection, a busy default port makes this
+    deployment choose a free one and, unless a project name is exported,
+    another project's containers or volumes make it choose its own name.
+    Returns the values, what was found, and notes.
     """
     ports = {name: _exported_port(name) for name in DEFAULT_PORTS}
     values = {name: (str(port), "exported") for name, port in ports.items() if port is not None}
     exported_name = _exported_project_name()
     if exported_name is not None:
         values["COMPOSE_PROJECT_NAME"] = (exported_name, "exported")
+    if not detect or (exported_name is not None and None not in ports.values()):
         return values, "", []
-    if not detect:
-        return values, "", []
-    containers, volumes = _docker_state()
+    # An exported project name is the operator's choice, so Docker is not asked
+    # about projects; default ports that are taken are still replaced.
+    containers, volumes = _docker_state() if exported_name is None else (None, None)
     own = sorted({
         project for project, directory, _ in containers or []
         if project and _same_directory(directory, root)
@@ -284,6 +455,16 @@ def _deployment_values(
         # This directory's stack exists and only .env is gone: new values
         # would silently point the CLI and MCP at a new, empty database.
         _refuse_missing_env(root, own, volumes)
+    # Volumes of a name bootstrap derives for this directory, with no
+    # containers from another directory, are most likely this deployment's
+    # own database stopped with --down: a new .env would miss it.
+    elsewhere = {project for project, directory, _ in containers or [] if directory}
+    derived = sorted({
+        project for project, _ in volumes or []
+        if project in _derived_project_names(root) and project not in elsewhere
+    })
+    if derived:
+        _refuse_derived_volumes(root, derived, volumes or [])
     found: list[str] = []
     notes: list[str] = []
     others = sorted({
@@ -332,9 +513,10 @@ def _deployment_values(
         else "The default Docker Compose project or host ports are taken on this machine"
     )
     used = {project for project, _, _ in containers or []} | {project for project, _ in volumes or []}
-    values["COMPOSE_PROJECT_NAME"] = (
-        _directory_project_name(root, used), "derived from the deployment directory",
-    )
+    if exported_name is None:
+        values["COMPOSE_PROJECT_NAME"] = (
+            _directory_project_name(root, used), "derived from the deployment directory",
+        )
     taken = {port for port in ports.values() if port is not None}
     for name, floor in AUTOMATIC_PORT_FLOORS.items():
         if ports[name] is None:
@@ -412,12 +594,33 @@ def main(argv: list[str] | None = None) -> int:
         help="unless COMPOSE_PROJECT_NAME is exported, check Docker and the default ports and "
         "choose a project name and free ports on a collision",
     )
+    parser.add_argument(
+        "--refresh-postgres-image", action="store_true",
+        help="only replace an existing .env's KIP_POSTGRES_IMAGE when an earlier KIP release shipped "
+        "that value; any other value is reported and kept",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="with --refresh-postgres-image: report, never write",
+    )
+    parser.add_argument(
+        "--example", type=Path,
+        help="the .env.example, or a package ZIP holding one, whose KIP_POSTGRES_IMAGE is current "
+        "(default: ROOT/.env.example)",
+    )
     arguments = parser.parse_args(argv)
     root: Path = arguments.root
     target = root / ".env"
+    example: Path = arguments.example or root / ".env.example"
+    if arguments.dry_run and not arguments.refresh_postgres_image:
+        parser.error("--dry-run needs --refresh-postgres-image")
+    if arguments.refresh_postgres_image:
+        if target.is_file():
+            _refresh_postgres_image(root, target, example, write=not arguments.dry_run)
+        return 0
     if target.exists() or target.is_symlink():
         if target.is_file():
             _append_application_role_credentials(root, target)
+            _refresh_postgres_image(root, target, example, write=True)
         return 0
     values, found, notes = _deployment_values(root, detect=arguments.detect_existing_deployment)
     text = (root / ".env.example").read_text(encoding="utf-8")

@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  UV_VERSION: "0.12.12"
+  UV_VERSION: "0.12.14"
   UV_NO_PROGRESS: "1"
   # Bounded retries for the package downloads every job makes (uv from PyPI,
   # npm for the Kordoc runtime). The e2e scripts retry their own Docker Hub
@@ -35,7 +35,7 @@ jobs:
         python-version: ["3.12", "3.13"]
     services:
       postgres:
-        image: pgvector/pgvector:0.8.2-pg18-trixie@sha256:b7337db8fe39d12fe8ecb0003c72680f24479813a744b43154eee6f2eab5a5f3
+        image: pgvector/pgvector:0.8.6-pg18-trixie@sha256:78bf48b801e792f99e3ac62b5036fd3876e9be48afda16c1e331af1c75ceb2ff
         env:
           POSTGRES_DB: kip
           POSTGRES_USER: kip_owner
@@ -58,6 +58,9 @@ jobs:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Full history: a test checks that every PostgreSQL image pin KIP
+          # ever shipped is known to the .env pin refresh.
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up Python

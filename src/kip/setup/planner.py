@@ -13,6 +13,7 @@ from kip.setup.models import (
     SetupPlan,
     SetupQuestion,
     SourcePlan,
+    comma_acl_scope_error,
 )
 
 
@@ -23,6 +24,13 @@ def inspect_setup(
 ) -> SetupInspection:
     question = _first_missing_question(answers)
     risks: list[str] = []
+    # Answers reject a comma scope; a state saved before that check still loads
+    # so it can be re-answered, but it is not ready: ask for the sources again.
+    comma_error = _comma_scope_error(answers)
+    if comma_error is not None:
+        risks.append(comma_error)
+        sources = _question("filesystem_sources")
+        question = sources.model_copy(update={"why": f"{comma_error}. {sources.why}"})
     if answers.model_provider in {"openai", "anthropic"}:
         risks.append(
             "remote generation remains blocked for data classifications not explicitly allowed"
@@ -42,6 +50,11 @@ def build_setup_plan(
 ) -> SetupPlan:
     if os.getuid() == 0 or os.getgid() == 0:
         raise ValidationError("create and apply setup plans as a non-root user and group that own the CAS and backup directories; do not run setup with sudo")
+    # Before completeness: a comma scope also makes the answers incomplete, and
+    # this message carries the fix.
+    comma_error = _comma_scope_error(answers)
+    if comma_error is not None:
+        raise ValidationError(comma_error)
     inspection = inspect_setup(answers, project_root=project_root)
     if not inspection.complete:
         missing = inspection.questions[0].id
@@ -149,6 +162,12 @@ def build_setup_plan(
         warnings.append(
             "no private evaluation dataset is configured; production promotion is blocked"
         )
+    generated_files = [
+        "config/kip.generated.toml",
+        "config/kip.host.generated.toml",
+        "compose.generated.yaml",
+        ".mcp.json",
+    ]
     plan = SetupPlan(
         plan_fingerprint="",
         answers_fingerprint=answers.fingerprint(),
@@ -180,11 +199,10 @@ def build_setup_plan(
         evaluation_dataset=answers.evaluation_dataset,
         interaction_memory_mode=answers.interaction_memory_mode,
         ontology_reviewers=answers.ontology_reviewers,
-        generated_files=[
-            "config/kip.generated.toml",
-            "config/kip.host.generated.toml",
-            "compose.generated.yaml",
-            ".mcp.json",
+        generated_files=generated_files,
+        # A package ships its own `.mcp.json`, so a first apply replaces it.
+        replaced_files=[
+            relative for relative in generated_files if (project_root / relative).exists()
         ],
         warnings=[*warnings, *_semantic_warnings(project_root)],
         semantic_search=semantic_runtime_ready(project_root),
@@ -194,6 +212,16 @@ def build_setup_plan(
     )
     return plan.model_copy(
         update={"plan_fingerprint": plan.calculate_fingerprint()}
+    )
+
+
+def _comma_scope_error(answers: SetupAnswers) -> str | None:
+    return comma_acl_scope_error(
+        ((source.name, source.acl_scope) for source in answers.filesystem_sources or []),
+        fix=(
+            "Re-answer with ./scripts/kip setup answer --question filesystem_sources, "
+            "then make and approve a new plan"
+        ),
     )
 
 
@@ -368,10 +396,16 @@ _QUESTIONS = {
         prompt="이 배포는 회사 자료와 개인 자료 중 어느 한쪽만 수집하나요?",
         answer_format="one choice",
         choices=["company", "personal"],
+        example="company",
         why=(
             "개인 자료와 회사 자료는 보존·감사 규칙이 달라 한 배포에 섞지 "
-            "않습니다. 팀 업무용이면 company를 선택하세요. 회사 NAS와 개인 "
-            "드라이브를 모두 색인해야 한다면 배포를 두 번 따로 설치하세요."
+            "않습니다. 폴더 경로만 입력하면 이 답이 기본 민감도 등급을 정합니다"
+            "(company는 restricted, personal은 personal). 팀 업무용이면 "
+            "company를 선택하세요. 번들 sample-data로 시험하는 데모·평가 "
+            "배포도 company입니다. 샘플은 개인정보가 없는 가상의 회사 연구과제 "
+            "문서이고, restricted 기본값은 외부 모델 전송을 허용 등급 목록 밖에 "
+            "둡니다. 회사 NAS와 개인 드라이브를 모두 색인해야 한다면 배포를 두 "
+            "번 따로 설치하세요."
         ),
     ),
     "filesystem_sources": SetupQuestion(

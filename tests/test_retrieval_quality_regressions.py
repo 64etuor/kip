@@ -5,6 +5,7 @@ import unicodedata
 
 import pytest
 
+from kip.application.search import _truncate_context_body
 from kip.domain.models import AnswerRequest, ContextRequest, SearchRequest
 
 
@@ -251,6 +252,23 @@ def test_filename_answer_cannot_bypass_deep_workbook_requirement(test_container)
     assert response.refusal_reason == "exact_xlsx_read_required"
 
 
+@pytest.mark.parametrize(
+    ("allowed", "expected"),
+    [
+        (0, ""),
+        (3, "ABC"),
+        (4, "A\n…\n"),
+        (5, "A\n…\nZ"),
+        (6, "AB\n…\nZ"),
+        (7, "AB\n…\nYZ"),
+    ],
+)
+def test_truncate_context_body_keeps_head_and_tail_around_a_marker(
+    allowed: int, expected: str
+) -> None:
+    assert _truncate_context_body("ABCDEFXYZ", allowed) == expected
+
+
 def test_search_context_and_read_expose_their_actual_verification(test_container):
     source = test_container.settings.project_root / "source" / "verification.txt"
     source.write_text("현장조사 안내 " * 1000)
@@ -267,7 +285,12 @@ def test_search_context_and_read_expose_their_actual_verification(test_container
     item = pack.items[0]
     assert item.source_verification == "stat"
     assert item.body_truncated is True
-    assert item.body == source.read_text()[:1000]
+    full = source.read_text()
+    assert len(item.body) == 1000
+    assert item.body != full[:1000]
+    assert item.body.startswith(full[:100])
+    assert item.body.endswith(full[-100:])
+    assert "…" in item.body
     read = test_container.application.evidence.read_unit(context, hit.unit_id)
     assert read.source_verification == "sha256"
 

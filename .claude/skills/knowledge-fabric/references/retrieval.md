@@ -5,11 +5,10 @@
 1. Exact document number, project number, email address, Slack ID, or canonical entity ID.
 2. Supported filters such as source kind, project, or document type. Date-range
    filtering is not in the current search contract; inspect dates in exact evidence.
-3. PostgreSQL lexical search.
+3. Default search (`hybrid`) already fuses vector and lexical candidates when the deployment's semantic projection is active, and reranks them only where the deployment chose `reranked`; any `meta.warnings` entry ending in `_degraded` means that ranking fell back, so treat the result as weaker. `semantic_disabled` means the deployment is lexical-only. Request an explicit `vector` or `hybrid` mode only to diagnose, not to answer.
 4. `vocab` prefix lookup to confirm the indexed spelling, then approved aliases through the graph. `vocab` shares prefixes only; it expands no synonyms.
-5. Approved graph traversal.
-6. Default search (`hybrid`) already fuses vector and lexical candidates when the deployment's semantic projection is active, and reranks them only where the deployment chose `reranked`; any `meta.warnings` entry ending in `_degraded` means that ranking fell back, so treat the result as weaker. Request an explicit `vector` or `hybrid` mode only to diagnose, not to answer.
-7. Exact source read.
+5. Approved graph traversal (`kip_ontology_context` / `graph neighbors`).
+6. Exact source read (`kip_read`; `kip_xlsx_read` with `cell_range` on MCP, `--range` on CLI).
 
 ## Weak result signals
 

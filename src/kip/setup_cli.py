@@ -69,6 +69,25 @@ def setup_inspect(
     )
 
 
+@setup_app.command("preset")
+def setup_preset(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Argument(help="The only preset is sample")],
+    project_root: Annotated[
+        Path | None,
+        typer.Option("--project-root"),
+    ] = None,
+    state: Annotated[Path | None, typer.Option("--state")] = None,
+) -> None:
+    """Fill remaining questions with safe sample-data defaults. Plan approval is still required."""
+    _run_setup(
+        ctx,
+        lambda service: service.apply_preset(name),
+        project_root=project_root,
+        state=state,
+    )
+
+
 @setup_app.command("answer")
 def setup_answer(
     ctx: typer.Context,

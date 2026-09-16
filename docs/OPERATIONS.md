@@ -53,13 +53,23 @@ machine당 하나이므로 `KIP_SEMANTIC_PORT`는 바꾸지 않고 이미 떠 �
 `./scripts/bootstrap.sh`는 `.env`를 새로 만들 때만 이 값을 정한다. export된
 `COMPOSE_PROJECT_NAME`, `KIP_POSTGRES_PORT`, `KIP_API_PORT`는 그대로 쓰고(이미 사용 중인
 port라도 유지한다) 두 DB URL의 port를 `KIP_POSTGRES_PORT`에 맞춘다(port가 1–65535 정수가
-아니면 멈춘다). `COMPOSE_PROJECT_NAME`이 export되지 않았으면 매번 `docker ps --all`,
+아니면 멈춘다). export되지 않은 PostgreSQL/API port가 사용 중이면 `COMPOSE_PROJECT_NAME`만
+export했어도 빈 port를 고른다(Docker에는 묻지 않는다). `COMPOSE_PROJECT_NAME`이 export되지 않았으면 매번 `docker ps --all`,
 `docker volume ls`와 `127.0.0.1`의 PostgreSQL/API port(export된 값, 없으면 5432/8080)를
 검사한다.
 
 - 이 디렉터리에서 만든 container가 있으면 `.env`만 사라진 기존 배포다. 새 무작위 비밀번호로는
   기존 DB volume을 열 수 없으므로 아무것도 쓰지 않고 `Action required`와 함께 exit 75로
   멈춘다. 백업한 `.env`를 복원한 뒤 다시 실행한다.
+- container는 없지만 bootstrap이 이 디렉터리에 붙이는 이름(`kip-<디렉터리>`, `kip-<디렉터리>-2`
+  …`-100`)의 volume이 있으면 `app-up.sh --down`으로 멈춘 이 배포의 DB일 가능성이 크다. 다른
+  디렉터리에서 만든 container가 그 이름을 쓰지 않는 한, 새 `.env`는 새 비밀번호나 다른 이름으로 빈
+  DB를 가리키게 되므로 volume 이름을 출력하고 아무것도 쓰지 않은 채 exit 75로 멈춘다. `.env`를
+  복원한다. `kip-foo-2`는 `foo` 디렉터리의 두 번째 이름이자 `foo-2` 디렉터리의 첫 이름이라, 그런
+  이름이면 그 디렉터리 배포의 volume일 수 있다고 함께 출력한다. 그 volume이 다른 배포의 것이면 그
+  이름이 아닌 `COMPOSE_PROJECT_NAME`을 export하고 다시 실행한다(사용 중인 기본 port는 여전히 바꾼다).
+  복원할 `.env`가 없는 잔여 volume이면 `docker volume inspect`로 확인하고, 데이터가 필요 없을 때만
+  출력된 `docker volume rm` 명령으로 지운 뒤 다시 실행한다.
 - 다른 디렉터리에서 만든 `kip` project container, container 없이 남은 `kip` project
   volume(`app-up.sh --down`으로 멈춘 배포), 또는 사용 중인 port가 있으면 배포 디렉터리 이름으로
   만든 `kip-<디렉터리>`와 55432·18080 이상의 첫 빈 port를 `.env`에 쓰고 무엇을 왜 골랐는지
@@ -97,6 +107,40 @@ Compose 명령이 오류를 보고한다. `./scripts/doctor.sh`는 같은 검사
 `./scripts/ops-report.sh`는 host `psql` 없이 거부되면 DB 검사를 "database unreachable"이
 아닌 `compose_project` 실패("compose project shared")로 보고한다. 다른 배포가 `down`으로 container를 지우고 volume만 남긴 경우는 감지하지
 못한다. volume에는 working_dir label이 없다.
+
+**DB URL port 검사.** plain 배포(`compose.generated.yaml`과 `config/kip.generated.toml`이
+없는 배포)의 번들 PostgreSQL은 `KIP_POSTGRES_PORT`에 publish된다. `KIP_DATABASE_URL`이나
+`KIP_BACKUP_DATABASE_URL`의 host가 `localhost`(대소문자 무관)·`127.0.0.1`·`[::1]`인데 port가 다르면
+그 port의 다른 배포 DB에 migrate·sync·search·backup하게 된다. URL 변수가 비어 있으면
+`<변수>_FILE`의 URL을 읽는다.
+
+- 검사하는 명령: `./scripts/app-up.sh`(`--database-only`와 전체 app profile), `./scripts/migrate.sh`,
+  `./scripts/kip`, `./scripts/mcp.sh`, `./scripts/backup.sh`, 그리고 bash wrapper를 거치지 않는
+  Python 엔트리포인트(`.venv/bin/kip`, `python -m kip.cli`, `kip-mcp`). 설정 이름과 해결책을 stderr에 출력하고
+  exit 2로 멈추며, stdout(MCP client의 protocol stream)에는 아무것도 쓰지 않는다.
+- 검사하지 않는 경우: `KIP_POSTGRES_PORT`가 비어 있을 때(bootstrap이 만드는 모든 `.env`에는 있고,
+  throwaway DB를 쓰는 e2e script와 verify gate가 이 경우다), `KIP_DATABASE_PORT_CHECK=off`(일부러
+  쓰는 별도 로컬 PostgreSQL), generated 배포(`setup_compose.py`가 확인), 다른 host(외부 DB), 그리고
+  `kip doctor`·`kip setup`·`kip version`·`--help`. wrapper는 `--config FILE`, `--workspace=X` 같은 root
+  option 뒤의 subcommand로 판단하고, `--` 뒤의 `--help`는 값으로 본다.
+- 복원: `./scripts/restore.sh`는 이 검사를 하지 않는다. 복원 대상 `KIP_RESTORE_DATABASE_URL`은 보통
+  다른 local port의 별도 빈 서버이고, 그 안전장치는 `KIP_RESTORE_CONFIRM=YES`, `KIP_DATABASE_URL`과
+  다른 대상, user table이 없는 대상 검사다. restore와 `restore-drill.sh`가 복원 대상에 대해 실행하는
+  `kip` 명령은 `KIP_DATABASE_PORT_CHECK=off`로 실행한다.
+- port 규칙: 생략하거나 `0`이면 5432다(`urlsplit`의 `port or 5432`와 같다). 65535 이하 정수가
+  아니면(`99999`, `abc`, `5432:1`) loopback URL은 거부하고 외부 host URL은 판단하지 않는다.
+  `[127.0.0.1]`처럼 `urlsplit`이 거부하는 host는 판단하지 않는다. `KIP_POSTGRES_PORT`가 숫자가 아니어도
+  멈춘다.
+- 한계: config의 `database.url_env`로 다른 변수를 고른 배포는 그 변수를 검사하지 않는다(bash는 TOML을
+  읽지 않는다).
+- `kip doctor`의 `database_url_port` 항목은 host·port·건너뛰기 규칙이 이 검사와 같다. 적용될 때는
+  필수 항목이고, 건너뛸 때는 `details.skipped`에 이유를 적는다. 고치는 방법은 두 URL에 같은 port를
+  쓰거나 override를 두는 것이다. URL 변수가 비어 있으면 bash와 doctor와 Python 가드 모두
+  `<변수>_FILE`을 읽는다.
+
+URL은 `urllib.parse.urlsplit`와 같게 나누지만, 모든 CLI·MCP 시작마다 도는 검사라 순수 bash로 실행한다.
+200회 평균으로 `common.sh` source만 42.7 ms, bash 검사 포함 41.7 ms(측정 오차 안), Python
+`urlsplit` 검사 포함 67.6 ms였고, bash 검사 자체는 1,000회 평균 0.07 ms다.
 
 Guided source는 host의 canonical 절대경로 그대로 container에 mount한다.
 두 config의 source root가 같아야 공유 DB의 URI/ACL snapshot도 일치한다.
@@ -209,6 +253,30 @@ schema 식별자)도 게시하므로 3.9.x의 업그레이더도 그대로 적�
 새 트리의 `upgrade.sh --finish`로 bootstrap·migrate·doctor를 이어간다. 또 3.10.0 이전 릴리스를 `--version`으로 고정하면 최신
 설치기가 예전 자산 이름으로 되돌아가 받는다.
 
+**PostgreSQL 이미지 pin(3.16.0, pgvector 0.8.6).** `.env`의 `KIP_POSTGRES_IMAGE`는
+`compose.yaml` 기본값보다 우선한다. 업그레이드 마무리 단계와 `./scripts/bootstrap.sh`는
+기존 `.env`의 값이 KIP이 이전에 배포한 pin(`pgvector/pgvector:0.8.2-pg18-trixie`, digest
+포함 여부 무관)과 정확히 같을 때만 그 한 줄을 현재 `.env.example` 값으로 바꾸고, 바뀐 값을
+`Updated KIP_POSTGRES_IMAGE …`로 출력한다. 실행 중인 PostgreSQL container는 다음
+`./scripts/app-up.sh`까지 이전 이미지로 남으며, 업그레이드 마무리 요약이 이를 다시 알린다. 다른 줄,
+권한, 가능한 경우 소유자, 줄바꿈은 유지한다. 임시 파일로 교체하므로 hard link는 분리되고, `.env`를 쓸
+수 없으면 경고만 내고 계속한다. 다른 값은 그대로 두고 현재 pin을 적은 경고를 내므로 직접 고친다.
+`--check`는 쓰지 않고 `Would update …`만 출력한다. `upgrade.sh --archive ZIP --dry-run`의 미리보기는
+3.16.0 이후 릴리스에서 올릴 때만 나온다. 3.15.x 배포의 dry run은 자신의 이전 `upgrade.sh`가
+실행하므로, `.env`의 `KIP_POSTGRES_IMAGE`를 패키지의 `.env.example`과 직접 비교한다. 실제 교체는
+새 스크립트로 실행되는 마무리(`--finish`) 단계에서 일어난다. 그 뒤 `./scripts/app-up.sh`가 새 이미지로 같은 volume의
+PostgreSQL을 다시 시작하고, `./scripts/migrate.sh`가 migration 0029와 매 migrate 단계의
+`ALTER EXTENSION vector UPDATE`로 extension catalog를 올린다. HNSW는 REINDEX가 필요 없지만,
+0.8.2에서 churn이 많았던 배포는 한 번
+`REINDEX INDEX CONCURRENTLY search.embeddings_1024_hnsw_cosine_idx;`(1536 projection을 쓰면
+`_1536_`도)를 실행한다. 0.8.2 백업은 0.8.6에 복원된다. restore 검증은 `vector`가 같은 0.8 line의 더 새
+patch로 복원된 경우만 받아들여 `extension_updates`에 기록한다. extension 구성이 다르거나, 다른
+extension의 버전이 바뀌었거나, 버전이 내려갔거나, 다른 minor/major line이면 여전히 실패한다. `kip doctor`의 필수가 아닌 `postgres_extensions` 항목이 `vector` catalog 버전과
+서버의 pgvector 버전을 비교한다. 상태는 `current`, `outdated`(고치기: `./scripts/kip migrate`),
+`newer_than_server`(DB를 migrate한 이미지로 PostgreSQL을 실행한다), `not_installed`,
+`not_available`, `not_checked`(catalog를 읽지 못함), memory repository의 `not_applicable`이다.
+절차 전체는 `docs/DEPLOYMENT_GUIDE.md` 11.9에 있다.
+
 ### Database readiness errors
 
 `kip` commands that need PostgreSQL fail within seconds with
@@ -245,10 +313,13 @@ part of the deterministic CI gate.
 `./scripts/bootstrap.sh` runs `scripts/prerequisites.sh` first: pure Bash, before
 dotenv parsing. That stage reuses a compatible Python 3.12+, or downloads the
 checksum-pinned uv recorded in `requirements/bootstrap.tsv` (version and
-SHA-256; currently uv 0.12.12) into `var/runtime/uv-<version>` and installs a
+SHA-256; currently uv 0.12.14) into `var/runtime/uv-<version>` and installs a
 managed Python 3.13.x under `var/runtime/python`. A stdlib-only Python stage
 then prepares Node/npm from the pinned Node 22 bundle when missing and checks
-Docker/Compose. Afterwards `.venv` is created with `uv venv` and synchronized
+Docker/Compose (Compose 2.20+; `--install-docker` on macOS installs the pinned
+Docker Desktop 4.91.0, which ships Compose 5.5.1). uv 0.12.14 returns 1 for
+expected package failures and 2 for operational ones; KIP scripts treat every
+nonzero uv status as a failure, so both codes stop bootstrap. Afterwards `.venv` is created with `uv venv` and synchronized
 from `uv.lock` with `uv sync --frozen` and the postgres, api, identity,
 extractors, mcp, and dev extras. Wrappers select the managed runtimes
 through `scripts/runtime-path.sh` (`var/runtime/bin`), and `./scripts/uv.sh`

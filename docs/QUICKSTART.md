@@ -41,8 +41,12 @@ agent는 `kip-setup` Skill에 따라 매번 하나의 누락된 결정만 질문
 
 ```bash
 curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh | bash
-# 위치와 버전 고정: | bash -s -- ~/kip --version X.Y.Z
+
+# 위치와 버전 고정 (X.Y.Z는 https://github.com/64etuor/kip/releases 의 버전)
+curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh | bash -s -- ~/kip --version X.Y.Z
 ```
+
+설치된 정확한 버전은 설치 디렉터리에서 `./scripts/kip version`으로 확인한다.
 
 bash, curl 또는 wget, sha256sum 또는 shasum, unzip 또는 python3만 있으면 되고
 Python은 bootstrap이 준비한다. digest가 맞지 않으면 아무것도 풀지 않는다.
@@ -192,7 +196,7 @@ Reference 설정은 filesystem parser를 파일 하나당 bounded child에서 �
 | `assertion_candidates` (`status`) | 사람 검토를 기다리는 관계 후보 수(0이면 할 일 없음) |
 | `lexical_search` (`capabilities`) | 키워드 검색 사용 가능 여부 |
 | `semantic_projection_status` (`capabilities`) | 의미 기반 검색 상태. 첫 sync가 embedding을 마치면 `active`가 됩니다. 그 전(`missing`/`shadow`)에는 검색이 lexical로 동작하고, lexical 전용 설치(`KIP_SEMANTIC=off`)는 `disabled`입니다. 빠른 identity 확인이라 빠진 unit(`stale`)은 `kip doctor`나 `kip projection verify`로 확인합니다 |
-| `ok` / `reason` (`doctor`) | 각 점검의 통과 여부와, 실패 시 해야 할 일 |
+| `ok` / `details.reason` / `details.fix` (`doctor`) | 각 점검의 통과 여부와, 실패 시 다음에 실행할 명령. 영어 에이전트는 `summary_en` |
 | `failed` / `warnings` (`sync run`) | 읽지 못한 파일 수와 파일별 이유 |
 
 막히면 [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)에서 증상별 해결 순서를

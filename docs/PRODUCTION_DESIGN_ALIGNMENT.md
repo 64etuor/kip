@@ -1,7 +1,7 @@
 # Production Design Alignment
 
 - **Status:** Living conformance register
-- **Last reviewed:** 2026-09-11 (3.12.0 semantic search on by default; older corpus measurements retain their dates)
+- **Last reviewed:** 2026-09-16 (3.16.0 comma-ACL last line, `semantic_disabled`, setup sample preset, MCP doctor; retrieval numbers remain the 3.12.0 evidence)
 - **Target:** `docs/PRD.md`, `docs/TRD.md`, and the approved
   [historical design](https://github.com/64etuor/kip/blob/1b04bad685762fe3002d9c4ec6a75f267df9fb94/docs/plans/2026-08-09-production-rag-starter-kit-design.md)
 - **Current truth:** generated contracts, the current checkout, measured

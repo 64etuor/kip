@@ -53,6 +53,9 @@ fi
   export KIP_DATABASE_STATEMENT_TIMEOUT_MS="${KIP_RESTORE_STATEMENT_TIMEOUT_MS:-300000}"
   export KIP_CAS_PATH="$KIP_DRILL_CAS_PATH"
   export KIP_SKIP_DOTENV=1
+  # The evaluation deliberately targets the restored database, not this
+  # deployment's, so the deployment port guard in scripts/kip does not apply.
+  export KIP_DATABASE_PORT_CHECK=off
   "$KIP_CLI" evaluate run "${EVALUATION_ARGS[@]}" \
     > "$REPORT_ROOT/evaluation-command.json"
 )

@@ -8,6 +8,7 @@ from kip.domain.json_types import JsonObject
 from kip.domain.models import (
     Capabilities,
     JobRecord,
+    MigrationReport,
     RequestContext,
     StatusReport,
 )
@@ -133,8 +134,11 @@ class OperationsUseCases:
             warnings=warnings,
         )
 
-    def migrate(self) -> list[str]:
+    def migrate(self) -> MigrationReport:
         return self._store.migrate(self._settings.project_root / "migrations")
+
+    def extension_versions(self, name: str) -> tuple[str | None, str | None] | None:
+        return self._store.extension_versions(name)
 
     def status(self, context: RequestContext) -> StatusReport:
         return self._store.status(context)

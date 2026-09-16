@@ -362,6 +362,21 @@
       "default": null,
       "title": "Relation Mining Mode"
     },
+    "replaced_files": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Replaced Files"
+    },
     "retention_days": {
       "title": "Retention Days",
       "type": "integer"

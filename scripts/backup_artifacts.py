@@ -520,6 +520,45 @@ def verify_backup(root: Path) -> dict[str, Any]:
     return {"file_count": len(files), "status": "verified"}
 
 
+# pg_restore recreates an extension at the restore server's default version, so
+# a backup of a volume that predates an image upgrade restores with a newer
+# extversion. Only these extensions may differ that way, and only by a newer
+# patch release in the same major.minor line: pgvector's 0.8.x update scripts
+# change no SQL objects, while crossing a minor line (0.7.4 to 0.8.0) adds some.
+SAME_LINE_UPDATE_EXTENSIONS = frozenset({"vector"})
+_RELEASE_VERSION = re.compile(r"(\d+)\.(\d+)\.(\d+)")
+
+
+def _is_same_line_update(backup: Any, restored: Any) -> bool:
+    if not isinstance(backup, str) or not isinstance(restored, str):
+        return False
+    old = _RELEASE_VERSION.fullmatch(backup)
+    new = _RELEASE_VERSION.fullmatch(restored)
+    if old is None or new is None:
+        return False
+    old_parts = tuple(int(part) for part in old.groups())
+    new_parts = tuple(int(part) for part in new.groups())
+    return old_parts[:2] == new_parts[:2] and new_parts[2] > old_parts[2]
+
+
+def _extension_updates(expected: Any, actual: Any) -> dict[str, dict[str, str]]:
+    if expected == actual:
+        return {}
+    mismatch = BackupError("restored database extensions do not match the backup")
+    if not isinstance(expected, dict) or not isinstance(actual, dict) or set(expected) != set(actual):
+        raise mismatch
+    updates: dict[str, dict[str, str]] = {}
+    for name in sorted(expected):
+        if expected[name] == actual[name]:
+            continue
+        if name not in SAME_LINE_UPDATE_EXTENSIONS or not _is_same_line_update(
+            expected[name], actual[name]
+        ):
+            raise mismatch
+        updates[name] = {"backup": expected[name], "restored": actual[name]}
+    return updates
+
+
 def compare_database(expected_path: Path, actual_path: Path) -> dict[str, Any]:
     expected = _database_manifest(expected_path)
     actual = _database_manifest(actual_path)
@@ -527,11 +566,13 @@ def compare_database(expected_path: Path, actual_path: Path) -> dict[str, Any]:
     actual_major = int(actual.get("server_version_num", 0)) // 10000
     if expected_major != actual_major:
         raise BackupError("restored PostgreSQL major version does not match the backup")
-    for field in ("migrations", "counts", "extensions", "rls_policy_count"):
+    for field in ("migrations", "counts", "rls_policy_count"):
         if expected.get(field) != actual.get(field):
             raise BackupError(f"restored database {field} do not match the backup")
+    extension_updates = _extension_updates(expected.get("extensions"), actual.get("extensions"))
     return {
         "database": actual.get("database"),
+        "extension_updates": extension_updates,
         "server_major": actual_major,
         "status": "verified",
     }

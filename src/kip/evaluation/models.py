@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from kip.domain.identity import comma_acl_scopes_error
 
 EvaluationDimension = Literal["retrieval", "answer", "ontology"]
 
@@ -64,6 +66,14 @@ class GoldenCase(EvaluationModel):
     expected_refusal: bool | None = None
     recall_at: int = Field(default=10, ge=1, le=100)
     notes: str | None = None
+
+    @field_validator("acl_scopes")
+    @classmethod
+    def acl_scopes_are_comma_free(cls, scopes: list[str]) -> list[str]:
+        error = comma_acl_scopes_error(scopes, subject="evaluation case acl_scope")
+        if error is not None:
+            raise ValueError(error)
+        return scopes
 
     @model_validator(mode="after")
     def reviewed_cases_are_immutable(self) -> Self:

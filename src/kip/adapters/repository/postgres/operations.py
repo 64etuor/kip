@@ -6,7 +6,7 @@ from typing import ClassVar
 
 from kip.adapters.repository.postgres.database import PostgresDatabase
 from kip.domain.json_types import JsonObject
-from kip.domain.models import RequestContext, StatusReport
+from kip.domain.models import MigrationReport, RequestContext, StatusReport
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,7 +17,10 @@ class PostgresOperationsStore:
     def ping(self) -> None:
         self.database.ping()
 
-    def migrate(self, migrations_dir: Path) -> list[str]:
+    def extension_versions(self, name: str) -> tuple[str | None, str | None] | None:
+        return self.database.extension_versions(name)
+
+    def migrate(self, migrations_dir: Path) -> MigrationReport:
         return self.database.migrate(migrations_dir)
 
     def status(self, context: RequestContext) -> StatusReport:

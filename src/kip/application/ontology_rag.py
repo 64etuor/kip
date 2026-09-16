@@ -10,6 +10,7 @@ from kip.application.evidence import EvidenceUseCases
 from kip.application.knowledge import KnowledgeUseCases
 from kip.application.telemetry import TelemetryUseCases
 from kip.domain.generation import GenerationEvidence
+from kip.domain.identity import comma_acl_scopes_error
 from kip.domain.json_types import JsonObject, JsonValue
 from kip.domain.knowledge import (
     AUTO_APPROVE_POLICY_PRINCIPAL,
@@ -103,6 +104,10 @@ class OntologyRagUseCases:
         # roles=["admin"]), so the check must live here for all three edges
         # to enforce it uniformly.
         self._require_admin(context)
+        # Every edge (CLI, REST, MCP) passes scopes here unsplit.
+        comma_error = comma_acl_scopes_error(entity.acl_scopes, subject="entity acl_scope")
+        if comma_error is not None:
+            raise ValidationError(comma_error)
         ontology = self._require_ontology()
         ontology.validate_entity_type(entity.entity_type)
         return self._store.save_entity(context, entity)

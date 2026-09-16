@@ -833,3 +833,29 @@ def test_archive_upgrade_finishes_with_the_upgraded_trees_upgrade_script(tmp_pat
     assert applied.returncode == 0, applied.stderr
     assert (unbootstrapped / "VERSION").read_text().strip() == "1.1.0"
     assert not (unbootstrapped / "finish-marker").exists()
+
+
+def test_archive_dry_run_on_a_release_with_the_refresh_previews_the_next_pin_and_writes_nothing(tmp_path: Path) -> None:
+    # Given a deployment that already runs this release's upgrade.sh and
+    # bootstrap_env.py (an upgrade from 3.16.0 onward), whose .env carries the
+    # pin its installed release shipped. A 3.15.x deployment dry-runs with its
+    # own older upgrade.sh, which has no refresh and previews nothing; its
+    # --finish runs the new tree's scripts and still rewrites the pin.
+    installed_pin = "pgvector/pgvector:0.8.2-pg18-trixie@sha256:" + "b" * 64
+    next_pin = "pgvector/pgvector:9.9.9-pg18-trixie@sha256:" + "0" * 64
+    kit = {"scripts/bootstrap_env.py": (ROOT / "scripts/bootstrap_env.py").read_bytes()}
+    deployment = _deploy(tmp_path, "1.0.0", {**OLD_KIT, **kit, ".env.example": f"KIP_POSTGRES_IMAGE={installed_pin}\n".encode()})
+    env_file = deployment / ".env"
+    env_file.write_text(env_file.read_text() + f"KIP_POSTGRES_IMAGE={installed_pin}\n")
+    before = env_file.read_bytes()
+    archive = _make_kit(tmp_path / "next", "1.1.0", {**NEW_KIT, **kit, ".env.example": f"KIP_POSTGRES_IMAGE={next_pin}\n".encode()})
+
+    result = subprocess.run(
+        ["/bin/bash", str(deployment / "scripts/upgrade.sh"), "--archive", str(archive), "--dry-run"],
+        capture_output=True, text=True, check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert f"Would update KIP_POSTGRES_IMAGE in {env_file}: {installed_pin} -> {next_pin}. Nothing was written." in result.stderr
+    assert env_file.read_bytes() == before
+    assert (deployment / "VERSION").read_text().strip() == "1.0.0"

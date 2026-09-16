@@ -39,7 +39,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  UV_VERSION: "0.12.12"
+  UV_VERSION: "0.12.14"
   UV_NO_PROGRESS: "1"
 
 jobs:

@@ -83,6 +83,26 @@ _CONTENT_TOKEN_RE = re.compile(r"[0-9A-Za-z]{2,}|[가-힣]{2,}")
 _PARTICLES = ("에서는", "으로는", "에게는", "에서", "으로", "에게", "까지", "부터", "의", "은", "는", "이", "가", "을", "를", "에", "로", "와", "과", "도")
 
 
+def _codeswitch_expansion(text: str) -> list[str]:
+    """Widen a Korean+English query without injecting the split into rerank.
+
+    Code-switched questions ranked the relevant evidence near the edge of a
+    small lexical window. Searching the Hangul-only and Latin-only token
+    groups as extra lexical candidates recovers that evidence; the reranker
+    still scores the original wording.
+    """
+    hangul: list[str] = []
+    latin: list[str] = []
+    for token in _content_terms(text):
+        if all("가" <= char <= "힣" for char in token):
+            hangul.append(token)
+        elif token.isascii():
+            latin.append(token)
+    if not hangul or not latin:
+        return []
+    return [" ".join(hangul), " ".join(latin)]
+
+
 def _content_terms(text: str) -> list[str]:
     tokens = _CONTENT_TOKEN_RE.findall(normalize_text(text).casefold())
     terms = list(tokens)

@@ -186,14 +186,18 @@ capabilities never grant a principal, workspace, scope, or role.
 - Interaction memory: `kip_clarify`, `kip_answer_clarification`,
   `kip_preferences`, `kip_remember_preference`, `kip_forget_preference`,
   `kip_feedback`
-- Operations visibility: `kip_jobs`
+- Operations visibility: `kip_jobs`, `kip_doctor`
+
+`kip_doctor` is read-only diagnostics (`checks[].details.reason` and
+`details.fix`, plus `summary` / `summary_en`). It does not sync or rebuild.
 
 Deliberate scope boundary: MCP does not expose sync triggers, telemetry,
 projection maintenance, raw get-by-id record reads, or manual assertion
 candidate creation. Synchronization and rebuilds must never be triggered from
 a normal retrieval surface (`AGENTS.md`: "Ordinary retrieval does not
 authorize sync, re-index, or projection rebuilds"); use the CLI or the admin
-REST routes for those operations.
+REST routes for those operations. Ordinary retrieval also does not authorize
+sync because a query missed.
 
 ## Registering KIP with an MCP client
 
@@ -223,6 +227,8 @@ MCP protocol and logs go to stderr. Pass `KIP_WORKSPACE`, `KIP_PRINCIPAL_ID`
 and `KIP_ACL_SCOPES` (and `KIP_ROLES=admin` only for a verified reviewer) as
 environment entries, the same way as `KIP_CONFIG` below; root options such as
 `kip --workspace acme mcp` reach the server as those variables too.
+`KIP_ACL_SCOPES` is comma-separated all the way to the database session, so a
+scope never contains a comma; `kip --acl-scope` rejects one that does.
 
 Setup writes the deployment's own `.mcp.json` in the absolute form. A
 `.mcp.json` from an earlier setup keeps `bash scripts/mcp.sh` with a relative
@@ -230,7 +236,10 @@ Setup writes the deployment's own `.mcp.json` in the absolute form. A
 client starts in the deployment root. `kip doctor` reports that as the
 non-required `mcp_registration` warning, with the absolute entry in
 `details.replacement`. Doctor never rewrites the file: edit it by hand, or
-apply an approved setup plan again, which rewrites it.
+apply an approved setup plan again, which rewrites it. The plan lists it in
+`replaced_files`, and the apply receipt's `summary` names the kept
+`.mcp.json.previous` (the copy that apply replaced) and `.mcp.json.original`
+(the earliest copy, never overwritten).
 
 The commands below were checked against Claude Code 2.1.266 and codex-cli
 0.144.6 with a throwaway `HOME`, reading back the configuration each one wrote.
@@ -240,8 +249,12 @@ The commands below were checked against Claude Code 2.1.266 and codex-cli
 User scope makes the server available in every project for this user (stored
 in `~/.claude.json`):
 
+`/abs/path/kip` is the launcher path the installer printed (default
+`~/.local/bin/kip`, expanded). A client started before that PATH change does
+not see a bare `kip`.
+
 ```bash
-claude mcp add --scope user kip -- kip mcp
+claude mcp add --scope user kip -- '/abs/path/kip' mcp
 
 # Without the launcher
 claude mcp add --scope user kip \
@@ -254,7 +267,7 @@ shares it with everyone who opens that project. Run it in the project that
 should use KIP:
 
 ```bash
-claude mcp add --scope project kip -- kip mcp
+claude mcp add --scope project kip -- '/abs/path/kip' mcp
 ```
 
 `claude mcp add` refuses a name that already exists in the target file
@@ -269,7 +282,7 @@ and whether it connects.
 server is available to every Codex session for this user:
 
 ```bash
-codex mcp add kip -- kip mcp
+codex mcp add kip -- '/abs/path/kip' mcp
 
 # Without the launcher
 codex mcp add kip --env KIP_CONFIG=/srv/kip/config/kip.host.generated.toml \

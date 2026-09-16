@@ -241,7 +241,7 @@ SQLite + FTS5 adapter는 다음이 완료된 뒤 별도 packaging target으로 �
 ```yaml
 services:
   postgres:
-    image: pgvector/pgvector:0.8.2-pg18-trixie
+    image: pgvector/pgvector:0.8.6-pg18-trixie
     restart: unless-stopped
     ports:
       - "127.0.0.1:5432:5432"
@@ -807,6 +807,31 @@ is verified by `kip doctor` and `kip projection verify`, and every sync keeps
 the projection current. A future extension-free profile
 would be a separate supported distribution with its own migration and test
 matrix; it is not the current production contract.
+
+The reference image pins `pgvector/pgvector:0.8.6-pg18-trixie` by digest; 0.8.3
+and 0.8.4 fix HNSW corruption when VACUUM runs alongside INSERT, and the
+remaining INSERT/VACUUM race (pgvector #1010) is fixed only in the unreleased
+0.8.7. A volume keeps the extension version it was created with, so migration
+`0029_vector_extension_update.sql` runs `ALTER EXTENSION vector UPDATE` when
+`pg_extension.extversion` differs from the server's default version and does
+nothing otherwise. Because a ledger entry runs once, and code can migrate
+before the image changes, the migration runner repeats the same guarded update
+after the migration files on every `kip migrate` and reports it as
+`data.extension_updates` (`{"vector": {"from": "0.8.2", "to": "0.8.6"}}`).
+Neither step fails a migrate: a role that does not own the extension, a catalog
+newer than the image, and a lock held by a concurrent session (bounded by a
+local `lock_timeout`) leave the catalog unchanged and return an operator
+warning in `meta.warnings`. The fix itself lives in the shared library and applies when
+the server restarts on the new image; the 0.8.x update scripts change no SQL
+objects and the on-disk HNSW format is unchanged, so the migration does not
+REINDEX. `REINDEX INDEX CONCURRENTLY` cannot run inside the migration's
+transaction, and a plain REINDEX would block index reads and writes for its
+duration. Repairing an index damaged before the upgrade is an operator step
+(TROUBLESHOOTING). Restore verification requires the same extension set and
+versions, except that `vector` may be restored at a newer patch release of the
+same major.minor line: `pg_restore` recreates it at the target's default
+version, and the comparison records the accepted difference as
+`extension_updates`.
 
 `pgcrypto`는 application-generated UUIDv7/ULID를 사용하면 필수가 아니다. ID 생성은 domain utility가 담당한다.
 

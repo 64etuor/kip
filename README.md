@@ -15,16 +15,27 @@
 
 ```bash
 curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh | bash
-cd ~/kip && ./scripts/app-up.sh --database-only   # 번들 PostgreSQL 준비
+cd ~/kip && ./scripts/kip version                 # 설치한 정확한 버전
+./scripts/kip setup inspect                       # 또는 setup preset sample
+./scripts/app-up.sh --database-only               # 번들 PostgreSQL 준비
 ```
 
-Claude Code나 Codex에 아래 문장을 전달하면 설치, 셋업, 에이전트 연결까지
-진행합니다. 색인할 폴더, Docker 설치, plan 승인, client 설정 변경은 에이전트가
-먼저 묻습니다.
+특정 버전을 고정하려면 위치와 버전을 넘깁니다. `X.Y.Z`는
+[릴리스 목록](https://github.com/64etuor/kip/releases)의 버전입니다.
 
-> https://github.com/64etuor/kip README의 설치 명령으로 KIP를 설치하고,
-> `skills/kip-setup/SKILL.md` 절차대로 셋업한 뒤 그 skill의 "Connect agents"
-> 단계로 이 에이전트에 MCP와 skill을 연결해줘.
+```bash
+curl -fsSL https://github.com/64etuor/kip/releases/latest/download/install.sh | bash -s -- ~/kip --version X.Y.Z
+```
+
+Claude Code나 Codex에 아래 문장을 전달하면 최신 릴리스 설치, 셋업, 에이전트
+연결까지 진행하고 설치된 정확한 버전을 알려줍니다. 색인할 폴더, Docker 설치,
+plan 승인, client 설정 변경은 에이전트가 먼저 묻습니다. 버전을 고정하려면
+요청에 "버전 X.Y.Z로 고정해서"를 덧붙이세요.
+
+> https://github.com/64etuor/kip README의 설치 명령으로 최신 릴리스 KIP를
+> 설치하고, 설치한 디렉터리의 `scripts/kip version`이 출력한 정확한 버전을
+> 알려줘. 그다음 `skills/kip-setup/SKILL.md` 절차대로 셋업한 뒤 그 skill의
+> "Connect agents" 단계로 이 에이전트에 MCP와 skill을 연결해줘.
 
 ## 첫 질의
 

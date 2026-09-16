@@ -28,17 +28,18 @@ Search exact identifiers or lexical terms, then use `vocab` (`kip_vocabulary`
 over MCP) when results are weak — it is a prefix lookup over indexed tokens, not
 synonym expansion. The default mode is `hybrid` only where the deployment
 enabled semantic search. Where it did not — `scripts/bootstrap.sh` turns it off
-whenever the model runtime could not be installed — every search is lexical and
-nothing warns you, so a paraphrase can return no hits while the concept is
-indexed under other words. Read `capabilities` before concluding absence:
-`semantic_search: false` means lexical-only, so query exact identifiers and
-indexed spellings instead. A `meta.warnings` entry ending in `_degraded` means
+whenever the model runtime could not be installed — every search is lexical.
+Search and context then carry `semantic_disabled` in `meta.warnings`. Read
+`capabilities` before concluding absence: `semantic_search: false` means
+lexical-only, so query exact identifiers and indexed spellings instead. A `meta.warnings` entry ending in `_degraded` means
 part of an enabled ranking path was unavailable and it fell back. Mention it if
 it limits the answer; it does not authorize a sync or rebuild. Search hits carry
 `evidence_role=discovery` and `source_verification=not_checked`: their snippets
 and hashes describe the index, never a live check. `context` provides a bounded
-candidate pack, and an item with `body_truncated=true` holds only the leading
-part of the unit, so it cannot show that something is absent. Reopen every
+candidate pack, and an item with `body_truncated=true` holds the head and tail
+of the unit around a marker, so the middle is missing and it cannot show that
+something is absent. Call `kip_doctor` / `doctor` for deployment diagnostics
+instead of guessing a sync. Reopen every
 relied-on unit with `read` before making a claim. `read`, `context` items,
 `xlsx-read`, and answer citations all report `source_verification`; read it
 before reporting anything as changed. `read` always re-hashes, so it is `sha256`

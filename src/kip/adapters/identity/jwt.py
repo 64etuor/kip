@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from urllib.parse import urlsplit
 
-from kip.domain.identity import AclSnapshot, IdentityCredential
+from kip.domain.identity import AclSnapshot, IdentityCredential, comma_acl_scopes_error
 from kip.domain.models import RequestContext
 from kip.errors import AuthorizationError, ConfigurationError, DependencyUnavailableError
 
@@ -123,6 +123,12 @@ class JwtIdentityAdapter:
         principal_id = _required_string(claims, config.principal_claim)
         groups = _string_list(claims, config.group_claim, required=True)
         direct_scopes = _string_list(claims, config.scope_claim, required=False)
+        comma_error = comma_acl_scopes_error(
+            [*groups, *direct_scopes],
+            subject="JWT group or scope claim",
+        )
+        if comma_error is not None:
+            raise AuthorizationError(comma_error)
         workspace_scope = f"workspace:{workspace}"
         for scope in direct_scopes:
             if scope.startswith("workspace:") and scope != workspace_scope:

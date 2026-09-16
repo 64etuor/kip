@@ -198,10 +198,13 @@ def test_database_only_refuses_mismatched_host_config_before_starting(tmp_path: 
         (None, "postgresql://kip_owner:test-password@127.0.0.1:5432?sslmode=disable", None, 0),
         (None, "postgresql://kip_owner:test-password@127.0.0.1/kip", None, 0),
         ("55432", "postgresql://kip_owner:test-password@[::1]:5432/kip", None, 2),
-        (None, "postgresql://kip_owner:test-password@127.0.0.1:5432/kip",
+        ("5432", "postgresql://kip_owner:test-password@127.0.0.1:5432/kip",
          "postgresql://kip_backup:test-password@localhost:55432/kip", 2),
+        # No declared published port: nothing to compare (throwaway databases).
+        (None, "postgresql://kip_owner:test-password@127.0.0.1:57424/kip", None, 0),
     ],
-    ids=["other-port", "same-port", "default", "query-without-path", "no-port", "ipv6-loopback", "stale-backup-url"],
+    ids=["other-port", "same-port", "default", "query-without-path", "no-port", "ipv6-loopback", "stale-backup-url",
+         "undeclared-port"],
 )
 def test_plain_database_only_refuses_a_database_url_on_another_port(
     tmp_path: Path, published: str | None, url: str, backup: str | None, expected: int
@@ -222,6 +225,25 @@ def test_plain_database_only_refuses_a_database_url_on_another_port(
     if expected:
         assert "KIP_POSTGRES_PORT" in result.stderr
         assert not _calls(trace)
+
+
+@pytest.mark.parametrize(("override", "expected"), [(None, 2), ("off", 0)])
+def test_plain_full_app_refuses_a_database_url_on_another_port_unless_overridden(
+    tmp_path: Path, override: str | None, expected: int
+) -> None:
+    project, environment, trace = _installation(tmp_path, generated=False)
+    environment.update({"KIP_POSTGRES_PORT": "55432", "KIP_SEMANTIC": "off"})
+    if override is not None:
+        environment["KIP_DATABASE_PORT_CHECK"] = override
+
+    result = _run(project, environment)
+
+    assert result.returncode == expected, result.stderr
+    if expected:
+        assert "set KIP_DATABASE_PORT_CHECK=off" in result.stderr
+        assert not _calls(trace)
+    else:
+        assert [call["args"][-3:] for call in _calls(trace)] == [["up", "-d", "--build"]]
 
 
 @pytest.mark.parametrize("external", [False, True])

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from collections.abc import Callable, Mapping
 from dataclasses import replace
 from pathlib import Path
@@ -22,6 +23,12 @@ from kip.adapters.ocr.kordoc import (
 )
 from kip.application.projection_maintenance import after_reextraction, after_sync, stderr_progress
 from kip.container import Container, build_container
+from kip.database_port import (
+    database_port_doctor_check,
+    evaluate_database_port,
+    project_root_from_env,
+)
+from kip.domain.identity import ACL_SCOPE_COMMA_REASON, ROLE_COMMA_REASON
 from kip.domain.interactions import (
     ClarificationAnswer,
     ClarificationRequest,
@@ -226,7 +233,9 @@ def root(
     ),
     workspace: str | None = typer.Option(None, "--workspace", envvar="KIP_WORKSPACE"),
     principal: str = typer.Option("principal_local", "--principal", envvar="KIP_PRINCIPAL_ID"),
-    acl_scope: list[str] | None = typer.Option(None, "--acl-scope", help="Repeatable access scope"),
+    acl_scope: list[str] | None = typer.Option(
+        None, "--acl-scope", help="Repeatable access scope, one per option (a scope cannot contain a comma)"
+    ),
     acl_scopes: str | None = typer.Option(
         None,
         "--acl-scopes",
@@ -236,7 +245,7 @@ def root(
     role: list[str] | None = typer.Option(
         None,
         "--role",
-        help="Repeatable operator role (admin commands fail without an explicit role)",
+        help="Repeatable operator role, one per option (a role cannot contain a comma)",
     ),
     roles: str | None = typer.Option(
         None,
@@ -249,6 +258,31 @@ def root(
         # Operator commands that must work without a database or a full container.
         ctx.obj = None
         return
+    if ctx.invoked_subcommand != "doctor":
+        # Console scripts (`.venv/bin/kip`, `python -m kip.cli`) never run the
+        # bash wrapper. Refuse here with the same exit 2 as `scripts/kip`.
+        verdict = evaluate_database_port(project_root_from_env())
+        if not verdict.ok and verdict.required:
+            sys.stderr.write(verdict.refuse_message())
+            raise typer.Exit(code=2)
+    # A scope is comma-free everywhere it travels: KIP_ACL_SCOPES, the
+    # X-KIP-ACL-Scopes header and the PostgreSQL session setting
+    # (`string_to_array(kip.acl_scopes, ',')`) are all comma-separated, so one
+    # value with a comma would silently become several scopes.
+    comma_scopes = [value for value in acl_scope or [] if "," in value]
+    if comma_scopes:
+        _emit_error(None, ValidationError(
+            f"--acl-scope {comma_scopes[0]!r} contains a comma, and an ACL scope cannot: "
+            f"{ACL_SCOPE_COMMA_REASON}. Repeat --acl-scope once per scope"
+        ), workspace=workspace)
+        raise typer.Exit(code=3)
+    comma_roles = [value for value in role or [] if "," in value]
+    if comma_roles:
+        _emit_error(None, ValidationError(
+            f"--role {comma_roles[0]!r} contains a comma, and a role cannot: "
+            f"{ROLE_COMMA_REASON}. Repeat --role once per role, or pass --roles a,b"
+        ), workspace=workspace)
+        raise typer.Exit(code=3)
     if ctx.invoked_subcommand == "mcp":
         # The MCP server loads its own settings and reads the request identity
         # from the environment on every tool call, exactly as scripts/mcp.sh
@@ -712,11 +746,31 @@ def _semantic_doctor_check(
     WARN-level signal with the exact command that finishes the setup.
     """
     if not capabilities.semantic_search_configured:
+        # Intentional lexical-only mode, not a fault: say so explicitly so
+        # `enabled: false` is not read as something to repair.
+        # Only the configuration disables it; KIP_SEMANTIC is read at install and
+        # plan time, never here, so it cannot be named as the cause.
+        disabled_by = (
+            "search.semantic_enabled is not set (defaults to false)"
+            if settings.get("search.semantic_enabled") is None
+            else "search.semantic_enabled = false (set by configuration; KIP_SEMANTIC=off at install writes this)"
+        )
         return {
             "name": "semantic_search",
             "ok": True,
             "required": False,
-            "details": {"enabled": False, "model_runtime": None, "projection": "disabled", "reason": None},
+            "details": {
+                "enabled": False,
+                "model_runtime": None,
+                "projection": "disabled",
+                "reason": None,
+                "state": "disabled_by_configuration",
+                "disabled_by": disabled_by,
+                "message": (
+                    f"semantic search is disabled by configuration: {disabled_by}; "
+                    "lexical search is the intended mode"
+                ),
+            },
         }
     embedding = settings.get("models.embedding", {}) or {}
     base_url = str(embedding.get("base_url", "http://127.0.0.1:7997")).rstrip("/")
@@ -793,8 +847,97 @@ def _semantic_doctor_check(
             "model_runtime": runtime_ok,
             "projection": projection,
             "reason": reason,
+            "state": "ready" if reason is None else "degraded",
         },
     }
+
+
+def _version_key(version: str) -> tuple[int, ...] | None:
+    parts = version.split(".")
+    return tuple(int(part) for part in parts) if all(part.isdigit() for part in parts) else None
+
+
+def _postgres_extensions_doctor_check(operations: Any) -> dict[str, Any]:
+    """Compare the `vector` catalog version with the server's pgvector.
+
+    Not required: search keeps working on an outdated catalog, but backups
+    record `extversion` and `ALTER EXTENSION vector UPDATE` is what brings it
+    level. Image and Compose pins are outside doctor; it reports both versions.
+    """
+    details: dict[str, Any] = {
+        "extension": "vector", "installed_version": None, "server_version": None,
+        "state": "not_applicable", "reason": None,
+    }
+    check = {"name": "postgres_extensions", "ok": True, "required": False, "details": details}
+    try:
+        versions = operations.extension_versions("vector")
+    except Exception as error:
+        # A diagnostic must never fail doctor: an unreadable catalog is "not checked".
+        details.update({"state": "not_checked", "error": _error_message(error)})
+        return check
+    if versions is None:
+        return check
+    if not isinstance(versions, tuple) or len(versions) != 2:
+        details.update({"state": "not_checked", "error": f"unexpected extension_versions result: {versions!r}"})
+        return check
+    installed, server = versions
+    details.update({"installed_version": installed, "server_version": server})
+    if installed is not None and server is None:
+        # Installed in this database, but the server cannot load it (an image
+        # without pgvector). The older adapter shape reports (None, None) here.
+        check["ok"] = False
+        details.update({
+            "state": "installed_but_unavailable",
+            "reason": f"the vector extension is installed ({installed}) but this server has no pgvector",
+            "fix": "run the pgvector PostgreSQL image the database was created with",
+        })
+        return check
+    if installed is None or server is None:
+        details["state"] = "not_installed" if server is not None else "not_available"
+        return check
+    if installed == server:
+        details["state"] = "current"
+        return check
+    installed_key, server_key = _version_key(installed), _version_key(server)
+    if installed_key is None or server_key is None:
+        # A development or distribution build (`0.8.7-dev`) cannot be ordered and
+        # may be newer, so report both versions without migrate advice.
+        details["state"] = "unknown_version"
+        return check
+    check["ok"] = False
+    if installed_key > server_key:
+        details.update({
+            "state": "newer_than_server",
+            "reason": (
+                f"the vector extension catalog ({installed}) is newer than the server's pgvector "
+                f"({server}), which happens when the database runs on an older image than the one "
+                "migrations ran on"
+            ),
+            "fix": "run the PostgreSQL image the database was migrated with",
+        })
+    else:
+        details.update({
+            "state": "outdated",
+            "reason": (
+                f"the vector extension catalog ({installed}) is older than the server's pgvector "
+                f"({server}), which happens when migrations ran before the image changed"
+            ),
+            "fix": "./scripts/kip migrate",
+        })
+    return check
+
+
+def _database_port_doctor_check(project_root: Path) -> dict[str, Any]:
+    """`kip_database_port_check` in scripts/common.sh, reported instead of refused.
+
+    `scripts/kip` skips that guard for doctor so this check can show the
+    problem. Required when it applies: a loopback URL on another port reaches
+    whichever PostgreSQL owns that port, possibly another deployment's. Unlike
+    the bash wrapper, this also reads `KIP_DATABASE_URL_FILE` when the env var
+    is empty. A URL port that is not a number from 1 to 65535 fails here:
+    that URL cannot connect to anything.
+    """
+    return database_port_doctor_check(project_root)
 
 
 def _kordoc_ocr_doctor_check(settings: Settings) -> dict[str, Any]:
@@ -855,16 +998,64 @@ def _doctor_summary(checks: list[dict[str, Any]], required_failures: list[str]) 
     if required_failures:
         return (
             f"문제: 필수 점검 {len(required_failures)}건 실패 ({', '.join(required_failures)}). "
-            "아래 checks 항목의 reason을 확인하세요."
+            "아래 checks 항목의 details.reason과 details.fix를 확인하세요."
         )
+    lexical_note = ""
+    for item in checks:
+        details = item.get("details")
+        if (
+            item["name"] == "semantic_search" and isinstance(details, dict)
+            and details.get("state") == "disabled_by_configuration"
+        ):
+            lexical_note = (
+                f" 시맨틱 검색은 설정으로 꺼져 있습니다: {details.get('disabled_by')}. "
+                "lexical 검색이 의도된 모드입니다."
+            )
     optional_warnings = [item for item in checks if not item["required"] and not item["ok"]]
     if not optional_warnings:
-        return f"정상: 필수 점검 {required_ok}/{required_total} 통과."
+        return f"정상: 필수 점검 {required_ok}/{required_total} 통과.{lexical_note}"
     first = optional_warnings[0]
     details = first.get("details")
     reason = details.get("reason") if isinstance(details, dict) else None
     hint = f"{first['name']}" + (f" — {reason}" if reason else "")
-    return f"정상: 필수 점검 {required_ok}/{required_total} 통과. 경고 {len(optional_warnings)}건({hint})."
+    return (
+        f"정상: 필수 점검 {required_ok}/{required_total} 통과. "
+        f"경고 {len(optional_warnings)}건({hint}).{lexical_note}"
+    )
+
+
+def _doctor_summary_en(checks: list[dict[str, Any]], required_failures: list[str]) -> str:
+    """English twin of `_doctor_summary` for agents following English skills."""
+    required_total = sum(1 for item in checks if item["required"])
+    required_ok = required_total - len(required_failures)
+    if required_failures:
+        return (
+            f"Problem: {len(required_failures)} required check(s) failed "
+            f"({', '.join(required_failures)}). Read checks[].details.reason "
+            "and details.fix for the next command."
+        )
+    lexical_note = ""
+    for item in checks:
+        details = item.get("details")
+        if (
+            item["name"] == "semantic_search" and isinstance(details, dict)
+            and details.get("state") == "disabled_by_configuration"
+        ):
+            lexical_note = (
+                f" Semantic search is off by configuration: {details.get('disabled_by')}. "
+                "Lexical search is the intended mode."
+            )
+    optional_warnings = [item for item in checks if not item["required"] and not item["ok"]]
+    if not optional_warnings:
+        return f"OK: {required_ok}/{required_total} required checks passed.{lexical_note}"
+    first = optional_warnings[0]
+    details = first.get("details")
+    reason = details.get("reason") if isinstance(details, dict) else None
+    hint = f"{first['name']}" + (f" — {reason}" if reason else "")
+    return (
+        f"OK: {required_ok}/{required_total} required checks passed. "
+        f"{len(optional_warnings)} warning(s) ({hint}).{lexical_note}"
+    )
 
 
 @app.command(rich_help_panel=_DEPLOYMENT_PANEL)
@@ -1043,126 +1234,129 @@ def _skill_installs_doctor_check(settings: Settings) -> dict[str, Any]:
     return {"name": "skill_installs", "ok": not stale, "required": False, "details": details}
 
 
+def collect_doctor_report(container: Any, context: RequestContext) -> dict[str, Any]:
+    """The doctor payload CLI and MCP share, including `summary` and `summary_en`."""
+    settings = container.settings
+    capabilities = container.application.operations.capabilities(context)
+    checks: list[dict[str, Any]] = []
+    checks.append(
+        {
+            "name": "configuration",
+            "ok": settings.config_path.exists(),
+            "required": settings.environment not in {"development", "test"},
+            "details": {"path": str(settings.config_path)},
+        }
+    )
+    checks.append(
+        {
+            "name": "canonical_repository",
+            "ok": capabilities.repository in {"postgresql", "memory"},
+            "required": True,
+            "details": {"backend": capabilities.repository},
+        }
+    )
+    checks.append(_database_port_doctor_check(settings.project_root))
+    checks.append(_postgres_extensions_doctor_check(container.application.operations))
+    checks.append(
+        {
+            "name": "content_addressed_store",
+            "ok": settings.cas_path.exists() and settings.cas_path.is_dir(),
+            "required": True,
+            "details": {"path": str(settings.cas_path)},
+        }
+    )
+    checks.append(_kordoc_ocr_doctor_check(settings))
+    verification = None
+    if capabilities.semantic_search:
+        try:
+            verification = container.application.retrieval.verify_semantic_projection(context)
+        except KipError:
+            verification = None
+    checks.append(_semantic_doctor_check(settings, capabilities, verification))
+    for source in settings.get("sources.filesystem", []) or []:
+        if not isinstance(source, dict) or not source.get("enabled", True):
+            continue
+        root_value = source.get("root")
+        root_path = Path(str(root_value)).expanduser().resolve() if root_value else None
+        checks.append(
+            {
+                "name": f"filesystem_source:{source.get('name', 'unnamed')}",
+                "ok": bool(root_path and root_path.exists() and root_path.is_dir()),
+                "required": True,
+                "details": {
+                    "path": str(root_path) if root_path else None,
+                    "configured_read_only": bool(source.get("read_only", False)),
+                },
+            }
+        )
+    ontology_root = settings.project_root / "ontology"
+    adaptive_discovery = bool(settings.get("ontology.adaptive_discovery", False))
+    ontology_root_writable = ontology_root.is_dir() and os.access(ontology_root, os.W_OK)
+    ontology_check_ok = (not adaptive_discovery) or ontology_root_writable
+    checks.append(
+        {
+            "name": "ontology_adaptive_discovery_writable",
+            "ok": ontology_check_ok,
+            "required": adaptive_discovery,
+            "details": {
+                "path": str(ontology_root),
+                "adaptive_discovery_enabled": adaptive_discovery,
+                "reason": None
+                if ontology_check_ok
+                else (
+                    "ontology.adaptive_discovery is enabled but the ontology "
+                    "root is missing or not writable; discovery approval "
+                    "will fail closed"
+                ),
+            },
+        }
+    )
+    pending_release_path = ontology_root / RELEASE_JOURNAL_FILENAME
+    pending_release_exists = pending_release_path.exists()
+    checks.append(
+        {
+            "name": "ontology_pending_release_journal",
+            "ok": not pending_release_exists,
+            "required": False,
+            "details": {
+                "path": str(pending_release_path),
+                "reason": None
+                if not pending_release_exists
+                else (
+                    "a pending ontology release journal was found; a prior "
+                    "release may have crashed mid-write and will be healed "
+                    "on the next container start-up or materialization"
+                ),
+            },
+        }
+    )
+    checks.append(_mcp_registration_doctor_check(settings))
+    checks.append(_skill_installs_doctor_check(settings))
+    required_failures = [item["name"] for item in checks if item["required"] and not item["ok"]]
+    return {
+        "healthy": not required_failures,
+        "required_failures": required_failures,
+        "checks": checks,
+        "capabilities": capabilities.model_dump(mode="json"),
+        "summary": _doctor_summary(checks, required_failures),
+        "summary_en": _doctor_summary_en(checks, required_failures),
+    }
+
+
 @app.command(rich_help_panel=_DEPLOYMENT_PANEL)
 def doctor(ctx: typer.Context) -> None:
     """Check configuration, source mounts, storage, and adapter availability."""
-
-    def action(runtime: Runtime) -> Any:
-        settings = runtime.container.settings
-        capabilities = runtime.container.application.operations.capabilities(runtime.context)
-        checks: list[dict[str, Any]] = []
-        checks.append(
-            {
-                "name": "configuration",
-                "ok": settings.config_path.exists(),
-                "required": settings.environment not in {"development", "test"},
-                "details": {"path": str(settings.config_path)},
-            }
-        )
-        checks.append(
-            {
-                "name": "canonical_repository",
-                "ok": capabilities.repository in {"postgresql", "memory"},
-                "required": True,
-                "details": {"backend": capabilities.repository},
-            }
-        )
-        checks.append(
-            {
-                "name": "content_addressed_store",
-                "ok": settings.cas_path.exists() and settings.cas_path.is_dir(),
-                "required": True,
-                "details": {"path": str(settings.cas_path)},
-            }
-        )
-        checks.append(_kordoc_ocr_doctor_check(settings))
-        verification = None
-        if capabilities.semantic_search:
-            try:
-                verification = runtime.container.application.retrieval.verify_semantic_projection(
-                    runtime.context
-                )
-            except KipError:
-                verification = None
-        checks.append(_semantic_doctor_check(settings, capabilities, verification))
-        for source in settings.get("sources.filesystem", []) or []:
-            if not isinstance(source, dict) or not source.get("enabled", True):
-                continue
-            root_value = source.get("root")
-            root_path = Path(str(root_value)).expanduser().resolve() if root_value else None
-            checks.append(
-                {
-                    "name": f"filesystem_source:{source.get('name', 'unnamed')}",
-                    "ok": bool(root_path and root_path.exists() and root_path.is_dir()),
-                    "required": True,
-                    "details": {
-                        "path": str(root_path) if root_path else None,
-                        "configured_read_only": bool(source.get("read_only", False)),
-                    },
-                }
-            )
-        ontology_root = settings.project_root / "ontology"
-        adaptive_discovery = bool(settings.get("ontology.adaptive_discovery", False))
-        ontology_root_writable = ontology_root.is_dir() and os.access(ontology_root, os.W_OK)
-        ontology_check_ok = (not adaptive_discovery) or ontology_root_writable
-        checks.append(
-            {
-                "name": "ontology_adaptive_discovery_writable",
-                "ok": ontology_check_ok,
-                # Only a real blocker once adaptive discovery is on: approval
-                # of a discovery candidate writes the release and fails
-                # closed if the root is missing or not writable.
-                "required": adaptive_discovery,
-                "details": {
-                    "path": str(ontology_root),
-                    "adaptive_discovery_enabled": adaptive_discovery,
-                    "reason": None
-                    if ontology_check_ok
-                    else (
-                        "ontology.adaptive_discovery is enabled but the ontology "
-                        "root is missing or not writable; discovery approval "
-                        "will fail closed"
-                    ),
-                },
-            }
-        )
-        pending_release_path = ontology_root / RELEASE_JOURNAL_FILENAME
-        pending_release_exists = pending_release_path.exists()
-        checks.append(
-            {
-                "name": "ontology_pending_release_journal",
-                "ok": not pending_release_exists,
-                "required": False,
-                "details": {
-                    "path": str(pending_release_path),
-                    "reason": None
-                    if not pending_release_exists
-                    else (
-                        "a pending ontology release journal was found; a prior "
-                        "release may have crashed mid-write and will be healed "
-                        "on the next container start-up or materialization"
-                    ),
-                },
-            }
-        )
-        checks.append(_mcp_registration_doctor_check(settings))
-        checks.append(_skill_installs_doctor_check(settings))
-        required_failures = [item["name"] for item in checks if item["required"] and not item["ok"]]
-        return {
-            "healthy": not required_failures,
-            "required_failures": required_failures,
-            "checks": checks,
-            "capabilities": capabilities.model_dump(mode="json"),
-            "summary": _doctor_summary(checks, required_failures),
-        }
-
-    _run(ctx, action)
+    _run(ctx, lambda runtime: collect_doctor_report(runtime.container, runtime.context))
 
 
 @app.command(rich_help_panel=_OPERATOR_PANEL)
 def migrate(ctx: typer.Context) -> None:
     """Apply append-only PostgreSQL migrations."""
-    _run(ctx, lambda runtime: {"applied": runtime.container.application.operations.migrate()})
+    _run(
+        ctx,
+        lambda runtime: runtime.container.application.operations.migrate(),
+        warnings=lambda report: report.warnings,
+    )
 
 
 @app.command(rich_help_panel=_RETRIEVAL_PANEL)
@@ -2208,7 +2402,9 @@ def ontology_entity_create(
                 entity_type=entity_type,
                 canonical_name=name,
                 aliases=_split_values(alias),
-                acl_scopes=_split_values(acl_scope),
+                # Unsplit: a scope never contains a comma, and create_entity
+                # rejects one with the shared explanation for every edge.
+                acl_scopes=[scope.strip() for scope in acl_scope or [] if scope.strip()],
             ),
         )
 

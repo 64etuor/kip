@@ -313,3 +313,102 @@ def test_apply_rejects_tampered_plan_before_writing(tmp_path: Path) -> None:
         apply_setup_plan(tampered, project_root=project_root)
 
     assert not (project_root / "config/kip.generated.toml").exists()
+
+
+def test_apply_receipt_says_which_files_were_replaced_and_where_the_old_copies_are(
+    tmp_path: Path,
+) -> None:
+    # Given a package project whose shipped .mcp.json the plan lists for replacement
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    (project_root / ".mcp.json").write_text('{"mcpServers": {}}\n', encoding="utf-8")
+    plan = build_setup_plan(complete_setup_answers(tmp_path), project_root=project_root)
+    assert plan.replaced_files == [".mcp.json"]
+
+    # When the approved plan is applied
+    receipt = apply_setup_plan(plan, project_root=project_root)
+
+    # Then the receipt names the replacement and the kept copy in plain words
+    assert [item.model_dump() for item in receipt.replaced_files] == [
+        {"file": ".mcp.json", "previous_copy": ".mcp.json.previous", "original_copy": ".mcp.json.original"}
+    ]
+    assert ".mcp.json (previous copy: .mcp.json.previous; original copy: .mcp.json.original)" in receipt.summary
+    assert "Replaced 1 existing file(s)" in receipt.summary
+    assert "Not in the plan" not in receipt.summary
+    assert (project_root / ".mcp.json.previous").read_text(encoding="utf-8") == '{"mcpServers": {}}\n'
+
+
+def test_apply_receipt_flags_replacements_the_plan_did_not_list(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    plan = build_setup_plan(complete_setup_answers(tmp_path), project_root=project_root)
+
+    first = apply_setup_plan(plan, project_root=project_root)
+    second = apply_setup_plan(plan, project_root=project_root)
+
+    assert first.replaced_files == []
+    assert first.summary.endswith("No existing file was replaced.")
+    assert len(second.replaced_files) == 4
+    assert "did not exist when the plan was made: config/kip.generated.toml" in second.summary
+
+
+def test_apply_keeps_the_earliest_original_across_repeated_applies(tmp_path: Path) -> None:
+    # Given the package's own .mcp.json
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    package_default = '{"mcpServers": {"package": {}}}\n'
+    (project_root / ".mcp.json").write_text(package_default, encoding="utf-8")
+    plan = build_setup_plan(complete_setup_answers(tmp_path), project_root=project_root)
+
+    # When the same plan is applied twice
+    first = apply_setup_plan(plan, project_root=project_root)
+    generated = (project_root / ".mcp.json").read_text(encoding="utf-8")
+    second = apply_setup_plan(plan, project_root=project_root)
+
+    # Then .previous rolls forward while .original keeps the package default
+    assert (project_root / ".mcp.json.previous").read_text(encoding="utf-8") == generated
+    assert (project_root / ".mcp.json.original").read_text(encoding="utf-8") == package_default
+    [mcp] = [item for item in second.replaced_files if item.file == ".mcp.json"]
+    assert mcp.model_dump() == {
+        "file": ".mcp.json", "previous_copy": ".mcp.json.previous", "original_copy": ".mcp.json.original",
+    }
+    assert first.replaced_files[0].original_copy == ".mcp.json.original"
+    assert (
+        ".mcp.json (previous copy: .mcp.json.previous; original copy: .mcp.json.original)" in second.summary
+    )
+    assert "FILE.original the earliest copy, written once and never overwritten" in second.summary
+
+
+def test_apply_seeds_the_original_from_a_previous_copy_an_older_apply_left(tmp_path: Path) -> None:
+    # Given a deployment set up before .original existed: .previous holds the
+    # package default and .mcp.json is already generated.
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    (project_root / ".mcp.json.previous").write_text('{"package": true}\n', encoding="utf-8")
+    (project_root / ".mcp.json").write_text('{"generated": 1}\n', encoding="utf-8")
+    plan = build_setup_plan(complete_setup_answers(tmp_path), project_root=project_root)
+
+    apply_setup_plan(plan, project_root=project_root)
+
+    assert (project_root / ".mcp.json.original").read_text(encoding="utf-8") == '{"package": true}\n'
+    assert (project_root / ".mcp.json.previous").read_text(encoding="utf-8") == '{"generated": 1}\n'
+
+
+def test_apply_refuses_a_saved_plan_with_a_comma_acl_scope(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    plan = build_setup_plan(complete_setup_answers(tmp_path), project_root=project_root)
+    source = plan.sources[0].model_copy(update={"acl_scope": "group:a,b"})
+    legacy = plan.model_copy(update={"sources": [source]})
+    legacy = legacy.model_copy(update={"plan_fingerprint": legacy.calculate_fingerprint()})
+
+    with pytest.raises(ConflictError) as raised:
+        apply_setup_plan(legacy, project_root=project_root)
+
+    assert str(raised.value) == (
+        "filesystem source acl_scope contains a comma (company-docs: 'group:a,b'), and an ACL scope cannot: "
+        "scopes are comma-separated in KIP_ACL_SCOPES, the X-KIP-ACL-Scopes header and the database session, "
+        "so it would become separate scopes. Re-answer filesystem_sources with comma-free scopes, then make "
+        "and approve a new plan"
+    )
+    assert not (project_root / "config/kip.generated.toml").exists()

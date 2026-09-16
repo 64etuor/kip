@@ -32,6 +32,7 @@ from kip.setup.models import (
     SetupPlan,
     SetupReceipt,
     SourcePreview,
+    comma_acl_scope_error,
 )
 from kip.setup.paths import canonical_managed_path, canonical_source_root
 from kip.setup.planner import build_setup_plan, inspect_setup
@@ -59,6 +60,60 @@ class SetupService:
 
     def inspect(self) -> SetupInspection:
         return inspect_setup(self.load_answers(), project_root=self.project_root)
+
+    def apply_preset(self, name: str) -> SetupInspection:
+        """Fill remaining questions with the documented sample-data defaults.
+
+        `sample` is the try-KIP path: api_key identity, bundled sample-data,
+        generation off, manual sync. Plan approval is still required.
+        """
+        if name != "sample":
+            raise ValidationError("unsupported setup preset; the only preset is sample")
+        sample = (self.project_root / "sample-data").resolve()
+        if not sample.is_dir():
+            raise ValidationError(
+                f"sample-data is missing at {sample}; unpack the KIP package or clone the repository"
+            )
+        cas = self.project_root / "var" / "cas"
+        backup = self.project_root / "var" / "backups"
+        cas.mkdir(parents=True, exist_ok=True)
+        backup.mkdir(parents=True, exist_ok=True)
+        cas.chmod(0o700)
+        backup.chmod(0o700)
+        values = {
+            "workspace": "default",
+            "identity_mode": "api_key",
+            "identity_owner": "local-operator",
+            "identity_api_key_secret_ref": "env:KIP_API_KEY",
+            "identity_admin_key_secret_ref": "env:KIP_ADMIN_KEY",
+            "source_ownership": "company",
+            "filesystem_sources": str(sample),
+            "ontology_profile": "empty",
+            "model_provider": "disabled",
+            "relation_mining_mode": "disabled",
+            "database_secret_ref": "env:KIP_DATABASE_URL",
+            "cas_path": str(cas.resolve()),
+            "backup_path": str(backup.resolve()),
+            "retention_days": "7",
+            "sync_schedule": "manual",
+            "evaluation_dataset": "none",
+            "ontology_reviewers": '["local-operator"]',
+            "interaction_memory_mode": "explicit_consent",
+        }
+        for _ in range(len(values) + 1):
+            inspection = self.inspect()
+            if inspection.complete:
+                return inspection
+            question_id = inspection.questions[0].id
+            value = values.get(question_id)
+            if value is None:
+                raise ValidationError(
+                    f"sample preset does not answer {question_id}; finish that question by hand"
+                )
+            inspection = self.record_answer(question_id, value)
+            if inspection.complete:
+                return inspection
+        raise ValidationError("sample preset did not complete setup")
 
     def record_answer(self, question_id: str, value: str) -> SetupInspection:
         answers = self.load_answers()
@@ -137,6 +192,15 @@ class SetupService:
                 mcp_path,
             )
         )
+        comma_error = comma_acl_scope_error(
+            ((source.name, source.acl_scope) for source in plan.sources),
+            fix="Re-answer filesystem_sources with comma-free scopes, then make, approve and apply a new plan",
+        )
+        checks.append(SetupCheck(
+            name="source_acl_scopes",
+            ok=comma_error is None,
+            detail=comma_error or "every source acl_scope is comma-free",
+        ))
         source_summaries: list[JsonObject] = []
         for source in plan.sources:
             exists = Path(source.host_root).is_dir()
@@ -315,6 +379,12 @@ class SetupService:
             names = [source.name for source in sources]
             if len(names) != len(set(names)):
                 raise ValidationError("filesystem source names must be unique")
+            comma_error = comma_acl_scope_error(
+                ((source.name, source.acl_scope) for source in sources),
+                fix=f"Give each source one comma-free scope, for example workspace:{answers.workspace}",
+            )
+            if comma_error is not None:
+                raise ValidationError(comma_error)
             return sources
         if question_id in {
             "model_egress_classifications",

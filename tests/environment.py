@@ -168,6 +168,7 @@ KNOWN_ABSENT_AMBIENT_KEYS: Mapping[str, str] = MappingProxyType(
         "KIP_ADMIN_KEY_FILE": _SECRET_FILE_TWIN,
         "KIP_API_KEY_FILE": _SECRET_FILE_TWIN,
         "KIP_DATABASE_URL_FILE": _SECRET_FILE_TWIN,
+        "KIP_BACKUP_DATABASE_URL_FILE": _SECRET_FILE_TWIN,
         "KIP_GENERATION_API_KEY_FILE": _SECRET_FILE_TWIN,
         "KIP_OPENAI_API_KEY_FILE": _SECRET_FILE_TWIN,
         "KIP_ROLES": _REQUEST_IDENTITY,
@@ -190,6 +191,11 @@ KNOWN_ABSENT_AMBIENT_KEYS: Mapping[str, str] = MappingProxyType(
         "KIP_COMPOSE_ADOPT": (
             "an operator's one-time override of the Compose project guard in "
             "scripts/common.sh; setup verify only names it in a fix message"
+        ),
+        "KIP_DATABASE_PORT_CHECK": (
+            "an operator's override of the database port guard in scripts/common.sh "
+            "and the Python CLI/MCP entrypoints; kip doctor's database_url_port check "
+            "reads it, and a test of that check sets its own value"
         ),
         "KIP_CONTAINER_DATABASE_URL": _DEPLOYMENT_ONLY,
         "KIP_EMBEDDING_DIMENSIONS": _DEPLOYMENT_ONLY,

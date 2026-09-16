@@ -19,7 +19,10 @@ Resume an interrupted configuration from inspect.
 1. Run `./scripts/kip setup inspect`. If incomplete, ask exactly one question:
    the returned `data.questions` item. Each question carries `prompt`,
    `answer_format`, `why` (the reason to relay — there is no `reason` field),
-   and optionally `choices` and `example`.
+   and optionally `choices` and `example`. For a try-KIP path on bundled
+   `sample-data`, `./scripts/kip setup preset sample` fills the remaining
+   questions with safe defaults (`api_key`, `company`, empty ontology, local
+   generation off, `manual` sync). Plan approval is still required.
 2. Record that response using `./scripts/kip setup answer --question ID --value VALUE`.
    Repeat inspect. Accept secret references, never credential values:
    `env:NAME`, or `file:/absolute/path` only for model credentials.
@@ -27,9 +30,12 @@ Resume an interrupted configuration from inspect.
    requires a generation provider and creates candidates, not approved facts.
 3. Run `./scripts/kip setup preview` and check source scope against the request.
    Run `./scripts/kip setup plan --output PLAN`, show its generated files,
-   read-only mounts, egress, ontology, consent, warnings, and fingerprint.
-   Obtain approval of this concrete plan.
-4. Run `./scripts/kip setup apply --plan PLAN`, then
+   `replaced_files` (existing files apply overwrites, such as the package's
+   `.mcp.json`), read-only mounts, egress, ontology, consent, warnings, and
+   fingerprint. Obtain approval of this concrete plan.
+4. Run `./scripts/kip setup apply --plan PLAN` and relay its `summary`, which
+   names each replaced file, its `FILE.previous` (the copy this apply replaced)
+   and `FILE.original` (the earliest copy, never overwritten). Then run
    `./scripts/kip setup verify --plan PLAN`. Report the receipt's limitations
    and failed `runtime_readiness` items with their remediation.
 
@@ -72,14 +78,14 @@ offer these steps and run them only with consent, because they write the
 user's client configuration:
 
 1. Register MCP by the launcher's absolute path (a running client does not see
-   the PATH the installer added): `claude mcp add --scope user kip -- KIP mcp`
-   or `codex mcp add kip -- KIP mcp`, where `KIP` is the launcher path the
-   installer printed (default `~/.local/bin/kip`, expanded). Without a launcher
-   use `DEPLOYMENT/scripts/kip mcp`.
+   the PATH the installer added): `claude mcp add --scope user kip -- '/abs/path/kip' mcp`
+   or `codex mcp add kip -- '/abs/path/kip' mcp`, where `/abs/path/kip` is the
+   launcher path the installer printed (default `~/.local/bin/kip`, expanded).
+   Without a launcher use `DEPLOYMENT/scripts/kip mcp`. Restart the client
+   afterwards; `claude mcp get kip` or `codex mcp get kip` shows the stored
+   entry.
 2. Install skills: `DEPLOYMENT/scripts/install-agent-files.sh personal --client all`,
-   or `project DIR` for one project.
-3. Tell the user to restart the client; `claude mcp get kip` or
-   `codex mcp get kip` shows the stored entry.
+   or `project DIR` for one project. Restart is already required after step 1.
 
 ## Never bypass the state machine
 
@@ -120,7 +126,9 @@ embedding model (about 1.2 GB) unless
 there leaves bootstrap successful and search lexical. The plan's
 `semantic_search` records whether the runtime is installed; a lexical-only plan
 drops the compose `models` service and warns why. Report that choice with the
-plan rather than changing it silently.
+plan rather than changing it silently. With semantic search off, `kip doctor`
+reports `semantic_search` as `state: disabled_by_configuration`: lexical
+search is the intended mode, not a fault to repair.
 
 Read [question formats](references/questions.md) only when the returned answer
 format needs clarification.

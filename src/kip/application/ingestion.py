@@ -6,7 +6,7 @@ from pathlib import Path
 from kip.application.ingestion_events import EventFamily, EventIngestionWorkflow
 from kip.application.ingestion_files import FileIngestionWorkflow
 from kip.domain.egress import DataClassification
-from kip.domain.identity import AclSnapshot
+from kip.domain.identity import AclSnapshot, comma_acl_scopes_error
 from kip.domain.models import (
     ConnectorEvent,
     IngestResult,
@@ -364,6 +364,9 @@ class IngestionUseCases:
         context: RequestContext,
         event: ConnectorEvent,
     ) -> IngestResult:
+        comma_error = comma_acl_scopes_error(event.acl_scopes, subject="connector event acl_scope")
+        if comma_error is not None:
+            raise ValidationError(comma_error)
         selected = event.model_copy(
             update={"acl_snapshot": self._sources.event_acl_snapshot(event)}
         )

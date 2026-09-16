@@ -7,6 +7,7 @@ import pytest
 from kip.adapters.repository.memory import MemoryRepository
 from kip.adapters.repository.memory.retrieval import MemoryRetrievalStore
 from kip.adapters.repository.memory.state import MemoryState
+from kip.application.search_engine import _codeswitch_expansion
 from kip.container import build_container
 from kip.domain.models import SearchRequest
 from kip.errors import DependencyUnavailableError
@@ -309,3 +310,9 @@ def test_optional_default_mode_falls_back_but_explicit_hybrid_fails(
             SearchRequest(query="승인"),
             mode="hybrid",
         )
+
+
+def test_codeswitch_expansion_splits_hangul_and_latin_without_touching_one_script() -> None:
+    assert _codeswitch_expansion("참여율 변경 approval") == ["참여율 변경", "approval"]
+    assert _codeswitch_expansion("참여율 변경 승인") == []
+    assert _codeswitch_expansion("participation rate") == []

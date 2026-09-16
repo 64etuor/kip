@@ -47,6 +47,7 @@ _DEGRADED_FLAGS: tuple[str, ...] = (
     "rerank_degraded",
     "lexical_rerank_degraded",
 )
+SEMANTIC_DISABLED_WARNING = "semantic_disabled"
 # One vocabulary for one event: `ContextBundle.truncated` is the structured
 # field and `context_truncated` is its name in the query trace and in
 # `meta.warnings`. Both are derived from the same bundle flag here so they
@@ -271,6 +272,10 @@ class RetrievalUseCases:
             for flag in _DEGRADED_FLAGS
             if flag in degraded or any(bool(metadata.get(flag)) for metadata in metadatas)
         ]
+        if not bool(self._settings.get("search.semantic_enabled", False)):
+            # Lexical-only deployments still return hits; the warning stops a
+            # paraphrase miss being read as absence.
+            warnings.append(SEMANTIC_DISABLED_WARNING)
         if results:
             return warnings
         try:
@@ -344,7 +349,7 @@ class RetrievalUseCases:
             body = evidence.unit.body
             allowed = min(remaining, item_cap)
             if len(body) > allowed:
-                body = body[:allowed]
+                body = _truncate_context_body(body, allowed)
                 truncated = True
             items.append(
                 ContextItem(
@@ -460,6 +465,30 @@ class RetrievalUseCases:
 def _degradation_warnings(degraded: Sequence[str]) -> list[str]:
     """Degradation markers in their canonical envelope order."""
     return [flag for flag in _DEGRADED_FLAGS if flag in degraded]
+
+
+_CONTEXT_TRUNCATION_MARKER = "\n…\n"
+
+
+def _truncate_context_body(body: str, allowed: int) -> str:
+    """Keep the head and tail of a long unit around an explicit marker.
+
+    Truncating only from the start hid tables and conclusions that live at the
+    end of a long unit. A truncated body still cannot prove absence. This uses
+    the same 50/50 split idea as embedding `head_tail_v1`, but operates on the
+    raw evidence body and does not reserve a title prefix.
+    """
+    if allowed < 1:
+        return ""
+    if len(body) <= allowed:
+        return body
+    marker = _CONTEXT_TRUNCATION_MARKER
+    if allowed <= len(marker):
+        return body[:allowed]
+    sampled = allowed - len(marker)
+    head = (sampled + 1) // 2
+    tail = sampled - head
+    return body[:head] + marker + (body[-tail:] if tail else "")
 
 
 def _filter_summary(request: SearchRequest) -> QueryFilterSummary:

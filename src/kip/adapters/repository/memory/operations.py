@@ -8,7 +8,7 @@ from typing import ClassVar
 
 from kip.adapters.repository.memory.state import MemoryState
 from kip.domain.json_types import JsonObject
-from kip.domain.models import RequestContext, StatusReport
+from kip.domain.models import MigrationReport, RequestContext, StatusReport
 from kip.errors import ValidationError
 
 
@@ -21,8 +21,12 @@ class MemoryOperationsStore:
         # The in-memory store is reachable whenever the process is alive.
         return None
 
-    def migrate(self, migrations_dir: Path) -> list[str]:
-        return [path.name for path in sorted(migrations_dir.glob("*.sql"))]
+    def extension_versions(self, name: str) -> tuple[str | None, str | None] | None:
+        # No database, so no extension catalog to compare.
+        return None
+
+    def migrate(self, migrations_dir: Path) -> MigrationReport:
+        return MigrationReport(applied=[path.name for path in sorted(migrations_dir.glob("*.sql"))])
 
     def status(self, context: RequestContext) -> StatusReport:
         packets = [

@@ -174,10 +174,28 @@ def test_mcp_v2_client_discovers_and_calls_server_in_process(test_container, mon
     envelope = json.loads(raw_envelope)
 
     assert "kip_capabilities" in tool_names
+    assert "kip_doctor" in tool_names
     assert is_error is False
     assert server_version == __version__
     assert envelope["schema_version"] == "kip.envelope.v1"
     assert envelope["ok"] is True
+
+
+def test_mcp_doctor_returns_the_cli_payload(test_container, monkeypatch) -> None:
+    monkeypatch.setattr("kip.mcp_server.build_container", lambda: test_container)
+    server = create_server()
+
+    async def invoke() -> dict:
+        result = await server.call_tool("kip_doctor", {})
+        assert isinstance(result.content[0], TextContent)
+        return json.loads(result.content[0].text)
+
+    envelope = anyio.run(invoke)
+    assert envelope["ok"] is True
+    assert "summary_en" in envelope["data"]
+    assert envelope["data"]["summary_en"].startswith("OK:")
+    names = [item["name"] for item in envelope["data"]["checks"]]
+    assert "canonical_repository" in names
 
 
 def test_mcp_success_result_is_wrapped_in_the_envelope(test_container, monkeypatch) -> None:
@@ -251,20 +269,20 @@ def test_empty_search_explains_missing_index_identically_across_edges(test_conta
 
     for envelope in envelopes():
         assert envelope["ok"] and envelope["data"] == []
-        assert envelope["meta"]["warnings"] == ["no_visible_indexed_units"]
+        assert envelope["meta"]["warnings"] == ["semantic_disabled", "no_visible_indexed_units"]
     cli_context = CliRunner().invoke(app, ["context", "정산", "--limit", "2"])
     assert cli_context.exit_code == 0, cli_context.output
-    assert json.loads(cli_context.output)["meta"]["warnings"] == ["no_visible_indexed_units"]
+    assert json.loads(cli_context.output)["meta"]["warnings"] == ["semantic_disabled", "no_visible_indexed_units"]
     with TestClient(create_app(test_container)) as client:
         rest_context = client.post("/v1/context", json={"query": "정산", "limit": 2}, headers={"X-KIP-API-Key": "test-key"})
-        assert rest_context.json()["meta"]["warnings"] == ["no_visible_indexed_units"]
+        assert rest_context.json()["meta"]["warnings"] == ["semantic_disabled", "no_visible_indexed_units"]
 
     async def invoke_context():
         async with Client(create_server(test_container)) as client:
             result = await client.call_tool("kip_context", {"query": "정산", "limit": 2})
             return json.loads(result.content[0].text)
 
-    assert anyio.run(invoke_context)["meta"]["warnings"] == ["no_visible_indexed_units"]
+    assert anyio.run(invoke_context)["meta"]["warnings"] == ["semantic_disabled", "no_visible_indexed_units"]
 
     source = test_container.settings.project_root / "source" / "정산.txt"
     source.write_text("정산 안내 문서")
@@ -272,10 +290,13 @@ def test_empty_search_explains_missing_index_identically_across_edges(test_conta
     test_container.application.ingestion.sync_filesystem(context, "fixture")
     for envelope in envelopes():
         assert envelope["ok"] and envelope["data"]
-        assert envelope["meta"]["warnings"] == []
+        assert envelope["meta"]["warnings"] == ["semantic_disabled"]
     # An outsider sees no units; the warning must not imply hidden ones exist.
     outsider = test_container.application.operations.request_context(acl_scopes=[])
-    assert test_container.application.retrieval.result_warnings(outsider, []) == ["no_visible_indexed_units"]
+    assert test_container.application.retrieval.result_warnings(outsider, []) == [
+        "semantic_disabled",
+        "no_visible_indexed_units",
+    ]
 
 
 def test_degraded_default_search_is_reported_identically_across_edges(test_container, monkeypatch):

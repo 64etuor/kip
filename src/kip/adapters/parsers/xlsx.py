@@ -20,12 +20,25 @@ _REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 _PACKAGE_REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 
 
-def _split_text(text: str, max_chars: int) -> list[str]:
+def _split_text_spans(
+    text: str, max_chars: int, overlap_chars: int | None = None
+) -> list[tuple[int, str]]:
+    """Split a sheet dump into (offset, chunk) windows with an overlapping tail.
+
+    Same overlap rule as HWP: overlap must stay below half of max_chars.
+    The default is 400 characters, or a quarter of the window when the unit
+    cap is smaller than 1600. Offsets are into `text`, so locators stay true
+    after a rewind.
+    """
     if max_chars < 1:
         raise ValueError("max_chars must be positive")
+    if overlap_chars is None:
+        overlap_chars = min(400, max(0, max_chars // 4 - 1))
+    if overlap_chars < 0 or overlap_chars >= max_chars // 2:
+        raise ValueError("overlap_chars must be non-negative and below half of max_chars")
     if len(text) <= max_chars:
-        return [text] if text else []
-    chunks: list[str] = []
+        return [(0, text)] if text else []
+    spans: list[tuple[int, str]] = []
     start = 0
     while start < len(text):
         end = min(start + max_chars, len(text))
@@ -33,9 +46,15 @@ def _split_text(text: str, max_chars: int) -> list[str]:
             line_break = text.rfind("\n", start, end)
             if line_break > start + max_chars // 2:
                 end = line_break + 1
-        chunks.append(text[start:end])
-        start = end
-    return chunks
+        spans.append((start, text[start:end]))
+        if end >= len(text):
+            break
+        start = max(end - overlap_chars, start + 1)
+    return spans
+
+
+def _split_text(text: str, max_chars: int, overlap_chars: int | None = None) -> list[str]:
+    return [chunk for _, chunk in _split_text_spans(text, max_chars, overlap_chars)]
 
 
 def _tag(local: str) -> str:
@@ -169,18 +188,17 @@ class XlsxShallowParser:
                     header = f"Sheet: {sheet_name}\nUsed range: {dimension or 'unknown'}"
                     body = header + ("\n" + "\n".join(strings) if strings else "")
                     aggregate_parts.append(body)
-                    chunks = _split_text(body, self.max_chars_per_unit)
+                    spans = _split_text_spans(body, self.max_chars_per_unit)
                     if truncated:
                         warnings.append(f"sheet {sheet_name}: shallow text truncated")
-                    chunk_start = 0
-                    for chunk_index, chunk in enumerate(chunks):
+                    for chunk_index, (chunk_start, chunk) in enumerate(spans):
                         normalized = normalize_text(chunk)
                         locator_data: dict[str, object] = {"sheet": sheet_name, "range": dimension}
-                        if len(chunks) > 1:
+                        if len(spans) > 1:
                             locator_data.update(
                                 {
                                     "chunk": chunk_index,
-                                    "chunk_count": len(chunks),
+                                    "chunk_count": len(spans),
                                     "char_start": chunk_start,
                                     "char_end": chunk_start + len(chunk),
                                 }
@@ -206,13 +224,12 @@ class XlsxShallowParser:
                                     "truncated": truncated,
                                     "deep_read_required_for_numbers": True,
                                     "chunk": chunk_index,
-                                    "chunk_count": len(chunks),
+                                    "chunk_count": len(spans),
                                     "hidden": sheet_hidden,
                                 },
                             )
                         )
                         next_ordinal += 1
-                        chunk_start += len(chunk)
         except (zipfile.BadZipFile, KeyError, ET.ParseError) as exc:
             raise ParserError(f"XLSX parse failed: {path}: {exc}") from exc
         aggregate = "\n".join(aggregate_parts)

@@ -9,7 +9,7 @@
         },
         "body_truncated": {
           "default": false,
-          "description": "When true, body is only the leading portion of the evidence unit.",
+          "description": "When true, body is the head and tail of the evidence unit around an explicit marker; the middle is missing. A truncated body cannot prove absence.",
           "title": "Body Truncated",
           "type": "boolean"
         },

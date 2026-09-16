@@ -10,6 +10,43 @@ from kip.cli import app
 from tests.setup_support import prepare_setup_project
 
 
+def test_setup_preset_sample_completes_on_bundled_sample_data(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    prepare_setup_project(project_root)
+    sample = project_root / "sample-data"
+    sample.mkdir()
+    (sample / "memo.md").write_text("참여율 변경 승인", encoding="utf-8")
+    state = tmp_path / "setup-state.json"
+    runner = CliRunner()
+
+    result = runner.invoke(
+        app,
+        [
+            "setup",
+            "preset",
+            "sample",
+            "--project-root",
+            str(project_root),
+            "--state",
+            str(state),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
+    assert payload["data"]["complete"] is True
+    assert payload["data"]["questions"] == []
+    saved = json.loads(state.read_text(encoding="utf-8"))
+    assert saved["source_ownership"] == "company"
+    assert saved["model_provider"] == "disabled"
+    assert saved["relation_mining_mode"] == "disabled"
+    assert saved["filesystem_sources"][0]["root"] == str(sample.resolve())
+
+
 def test_setup_cli_runs_before_runtime_configuration(
     tmp_path: Path,
     monkeypatch,
@@ -274,3 +311,51 @@ def _write_complete_state(
         "ontology_reviewers": ["knowledge-owner"],
     }
     state.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_setup_rejects_a_comma_acl_scope_on_answer_and_a_saved_one_before_plan(tmp_path: Path) -> None:
+    from tests.setup_support import complete_setup_answers
+
+    answers = complete_setup_answers(tmp_path)
+    project_root = tmp_path / "project"
+    state = tmp_path / "setup-state.json"
+    state.write_text(answers.model_dump_json(), encoding="utf-8")
+    source = answers.filesystem_sources[0]
+    runner = CliRunner()
+
+    # An answer with a comma scope is a validation_error at answer time.
+    rejected = runner.invoke(app, [
+        *_setup_args(project_root, state), "answer", "--question", "filesystem_sources",
+        "--value", json.dumps([{"name": "company-docs", "root": source.root,
+                                "classification": "internal", "acl_scope": "group:a,b"}]),
+    ])
+    assert rejected.exit_code == 3
+    error = json.loads(rejected.stderr)["error"]
+    assert error["code"] == "validation_error"
+    assert error["message"] == (
+        "filesystem source acl_scope contains a comma (company-docs: 'group:a,b'), and an ACL scope cannot: "
+        "scopes are comma-separated in KIP_ACL_SCOPES, the X-KIP-ACL-Scopes header and the database session, "
+        "so it would become separate scopes. Give each source one comma-free scope, for example workspace:acme-rnd"
+    )
+    assert json.loads(state.read_text(encoding="utf-8"))["filesystem_sources"][0]["acl_scope"] == "workspace:acme-rnd"
+
+    # A state saved before the check still loads, but inspect and plan say so loudly.
+    saved = answers.model_copy(update={"filesystem_sources": [source.model_copy(update={"acl_scope": "group:a,b"})]})
+    state.write_text(saved.model_dump_json(), encoding="utf-8")
+    inspected = json.loads(runner.invoke(app, [*_setup_args(project_root, state), "inspect"]).stdout)["data"]
+    assert any("contains a comma" in risk and "--question filesystem_sources" in risk for risk in inspected["risks"])
+    # Not ready: the sources question is asked again, with the error as its why.
+    assert inspected["complete"] is False
+    [question] = inspected["questions"]
+    assert question["id"] == "filesystem_sources"
+    assert question["why"].startswith("filesystem source acl_scope contains a comma (company-docs: 'group:a,b')")
+    reanswered = runner.invoke(app, [
+        *_setup_args(project_root, state), "answer", "--question", "filesystem_sources", "--value", source.root,
+    ])
+    assert reanswered.exit_code == 0, reanswered.stderr
+    assert json.loads(reanswered.stdout)["data"]["complete"] is True
+    state.write_text(saved.model_dump_json(), encoding="utf-8")
+    planned = runner.invoke(app, [*_setup_args(project_root, state), "plan", "--output", str(tmp_path / "plan.json")])
+    assert planned.exit_code == 3
+    assert "Re-answer with ./scripts/kip setup answer --question filesystem_sources" in json.loads(planned.stderr)["error"]["message"]
+    assert not (tmp_path / "plan.json").exists()

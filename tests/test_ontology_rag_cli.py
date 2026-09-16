@@ -134,3 +134,30 @@ def test_relation_mining_caps_match_example_config() -> None:
         request_fields["max_relation_proposals"].default
         == mining_config["max_relation_proposals"]
     )
+
+
+def test_ontology_entity_create_rejects_an_acl_scope_with_a_comma_instead_of_splitting_it() -> None:
+    rejected = CliRunner().invoke(
+        app,
+        ["ontology", "entity-create", "--id", "ent_comma", "--type", "Project", "--name", "쉼표 과제",
+         "--acl-scope", "group:a,b"],
+        env=_env(admin=True),
+    )
+
+    assert rejected.exit_code == 3
+    error = json.loads(rejected.stderr)["error"]
+    assert error["code"] == "validation_error"
+    assert error["message"] == (
+        "entity acl_scope 'group:a,b' contains a comma, and an ACL scope cannot: scopes are comma-separated "
+        "in KIP_ACL_SCOPES, the X-KIP-ACL-Scopes header and the database session, so it would become "
+        "separate scopes"
+    )
+
+    repeated = CliRunner().invoke(
+        app,
+        ["ontology", "entity-create", "--id", "ent_scoped", "--type", "Project", "--name", "범위 과제",
+         "--acl-scope", "project:b", "--acl-scope", "project:a"],
+        env=_env(admin=True),
+    )
+    assert repeated.exit_code == 0, repeated.stdout
+    assert json.loads(repeated.stdout)["data"]["acl_scopes"] == ["project:a", "project:b"]

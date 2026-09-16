@@ -149,6 +149,75 @@ EOF
   return 2
 }
 
+# A plain deployment publishes its bundled PostgreSQL on KIP_POSTGRES_PORT. A
+# loopback KIP_DATABASE_URL or KIP_BACKUP_DATABASE_URL on another port reaches
+# whatever listens there, often another deployment's database. An empty
+# variable is read from its NAME_FILE, as kip.settings reads secrets. A script
+# that deliberately points KIP_DATABASE_URL at another database (restore.sh's
+# target) sets KIP_DATABASE_PORT_CHECK=off for those calls. Returns 0
+# when the ports agree, when KIP_POSTGRES_PORT is unset or empty (nothing to
+# compare; throwaway e2e and test databases), for another host (an external
+# database), for setup's generated deployment (setup_compose.py checks it) and
+# with KIP_DATABASE_PORT_CHECK=off (a deliberately separate local PostgreSQL);
+# otherwise 2 with a message on stderr. A loopback URL whose port is not an
+# integer up to 65535 is refused too; 0 means 5432, as urlsplit's
+# `port or 5432` reads it. Pure bash because scripts/kip and scripts/mcp.sh run
+# it on every start. The URL is split like urllib.parse.urlsplit: userinfo ends
+# at the last "@", the host at the first ":" or at "]" for [::1], and a
+# malformed [host] skips the URL.
+kip_database_port_check() {
+  local published="${KIP_POSTGRES_PORT:-}" name value file location host port digits
+  local fix="If this URL deliberately names a separate local PostgreSQL, set KIP_DATABASE_PORT_CHECK=off."
+  [[ "${KIP_DATABASE_PORT_CHECK:-on}" != off ]] || return 0
+  [[ -n "$published" ]] || return 0
+  [[ ! -e "$PROJECT_ROOT/compose.generated.yaml" && ! -e "$PROJECT_ROOT/config/kip.generated.toml" ]] || return 0
+  if [[ ! "$published" =~ ^[0-9]{1,5}$ ]]; then
+    printf "error: KIP_POSTGRES_PORT='%s' is not a port number\n" "$published" >&2
+    return 2
+  fi
+  for name in KIP_DATABASE_URL KIP_BACKUP_DATABASE_URL; do
+    value="${!name:-}"
+    file="${name}_FILE"
+    if [[ -z "$value" && -n "${!file:-}" && -r "${!file}" ]]; then
+      value="$(<"${!file}")"
+      value="${value#"${value%%[![:space:]]*}"}"
+      value="${value%"${value##*[![:space:]]}"}"
+    fi
+    [[ "$value" == *://* ]] || continue
+    location="${value#*://}"
+    location="${location%%[/?#]*}"
+    location="${location##*@}"
+    if [[ "$location" == \[* ]]; then
+      # urlsplit rejects anything but an IPv6 address followed by ":" or the end.
+      host="${location#\[}"
+      host="${host%%\]*}"
+      port="${location#*\]}"
+      [[ "$location" == *\]* && "$host" == ::1 && ( -z "$port" || "$port" == :* ) ]] || continue
+    else
+      host="${location%%:*}"
+      port="${location#"$host"}"
+    fi
+    case "$port" in :*) port="${port#:}" ;; *) port="" ;; esac
+    case "$host" in
+      [Ll][Oo][Cc][Aa][Ll][Hh][Oo][Ss][Tt]|127.0.0.1|::1) ;;
+      *) continue ;;
+    esac
+    port="${port:-5432}"
+    digits="${port#"${port%%[!0]*}"}"
+    [[ ! "$port" =~ ^0+$ ]] || digits=5432
+    if [[ ! "$port" =~ ^[0-9]+$ || ${#digits} -gt 5 ]] || (( 10#$digits > 65535 )); then
+      printf "error: %s has an invalid port '%s' (use 1-65535). Set the same port as KIP_POSTGRES_PORT (%s) in KIP_DATABASE_URL and KIP_BACKUP_DATABASE_URL in .env. %s\n" \
+        "$name" "$port" "$((10#$published))" "$fix" >&2
+      return 2
+    fi
+    (( 10#$digits != 10#$published )) || continue
+    printf 'error: %s uses port %s, but this deployment publishes PostgreSQL on %s (KIP_POSTGRES_PORT); another deployment may own port %s. Set the same port in KIP_DATABASE_URL and KIP_BACKUP_DATABASE_URL in .env. %s\n' \
+      "$name" "$((10#$digits))" "$((10#$published))" "$((10#$digits))" "$fix" >&2
+    return 2
+  done
+  return 0
+}
+
 # Call before any Compose command on the deployment's stack: refuses (2) as
 # above, and leaves an unreachable Docker to the Compose command that follows.
 kip_compose_project_guard() {

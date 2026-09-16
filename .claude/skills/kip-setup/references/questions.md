@@ -2,6 +2,15 @@
 
 Use the exact `answer_format`, `choices`, and `example` returned by `kip setup inspect`. These examples clarify the non-scalar forms.
 
+## Source ownership
+
+`company` or `personal`; one deployment never mixes them. The answer sets the
+default classification for folder shorthand (`company` → `restricted`,
+`personal` → `personal`). For a demo or evaluation on the bundled
+`sample-data`, answer `company`: the samples are fictional company research
+documents with no personal data, and `restricted` stays outside the remote
+model egress allowlist unless the user lists it.
+
 ## Filesystem sources
 
 Accept an absolute folder path or a JSON array of paths for the simple case.
@@ -24,7 +33,7 @@ have never seen these terms:
 | `name` | 폴더 별명 (수집 명령에서 쓰는 이름) | 영문 소문자·하이픈 |
 | `root` | 실제 절대경로 | 예: `/mnt/nas/영업팀` |
 | `classification` | 민감도 등급 | 아래 표 |
-| `acl_scope` | 이 자료를 볼 수 있는 그룹 이름표 | 형식 `workspace:이름`; 보통 조직 workspace와 동일 |
+| `acl_scope` | 이 자료를 볼 수 있는 그룹 이름표 | 형식 `workspace:이름`; 보통 조직 workspace와 동일; 쉼표 불가 |
 | `include_extensions` | 색인할 확장자 | 생략하면 기본 목록 |
 | `exclude_globs` | 제외 패턴 | 예: `**/backup/**` |
 
@@ -38,6 +47,12 @@ levels listed there are ever sent to a remote model):
 | `confidential` | 관련 부서만 |
 | `restricted` | 지정된 소수만 (계약서·인사 등) |
 | `personal` | 개인정보 포함 |
+
+An `acl_scope` never contains a comma: scopes are comma-separated in
+`KIP_ACL_SCOPES`, the `X-KIP-ACL-Scopes` header and the database session, so
+the answer is rejected. A state saved earlier with one is incomplete: inspect
+asks `filesystem_sources` again with the error in `why` and `risks`, and plan
+and apply refuse it until that question is re-answered.
 
 When the user is unsure, choose the stricter level; it can be relaxed later.
 Start with one folder, verify the result, then add more.

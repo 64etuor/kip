@@ -194,6 +194,7 @@ def test_doctor_command_surfaces_kordoc_resolvability(
     summary = payload["data"]["summary"]
     assert summary.startswith("정상:")
     assert "경고" in summary
+    assert payload["data"]["summary_en"].startswith("OK:")
 
 
 def test_doctor_summary_is_clean_when_every_check_passes(
@@ -731,3 +732,311 @@ def test_skill_installs_check_does_not_warn_about_a_removed_location(tmp_path: P
 
     assert check["ok"] is True
     assert {item["state"] for item in check["details"]["installs"]} == {"missing"}
+
+
+def test_semantic_doctor_check_calls_configured_off_the_intended_lexical_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from kip.cli import _doctor_summary
+
+    # The environment never decides it: only the configuration disables semantic search.
+    monkeypatch.setenv("KIP_SEMANTIC", "on")
+    explicit = Settings(
+        project_root=tmp_path, config_path=tmp_path / "kip.toml", raw={"search": {"semantic_enabled": False}},
+        environment="test", database_url="memory://", cas_path=tmp_path / "cas",
+    )
+    check = _semantic_doctor_check(explicit, _capabilities(configured=False, ready=False, status="disabled"))
+
+    # Backward-compatible keys stay; the state and message are added.
+    assert check["ok"] is True
+    assert {key: check["details"][key] for key in ("enabled", "model_runtime", "projection", "reason")} == {
+        "enabled": False, "model_runtime": None, "projection": "disabled", "reason": None,
+    }
+    assert check["details"]["state"] == "disabled_by_configuration"
+    disabled_by = "search.semantic_enabled = false (set by configuration; KIP_SEMANTIC=off at install writes this)"
+    assert check["details"]["disabled_by"] == disabled_by
+    assert check["details"]["message"] == (
+        f"semantic search is disabled by configuration: {disabled_by}; lexical search is the intended mode"
+    )
+    required = {"name": "configuration", "ok": True, "required": True, "details": {}}
+    assert _doctor_summary([required, check], []) == (
+        f"정상: 필수 점검 1/1 통과. 시맨틱 검색은 설정으로 꺼져 있습니다: {disabled_by}. "
+        "lexical 검색이 의도된 모드입니다."
+    )
+
+    unset = _semantic_doctor_check(_settings(tmp_path, None), _capabilities(configured=False, ready=False, status="disabled"))
+    assert unset["details"]["disabled_by"] == "search.semantic_enabled is not set (defaults to false)"
+
+
+class _FakeOperations:
+    def __init__(self, result: tuple[str | None, str | None] | None = None, error: Exception | None = None) -> None:
+        self.result, self.error, self.asked = result, error, []
+
+    def extension_versions(self, name: str) -> tuple[str | None, str | None] | None:
+        self.asked.append(name)
+        if self.error is not None:
+            raise self.error
+        return self.result
+
+
+def test_postgres_extensions_check_is_not_applicable_on_the_memory_repository(tmp_path: Path) -> None:
+    from kip.cli import _postgres_extensions_doctor_check
+
+    container = build_container(_settings(tmp_path, None), repository=MemoryRepository())
+
+    check = _postgres_extensions_doctor_check(container.application.operations)
+
+    assert check == {
+        "name": "postgres_extensions", "ok": True, "required": False,
+        "details": {"extension": "vector", "installed_version": None, "server_version": None,
+                    "state": "not_applicable", "reason": None},
+    }
+
+
+def test_postgres_extensions_check_fails_an_outdated_vector_catalog_without_requiring_it() -> None:
+    from kip.cli import _postgres_extensions_doctor_check
+
+    operations = _FakeOperations(("0.8.2", "0.8.6"))
+    check = _postgres_extensions_doctor_check(operations)
+
+    assert operations.asked == ["vector"]
+    assert check["ok"] is False and check["required"] is False
+    assert check["details"] == {
+        "extension": "vector", "installed_version": "0.8.2", "server_version": "0.8.6", "state": "outdated",
+        "reason": (
+            "the vector extension catalog (0.8.2) is older than the server's pgvector (0.8.6), "
+            "which happens when migrations ran before the image changed"
+        ),
+        "fix": "./scripts/kip migrate",
+    }
+    newer = _postgres_extensions_doctor_check(_FakeOperations(("0.8.10", "0.8.6")))
+    assert newer["ok"] is False and newer["details"]["state"] == "newer_than_server"
+    assert "fix" in newer["details"] and newer["details"]["fix"] != "./scripts/kip migrate"
+
+
+def test_postgres_extensions_check_passes_a_current_catalog_and_reports_both_versions() -> None:
+    from kip.cli import _postgres_extensions_doctor_check
+
+    check = _postgres_extensions_doctor_check(_FakeOperations(("0.8.6", "0.8.6")))
+    assert check["ok"] is True
+    assert check["details"] == {
+        "extension": "vector", "installed_version": "0.8.6", "server_version": "0.8.6",
+        "state": "current", "reason": None,
+    }
+    missing = _postgres_extensions_doctor_check(_FakeOperations((None, "0.8.6")))
+    assert missing["ok"] is True and missing["details"]["state"] == "not_installed"
+
+
+def test_postgres_extensions_check_reports_a_query_failure_as_not_checked() -> None:
+    from kip.cli import _postgres_extensions_doctor_check
+    from kip.errors import DependencyUnavailableError
+
+    check = _postgres_extensions_doctor_check(_FakeOperations(error=DependencyUnavailableError("PostgreSQL is not reachable")))
+
+    assert check["ok"] is True and check["required"] is False
+    assert check["details"]["state"] == "not_checked"
+    assert "PostgreSQL is not reachable" in check["details"]["error"]
+
+
+def _port_environment(monkeypatch: pytest.MonkeyPatch, **values: str) -> None:
+    for name in (
+        "KIP_POSTGRES_PORT",
+        "KIP_DATABASE_PORT_CHECK",
+        "KIP_DATABASE_URL",
+        "KIP_BACKUP_DATABASE_URL",
+        "KIP_DATABASE_URL_FILE",
+        "KIP_BACKUP_DATABASE_URL_FILE",
+    ):
+        if name in values:
+            monkeypatch.setenv(name, values[name])
+        else:
+            monkeypatch.delenv(name, raising=False)
+
+
+@pytest.mark.parametrize(
+    ("values", "generated", "skipped"),
+    [
+        ({"KIP_DATABASE_URL": "postgresql://kip:test-password@127.0.0.1:55432/kip"}, False,
+         "KIP_POSTGRES_PORT is not set"),
+        ({"KIP_POSTGRES_PORT": "5432", "KIP_DATABASE_PORT_CHECK": "off",
+          "KIP_DATABASE_URL": "postgresql://kip:test-password@127.0.0.1:55432/kip"}, False,
+         "KIP_DATABASE_PORT_CHECK=off"),
+        ({"KIP_POSTGRES_PORT": "5432",
+          "KIP_DATABASE_URL": "postgresql://kip:test-password@127.0.0.1:55432/kip"}, True,
+         "generated deployment (setup verify checks it)"),
+    ],
+)
+def test_database_port_check_is_skipped_where_the_bash_guard_does_not_apply(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, values: dict[str, str], generated: bool, skipped: str
+) -> None:
+    from kip.cli import _database_port_doctor_check
+
+    _port_environment(monkeypatch, **values)
+    if generated:
+        (tmp_path / "compose.generated.yaml").write_text("services: {}\n", encoding="utf-8")
+
+    check = _database_port_doctor_check(tmp_path)
+
+    assert check == {
+        "name": "database_url_port", "ok": True, "required": False,
+        "details": {"reason": None, "skipped": skipped},
+    }
+
+
+@pytest.mark.parametrize(
+    ("name", "url", "port"),
+    [
+        ("KIP_DATABASE_URL", "postgresql://kip:test-password@127.0.0.1:55432/kip", 55432),
+        ("KIP_DATABASE_URL", "postgresql://kip:test-password@LOCALHOST/kip", 5432),
+        ("KIP_BACKUP_DATABASE_URL", "postgresql://kip_backup:test-password@[::1]:05433/kip", 5433),
+    ],
+)
+def test_database_port_check_fails_a_loopback_url_on_another_port(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, url: str, port: int
+) -> None:
+    from kip.cli import _database_port_doctor_check
+
+    values = {"KIP_POSTGRES_PORT": "15432", name: url}
+    if name != "KIP_DATABASE_URL":
+        values["KIP_DATABASE_URL"] = "postgresql://kip:test-password@localhost:15432/kip"
+    _port_environment(monkeypatch, **values)
+
+    check = _database_port_doctor_check(tmp_path)
+
+    assert check["ok"] is False and check["required"] is True
+    assert check["details"] == {
+        "reason": (
+            f"{name} uses port {port}, but this deployment publishes PostgreSQL on 15432 "
+            f"(KIP_POSTGRES_PORT); another deployment may own port {port}"
+        ),
+        "fix": (
+            "set the same port in KIP_DATABASE_URL and KIP_BACKUP_DATABASE_URL in .env, "
+            "or KIP_DATABASE_PORT_CHECK=off for a deliberately separate local PostgreSQL"
+        ),
+    }
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"KIP_POSTGRES_PORT": "05432", "KIP_DATABASE_URL": "postgresql://kip:test-password@127.0.0.1:5432/kip",
+         "KIP_BACKUP_DATABASE_URL": "postgresql://kip_backup:test-password@localhost/kip"},
+        {"KIP_POSTGRES_PORT": "5432", "KIP_DATABASE_URL": "postgresql://kip:test-password@db.example.test:6543/kip",
+         "KIP_BACKUP_DATABASE_URL": "postgresql://kip:test-password@10.0.0.5:6543/kip"},
+        {"KIP_POSTGRES_PORT": "5432", "KIP_DATABASE_URL": "memory://"},
+    ],
+    ids=["matching-port", "external-host", "no-network-url"],
+)
+def test_database_port_check_passes_a_matching_or_non_loopback_url(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, values: dict[str, str]
+) -> None:
+    from kip.cli import _database_port_doctor_check
+
+    _port_environment(monkeypatch, **values)
+
+    assert _database_port_doctor_check(tmp_path) == {
+        "name": "database_url_port", "ok": True, "required": True, "details": {"reason": None},
+    }
+
+
+def test_database_port_check_reads_a_file_when_the_env_url_is_empty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from kip.cli import _database_port_doctor_check
+
+    secret = tmp_path / "database-url"
+    secret.write_text("postgresql://kip:test-password@127.0.0.1:55432/kip\n", encoding="utf-8")
+    _port_environment(
+        monkeypatch,
+        KIP_POSTGRES_PORT="15432",
+        KIP_DATABASE_URL_FILE=str(secret),
+    )
+
+    check = _database_port_doctor_check(tmp_path)
+
+    assert check["ok"] is False and check["required"] is True
+    assert "KIP_DATABASE_URL uses port 55432" in check["details"]["reason"]
+
+
+def test_database_port_check_fails_a_published_port_that_is_not_a_number(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from kip.cli import _database_port_doctor_check
+
+    _port_environment(monkeypatch, KIP_POSTGRES_PORT="54a2",
+                      KIP_DATABASE_URL="postgresql://kip:test-password@127.0.0.1:5432/kip")
+
+    assert _database_port_doctor_check(tmp_path) == {
+        "name": "database_url_port", "ok": False, "required": True,
+        "details": {"reason": "KIP_POSTGRES_PORT='54a2' is not a port number"},
+    }
+
+
+def test_postgres_extensions_check_does_not_order_a_non_numeric_version() -> None:
+    from kip.cli import _postgres_extensions_doctor_check
+
+    check = _postgres_extensions_doctor_check(_FakeOperations(("0.8.7-dev", "0.8.6")))
+
+    # A development build may be newer: report both versions, advise nothing.
+    assert check["ok"] is True and check["required"] is False
+    assert check["details"] == {
+        "extension": "vector", "installed_version": "0.8.7-dev", "server_version": "0.8.6",
+        "state": "unknown_version", "reason": None,
+    }
+
+
+def test_postgres_extensions_check_fails_an_installed_extension_the_server_cannot_load() -> None:
+    from kip.cli import _postgres_extensions_doctor_check
+
+    check = _postgres_extensions_doctor_check(_FakeOperations(("0.8.6", None)))
+
+    assert check["ok"] is False and check["required"] is False
+    assert check["details"] == {
+        "extension": "vector", "installed_version": "0.8.6", "server_version": None,
+        "state": "installed_but_unavailable",
+        "reason": "the vector extension is installed (0.8.6) but this server has no pgvector",
+        "fix": "run the pgvector PostgreSQL image the database was created with",
+    }
+    # The older adapter shape cannot tell an unavailable server apart: it stays not_available.
+    assert _postgres_extensions_doctor_check(_FakeOperations((None, None)))["details"]["state"] == "not_available"
+
+
+@pytest.mark.parametrize(
+    ("name", "url", "raw"),
+    [
+        ("KIP_DATABASE_URL", "postgresql://kip:test-password@127.0.0.1:99999/kip", "99999"),
+        ("KIP_DATABASE_URL", "postgresql://kip:test-password@db.example.test:54a2/kip", "54a2"),
+        ("KIP_BACKUP_DATABASE_URL", "postgresql://kip_backup:test-password@[::1]:abc/kip", "abc"),
+    ],
+)
+def test_database_port_check_fails_a_url_whose_port_is_not_a_port(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, url: str, raw: str
+) -> None:
+    from kip.cli import _database_port_doctor_check
+
+    values = {"KIP_POSTGRES_PORT": "5432", name: url}
+    if name != "KIP_DATABASE_URL":
+        values["KIP_DATABASE_URL"] = "postgresql://kip:test-password@localhost:5432/kip"
+    _port_environment(monkeypatch, **values)
+
+    check = _database_port_doctor_check(tmp_path)
+
+    assert check["ok"] is False and check["required"] is True
+    assert check["details"] == {
+        "reason": f"{name} has an invalid port ({raw!r}), so it cannot connect",
+        "fix": f"set a port number from 1 to 65535 in {name} in .env",
+    }
+
+
+def test_database_port_check_reports_an_explicit_port_zero_instead_of_defaulting_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from kip.cli import _database_port_doctor_check
+
+    _port_environment(monkeypatch, KIP_POSTGRES_PORT="5432",
+                      KIP_DATABASE_URL="postgresql://kip:test-password@127.0.0.1:0/kip")
+
+    check = _database_port_doctor_check(tmp_path)
+
+    assert check["ok"] is False
+    assert check["details"]["reason"].startswith("KIP_DATABASE_URL uses port 0, but this deployment publishes")

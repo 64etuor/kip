@@ -4,7 +4,7 @@ import hmac
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from kip.domain.identity import AclSnapshot, IdentityCredential
+from kip.domain.identity import AclSnapshot, IdentityCredential, comma_acl_scopes_error
 from kip.domain.models import RequestContext
 from kip.errors import AuthorizationError, ConfigurationError
 from kip.ids import stable_id
@@ -24,6 +24,9 @@ class ApiKeyIdentityAdapter:
     ) -> None:
         if not expected_api_key and not allow_anonymous:
             raise ConfigurationError("API-key identity mode requires KIP_API_KEY")
+        comma_error = comma_acl_scopes_error(acl_scopes, subject="API-key acl_scope")
+        if comma_error is not None:
+            raise ConfigurationError(comma_error)
         self._expected_api_key = expected_api_key
         self._workspace = workspace
         self._principal_id = principal_id

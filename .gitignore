@@ -16,6 +16,7 @@ config/kip.generated.toml*
 config/kip.host.generated.toml*
 compose.generated.yaml*
 .mcp.json.previous
+.mcp.json.original
 .kip/
 *.log
 .DS_Store

@@ -105,10 +105,67 @@ key separation, local source availability, and reports an unprovisioned local
 generation service as incomplete. The receipt starts with `app-up.sh`, which
 orders database readiness and migration before services (ADR-057).
 
+`SetupPlan.replaced_files` (additive; absent on older plans and then excluded
+from the fingerprint) lists the generated files that already exist when the
+plan is made, such as the package's `.mcp.json`, so plan approval covers
+replacing them. The `kip.setup-apply.v1` receipt keeps `written_files` and
+`previous_files` and adds `replaced_files` (`file`, `previous_copy` and
+`original_copy`) and a plain-language `summary` naming each replaced file and
+its copies. `FILE.previous` is the copy the latest apply replaced;
+`FILE.original` is the earliest copy, written once (from an existing
+`FILE.previous` when one predates it) and never overwritten, so the package's
+own `.mcp.json` survives repeated applies. Setup never deletes either copy.
+
+A filesystem source `acl_scope` cannot contain a comma, because scopes are
+comma-separated in `KIP_ACL_SCOPES`, the `X-KIP-ACL-Scopes` header and the
+database session. `setup answer` rejects one with `validation_error`; a state
+or plan saved before that check still loads, but inspect reports it in
+`risks`, `setup plan` and `setup apply` refuse it with the fix, and `setup
+verify` fails its `source_acl_scopes` check.
+
 Guided `SourcePlan.target_root` equals its canonical `host_root`, preserving
 shared host/container source URIs and snapshot identities. Old plans with split
 source namespaces cannot apply; regenerate and explicitly sync the approved
 scope. Managed CAS/backup paths remain runtime-specific.
+
+## Operator diagnostics
+
+`kip migrate` returns `data.applied` (migration file names applied by this
+run) and `data.extension_updates`, a map of extension catalogs brought up to
+the server's default version after the migration files, for example
+`{"vector": {"from": "0.8.2", "to": "0.8.6"}}` (empty when nothing changed).
+Operator guidance the update step could not act on is returned in
+`meta.warnings`, not in `data`.
+
+`kip doctor` returns `healthy`, `required_failures`, `checks`, `capabilities`
+and `summary`. Each check is `{name, ok, required, details}`; only a failed
+required check makes `healthy` false. Keys are additive across releases.
+
+- `semantic_search` (never required) keeps `enabled`, `model_runtime`,
+  `projection` and `reason`, and adds `state`: `disabled_by_configuration`,
+  `ready` or `degraded`. When disabled by configuration it also carries
+  `disabled_by` (`search.semantic_enabled = false (set by configuration;
+  KIP_SEMANTIC=off at install writes this)`, or `search.semantic_enabled is
+  not set (defaults to false)`) and `message`; that state is the intended
+  lexical mode, and `summary` says so.
+- `postgres_extensions` (never required) compares the `vector` catalog with the
+  server's pgvector. `details` carries `extension`, `installed_version`,
+  `server_version`, `state` and `reason`, plus `fix` on a failure and `error`
+  when not checked. States: `not_applicable` (memory repository), `current`,
+  `not_installed`, `not_available` and `unknown_version` (a non-numeric version
+  that cannot be ordered) pass; `not_checked` (the catalog query failed) passes
+  with `error`; `outdated` (fix `./scripts/kip migrate`), `newer_than_server`
+  and `installed_but_unavailable` fail. Image and Compose pins are not read.
+- `database_url_port` reports the `scripts/common.sh` port guard instead of
+  refusing. It is skipped (`required: false`, `details.skipped`) when
+  `KIP_DATABASE_PORT_CHECK=off`, when setup generated the deployment, or when
+  `KIP_POSTGRES_PORT` is unset. Otherwise it is required and fails, with
+  `reason` and `fix`, when `KIP_POSTGRES_PORT` is not a port number, when
+  `KIP_DATABASE_URL` or `KIP_BACKUP_DATABASE_URL` has an invalid port, or when
+  a loopback URL uses a port other than `KIP_POSTGRES_PORT`. Empty
+  `KIP_DATABASE_URL` / `KIP_BACKUP_DATABASE_URL` are filled from the matching
+  `*_FILE` the way the bash guard does. Python `kip` / `kip-mcp` refuse the
+  same mismatch with exit 2; doctor reports it.
 
 ## Search boundary
 
@@ -178,6 +235,8 @@ own scope and never asserts that hidden units exist. When the retrieval run
 degraded, the search and context envelopes' `meta.warnings` list it on every
 edge — alongside `no_visible_indexed_units` when the result is also empty,
 because a degraded run that returned nothing carries no hit metadata:
+`semantic_disabled` (semantic search is off by configuration; every search is
+lexical, so a paraphrase miss is not proof of absence),
 `semantic_degraded` (default-mode search fell back to lexical because the
 model runtime or active projection was unavailable), `rerank_degraded` (only
 in a deployment whose default mode is `reranked`: only the reranker failed; the
@@ -219,8 +278,9 @@ tests `is not False`, so an unverifiable unit is refused rather than cited.
 its `source_verification` is only ever `sha256`. `SearchHit` carries neither field; a
 hit is `evidence_role=discovery` with `source_verification=not_checked`.
 `ContextItem.body_truncated` is true
-when the returned body is only the leading portion of the unit; a truncated
-context item cannot show that something is absent.
+when the returned body is the head and tail of the unit around an explicit
+ellipsis marker; the middle is missing. A truncated context item cannot
+show that something is absent.
 
 Envelope versions are unchanged and readers must tolerate unknown fields, but
 the three-valued `source_changed_since_index` is not purely additive for
@@ -642,6 +702,22 @@ the principal ACL snapshot when applicable. It is application-internal request
 state, not caller-authoritative JSON. API adapters construct it through the
 configured identity port after cryptographic or constant-time credential
 verification.
+
+An ACL scope never contains a comma: `KIP_ACL_SCOPES`, the
+`X-KIP-ACL-Scopes` header and the database session carry scope lists
+comma-separated. Every single-scope entrance rejects one that does:
+`kip --acl-scope`, `kip ontology entity-create --acl-scope`,
+`POST /v1/ontology/entities`, the `kip_ontology_entity_create` MCP tool,
+`POST /v1/connectors/events`, guided setup's `filesystem_sources`, JWT group
+names and scope claims (`forbidden`), configured `identity.api_key.acl_scopes`,
+filesystem source `acl_scope` and connector-policy `acl_scopes` (configuration
+error at load), evaluation-dataset `acl_scopes`, `RequestContext.acl_scopes`,
+and the PostgreSQL session GUC itself (`session_acl_scopes_value`) as a
+final fail-closed check. The sibling `kip.roles` GUC is split the same way, so
+`--role` and `session_roles_value` reject a comma inside one role before
+`set_config('kip.roles', ...)`. List forms such as `--acl-scopes a,b`,
+`--roles a,b` and the header still separate on commas. `workspace:`, `group:`
+and `project:` scopes without a comma keep working.
 
 ## Connector boundary
 

@@ -436,8 +436,9 @@ describe the index rather than a live check. Reopened evidence reports how it
 was checked — `stat` (size/mtime still matched the indexed revision, no new
 digest), `sha256` (live file hashed), or `unavailable` (source unreadable, with
 `source_changed_since_index` true) — on `EvidenceRead`, `ContextItem`, and
-`AnswerCitation`. `ContextItem.body_truncated` marks a body that is the head
-and tail of the unit around a marker; the middle is missing. The fields are additive, envelope versions are
+`AnswerCitation`. `ContextItem.body_truncated` was introduced here as a
+prefix cut; since 3.15.7 it marks the head and tail of the unit around a
+marker (the middle is missing). The fields are additive, envelope versions are
 unchanged, and generated `contracts/` carry them. `XlsxRangeRead` did not
 report `source_verification` yet, and `unavailable` reporting a change was the
 defect 3.14.0 corrects; see the 2026-09-13 section.
@@ -749,7 +750,12 @@ substitutes for that full-corpus benchmark.
   Separately, the 2026-08-10 native-HWP OneDrive A/B first promoted local
   RapidFuzz on a 253-query source-derived set; ADR-034 superseded that default
   with candidate-local BM25 after the reviewed 19-case comparison.
-- The 2026-08-06 loaded-corpus audit is recorded in `docs/RAG_QUALITY_AUDIT_2026-08-06.md`; at that time lexical was active and all semantic candidates were shadow-only.
+- The 2026-08-06 loaded-corpus audit is the historical
+  [`RAG_QUALITY_AUDIT_2026-08-06`](https://github.com/64etuor/kip/blob/1b04bad685762fe3002d9c4ec6a75f267df9fb94/docs/RAG_QUALITY_AUDIT_2026-08-06.md);
+  at that time lexical was active and all semantic candidates were shadow-only.
+  The 2026-08-10 package acceptance of 3.2.0 is the historical
+  [`PRODUCTION_ACCEPTANCE_2026-08-10`](PRODUCTION_ACCEPTANCE_2026-08-10.md)
+  (Neo4j was still in scope then; it was removed in ADR-046).
 - The default semantic path depends on Infinity 0.0.77, the latest release,
   which bounds transformers below 5; its reviewed advisories are recorded in
   `docs/SECURITY.md` and replacing the runtime is a tracked limitation. The

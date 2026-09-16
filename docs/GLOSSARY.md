@@ -247,4 +247,5 @@ AI 클라이언트(예: Claude Desktop)가 KIP 기능을 도구처럼 쓰게 해
 - 처음 설치: [`QUICKSTART.md`](QUICKSTART.md)
 - 매일 운영: [`OPERATIONS.md`](OPERATIONS.md)
 - 실제 운영 전 점검: [`PRODUCTION_CHECKLIST.md`](PRODUCTION_CHECKLIST.md)
+- 애플리케이션 연동: [`APP_INTEGRATION.md`](APP_INTEGRATION.md)
 - 온톨로지 편집: [`ONTOLOGY_GUIDE.md`](ONTOLOGY_GUIDE.md)

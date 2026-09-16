@@ -30,7 +30,12 @@ on `EvidenceRead`, `ContextItem`, and `AnswerCitation`, and `body_truncated` on
 `ContextItem`. Integrators must tolerate unknown fields rather than reject
 them. Treat every hit with `evidence_role=discovery` (and its
 `source_verification=not_checked`) as a pointer, not evidence: reopen the unit
-before quoting or citing it.
+before quoting or citing it. Since 3.15.7, `body_truncated=true` means the
+body is the head and tail of the unit around an explicit marker; the middle
+is missing and cannot prove absence. Search and context also report
+`semantic_disabled` when semantic search is off by configuration (lexical
+is the intended mode), distinct from `_degraded` (an enabled path fell back).
+The canonical wording is in [`DATA_CONTRACTS.md`](DATA_CONTRACTS.md).
 
 3.12.0 turns semantic search on by default (ADR-065) without changing envelope
 versions: the default mode is `hybrid`, and the BGE cross-encoder reranker is

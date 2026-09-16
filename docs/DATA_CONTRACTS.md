@@ -137,9 +137,10 @@ the server's default version after the migration files, for example
 Operator guidance the update step could not act on is returned in
 `meta.warnings`, not in `data`.
 
-`kip doctor` returns `healthy`, `required_failures`, `checks`, `capabilities`
-and `summary`. Each check is `{name, ok, required, details}`; only a failed
-required check makes `healthy` false. Keys are additive across releases.
+`kip doctor` returns `healthy`, `required_failures`, `checks`, `capabilities`,
+`summary` and `summary_en`. Each check is `{name, ok, required, details}`;
+only a failed required check makes `healthy` false. Keys are additive across
+releases. MCP `kip_doctor` is the same payload.
 
 - `semantic_search` (never required) keeps `enabled`, `model_runtime`,
   `projection` and `reason`, and adds `state`: `disabled_by_configuration`,

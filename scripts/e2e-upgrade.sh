@@ -209,7 +209,7 @@ e2e_profile_digests "$home" > "$work/throwaway-home.before"
 e2e_resolve_database
 grep -q "^KIP_DATABASE_URL=" "$deployment_a/.env" \
   || e2e_fail "the installed .env carries no KIP_DATABASE_URL line"
-e2e_set_dotenv "$deployment_a/.env" "KIP_DATABASE_URL=$E2E_DATABASE_URL"
+e2e_point_deployment_at_database "$deployment_a/.env"
 
 # -------------------------------------------------- deployment-owned files
 e2e_log "Marking the deployment-owned files an upgrade must never replace"

@@ -413,6 +413,22 @@ target.write_text("\n".join(lines) + "\n", encoding="utf-8")
 ' "$@"
 }
 
+# Point a bootstrapped .env at this run's throwaway (or supplied) database.
+# Bootstrap writes KIP_POSTGRES_PORT=5432 and matching URLs; the e2e database
+# is on another loopback port, which the 3.15.5 port guard refuses unless the
+# published port and both URLs agree.
+e2e_point_deployment_at_database() {
+  local env_file="$1" port
+  port="${E2E_POSTGRES_PORT:-}"
+  if [[ -z "$port" ]]; then
+    port="$("${E2E_PYTHON:-python3}" -c 'from urllib.parse import urlsplit; import sys; print(urlsplit(sys.argv[1]).port or 5432)' "$E2E_DATABASE_URL")"
+  fi
+  e2e_set_dotenv "$env_file" \
+    "KIP_DATABASE_URL=$E2E_DATABASE_URL" \
+    "KIP_BACKUP_DATABASE_URL=$E2E_DATABASE_URL" \
+    "KIP_POSTGRES_PORT=$port"
+}
+
 e2e_digest() {
   # sha256 of a file, or the literal "absent". Used to prove a path this run
   # did not ask to change was not changed.

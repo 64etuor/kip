@@ -140,7 +140,7 @@ e2e_resolve_database
 e2e_log "Pointing the deployment at PostgreSQL and migrating"
 grep -q "^KIP_DATABASE_URL=" "$deployment/.env" \
   || e2e_fail "the installed .env carries no KIP_DATABASE_URL line"
-e2e_set_dotenv "$deployment/.env" "KIP_DATABASE_URL=$E2E_DATABASE_URL"
+e2e_point_deployment_at_database "$deployment/.env"
 
 # Every command below runs through the GLOBAL launcher, not through
 # $deployment/scripts/kip: an operator's `kip` is the launcher, and a launcher

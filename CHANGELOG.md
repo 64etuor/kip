@@ -2,20 +2,8 @@
 
 ## 3.15.7 - 2026-09-16
 
-- End-to-end checks accept lexical-only `semantic_disabled`, allow the
-  intended `.env` `KIP_POSTGRES_IMAGE` refresh on upgrade, and keep compose
-  published ports aligned with both database URLs so the 3.15.5 port guard
-  does not refuse `app-up.sh`. 3.15.6's GitHub Release had no install
-  archive because those three jobs failed and skipped publish.
-
-## 3.15.6 - 2026-09-16
-
-- Installer and upgrade end-to-end tests set `KIP_POSTGRES_PORT` and both
-  database URLs to the throwaway PostgreSQL. 3.15.5's port guard refused
-  `kip migrate` when bootstrap left 5432 in `.env` and only the URL named
-  the throwaway port.
-
-## 3.15.5 - 2026-09-16
+The first published release of this work. Git tags v3.15.5 and v3.15.6 were
+not published (no install archives) and were removed.
 
 - PostgreSQL moves from `pgvector/pgvector` 0.8.2 to 0.8.6, pinned by digest
   (ADR-068). 0.8.6 includes the 0.8.3-0.8.4 fixes for HNSW index corruption
@@ -169,6 +157,10 @@
     behave the same.
   - The Docker Desktop pin moves from 4.90.0 to 4.91.0 (Compose 5.5.1, Engine
     29.8.0), with both DMGs hashed.
+  - End-to-end checks set throwaway PostgreSQL ports on both database URLs
+    and `KIP_POSTGRES_PORT`, accept lexical-only `semantic_disabled`, and
+    allow the intended `.env` `KIP_POSTGRES_IMAGE` refresh on upgrade, so
+    installer, upgrade and compose-roles jobs can publish.
 
 ## 3.15.4 - 2026-09-15
 

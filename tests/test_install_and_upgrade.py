@@ -837,7 +837,7 @@ def test_archive_upgrade_finishes_with_the_upgraded_trees_upgrade_script(tmp_pat
 
 def test_archive_dry_run_on_a_release_with_the_refresh_previews_the_next_pin_and_writes_nothing(tmp_path: Path) -> None:
     # Given a deployment that already runs this release's upgrade.sh and
-    # bootstrap_env.py (an upgrade from 3.15.5 onward), whose .env carries the
+    # bootstrap_env.py (an upgrade from 3.15.7 onward), whose .env carries the
     # pin its installed release shipped. A 3.15.4 deployment dry-runs with its
     # own older upgrade.sh, which has no refresh and previews nothing; its
     # --finish runs the new tree's scripts and still rewrites the pin.

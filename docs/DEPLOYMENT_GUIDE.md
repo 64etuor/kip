@@ -791,9 +791,9 @@ security 정책을 우회한다. 따라서 migration 0028이 34개 테이블에 
   가리키게 한다. 백업 login은 그룹 membership이 아니라 `BYPASSRLS` 속성을 직접
   가져야 한다.
 
-### 11.9 3.15.5 PostgreSQL 이미지(pgvector 0.8.6) 올리기
+### 11.9 PostgreSQL 이미지(pgvector 0.8.6) 올리기
 
-3.15.5의 `compose.yaml` 기본 PostgreSQL 이미지는 digest로 고정한
+3.15.7의 `compose.yaml` 기본 PostgreSQL 이미지는 digest로 고정한
 `pgvector/pgvector:0.8.6-pg18-trixie`다. 기존 배포의 `.env`에는 예전 `.env.example`이 쓴
 `KIP_POSTGRES_IMAGE=pgvector/pgvector:0.8.2-pg18-trixie`(digest가 붙었거나 없는 형태)가 남아
 있다. 이 값이 compose 기본값보다 우선하므로, 그대로 두면 업그레이드해도 새 이미지를 받지 않는다.
@@ -806,7 +806,7 @@ security 정책을 우회한다. 따라서 migration 0028이 34개 테이블에 
    경고만 내고 계속한다. 실행 중인 PostgreSQL container는 4단계의 `./scripts/app-up.sh`까지 이전
    이미지로 남으며, 업그레이드 마무리 요약이 이를 다시 알린다. `.env`에 이 줄이 없으면 compose 기본값을 쓰므로 바꿀 것이 없다.
 2. `--check`는 `.env`를 쓰지 않고 `Would update …`만 출력한다. `./scripts/upgrade.sh --archive ZIP
-   --dry-run`의 미리보기(패키지 안의 `.env.example`과 비교)는 3.15.5 이후 릴리스에서 올릴 때만
+   --dry-run`의 미리보기(패키지 안의 `.env.example`과 비교)는 3.15.7 이후 릴리스에서 올릴 때만
    나온다. 3.15.4 및 이전 배포의 dry run은 자신의 이전 `upgrade.sh`가 실행해 이 단계가 없으므로,
    `.env`의 `KIP_POSTGRES_IMAGE`를 패키지의 `.env.example`과 직접 비교한다. 실제 교체는 새 스크립트로
    실행되는 마무리(`--finish`) 단계에서 일어난다. `--latest`/`--version`의 `--dry-run`은 설치기가

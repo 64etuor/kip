@@ -429,6 +429,72 @@ e2e_point_deployment_at_database() {
     "KIP_POSTGRES_PORT=$port"
 }
 
+# Rewrite published ports on an already-bootstrapped .env, including the
+# loopback database URLs bootstrap filled from 5432. Setting only
+# KIP_POSTGRES_PORT leaves the URLs on 5432 and the 3.15.5 port guard refuses
+# app-up.
+e2e_set_published_ports() {
+  local env_file="$1" postgres_port="$2" api_port="$3"
+  "${E2E_PYTHON:-python3}" - "$env_file" "$postgres_port" "$api_port" <<'PY'
+import sys
+from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
+
+path = Path(sys.argv[1])
+postgres_port = sys.argv[2]
+api_port = sys.argv[3]
+
+
+def with_port(url: str, port: str) -> str:
+    parts = urlsplit(url)
+    if parts.scheme not in {"postgresql", "postgres"} or not parts.hostname:
+        return url
+    userinfo, at, _ = parts.netloc.rpartition("@")
+    host = f"[{parts.hostname}]" if ":" in parts.hostname else parts.hostname
+    location = f"{userinfo}{at}{host}:{port}"
+    return urlunsplit((parts.scheme, location, parts.path, parts.query, parts.fragment))
+
+
+assignments = {
+    "KIP_POSTGRES_PORT": postgres_port,
+    "KIP_API_PORT": api_port,
+}
+lines = path.read_text(encoding="utf-8").splitlines()
+present = set()
+for index, line in enumerate(lines):
+    key = line.split("=", 1)[0].strip()
+    if key in assignments:
+        lines[index] = f"{key}={assignments[key]}"
+        present.add(key)
+    elif key in {"KIP_DATABASE_URL", "KIP_BACKUP_DATABASE_URL"} and "=" in line:
+        name, _, value = line.partition("=")
+        lines[index] = f"{name}={with_port(value, postgres_port)}"
+for key, value in assignments.items():
+    if key not in present:
+        lines.append(f"{key}={value}")
+path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+PY
+}
+
+# Digest of .env ignoring KIP_POSTGRES_IMAGE. upgrade.sh is allowed to refresh
+# a pin KIP itself shipped; every other line must stay byte-identical.
+e2e_dotenv_identity_digest() {
+  "${E2E_PYTHON:-python3}" - "$1" <<'PY'
+import hashlib
+import re
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text(encoding="utf-8")
+kept = [
+    line
+    for line in text.splitlines()
+    if not re.match(r"^\s*(export\s+)?KIP_POSTGRES_IMAGE\s*=", line)
+]
+sys.stdout.write(hashlib.sha256(("\n".join(kept) + "\n").encode()).hexdigest() + "\n")
+PY
+}
+
 e2e_digest() {
   # sha256 of a file, or the literal "absent". Used to prove a path this run
   # did not ask to change was not changed.

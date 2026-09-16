@@ -22,8 +22,9 @@
 # which is the bulk of the cost: expect 6-8 minutes there.
 #
 # Semantic search is off (KIP_SEMANTIC=off): the model runtime is a 1.2 GB
-# download and is covered by scripts/e2e-semantic.sh instead. This check
-# therefore asserts a lexical deployment and fails on ANY meta.warnings.
+# download and is covered by scripts/e2e-semantic.sh instead. Search and
+# context then carry `semantic_disabled` so a paraphrase miss is not read as
+# absence; any other warning still fails the check.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -176,10 +177,10 @@ print(f"sync: inserted={inserted} failed={failed}")
 PY
 
 # ------------------------------------------------------------- envelopes
-# A lexical deployment that just indexed the bundled corpus must warn about
-# nothing at all. Any new warning is a behaviour change the release has to
-# declare here on purpose.
-allow=()
+# A lexical deployment that just indexed the bundled corpus must warn only
+# that semantic search is off. Any other warning is a behaviour change the
+# release has to declare here on purpose.
+allow=(--allow-warning semantic_disabled)
 
 e2e_log "Retrieval through the installed kip"
 status=0

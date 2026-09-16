@@ -231,7 +231,7 @@ mkdir -p "$deployment_a/var"
 printf '%s\n' "$sentinel" > "$deployment_a/var/e2e-sentinel.txt"
 owned_before="$work/owned.before"
 {
-  printf '%s .env\n' "$(e2e_digest "$deployment_a/.env")"
+  printf '%s .env\n' "$(e2e_dotenv_identity_digest "$deployment_a/.env")"
   printf '%s config/kip.toml\n' "$(e2e_digest "$deployment_a/config/kip.toml")"
   printf '%s .mcp.json\n' "$(e2e_digest "$deployment_a/.mcp.json")"
   printf '%s var/e2e-sentinel.txt\n' "$(e2e_digest "$deployment_a/var/e2e-sentinel.txt")"
@@ -308,13 +308,15 @@ e2e_note "version moved: $previous -> $version"
 
 owned_after="$work/owned.after"
 {
-  printf '%s .env\n' "$(e2e_digest "$deployment_a/.env")"
+  printf '%s .env\n' "$(e2e_dotenv_identity_digest "$deployment_a/.env")"
   printf '%s config/kip.toml\n' "$(e2e_digest "$deployment_a/config/kip.toml")"
   printf '%s .mcp.json\n' "$(e2e_digest "$deployment_a/.mcp.json")"
   printf '%s var/e2e-sentinel.txt\n' "$(e2e_digest "$deployment_a/var/e2e-sentinel.txt")"
 } > "$owned_after"
 e2e_assert_same_profiles "$owned_before" "$owned_after" \
-  "deployment-owned files (.env, config/kip.toml, .mcp.json, var/) survived the upgrade"
+  "deployment-owned files (.env except KIP_POSTGRES_IMAGE, config/kip.toml, .mcp.json, var/) survived the upgrade"
+grep -q "$sentinel" "$deployment_a/.env" \
+  || e2e_fail "upgrade dropped the .env sentinel"
 
 [[ "$(e2e_digest "$launcher")" == "$launcher_before" ]] \
   || e2e_fail "kip update rewrote the global launcher, which opened the unrelated deployment B ($deployment_b)"
@@ -405,7 +407,8 @@ e2e_assert_status 0 "$status" "kip sync run --source sample after the upgrade"
 status=0
 run_a search "정산" --limit 5 > "$work/search.json" || status=$?
 e2e_assert_status 0 "$status" "kip search after the upgrade"
-"$E2E_PYTHON" "$E2E_PROJECT_ROOT/tests/e2e/kip_envelope.py" search "$work/search.json" --min-hits 2
+"$E2E_PYTHON" "$E2E_PROJECT_ROOT/tests/e2e/kip_envelope.py" search "$work/search.json" --min-hits 2 \
+  --allow-warning semantic_disabled
 
 # ----------------------------------------- a stale registered copy is refreshed
 # Nothing is bumped: one registered copy is made to look like an older install

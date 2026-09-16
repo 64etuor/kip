@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.15.7 - 2026-09-16
+
+- End-to-end checks accept lexical-only `semantic_disabled`, allow the
+  intended `.env` `KIP_POSTGRES_IMAGE` refresh on upgrade, and keep compose
+  published ports aligned with both database URLs so the 3.15.5 port guard
+  does not refuse `app-up.sh`. 3.15.6's GitHub Release had no install
+  archive because those three jobs failed and skipped publish.
+
 ## 3.15.6 - 2026-09-16
 
 - Installer and upgrade end-to-end tests set `KIP_POSTGRES_PORT` and both

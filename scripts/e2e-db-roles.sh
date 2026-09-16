@@ -389,11 +389,10 @@ run_compose_mode() {
   postgres_port="$(e2e_free_port)"
   api_port="$(e2e_free_port)"
   # Give the deployment this run's ports so nothing collides with a deployment
-  # that already exists on this machine.
-  e2e_set_dotenv "$DEPLOYMENT/.env" \
-    "KIP_POSTGRES_PORT=$postgres_port" \
-    "KIP_API_PORT=$api_port" \
-    "KIP_SEMANTIC=off"
+  # that already exists on this machine. Rewrite the loopback database URLs
+  # too: bootstrap filled them at 5432, and the port guard refuses a mismatch.
+  e2e_set_published_ports "$DEPLOYMENT/.env" "$postgres_port" "$api_port"
+  e2e_set_dotenv "$DEPLOYMENT/.env" "KIP_SEMANTIC=off"
 
   # compose.yaml pins `name: kip`. COMPOSE_PROJECT_NAME takes precedence over
   # it, which is what keeps this run out of an existing kip project's

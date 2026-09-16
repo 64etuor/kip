@@ -1,0 +1,333 @@
+contracts/openapi.json
+  s_16a999dee6ecf2::t_e7a78346d8e6b2 1065
+scripts/upgrade.sh
+  s_16a999dee6ecf2::t_89697b25a0f32e 64-69,72-74,77-78,84-86,88,124-125
+  s_16a999dee6ecf2::t_438de2795631a2 25,70-71,75-76,79-82,92,100
+requirements/bootstrap.tsv
+  s_16a999dee6ecf2::t_6297f899cc7172 2-5,11-12
+scripts/restore.sh
+  s_16a999dee6ecf2::t_f28eb6366b6b82 86-91
+scripts/restore-drill.sh
+  s_16a999dee6ecf2::t_88bdbe21914a75 56-58
+docs/TRD.md
+  s_16a999dee6ecf2::t_26ed54b4da0e57 244
+  s_16a999dee6ecf2::t_26315312fc871a 811-816,825-835
+  s_16a999dee6ecf2::t_96ed39276f6865 817-824
+docs/APP_INTEGRATION.md
+  s_16a999dee6ecf2::t_9c0be8248da2c9 230-231
+  s_16a999dee6ecf2::t_6e57222dcf0aff 241-242
+  s_16a999dee6ecf2::t_5405a17daf2470 239-240
+src/kip/application/operations.py
+  s_16a999dee6ecf2::t_80cdb39d11711f 137
+  s_16a999dee6ecf2::t_74034988520474 11
+  s_16a999dee6ecf2::t_1aaa01990e78fe 140-142
+scripts/migrate.sh
+  s_16a999dee6ecf2::t_f9052d03079f36 5
+scripts/bootstrap_env.py
+  s_16a999dee6ecf2::t_89697b25a0f32e 15,38-49,179-180,184-215,217-252,261,265-267,597-609,613-618
+  s_16a999dee6ecf2::t_438de2795631a2 79-108,135-137,162-163,165-167,216,253-260,262-264,400-401,403-409,412-413,415,417-428,435-438,445,447-448,516-519
+  s_16a999dee6ecf2::t_6f5394d202f406 181-183
+  s_16a999dee6ecf2::t_b41cb32b9f7d44 351-361,398-399,402,410-411,414,416,458-466
+  s_16a999dee6ecf2::t_995fcd62dbe0d9 168
+  s_16a999dee6ecf2::t_b6ddcb6b41a0c1 268-269
+  s_16a999dee6ecf2::t_4c61a0ce1c5ac3 449
+  s_16a999dee6ecf2::t_74e58bf88d831d 467
+  s_16a999dee6ecf2::t_04239291010bce 619
+docs/IMPLEMENTATION_STATUS.md
+  s_16a999dee6ecf2::t_64cac718c616a7 646
+scripts/bootstrap.sh
+  s_16a999dee6ecf2::t_89697b25a0f32e 38-42
+  s_16a999dee6ecf2::t_438de2795631a2 30-33
+  s_16a999dee6ecf2::t_4bae792636d2d2 34-35
+src/kip/application/ingestion_events.py
+  s_16a999dee6ecf2::t_03459af3e0db71 8
+  s_16a999dee6ecf2::t_e107bb6849a582 74-77
+src/kip/setup/planner.py
+  s_16a999dee6ecf2::t_6b55ed5c645a63 28,32-33
+  s_16a999dee6ecf2::t_3a8b1d8286d13d 202-205
+  s_16a999dee6ecf2::t_7ba9229bc863af 16
+  s_16a999dee6ecf2::t_75c0cff606eba1 53-57
+  s_16a999dee6ecf2::t_0b9b518914f917 165-170
+  s_16a999dee6ecf2::t_66a6272f4f8eaf 27,29-31
+  s_16a999dee6ecf2::t_048a6809b298f2 218-227
+  s_16a999dee6ecf2::t_ca0ba6dc8173a1 399,402-408
+tests/test_setup_cli.py
+  s_16a999dee6ecf2::t_ab654772594874 314-346,358-361
+  s_16a999dee6ecf2::t_8c45c955c02a54 347-357
+tests/contract/test_operations_extension_versions.py
+  s_16a999dee6ecf2::t_03b65f70e1ea42 1-37
+src/kip/setup/models.py
+  s_16a999dee6ecf2::t_1944f7fe7559b4 6
+  s_16a999dee6ecf2::t_b36a14ccd7f108 309-312
+  s_16a999dee6ecf2::t_84b04843b52689 351-361,364,366-367
+  s_16a999dee6ecf2::t_ed58a84842b0e8 362-363,365,368-369,375-377
+  s_16a999dee6ecf2::t_aab83fa62b9ae8 13
+  s_16a999dee6ecf2::t_bc68793c46989b 328-329
+tests/test_app_up.py
+  s_16a999dee6ecf2::t_2de1f30c602131 230-248
+  s_16a999dee6ecf2::t_390093ab118ea8 201,203-204,206-207
+pyproject.toml
+  s_16a999dee6ecf2::t_ca9545b7c8da52 7
+CHANGELOG.md
+  s_16a999dee6ecf2::t_b6a2a774989a66 67-69
+  s_16a999dee6ecf2::t_0dc4874422c661 16-21
+  s_16a999dee6ecf2::t_c87ddf29c5e86a 87-98,116-127
+  s_16a999dee6ecf2::t_13e6a3a3a02d15 99-102
+  s_16a999dee6ecf2::t_4942896cf5d636 70-86
+  s_16a999dee6ecf2::t_023f2bf01d5ec6 3-10,24-36,50-66,128
+  s_16a999dee6ecf2::t_fb4c7a14df3a41 37-49
+  s_16a999dee6ecf2::t_f7dd2ce0eb7317 103-108,113
+  s_16a999dee6ecf2::t_eefd7eab0834de 11-15,22-23
+  s_16a999dee6ecf2::t_9ee5772b251629 109-112,114-115
+  s_16a999dee6ecf2::t_d5c5e7c319d966 129-131
+src/kip/adapters/repository/postgres/operations.py
+  s_16a999dee6ecf2::t_f97b63dd4d4a7c 9
+  s_16a999dee6ecf2::t_00b9c600d1dca3 20-22
+  s_16a999dee6ecf2::t_6a357584a0144d 23
+docs/QUICKSTART.md
+  s_16a999dee6ecf2::t_b4dc7481b5a953 44-46,49
+  s_16a999dee6ecf2::t_46538a4faacc7e 50
+.gitignore
+  s_16a999dee6ecf2::t_f82fafe33cca96 19
+docs/TROUBLESHOOTING.md
+  s_16a999dee6ecf2::t_d0435b0074837c 202-209,219-233,246-250
+  s_16a999dee6ecf2::t_8538f8700a7acb 234-240
+  s_16a999dee6ecf2::t_6defecb8cc081b 241-245
+  s_16a999dee6ecf2::t_698264de735846 251
+contracts/openapi.yaml
+  s_16a999dee6ecf2::t_e7a78346d8e6b2 6
+src/kip/ports/operations.py
+  s_16a999dee6ecf2::t_e4791363261469 21,23,28-31
+  s_16a999dee6ecf2::t_aabc85fe45ba5f 22,24-27
+  s_16a999dee6ecf2::t_70a72795a5fa2e 32-38
+  s_16a999dee6ecf2::t_5fee8ed184bdf3 7
+src/kip/setup/writer.py
+  s_16a999dee6ecf2::t_307a6dc49c7959 63-68
+  s_16a999dee6ecf2::t_fbf41b19129993 104-109,112-116
+  s_16a999dee6ecf2::t_c7804807558af7 17
+  s_16a999dee6ecf2::t_816f3a5d0f0ae2 97,123-137,142,147-154
+  s_16a999dee6ecf2::t_61fa56583f798a 138-141,143-145
+src/kip/adapters/repository/postgres/database.py
+  s_16a999dee6ecf2::t_71eac259da4006 61
+  s_16a999dee6ecf2::t_5df7b5871c35f4 359,367-368,373-378
+  s_16a999dee6ecf2::t_2d11228f15eb1c 360-366,369-372
+  s_16a999dee6ecf2::t_87c97266ba61ad 416-429,433-435,453-456,462-475,496
+  s_16a999dee6ecf2::t_1d2e64340abf74 476-495
+  s_16a999dee6ecf2::t_2899de6df064b9 379
+  s_16a999dee6ecf2::t_cf46ed79e8e1f4 430-432,436-452,457-461
+  s_16a999dee6ecf2::t_c6565c8f36175a 83-86
+src/kip/domain/identity.py
+  s_16a999dee6ecf2::t_5ef71928476669 3
+  s_16a999dee6ecf2::t_fb4ee3838bd594 8-30
+  s_16a999dee6ecf2::t_0c3627a390f4d8 31-33
+src/kip/setup/service.py
+  s_16a999dee6ecf2::t_41b81124e348c5 79,100,195-203
+  s_16a999dee6ecf2::t_a854d19842f572 35
+  s_16a999dee6ecf2::t_9233d0f1afd8e7 382-387
+  s_16a999dee6ecf2::t_f869a1a782c3e0 76-78
+  s_16a999dee6ecf2::t_eb82291901a42c 80-82,97-99
+  s_16a999dee6ecf2::t_6123ba928abff6 101-103
+deploy/compose.roles.yaml
+  s_16a999dee6ecf2::t_26ed54b4da0e57 25
+scripts/kip
+  s_16a999dee6ecf2::t_438de2795631a2 11,17-21,23,37
+  s_16a999dee6ecf2::t_f9052d03079f36 35-36
+  s_16a999dee6ecf2::t_6f5394d202f406 6-10,12-16,22,24-34
+tests/test_setup_planner.py
+  s_16a999dee6ecf2::t_8708ee841e8d2d 220-257
+tests/test_ontology_rag_cli.py
+  s_16a999dee6ecf2::t_a162f04dae87ae 137-163
+tests/test_acl_scope_commas.py
+  s_16a999dee6ecf2::t_cd0302e2d0981c 1-50,80-113
+  s_16a999dee6ecf2::t_3e89823db56aa4 51-79
+  s_16a999dee6ecf2::t_4a28b422f91427 114-116
+tests/test_migrations_vector_extension.py
+  s_16a999dee6ecf2::t_1adc089b6ee111 1-11,13,15,19,21-50,53-76,78-105
+  s_16a999dee6ecf2::t_3efa8a840f2ba1 269-397
+  s_16a999dee6ecf2::t_05379b2eed0b93 106-119,157-268
+  s_16a999dee6ecf2::t_2760f606cb897c 140-141
+  s_16a999dee6ecf2::t_4c95808b95b92c 77
+  s_16a999dee6ecf2::t_7bfb4e865433cd 12,14,16-18,20
+  s_16a999dee6ecf2::t_5556c9393c17fa 120-139,142-156
+  s_16a999dee6ecf2::t_7c1b5a4215b3d0 51-52
+  s_16a999dee6ecf2::t_473e7950370eb2 398-400
+.env.example
+  s_16a999dee6ecf2::t_26ed54b4da0e57 22
+tests/test_bootstrap_env.py
+  s_16a999dee6ecf2::t_2d303a236408ce 289-294,313-317,322,324-331,344-365,536-537,570-572,675-685,687-693,714,718,722,750-751,754-758,768-825
+  s_16a999dee6ecf2::t_2de1f30c602131 295-312,318-321,323,332-343,366-379,383-384,386,490,500-501,517-520
+  s_16a999dee6ecf2::t_7cecf5a9b51daf 14,18,539-569,573-674,686,694-713,715-717,719-721,723-749,752-753,759-767
+  s_16a999dee6ecf2::t_390093ab118ea8 158,187-189,191,197,207
+  s_16a999dee6ecf2::t_84737427f39ca9 521
+tests/test_install_and_upgrade.py
+  s_16a999dee6ecf2::t_58017ee6227866 836-837,844-861
+  s_16a999dee6ecf2::t_2d303a236408ce 838-843
+scripts/backup_artifacts.py
+  s_16a999dee6ecf2::t_832770cd87a5e8 523-561,569,572,575
+contracts/setup-plan.schema.json
+  s_16a999dee6ecf2::t_e7a78346d8e6b2 365-379
+scripts/common.sh
+  s_16a999dee6ecf2::t_438de2795631a2 162-164,207-208
+  s_16a999dee6ecf2::t_6c7b3fc5c9f6cb 172
+  s_16a999dee6ecf2::t_5836540f18dbba 191,195
+  s_16a999dee6ecf2::t_d5009e9ce816d8 212
+  s_16a999dee6ecf2::t_68e9fd8d93a375 152-161,165-167,169-170,180-185,206,209-211,213-215
+  s_16a999dee6ecf2::t_1ef404cb5ef442 168,171,173-179,186-190,192-194,196-205,216-220
+skills/kip-setup/SKILL.md
+  s_16a999dee6ecf2::t_c5541149432b2f 33,36
+  s_16a999dee6ecf2::t_7b6e3d252c6b23 34-35,37-38
+  s_16a999dee6ecf2::t_d7b8e92bc4467d 129-131
+docs/DATA_CONTRACTS.md
+  s_16a999dee6ecf2::t_dbf337b7dd95ae 108-111,125
+  s_16a999dee6ecf2::t_b8f1bf21e7eac6 131-166
+  s_16a999dee6ecf2::t_cb67b16a5edc78 706-708
+  s_16a999dee6ecf2::t_6998c6c3d9fcf7 112-124
+  s_16a999dee6ecf2::t_6332ccd73ceab5 167-169
+  s_16a999dee6ecf2::t_59798b5b4154d5 709-711
+README.md
+  s_16a999dee6ecf2::t_00e7a8dd87fee9 19,23-24,26-38
+  s_16a999dee6ecf2::t_e3fa43d5cb4123 18
+  s_16a999dee6ecf2::t_7e8cfa88a17ba2 20
+tests/test_operational_recovery.py
+  s_16a999dee6ecf2::t_4e43087e5cd739 155-200,210-219,221,223-243
+  s_16a999dee6ecf2::t_187eadabc72ae2 201-209
+  s_16a999dee6ecf2::t_c5d0668f0b8a8a 220,222
+docs/DEPLOYMENT_GUIDE.md
+  s_16a999dee6ecf2::t_27f342642fe795 137-138,146-149,155-160,804-813,829-832
+  s_16a999dee6ecf2::t_58017ee6227866 793-803,814-828
+  s_16a999dee6ecf2::t_851e6de685e014 144-145,154
+scripts/mcp.sh
+  s_16a999dee6ecf2::t_f9052d03079f36 5
+skills/kip-setup/references/questions.md
+  s_16a999dee6ecf2::t_a471449634177f 36
+  s_16a999dee6ecf2::t_4c884bd66e000f 5-13
+  s_16a999dee6ecf2::t_80d037dbec1785 51-52,56
+  s_16a999dee6ecf2::t_71cc9c4ad68a53 53-55
+docs/adr/ADR-068-pgvector-extension-upgrades-and-restore.md
+  s_16a999dee6ecf2::t_ee3bbbf3dbca2f 1-66
+VERSION
+  s_16a999dee6ecf2::t_ca9545b7c8da52 1
+src/kip/cli.py
+  s_16a999dee6ecf2::t_369bcb88787894 1252
+  s_16a999dee6ecf2::t_9f082083a379ea 26
+  s_16a999dee6ecf2::t_eef36a60d8c720 749-750,752-754
+  s_16a999dee6ecf2::t_fceb04bc64c2c0 1002,1027,1243,1251,1261,1312
+  s_16a999dee6ecf2::t_0453a687df3d59 1242,1250,1260,1309-1311,1327-1330
+  s_16a999dee6ecf2::t_07c910ff71ce06 1012
+  s_16a999dee6ecf2::t_72e832f126c902 916-918
+  s_16a999dee6ecf2::t_246cb2b48ed245 264
+  s_16a999dee6ecf2::t_075a8711e2aeb7 861-863,866-875,883-887,889
+  s_16a999dee6ecf2::t_726737769ffea2 279,283,850,857-860,864-865,876-882,888,890-910
+  s_16a999dee6ecf2::t_492a3865071991 751
+  s_16a999dee6ecf2::t_95f39e7d0919a8 911-915,919-942
+  s_16a999dee6ecf2::t_f2dba58bead010 1004-1011,1014-1025
+  s_16a999dee6ecf2::t_45aa6200c7e386 261-263,265-266
+  s_16a999dee6ecf2::t_30278cd86d4b47 855-856
+  s_16a999dee6ecf2::t_55049de84b4ebc 27-29
+  s_16a999dee6ecf2::t_eb32f5f1229115 267-269,276-278
+  s_16a999dee6ecf2::t_b34e510709d46d 280-282
+  s_16a999dee6ecf2::t_98cfdeec224785 284-285
+  s_16a999dee6ecf2::t_1dcf8a3e115e81 755-757
+  s_16a999dee6ecf2::t_0a92aa0c0d5e50 1001
+  s_16a999dee6ecf2::t_daf2ba6e918ee4 1003
+  s_16a999dee6ecf2::t_8650ecabd72a36 1013
+  s_16a999dee6ecf2::t_91d50723f456e4 1026
+  s_16a999dee6ecf2::t_323fcafe5495c7 1028-1030
+  s_16a999dee6ecf2::t_4845a51f0090d0 1239-1241
+  s_16a999dee6ecf2::t_d3b9bf93905fd5 1244-1249
+  s_16a999dee6ecf2::t_6265116f56ab35 1253-1255,1257-1259
+  s_16a999dee6ecf2::t_74771a15015003 1262-1264
+  s_16a999dee6ecf2::t_a0030d2aa9ac2d 1306-1308
+  s_16a999dee6ecf2::t_228da6463d2401 1313-1315,1324-1326
+tests/test_database_port_check.py
+  s_16a999dee6ecf2::t_6f5394d202f406 131-140,143-146,148-165,268
+  s_16a999dee6ecf2::t_19ea015d8b05d6 192
+  s_16a999dee6ecf2::t_390093ab118ea8 115-130,168
+  s_16a999dee6ecf2::t_2d303a236408ce 61-62,71-72,74,141-142,147,199-200,240-242,247
+  s_16a999dee6ecf2::t_1a642181fe1867 1-60,63-70,73,75-114,166-167,169-191,193-198,203-206,210-211,213-214,222-236,267,278,283-285,287,294-297,302
+  s_16a999dee6ecf2::t_88bdbe21914a75 293,301,304-312,314-345,347-351,353-354,356-360,362,366-384,387-390,392-396,399,402-404
+  s_16a999dee6ecf2::t_1a6bc0e667f5b5 201-202,207-209,212,215-221,237-239,243-246,248-265,274,276,313,346,352,355,361,363-365,385-386,391,397-398,400-401
+  s_16a999dee6ecf2::t_af51581040d46c 266
+  s_16a999dee6ecf2::t_c2a18553166ca2 269-273
+  s_16a999dee6ecf2::t_d6ad7eb7286aa1 275
+  s_16a999dee6ecf2::t_ae8e778108236f 277
+  s_16a999dee6ecf2::t_c525b59ccf1094 279-282
+  s_16a999dee6ecf2::t_695ba7ab53561f 286
+  s_16a999dee6ecf2::t_29d9dca366e738 288-292
+  s_16a999dee6ecf2::t_47fa43a5031fab 298-300
+  s_16a999dee6ecf2::t_2cd5b445cec31c 303
+compose.yaml
+  s_16a999dee6ecf2::t_26ed54b4da0e57 10
+README.en.md
+  s_16a999dee6ecf2::t_5b061319a98fa4 19-27,29,31-35
+tests/test_cli_surface.py
+  s_16a999dee6ecf2::t_8708ee841e8d2d 635-660
+  s_16a999dee6ecf2::t_29a649cfd55d13 661-663
+tests/test_setup_writer.py
+  s_16a999dee6ecf2::t_8708ee841e8d2d 316-332,334,336-352
+  s_16a999dee6ecf2::t_c74583d3ac1c70 333,335
+  s_16a999dee6ecf2::t_ab654772594874 353-414
+src/kip/application/ontology_rag.py
+  s_16a999dee6ecf2::t_b873369848c9d1 107-110
+  s_16a999dee6ecf2::t_6b6ddbf6c39246 13
+compose.production.yaml
+  s_16a999dee6ecf2::t_26ed54b4da0e57 29,179
+tests/test_cli_doctor.py
+  s_16a999dee6ecf2::t_03b65f70e1ea42 764,769-838
+  s_16a999dee6ecf2::t_cad7211a2d850b 915-916
+  s_16a999dee6ecf2::t_a00fcf2069d6f2 839-914,917-920,922-945,1002
+  s_16a999dee6ecf2::t_8708ee841e8d2d 735-741,749-755,758,760-761,765-766
+  s_16a999dee6ecf2::t_a162f04dae87ae 742-748,756-757,762,767-768,921,946-1001,1003-1016
+  s_16a999dee6ecf2::t_33ea7cdaec3079 759,763
+  s_16a999dee6ecf2::t_b25258edc1490d 1017-1019
+scripts/app-up.sh
+  s_16a999dee6ecf2::t_f9052d03079f36 81,116
+THIRD-PARTY-NOTICES.md
+  s_16a999dee6ecf2::t_26ed54b4da0e57 81
+scripts/backup.sh
+  s_16a999dee6ecf2::t_2f52b16a8b3c6f 6-7
+migrations/0029_vector_extension_update.sql
+  s_16a999dee6ecf2::t_7af592243fdd99 12-13,15-20,37-42
+  s_16a999dee6ecf2::t_5b81dba84dcb37 1-11,14,21-36,43-45
+  s_16a999dee6ecf2::t_2f25fbd2a0e401 46-48
+tests/test_setup_verify.py
+  s_16a999dee6ecf2::t_3ec9ced9a5f839 451-474
+.github/workflows/ci.yml
+  s_16a999dee6ecf2::t_631fdf7efec4d2 18
+  s_16a999dee6ecf2::t_26ed54b4da0e57 38
+  s_16a999dee6ecf2::t_882affaf76a454 61-63
+src/kip/adapters/repository/memory/operations.py
+  s_16a999dee6ecf2::t_4f02159425161f 28-29
+  s_16a999dee6ecf2::t_0a44c1fb12af3d 24-27
+  s_16a999dee6ecf2::t_2e87e49c5e8d04 11
+src/kip/__init__.py
+  s_16a999dee6ecf2::t_ca9545b7c8da52 3
+.github/workflows/semantic-runtime.yml
+  s_16a999dee6ecf2::t_631fdf7efec4d2 42
+docs/OPERATIONS.md
+  s_16a999dee6ecf2::t_58017ee6227866 256-257,266-269,277
+  s_16a999dee6ecf2::t_cbe310338ff035 273-276
+  s_16a999dee6ecf2::t_27f342642fe795 56-57,68-72,112-141,258-265,270-272
+  s_16a999dee6ecf2::t_667ae41d5f83f9 64-67,111,142,319-320
+  s_16a999dee6ecf2::t_9e27a93662f1b6 143-144
+  s_16a999dee6ecf2::t_a06241c7c382aa 278-279
+  s_16a999dee6ecf2::t_460600519955b8 321-322
+uv.lock
+  s_16a999dee6ecf2::t_a10faa42efcc31 764
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "319f59a6dfb107b65948935beae60f6fb844f88b",
+  "prompts": {},
+  "sessions": {
+    "s_16a999dee6ecf2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b9abc8ac-2c56-4e22-a7c7-3deb16f779f3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

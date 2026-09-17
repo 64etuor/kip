@@ -232,10 +232,10 @@ which bounds the chunk size of HWP/HWPX units at extraction time. Other
 parsers apply the same 4000-character bound as a hard-coded default. When a search or context request
 returns nothing and no indexed unit is visible to the caller, `meta.warnings`
 carries `no_visible_indexed_units` on every edge; it describes the caller's
-own scope and never asserts that hidden units exist. When the retrieval run
-degraded, the search and context envelopes' `meta.warnings` list it on every
-edge — alongside `no_visible_indexed_units` when the result is also empty,
-because a degraded run that returned nothing carries no hit metadata:
+own scope and never asserts that hidden units exist. When retrieval is not
+full semantic ranking, the search and context envelopes' `meta.warnings` list
+it on every edge — alongside `no_visible_indexed_units` when the result is
+also empty, because a run that returned nothing carries no hit metadata:
 `semantic_disabled` (semantic search is off by configuration; every search is
 lexical, so a paraphrase miss is not proof of absence),
 `semantic_degraded` (default-mode search fell back to lexical because the

@@ -121,7 +121,9 @@ Setup plan은 이 runtime이 있는지를 `semantic_search`로 기록하고 그�
 host/container config를 생성한다. Lexical 전용 plan은 compose의 `models` 서비스를
 빼고 그 이유를 경고한다. 첫 sync는 새 unit을 embedding하며, 검토된 기본 embedding
 identity의 projection이 완성되면 자동으로 활성화한다. 그 전까지 검색 envelope의
-`meta.warnings`에 `semantic_degraded`가 붙고 결과는 lexical이다. 큰 corpus의 첫
+`meta.warnings`에 `semantic_degraded`가 붙고 결과는 lexical이다. `KIP_SEMANTIC=off`
+설치는 `semantic_disabled`이고, 이는 의도된 lexical 전용이지 실패한 semantic이
+아니다. 큰 corpus의 첫
 projection은 몇 시간이 걸릴 수 있다. `./scripts/kip doctor`의 `semantic_search`
 항목이 runtime 연결과 projection 완성도(`stale` 포함), 고칠 명령을 알려준다.
 기본 검색 mode는 `hybrid`(lexical+vector reciprocal-rank fusion)이고 runtime은

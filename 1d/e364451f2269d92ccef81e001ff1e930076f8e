@@ -1,0 +1,20 @@
+docs/IMPLEMENTATION_STATUS.md
+  s_933aeb169886cb::t_b1d7020378a2f0 757
+  s_933aeb169886cb::t_dadcd9e34e5d00 754
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "1de364451f2269d92ccef81e001ff1e930076f8e",
+  "prompts": {},
+  "sessions": {
+    "s_933aeb169886cb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee81213d-ecb5-4436-abf7-b76c4b19f2b5",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

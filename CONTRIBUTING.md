@@ -58,6 +58,17 @@ loading `common.sh`; preserve that order. Keep shell wrappers executable —
 - Update `docs/IMPLEMENTATION_STATUS.md` and
   `docs/PRODUCTION_DESIGN_ALIGNMENT.md` when evidence or limitations change.
   Historical plans and green tests are not live acceptance.
+- Every relative Markdown link must resolve: shipped documents against the
+  package file set, and every tracked document, shipped or not, against the
+  tracked files present in the worktree (not `HEAD`, so a file deleted locally
+  is a missing target). `scripts/verify_project.py` checks both and lists a
+  defect found by both passes once. Link an unshipped historical record by its
+  commit-pinned GitHub URL with the full 40-character revision, as
+  `docs/IMPLEMENTATION_STATUS.md` does; the script verifies that revision and
+  path against the checkout history, which needs a full clone (a shallow clone
+  fails the check by name). The check recognises this repository by
+  `REPOSITORY` and `ROOT_COMMIT` in `scripts/verify_project.py`; a fork that
+  pins links into its own history repoints both.
 
 ## Data safety while developing
 

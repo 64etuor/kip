@@ -4,6 +4,21 @@ This is the current readiness inventory, not the target architecture. The
 target-to-current matrix and ordered gap register live in
 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`.
 
+## 2026-09-19 shipped documents link again (3.15.8)
+
+A documentation and gate release: no runtime, contract, installer or
+configuration behaviour changed. The shipped document set passes the packaged
+link check again after a 3.15.7 follow-up commit had linked this file to the
+unshipped 2026-08-10 acceptance record and left `main` CI red for three days.
+`verify_project.py` now also checks the links of every git-tracked Markdown
+file against the checkout, so historical records and plans, which never ship,
+no longer rot unnoticed; the bundle test guards the acceptance record out of
+the package the way it already guarded the 2026-08-06 audit.
+
+No retrieval, answer-quality or acceptance evidence changed. The 3.12.0
+retrieval numbers, the 19-case private golden set and the open gates in
+`PRODUCTION_DESIGN_ALIGNMENT.md` stand as they were.
+
 ## 2026-09-16 comma ACL last line and agent retrieval CX (3.15.7)
 
 A single ACL scope with a comma is rejected at every entrance that used to

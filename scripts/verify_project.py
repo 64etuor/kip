@@ -3,15 +3,21 @@ from __future__ import annotations
 
 import ast
 import json
+import subprocess
 import sys
 from pathlib import Path
 
 from kip.architecture_rules import adapter_imports
-from kip.documentation import documentation_link_errors
+from kip.documentation import documentation_link_errors, pinned_repository_links
 from kip.ontology import validate_ontology
 from kip.package_archive_policy import selected_source_files
 
 ROOT = Path(__file__).resolve().parents[1]
+# Commit-pinned links into this repository are verified against the checkout
+# history. The root commit tells a KIP checkout apart from a recipient's own
+# repository that merely contains the extracted package.
+REPOSITORY = "64etuor/kip"
+ROOT_COMMIT = "95808190211336937f4e680d0f8a6da523eb7d91"
 
 
 def _skill_files(root: Path) -> dict[Path, bytes]:
@@ -27,12 +33,134 @@ def require(condition: bool, message: str, errors: list[str]) -> None:
         errors.append(message)
 
 
+def _tracked_files(root: Path) -> dict[str, bytes] | None:
+    """Every git-tracked file present in the worktree, Markdown bodies loaded.
+
+    Returns None only when ``root`` is not a git checkout (a package recipient
+    running this script). Any other git failure raises, so a broken index or
+    an ownership refusal cannot turn the repository link check into a silent
+    skip that still prints a green verdict.
+    """
+    if not (root / ".git").exists():
+        return None
+    listing = subprocess.run(
+        ["git", "-C", str(root), "ls-files", "-z"],
+        capture_output=True, check=True,
+    ).stdout
+    files: dict[str, bytes] = {}
+    for raw in listing.split(b"\0"):
+        if not raw:
+            continue
+        name = raw.decode("utf-8", "surrogateescape")
+        path = root / name
+        if not path.is_file():
+            continue
+        files[name] = path.read_bytes() if name.endswith(".md") else b""
+    return files
+
+
+def _repository_link_errors(root: Path, packaged_errors: list[str], *, anchor: str = ROOT_COMMIT) -> list[str]:
+    """Link errors of every tracked document, without the ones already reported.
+
+    Shipped documents are checked against the package by the caller. Historical
+    records and plans stay in the repository only, so their links are checked
+    against the tracked worktree; otherwise they rot unnoticed. Every tracked
+    document is checked, shipped or not, and a defect the packaged pass already
+    reported is listed once. Commit-pinned links are verified only when the
+    checkout holds ``anchor`` (this repository's root commit): a recipient who
+    committed the extracted package into their own repository has no KIP
+    history and is not blamed for it, while a shallow clone of this
+    repository fails once, by name.
+    """
+    try:
+        tracked = _tracked_files(root)
+    except subprocess.CalledProcessError as exc:
+        detail = exc.stderr.decode("utf-8", "replace").strip()
+        return [f"git ls-files failed, repository link check did not run: {detail}"]
+    except OSError as exc:
+        return [f"git ls-files failed, repository link check did not run: {exc}"]
+    if tracked is None:
+        return []
+    if not tracked:
+        # An empty listing inside a checkout means git answered with nothing
+        # (for example a redirected index), which is a failed check, not a
+        # repository without documents.
+        return ["git ls-files listed no tracked files, repository link check did not run"]
+    already = set(packaged_errors)
+    errors = [
+        error for error in documentation_link_errors(tracked, scope="repository")
+        if error.replace(" repository link target missing: ", " packaged link target missing: ", 1) not in already
+    ]
+    try:
+        errors.extend(_pinned_link_errors(root, tracked, anchor))
+    except subprocess.CalledProcessError as exc:
+        detail = exc.stderr.decode("utf-8", "replace").strip()
+        errors.append(f"git rev-parse failed, pinned link check did not run: {detail}")
+    return errors
+
+
+def _pinned_link_errors(root: Path, tracked: dict[str, bytes], anchor: str) -> list[str]:
+    links = pinned_repository_links(tracked, REPOSITORY)
+    if not links:
+        return []
+    if not _git_object_exists(root, f"{anchor}^{{commit}}"):
+        if _git_is_shallow(root):
+            return [
+                "this clone is shallow, so the commit-pinned links cannot be verified; "
+                "fetch the full history (git fetch --unshallow) and run again"
+            ]
+        return []  # not a KIP checkout: the package sits inside another repository
+    errors: list[str] = []
+    known_revisions: dict[str, bool] = {}
+    for name, number, revision, path in links:
+        if "\x00" in path or not path or ".." in path.split("/"):
+            errors.append(f"{name}:{number}: pinned link path is not valid: {path!r}")
+            continue
+        if revision not in known_revisions:
+            known_revisions[revision] = _git_object_exists(root, f"{revision}^{{commit}}")
+        if not known_revisions[revision]:
+            errors.append(f"{name}:{number}: pinned revision is not in this repository's history: {revision[:12]}")
+            continue
+        if not _git_object_exists(root, f"{revision}:{path}"):
+            errors.append(f"{name}:{number}: pinned link target missing in history: {revision[:12]}:{path}")
+    return errors
+
+
+def _git_object_exists(root: Path, spec: str) -> bool:
+    """True when ``spec`` resolves in this checkout's history.
+
+    A ``<revision>:<path>`` spec is resolved through trees, so the blob itself
+    need not be present locally and a blobless partial clone verifies offline;
+    ``cat-file -e`` would not. ``rev-parse --verify -q`` exits 1 for an absent
+    object or path and 128 for a failure such as a broken repository or a path
+    outside it; only the former is "absent", the latter is surfaced by the
+    caller.
+    """
+    probe = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "--verify", "-q", spec], capture_output=True
+    )
+    if probe.returncode == 0:
+        return True
+    if probe.returncode == 1:
+        return False
+    raise subprocess.CalledProcessError(probe.returncode, probe.args, probe.stdout, probe.stderr)
+
+
+def _git_is_shallow(root: Path) -> bool:
+    probe = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "--is-shallow-repository"], capture_output=True, text=True
+    )
+    return probe.returncode == 0 and probe.stdout.strip() == "true"
+
+
 def main() -> int:
     errors: list[str] = []
-    errors.extend(documentation_link_errors({
+    packaged_errors = documentation_link_errors({
         path.relative_to(ROOT).as_posix(): path.read_bytes()
         for path in selected_source_files(ROOT)
-    }))
+    })
+    errors.extend(packaged_errors)
+    errors.extend(_repository_link_errors(ROOT, packaged_errors))
     require((ROOT / "AGENTS.md").is_file(), "AGENTS.md must exist at project root", errors)
     require((ROOT / "CLAUDE.md").is_file(), "CLAUDE.md must exist at project root", errors)
     if (ROOT / "CLAUDE.md").exists():

@@ -38,3 +38,4 @@ tmp/
 ontology/.release.lock
 ontology/.pending-release.json
 .aio/
+.codegraph

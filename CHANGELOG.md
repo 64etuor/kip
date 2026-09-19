@@ -1,5 +1,51 @@
 # Changelog
 
+## 3.15.8 - 2026-09-19
+
+A documentation and gate release. Nothing in the runtime, the contracts or
+the installer changed; the published contracts only carry the new version.
+
+- The shipped documentation set links again. A 3.15.7 follow-up commit linked
+  `docs/IMPLEMENTATION_STATUS.md` to the historical 2026-08-10 acceptance
+  record by relative path, but that record stays in the repository and never
+  ships, so `verify_project.py` and the bundle tests rejected the packaged
+  link and `main` CI was red from 2026-09-16 to 2026-09-19. The link now
+  pins the record's GitHub revision, as the sibling 2026-08-06 audit link
+  does. The three audit links were repinned as well: they pointed at a
+  revision from before the audit's "Historical record" banner, so a reader
+  reached the superseded audit with no notice that ADR-065 replaced its
+  decision.
+- `tests/test_release_bundle.py` asserts that the 2026-08-10 acceptance
+  record is not in the bundle, next to the existing guard for the audit, so
+  allowlisting the record cannot pass silently as a fix for the link check.
+- `scripts/verify_project.py` checks every git-tracked Markdown file's
+  relative links against the git-tracked files present in the worktree, in
+  addition to checking shipped documents against the package. Historical
+  plans and records are not packaged, so their links had no check at all.
+  Messages name their universe (`packaged` or `repository` link target
+  missing), links are compared in NFC so a Korean filename resolves the same
+  on APFS and on Linux, two files that differ only by normalization form are
+  reported instead of one silently shadowing the other, and a git failure or
+  an empty listing inside a checkout fails the check instead of skipping it.
+  Commit-pinned links into this repository (`github.com/64etuor/kip/blob/
+  <revision>/<path>`) are verified offline against the checkout history, so
+  a mistyped revision or path in the link to a historical record fails the
+  gate. A shallow clone of this repository fails once, by name, rather than
+  being shown one broken link per pin, and a recipient who committed the
+  extracted package into their own repository is not asked for KIP's history:
+  the pinned links are verified only when the checkout holds this
+  repository's root commit. Outside any git checkout the repository pass does
+  not run, so a package recipient's `verify_project.py` and `pytest` behave
+  as before.
+- `.codegraph`, a dangling symlink to a maintainer's home directory that had
+  been tracked since the initial commit, is no longer tracked. It was never
+  packaged.
+- The unused `presentation/` pack was removed from the tree (it was never
+  packaged), operators are pointed at 3.15.7 rather than the unpublished
+  3.15.5 and 3.15.6 headings, and `docs/DATA_CONTRACTS.md` distinguishes
+  `semantic_disabled` (lexical-only by configuration) from the degraded
+  fallback warnings.
+
 ## 3.15.7 - 2026-09-16
 
 The first published release of this work. Git tags v3.15.5 and v3.15.6 were

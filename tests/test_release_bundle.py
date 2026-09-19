@@ -77,6 +77,7 @@ def test_release_bundle_contains_verified_starter_artifacts(tmp_path: Path) -> N
     bundle = _build_bundle(tmp_path)
     assert not (bundle / "package/docs/plans").exists()
     assert not (bundle / "package/docs/RAG_QUALITY_AUDIT_2026-08-06.md").exists()
+    assert not (bundle / "package/docs/PRODUCTION_ACCEPTANCE_2026-08-10.md").exists()
     assert documentation_link_errors({
         path.relative_to(bundle / "package").as_posix(): path.read_bytes()
         for path in (bundle / "package").rglob("*") if path.is_file()

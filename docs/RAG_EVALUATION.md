@@ -25,7 +25,7 @@ evidence and never substitutes for projection promotion and activation.
 
 The historical loaded-corpus audit, including the corrected unmeasured-metric
 semantics and all four retrieval variants, is
-[`2026-08-06 audit`](https://github.com/64etuor/kip/blob/1b04bad685762fe3002d9c4ec6a75f267df9fb94/docs/RAG_QUALITY_AUDIT_2026-08-06.md).
+[`2026-08-06 audit`](https://github.com/64etuor/kip/blob/5bd07deab8566209f0311814a5cbfc49f0877cb9/docs/RAG_QUALITY_AUDIT_2026-08-06.md).
 
 ## 3.12.0 default: hybrid semantic search
 

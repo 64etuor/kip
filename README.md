@@ -498,7 +498,7 @@ rerank하면 78.9% / 59.8%로 떨어졌고, BGE cross-encoder는 recall은 올�
 재현하는 절차(`make fetch-corpus` → `make evaluate`)는
 [`docs/QUICKSTART.md`](docs/QUICKSTART.md)의 "공개 corpus로 RAG 평가 재현하기"
 절에 있고, 전체 corpus의 parser·retrieval·semantic·graph·ontology audit는
-[`2026-08-06 기록`](https://github.com/64etuor/kip/blob/1b04bad685762fe3002d9c4ec6a75f267df9fb94/docs/RAG_QUALITY_AUDIT_2026-08-06.md)에
+[`2026-08-06 기록`](https://github.com/64etuor/kip/blob/5bd07deab8566209f0311814a5cbfc49f0877cb9/docs/RAG_QUALITY_AUDIT_2026-08-06.md)에
 있습니다.
 
 ## 12. 검증된 소스 ZIP

@@ -751,10 +751,10 @@ substitutes for that full-corpus benchmark.
   RapidFuzz on a 253-query source-derived set; ADR-034 superseded that default
   with candidate-local BM25 after the reviewed 19-case comparison.
 - The 2026-08-06 loaded-corpus audit is the historical
-  [`RAG_QUALITY_AUDIT_2026-08-06`](https://github.com/64etuor/kip/blob/1b04bad685762fe3002d9c4ec6a75f267df9fb94/docs/RAG_QUALITY_AUDIT_2026-08-06.md);
+  [`RAG_QUALITY_AUDIT_2026-08-06`](https://github.com/64etuor/kip/blob/5bd07deab8566209f0311814a5cbfc49f0877cb9/docs/RAG_QUALITY_AUDIT_2026-08-06.md);
   at that time lexical was active and all semantic candidates were shadow-only.
   The 2026-08-10 package acceptance of 3.2.0 is the historical
-  [`PRODUCTION_ACCEPTANCE_2026-08-10`](PRODUCTION_ACCEPTANCE_2026-08-10.md)
+  [`PRODUCTION_ACCEPTANCE_2026-08-10`](https://github.com/64etuor/kip/blob/5bd07deab8566209f0311814a5cbfc49f0877cb9/docs/PRODUCTION_ACCEPTANCE_2026-08-10.md)
   (Neo4j was still in scope then; it was removed in ADR-046).
 - The default semantic path depends on Infinity 0.0.77, the latest release,
   which bounds transformers below 5; its reviewed advisories are recorded in

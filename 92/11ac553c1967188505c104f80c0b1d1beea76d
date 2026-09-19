@@ -1,0 +1,23 @@
+docs/RAG_EVALUATION.md
+  s_933aeb169886cb::t_dadcd9e34e5d00 28
+README.md
+  s_933aeb169886cb::t_dadcd9e34e5d00 501
+tests/test_release_bundle.py
+  s_933aeb169886cb::t_dadcd9e34e5d00 80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "9211ac553c1967188505c104f80c0b1d1beea76d",
+  "prompts": {},
+  "sessions": {
+    "s_933aeb169886cb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee81213d-ecb5-4436-abf7-b76c4b19f2b5",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

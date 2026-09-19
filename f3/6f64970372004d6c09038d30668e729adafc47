@@ -1,0 +1,68 @@
+VERSION
+  s_933aeb169886cb::t_1b5cd5c791047f 1
+src/kip/__init__.py
+  s_933aeb169886cb::t_1b5cd5c791047f 3
+.gitignore
+  s_933aeb169886cb::t_fe6583e8f44506 41
+CONTRIBUTING.md
+  s_933aeb169886cb::t_a96dc0920d7e45 62-65,67
+  s_933aeb169886cb::t_fe6583e8f44506 61
+  s_933aeb169886cb::t_2e6ce8ca9126b9 66,68-71
+pyproject.toml
+  s_933aeb169886cb::t_1b5cd5c791047f 7
+contracts/openapi.json
+  s_933aeb169886cb::t_18ae90fe688c38 1065
+src/kip/documentation.py
+  s_933aeb169886cb::t_77e64fae27366a 32
+  s_933aeb169886cb::t_a96dc0920d7e45 40,42-46,64-78,81-85,87-89,94-95
+  s_933aeb169886cb::t_b9b1e7c82af5f8 6,14-16,18-30,50,79-80,86,93
+  s_933aeb169886cb::t_fe6583e8f44506 7,31,33-38,47,57,60-62
+  s_933aeb169886cb::t_1f789d9c51e045 17,90-92
+CHANGELOG.md
+  s_933aeb169886cb::t_fe6583e8f44506 22-26,40-42
+  s_933aeb169886cb::t_a96dc0920d7e45 27-32
+  s_933aeb169886cb::t_ca94cfa6c36086 3-21,43-48
+  s_933aeb169886cb::t_11e078dbe7a4c2 33-39
+tests/test_verify_project.py
+  s_933aeb169886cb::t_fe6583e8f44506 4,9,24-25,29-42,44-60,143,166,187-189,192-195
+  s_933aeb169886cb::t_a96dc0920d7e45 7-8,61-63,65-71,73-74,76-90,92-105,107-121,132-136,138,159,162,168,172
+  s_933aeb169886cb::t_74b743fb5cee3c 141
+  s_933aeb169886cb::t_b9b1e7c82af5f8 3,26-28,43,64,72,75,91,106,122-124,126-128,149,177-178,190-191,196
+  s_933aeb169886cb::t_2dcbd3a8a8dd4f 10-16
+  s_933aeb169886cb::t_694050983b5c66 125,129-131,137,139-140,142,144-148,150-158,160-161,163-165,167,169-171,173-176,179-186
+docs/IMPLEMENTATION_STATUS.md
+  s_933aeb169886cb::t_ca94cfa6c36086 7-21
+contracts/openapi.yaml
+  s_933aeb169886cb::t_18ae90fe688c38 6
+tests/test_documentation_distribution.py
+  s_933aeb169886cb::t_a96dc0920d7e45 29-37
+  s_933aeb169886cb::t_fe6583e8f44506 1,23-28,38-42
+  s_933aeb169886cb::t_c597b9206444df 43-44
+docs/PRODUCTION_DESIGN_ALIGNMENT.md
+  s_933aeb169886cb::t_ca94cfa6c36086 4
+scripts/verify_project.py
+  s_933aeb169886cb::t_fe6583e8f44506 37-44,46-49,54,158,161-162
+  s_933aeb169886cb::t_b9b1e7c82af5f8 114,117-121,123-124,127-129
+  s_933aeb169886cb::t_1b5cd5c791047f 6,36,45,50-53,55-61
+  s_933aeb169886cb::t_6728f9beee18d6 98,131,135-141
+  s_933aeb169886cb::t_a96dc0920d7e45 11,16,19,63-68,74-94,96-97,99,105,125-126,154-155,163
+  s_933aeb169886cb::t_6b8778ef953768 17-18,20,62,69-73,95,100-104,106-113,115-116,122,130,132-134,142-153
+uv.lock
+  s_933aeb169886cb::t_ff99b0d07f70b2 764
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "f36f64970372004d6c09038d30668e729adafc47",
+  "prompts": {},
+  "sessions": {
+    "s_933aeb169886cb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee81213d-ecb5-4436-abf7-b76c4b19f2b5",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}

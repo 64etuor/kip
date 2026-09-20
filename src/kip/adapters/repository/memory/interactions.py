@@ -19,7 +19,7 @@ from kip.domain.interactions import (
     resolved_clarification_values,
 )
 from kip.domain.models import RequestContext
-from kip.errors import AuthorizationError, ConflictError, NotFoundError, ValidationError
+from kip.errors import ConflictError, NotFoundError, ValidationError
 
 
 @dataclass(frozen=True, slots=True)
@@ -236,7 +236,6 @@ class MemoryInteractionStore:
         status: DiscoveryStatus | None,
         limit: int,
     ) -> list[OntologyDiscoveryCandidate]:
-        self._require_admin(context)
         selected = [
             candidate.model_copy(deep=True)
             for workspace, candidate in self.state.ontology_discovery_candidates.values()
@@ -251,7 +250,6 @@ class MemoryInteractionStore:
         context: RequestContext,
         candidate_id: str,
     ) -> OntologyDiscoveryCandidate:
-        self._require_admin(context)
         stored = self.state.ontology_discovery_candidates.get(candidate_id)
         if stored is None or stored[0] != context.workspace:
             raise NotFoundError("ontology discovery candidate not found")
@@ -265,7 +263,6 @@ class MemoryInteractionStore:
         *,
         now: datetime,
     ) -> OntologyDiscoveryCandidate:
-        self._require_admin(context)
         stored = self.state.ontology_discovery_candidates.get(candidate_id)
         if stored is None or stored[0] != context.workspace:
             raise NotFoundError("ontology discovery candidate not found")
@@ -302,7 +299,6 @@ class MemoryInteractionStore:
         *,
         before: datetime,
     ) -> int:
-        self._require_admin(context)
         expired_ids = [
             question_id
             for question_id, (workspace, _, question) in self.state.clarifications.items()
@@ -377,8 +373,3 @@ class MemoryInteractionStore:
         self.state.interaction_events.append(
             (context.workspace, context.principal_id, event.model_copy(deep=True))
         )
-
-    @staticmethod
-    def _require_admin(context: RequestContext) -> None:
-        if "admin" not in context.roles:
-            raise AuthorizationError("admin role is required for ontology discovery")

@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import ast
 import json
 import subprocess
 import sys
 from pathlib import Path
 
-from kip.architecture_rules import adapter_imports
+from kip.architecture_rules import (
+    edge_dependency_violations,
+    layer_dependency_violations,
+)
 from kip.documentation import documentation_link_errors, pinned_repository_links
 from kip.ontology import validate_ontology
 from kip.package_archive_policy import selected_source_files
@@ -161,6 +163,9 @@ def main() -> int:
     })
     errors.extend(packaged_errors)
     errors.extend(_repository_link_errors(ROOT, packaged_errors))
+    # pyproject.toml puts the repository root on sys.path for pytest, so a root
+    # `kip/` directory would shadow `src/kip/` in every test run.
+    require(not (ROOT / "kip").exists(), "a root kip/ directory shadows src/kip on the pytest path; remove it", errors)
     require((ROOT / "AGENTS.md").is_file(), "AGENTS.md must exist at project root", errors)
     require((ROOT / "CLAUDE.md").is_file(), "CLAUDE.md must exist at project root", errors)
     if (ROOT / "CLAUDE.md").exists():
@@ -207,33 +212,10 @@ def main() -> int:
         require("description:" in text, "Skill description is missing", errors)
         require((ROOT / "skills/knowledge-fabric/agents/openai.yaml").is_file(), "Skill UI metadata is missing", errors)
 
-    # Domain/application/ports may import KIP internals and stdlib only, never vendor adapters or SDKs.
-    forbidden_roots = {"psycopg", "neo4j", "fitz", "openpyxl", "fastapi", "mcp", "httpx"}
-    for base in [ROOT / "src/kip/domain", ROOT / "src/kip/application", ROOT / "src/kip/ports"]:
-        for path in base.rglob("*.py"):
-            try:
-                tree = ast.parse(path.read_text(encoding="utf-8"))
-            except SyntaxError as exc:
-                errors.append(f"syntax error in {path.relative_to(ROOT)}: {exc}")
-                continue
-            for node in ast.walk(tree):
-                names: list[str] = []
-                if isinstance(node, ast.Import):
-                    names = [alias.name for alias in node.names]
-                elif isinstance(node, ast.ImportFrom) and node.module:
-                    names = [node.module]
-                for name in names:
-                    root = name.split(".")[0]
-                    if root in forbidden_roots:
-                        errors.append(f"vendor dependency {name} imported by {path.relative_to(ROOT)}")
-
-    errors.extend(
-        f"concrete adapter imported by application layer: {violation}"
-        for violation in adapter_imports(
-            ROOT,
-            ROOT / "src/kip/application",
-        )
-    )
+    # The layering rules live in `kip.architecture_rules` so this gate, the
+    # boundary test and the characterization test cannot drift apart.
+    errors.extend(layer_dependency_violations(ROOT))
+    errors.extend(edge_dependency_violations(ROOT))
 
     for path in (ROOT / "scripts").glob("*.sh"):
         require(path.stat().st_mode & 0o111 != 0, f"shell script is not executable: {path.relative_to(ROOT)}", errors)

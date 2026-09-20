@@ -6,6 +6,7 @@ from typing import ClassVar
 from kip.adapters.repository.memory.state import MemoryState
 from kip.domain.models import RequestContext
 from kip.domain.telemetry import QueryTrace
+from kip.errors import ValidationError
 
 
 class MemoryQueryTraceStore:
@@ -24,12 +25,21 @@ class MemoryQueryTraceStore:
         request_id: str | None = None,
         limit: int = 100,
     ) -> list[QueryTrace]:
-        selected = [
-            trace
-            for workspace, trace in reversed(self._state.query_traces)
-            if workspace == context.workspace
-            and (request_id is None or trace.request_id == request_id)
-        ]
+        if not 1 <= limit <= 1000:
+            raise ValidationError("query trace limit must be between 1 and 1000")
+        # `PostgresQueryTraceStore.list_traces` orders by `started_at DESC,
+        # id DESC`; insertion order is not the same thing once two traces
+        # share a timestamp or arrive out of order.
+        selected = sorted(
+            (
+                trace
+                for workspace, trace in self._state.query_traces
+                if workspace == context.workspace
+                and (request_id is None or trace.request_id == request_id)
+            ),
+            key=lambda trace: (trace.started_at, trace.id),
+            reverse=True,
+        )
         return selected[:limit]
 
     def delete_before(self, context: RequestContext, before: datetime) -> int:

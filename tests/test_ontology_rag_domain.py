@@ -17,7 +17,7 @@ from kip.domain.knowledge import (
 )
 from kip.domain.models import SearchRequest
 from kip.errors import ValidationError
-from kip.ontology import OntologyCatalog
+from kip.ontology import load_catalog
 from kip.settings import Settings
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -99,7 +99,7 @@ def test_entity_names_and_aliases_are_normalized_and_resolvable(tmp_path: Path) 
 
 
 def test_ontology_validates_inherited_domain_and_range() -> None:
-    catalog = OntologyCatalog.load(ROOT / "ontology")
+    catalog = load_catalog(ROOT / "ontology")
 
     spec = catalog.validate_relation(
         subject_type="OfficialLetter",

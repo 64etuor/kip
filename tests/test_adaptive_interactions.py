@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError as PydanticValidationError
 
+from kip.adapters.ontology.release import RELEASE_JOURNAL_FILENAME
 from kip.adapters.repository.memory import MemoryRepository
 from kip.container import build_container
 from kip.domain.interactions import (
@@ -26,8 +27,7 @@ from kip.errors import (
     NotFoundError,
     ValidationError,
 )
-from kip.ontology import OntologyCatalog
-from kip.ontology_discovery_release import RELEASE_JOURNAL_FILENAME
+from kip.ontology import load_catalog
 from kip.settings import Settings
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -75,7 +75,7 @@ def _copied_project_root(tmp_path: Path) -> Path:
 
     Approving an `entity_type`/`predicate` discovery candidate now
     materializes it into the ontology tree the running container was built
-    from (see `kip.ontology_discovery_release`), so any test that exercises
+    from (see `kip.adapters.ontology.release`), so any test that exercises
     the accept path must never point `project_root` at the real repo
     checkout, or it would mutate tracked ontology files on disk.
     """
@@ -312,9 +312,21 @@ def test_discovery_candidates_are_deduplicated_and_proposing_never_auto_activate
         container.application.interactions.list_ontology_discovery_candidates(
             context
         )
+    # The other two admin-gated interaction operations refuse the same caller
+    # the same way. Reviewing is the one that writes an ontology release, so
+    # the denial has to land before the candidate is fetched or materialized.
+    with pytest.raises(AuthorizationError, match="admin role"):
+        container.application.interactions.review_ontology_discovery_candidate(
+            context,
+            first.id,
+            OntologyDiscoveryReview(action="accept"),
+            now=datetime(2026, 8, 10, 0, 2, tzinfo=UTC),
+        )
+    with pytest.raises(AuthorizationError, match="admin role"):
+        container.application.interactions.prune_expired_clarifications(context)
     # Merely proposing (never reviewed) must never touch the ontology tree.
     with pytest.raises(ValidationError, match="unknown ontology entity type"):
-        OntologyCatalog.load(ontology_root, domain_profile="empty").validate_entity_type(
+        load_catalog(ontology_root, domain_profile="empty").validate_entity_type(
             "contract"
         )
 
@@ -333,7 +345,7 @@ def test_discovery_candidates_are_deduplicated_and_proposing_never_auto_activate
     assert reviewed.release.file == "domains/empty.yaml"
     assert reviewed.release.version == "1.1.0"
     assert reviewed.release.catalog_refresh == "restart_required"
-    OntologyCatalog.load(ontology_root, domain_profile="empty").validate_entity_type("contract")
+    load_catalog(ontology_root, domain_profile="empty").validate_entity_type("contract")
     # ...but the catalog snapshot this already-running container holds is not
     # hot-swapped in place; a fresh load (a new process, or a restart) is
     # required to see it, matching `catalog_refresh: "restart_required"`.
@@ -386,7 +398,7 @@ def test_approving_a_predicate_candidate_materializes_defaults_and_syncs_review_
     assert reviewed.release is not None
     assert reviewed.release.kind == "predicate"
     assert reviewed.release.file == "core/predicates.yaml"
-    catalog = OntologyCatalog.load(ontology_root, domain_profile="empty")
+    catalog = load_catalog(ontology_root, domain_profile="empty")
     assert "cites" in catalog.evidence_required_predicates()
     assert catalog.predicate_specs["cites"].domain == ("EvidenceObject",)
 
@@ -419,7 +431,7 @@ def test_approval_materializes_before_persisting_status_and_never_activates_on_r
     assert rejected.status == "rejected"
     assert rejected.release is None
     with pytest.raises(ValidationError, match="unknown ontology entity type"):
-        OntologyCatalog.load(
+        load_catalog(
             project_root / "ontology", domain_profile="empty"
         ).validate_entity_type("contract")
 
@@ -460,7 +472,7 @@ def test_approval_that_fails_to_materialize_leaves_the_candidate_proposed(
     )
     assert [candidate.id for candidate in still_proposed] == [proposed.id]
     with pytest.raises(ValidationError, match="unknown ontology entity type"):
-        OntologyCatalog.load(
+        load_catalog(
             project_root / "ontology", domain_profile="empty"
         ).validate_entity_type("contract")
 

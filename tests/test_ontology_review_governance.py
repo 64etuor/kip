@@ -29,7 +29,7 @@ from kip.domain.models import (
 )
 from kip.errors import AuthorizationError, ConflictError, ValidationError
 from kip.ids import new_id
-from kip.ontology import FALLBACK_EVIDENCE_REQUIRED_PREDICATES, OntologyCatalog
+from kip.ontology import FALLBACK_EVIDENCE_REQUIRED_PREDICATES, load_catalog
 from kip.settings import Settings
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -136,7 +136,7 @@ def test_evidence_enforcement_set_is_derived_from_predicates_yaml() -> None:
         for name, definition in payload["predicates"].items()
         if definition["review"] == "required" or definition["risk"] == "high"
     }
-    catalog = OntologyCatalog.load(ROOT / "ontology")
+    catalog = load_catalog(ROOT / "ontology")
 
     assert catalog.evidence_required_predicates() == expected
     # Store-level fail-closed floor is a floor, not a snapshot: predicates

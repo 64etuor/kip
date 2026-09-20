@@ -86,6 +86,10 @@ from kip.domain.models import (  # noqa: E402
     VocabularyItem,
     XlsxRangeRead,
 )
+from kip.domain.ontology_migration import (  # noqa: E402
+    OntologyMigration,
+    OntologyMigrationMaterialization,
+)
 from kip.domain.package_archive import PackageArchiveManifest  # noqa: E402
 from kip.domain.telemetry import QueryTrace  # noqa: E402
 from kip.evaluation.answers import (  # noqa: E402
@@ -99,10 +103,6 @@ from kip.evaluation.ontology import (  # noqa: E402
     OntologyReview,
 )
 from kip.evaluation.reviews import EvaluationReviewBundle  # noqa: E402
-from kip.ontology_migration import (  # noqa: E402
-    OntologyMigration,
-    OntologyMigrationMaterialization,
-)
 from kip.settings import Settings  # noqa: E402
 from kip.setup.models import (  # noqa: E402
     SetupAnswers,

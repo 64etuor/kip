@@ -7,6 +7,7 @@ from typing import Final
 
 from kip.application.retrieval import apply_rerank, reciprocal_rank_fusion
 from kip.application.semantic import SEMANTIC_DEFAULT_MODE, SemanticProjectionUseCases
+from kip.domain.configuration import SearchSettings
 from kip.domain.file_references import FilenameSearchRequest
 from kip.domain.knowledge import normalize_entity_name
 from kip.domain.models import ContentUnit, RequestContext, SearchHit, SearchRequest
@@ -17,7 +18,6 @@ from kip.ports.knowledge import KnowledgeStore
 from kip.ports.reranker import RerankerPort
 from kip.ports.retrieval import RetrievalStore
 from kip.ports.text_analyzer import TextAnalyzerPort
-from kip.settings import Settings
 
 
 @unique
@@ -34,6 +34,7 @@ class SearchMode(StrEnum):
 # `tests/test_shipped_defaults_parity.py` pins them to the shipped values.
 # `semantic_enabled` is deliberately absent: semantic retrieval needs a model
 # runtime, so it stays opt-in rather than defaulting to the shipped profile.
+# `kip.container.build_search_settings` applies them once, at composition.
 SEARCH_DEFAULTS: Final[dict[str, object]] = {
     "default_mode": SEMANTIC_DEFAULT_MODE,
     "context_item_max_chars": 16000,
@@ -121,7 +122,7 @@ def _content_terms(text: str) -> list[str]:
 class SearchEngine:
     def __init__(
         self,
-        settings: Settings,
+        search_settings: SearchSettings,
         store: RetrievalStore,
         analyzer: TextAnalyzerPort,
         embedding: EmbeddingPort,
@@ -131,7 +132,7 @@ class SearchEngine:
         *,
         lexical_reranker: RerankerPort | None = None,
     ) -> None:
-        self._settings = settings
+        self._search_settings = search_settings
         self._store = store
         self._analyzer = analyzer
         self._embedding = embedding
@@ -151,12 +152,7 @@ class SearchEngine:
         Overflow hits backfill the tail when there are not enough distinct
         documents, so result count never shrinks below what the pool allows.
         """
-        cap = int(
-            self._settings.get(
-                "search.max_hits_per_document",
-                SEARCH_DEFAULTS["max_hits_per_document"],
-            )
-        )
+        cap = self._search_settings.max_hits_per_document
         if cap <= 0:
             return hits[:limit]
         selected: list[SearchHit] = []
@@ -198,22 +194,12 @@ class SearchEngine:
         see — it only adds vocabulary the reviewers have already bound to
         the same concept.
         """
-        if self._knowledge is None or not bool(
-            self._settings.get(
-                "search.alias_expansion_enabled",
-                SEARCH_DEFAULTS["alias_expansion_enabled"],
-            )
-        ):
+        if self._knowledge is None or not self._search_settings.alias_expansion_enabled:
             return []
         normalized_query = normalize_entity_name(query)
         if not normalized_query:
             return []
-        max_terms = int(
-            self._settings.get(
-                "search.alias_expansion_max_terms",
-                SEARCH_DEFAULTS["alias_expansion_max_terms"],
-            )
-        )
+        max_terms = self._search_settings.alias_expansion_max_terms
         terms: list[str] = []
         seen: set[str] = set()
         for entity in self._knowledge.resolve_entities(
@@ -291,12 +277,7 @@ class SearchEngine:
         no factual answer, needs the calibrated semantic score — which
         plugs into this same gate once the vector space is active.
         """
-        if not bool(
-            self._settings.get(
-                "search.abstain_on_unknown_terms",
-                SEARCH_DEFAULTS["abstain_on_unknown_terms"],
-            )
-        ):
+        if not self._search_settings.abstain_on_unknown_terms:
             return False
         tokens = query.content_tokens
         if not tokens:
@@ -307,8 +288,8 @@ class SearchEngine:
     def _resolve_mode(self, mode: str | None) -> _QueryPlan:
         explicit = mode is not None
         configured_mode = (
-            str(self._settings.get("search.default_mode", SEARCH_DEFAULTS["default_mode"]))
-            if self._settings.get("search.semantic_enabled", False)
+            self._search_settings.default_mode
+            if self._search_settings.semantic_enabled
             else SearchMode.LEXICAL.value
         )
         raw_mode = mode or configured_mode
@@ -351,19 +332,8 @@ class SearchEngine:
             return self._lexical_pool(context, request, query, degraded)
         return self._semantic_pool(context, request, query, plan, degraded)
 
-    def _candidate_limit(self, request: SearchRequest, setting: str) -> int:
-        return min(
-            100,
-            max(
-                request.limit,
-                int(
-                    self._settings.get(
-                        setting,
-                        SEARCH_DEFAULTS[setting.removeprefix("search.")],
-                    )
-                ),
-            ),
-        )
+    def _candidate_limit(self, request: SearchRequest, configured: int) -> int:
+        return min(100, max(request.limit, configured))
 
     def _candidate_pool(
         self,
@@ -384,9 +354,13 @@ class SearchEngine:
     ) -> list[SearchHit]:
         reranker = self._lexical_rerank_adapter()
         if reranker is None:
-            candidate_limit = self._candidate_limit(request, "search.hybrid_candidate_limit")
+            candidate_limit = self._candidate_limit(
+                request, self._search_settings.hybrid_candidate_limit
+            )
             return self._candidate_pool(context, request, query, candidate_limit)
-        candidate_limit = self._candidate_limit(request, "search.lexical_rerank_candidate_limit")
+        candidate_limit = self._candidate_limit(
+            request, self._search_settings.lexical_rerank_candidate_limit
+        )
         lexical = self._candidate_pool(context, request, query, candidate_limit)
         try:
             return self._rerank(
@@ -409,16 +383,10 @@ class SearchEngine:
         `lexical_rerank_enabled = true` without an adapter stays a loud
         misconfiguration, because there the operator did ask for it.
         """
-        configured = self._settings.get("search.lexical_rerank_enabled")
-        enabled = (
-            bool(SEARCH_DEFAULTS["lexical_rerank_enabled"])
-            if configured is None
-            else bool(configured)
-        )
-        if not enabled:
+        if not self._search_settings.lexical_rerank_enabled:
             return None
         if self._lexical_reranker is None:
-            if configured is None:
+            if not self._search_settings.lexical_rerank_explicit:
                 return None
             raise DependencyUnavailableError(
                 "lexical reranking is enabled without a reranker adapter"
@@ -433,7 +401,9 @@ class SearchEngine:
         plan: _QueryPlan,
         degraded: list[str],
     ) -> list[SearchHit]:
-        candidate_limit = self._candidate_limit(request, "search.hybrid_candidate_limit")
+        candidate_limit = self._candidate_limit(
+            request, self._search_settings.hybrid_candidate_limit
+        )
         candidate_request = request.model_copy(update={"limit": candidate_limit})
         try:
             space = self._semantic.search_space(context, explicit=plan.explicit)
@@ -451,12 +421,7 @@ class SearchEngine:
                 lexical,
                 vector,
                 limit=candidate_limit,
-                rank_constant=int(
-                    self._settings.get(
-                        "search.rrf_rank_constant",
-                        SEARCH_DEFAULTS["rrf_rank_constant"],
-                    )
-                ),
+                rank_constant=self._search_settings.rrf_rank_constant,
             )
         except DependencyUnavailableError:
             if plan.explicit:
@@ -525,12 +490,7 @@ class SearchEngine:
             len(fused),
             candidate_limit
             if candidate_limit is not None
-            else int(
-                self._settings.get(
-                    "search.rerank_candidate_limit",
-                    SEARCH_DEFAULTS["rerank_candidate_limit"],
-                )
-            ),
+            else self._search_settings.rerank_candidate_limit,
         )
         rerank_hits = fused[:rerank_depth]
         rerank_units = {

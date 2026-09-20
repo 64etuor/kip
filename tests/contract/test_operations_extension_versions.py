@@ -20,7 +20,7 @@ def test_memory_operations_store_has_no_extension_catalog() -> None:
 def test_postgres_operations_store_reports_the_installed_and_server_vector_versions(
     postgres_database_url: str,
 ) -> None:
-    from kip.cli import _postgres_extensions_doctor_check
+    from kip.application.diagnostics import _postgres_extensions_doctor_check
 
     repository = PostgresRepository(postgres_database_url)
     try:

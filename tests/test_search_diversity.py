@@ -20,7 +20,7 @@ def _seed_same_document_twice(test_container) -> None:
     test_container.application.ingestion.sync_filesystem(context, "fixture")
 
 
-def test_per_document_cap_promotes_the_second_document(test_container):
+def test_per_document_cap_promotes_the_second_document(test_container, reconfigured):
     _seed_same_document_twice(test_container)
     source = test_container.settings.project_root / "source"
     (source / "관련안내.txt").write_text(
@@ -29,8 +29,9 @@ def test_per_document_cap_promotes_the_second_document(test_container):
     context = test_container.application.operations.request_context()
     test_container.application.ingestion.sync_filesystem(context, "fixture")
     test_container.settings.raw["search"]["max_hits_per_document"] = 1
+    capped = reconfigured(test_container)
 
-    hits = test_container.application.retrieval.search(
+    hits = capped.application.retrieval.search(
         context,
         SearchRequest(query="전자결재", limit=2),
     )
@@ -39,12 +40,13 @@ def test_per_document_cap_promotes_the_second_document(test_container):
     assert len({hit.document_id for hit in hits}) == 2
 
 
-def test_backfill_keeps_results_when_only_one_document_matches(test_container):
+def test_backfill_keeps_results_when_only_one_document_matches(test_container, reconfigured):
     _seed_same_document_twice(test_container)
     context = test_container.application.operations.request_context()
     test_container.settings.raw["search"]["max_hits_per_document"] = 1
+    capped = reconfigured(test_container)
 
-    hits = test_container.application.retrieval.search(
+    hits = capped.application.retrieval.search(
         context,
         SearchRequest(query="부서장 전결", limit=5),
     )
@@ -54,12 +56,13 @@ def test_backfill_keeps_results_when_only_one_document_matches(test_container):
     assert len({hit.document_id for hit in hits}) == 1
 
 
-def test_cap_zero_disables_diversity(test_container):
+def test_cap_zero_disables_diversity(test_container, reconfigured):
     _seed_same_document_twice(test_container)
     context = test_container.application.operations.request_context()
     test_container.settings.raw["search"]["max_hits_per_document"] = 0
+    uncapped = reconfigured(test_container)
 
-    hits = test_container.application.retrieval.search(
+    hits = uncapped.application.retrieval.search(
         context,
         SearchRequest(query="부서장 전결", limit=5),
     )
@@ -67,12 +70,13 @@ def test_cap_zero_disables_diversity(test_container):
     assert len(hits) == 2
 
 
-def test_backfilled_hits_past_the_cap_are_marked(test_container):
+def test_backfilled_hits_past_the_cap_are_marked(test_container, reconfigured):
     _seed_same_document_twice(test_container)
     context = test_container.application.operations.request_context()
     test_container.settings.raw["search"]["max_hits_per_document"] = 1
+    capped = reconfigured(test_container)
 
-    hits = test_container.application.retrieval.search(
+    hits = capped.application.retrieval.search(
         context,
         SearchRequest(query="부서장 전결", limit=5),
     )

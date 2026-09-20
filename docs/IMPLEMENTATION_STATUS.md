@@ -4,6 +4,20 @@ This is the current readiness inventory, not the target architecture. The
 target-to-current matrix and ordered gap register live in
 `docs/PRODUCTION_DESIGN_ALIGNMENT.md`.
 
+## 2026-09-20 layering and adapter parity (3.16.0)
+
+Internal structure, not capability: the doctor engine is an application use
+case behind two probe ports, the MCP edge no longer imports the CLI, and the
+memory and PostgreSQL adapters agree on ACL-snapshot refusal, clarification
+conflicts and trace listing, with a new parity suite for the interaction and
+trace stores. The agent-facing skills and MCP instructions were cut to
+project-specific knowledge. No retrieval, answer-quality or acceptance
+evidence changed; the open gates in `PRODUCTION_DESIGN_ALIGNMENT.md` stand.
+The remaining architecture gaps from the 2026-09-20 audit are recorded there:
+`PostgresDatabase` is one 4,279-line class that the capability stores forward
+to, `RetrievalStore.search` carries a PostgreSQL `lexemes` argument, the core
+`StrictModel` is mutable, and identifiers are untyped strings.
+
 ## 2026-09-19 shipped documents link again (3.15.8)
 
 A documentation and gate release: no runtime, contract, installer or

@@ -7,6 +7,7 @@ from typing import Any, assert_never
 
 from kip.adapters.analyzers import KoreanNgramAnalyzer
 from kip.adapters.connectors.registry import ConfiguredSourceCatalog
+from kip.adapters.diagnostics import HttpModelRuntimeProbe, KordocOcrRuntimeProbe
 from kip.adapters.embeddings.http import HttpEmbeddingAdapter
 from kip.adapters.embeddings.noop import DisabledEmbeddingAdapter
 from kip.adapters.generators.anthropic import AnthropicGenerationAdapter
@@ -21,6 +22,14 @@ from kip.adapters.identity import (
     JwtIdentityConfig,
 )
 from kip.adapters.model_circuit import GuardedEmbedding, GuardedReranker, ModelCircuit
+from kip.adapters.ontology import (
+    FilesystemOntologyCatalog,
+    FilesystemOntologyReleaseWriter,
+)
+from kip.adapters.ontology.release import (
+    complete_pending_release_locked,
+    has_pending_release,
+)
 from kip.adapters.parsers.registry import ParserRegistry
 from kip.adapters.relation_miners import GeneratorRelationMiner
 from kip.adapters.repository.memory import MemoryRepository
@@ -38,6 +47,7 @@ from kip.adapters.storage import (
     LocalWorkbookReader,
 )
 from kip.application.answering import AnsweringUseCases
+from kip.application.diagnostics import DiagnosticsUseCases
 from kip.application.egress import EgressPolicyUseCases
 from kip.application.evidence import EvidenceUseCases
 from kip.application.ingestion import IngestionUseCases
@@ -49,8 +59,15 @@ from kip.application.ontology_rag import OntologyRagUseCases
 from kip.application.operations import OperationsUseCases
 from kip.application.runtime import Application
 from kip.application.search import RetrievalUseCases
-from kip.application.semantic import EMBEDDING_DEFAULTS
+from kip.application.search_engine import SEARCH_DEFAULTS
+from kip.application.semantic import EMBEDDING_DEFAULTS, SemanticProjectionUseCases
 from kip.application.telemetry import TelemetryUseCases
+from kip.domain.configuration import (
+    EmbeddingSettings,
+    GenerationSettings,
+    OperationsSettings,
+    SearchSettings,
+)
 from kip.domain.egress import (
     DataClassification,
     EgressPolicy,
@@ -58,9 +75,9 @@ from kip.domain.egress import (
     RetentionPolicy,
     normalize_model_service_hosts,
 )
+from kip.domain.file_references import normalized_extensions
+from kip.domain.ontology import OntologyCatalog
 from kip.errors import ConfigurationError
-from kip.ontology import OntologyCatalog
-from kip.ontology_discovery_release import complete_pending_release_locked, has_pending_release
 from kip.ports.embedding import EmbeddingPort
 from kip.ports.generation import GenerationPort
 from kip.ports.identity import IdentityResolverPort
@@ -112,26 +129,34 @@ def build_container(
             source_policy=source_policy,
             statement_timeout_ms=selected.database_statement_timeout_ms,
             pool_max_size=selected.database_pool_max_size,
-            hnsw_ef_search=int(selected.get("search.hnsw_ef_search", 200)),
-            hnsw_max_scan_tuples=int(
-                selected.get("search.hnsw_max_scan_tuples", 100_000)
+            hnsw_ef_search=_configured_integer(
+                "search", "hnsw_ef_search", selected.get("search.hnsw_ef_search", 200)
             ),
-            lexical_common_term_fraction=float(
-                selected.get("search.lexical_common_term_fraction", 0.02)
+            hnsw_max_scan_tuples=_configured_integer(
+                "search", "hnsw_max_scan_tuples", selected.get("search.hnsw_max_scan_tuples", 100_000)
             ),
-            projection_statement_timeout_ms=int(
-                selected.get("database.projection_statement_timeout_ms", 300_000)
+            lexical_common_term_fraction=_configured_number(
+                "search",
+                "lexical_common_term_fraction",
+                selected.get("search.lexical_common_term_fraction", 0.02),
+            ),
+            projection_statement_timeout_ms=_configured_integer(
+                "database",
+                "projection_statement_timeout_ms",
+                selected.get("database.projection_statement_timeout_ms", 300_000),
             ),
         )
     parsers = ParserRegistry.from_settings(selected)
     # Injected repositories obey the same deployment boundary as built-ins.
     selected_repository.configure_source_access(source_policy)
     analyzer = KoreanNgramAnalyzer(
-        min_n=int(selected.get("search.korean_ngram_min", 2)),
-        max_n=int(selected.get("search.korean_ngram_max", 4)),
+        min_n=_configured_integer("search", "korean_ngram_min", selected.get("search.korean_ngram_min", 2)),
+        max_n=_configured_integer("search", "korean_ngram_max", selected.get("search.korean_ngram_max", 4)),
     )
     allow_remote_egress = bool(selected.get("security.allow_remote_model_egress", False))
-    model_circuit_seconds = float(selected.get("models.circuit_cooldown_seconds", 30))
+    model_circuit_seconds = _configured_number(
+        "models", "circuit_cooldown_seconds", selected.get("models.circuit_cooldown_seconds", 30)
+    )
     model_service_hosts = _model_service_hosts(selected)
     embedding_config = selected.get("models.embedding", {}) or {}
     selected_embedding = embedding
@@ -142,17 +167,23 @@ def build_container(
     ):
         selected_embedding = HttpEmbeddingAdapter(
             base_url=str(embedding_config.get("base_url", "http://127.0.0.1:7997")),
-            model=str(embedding_config["model"]),
-            revision=str(embedding_config["revision"]),
-            dimensions=int(embedding_config.get("dimensions", 1024)),
+            model=_required_string("models.embedding", "model", embedding_config),
+            revision=_required_string("models.embedding", "revision", embedding_config),
+            dimensions=_configured_integer(
+                "models.embedding", "dimensions", embedding_config.get("dimensions", 1024)
+            ),
             query_instruction=str(
                 embedding_config.get("query_instruction", EMBEDDING_DEFAULTS["query_instruction"])
             ),
             allow_remote_egress=allow_remote_egress,
-            timeout_seconds=float(
-                embedding_config.get("timeout_seconds", EMBEDDING_DEFAULTS["timeout_seconds"])
+            timeout_seconds=_configured_number(
+                "models.embedding",
+                "timeout_seconds",
+                embedding_config.get("timeout_seconds", EMBEDDING_DEFAULTS["timeout_seconds"]),
             ),
-            query_timeout_seconds=float(embedding_config.get("query_timeout_seconds", 10)),
+            query_timeout_seconds=_configured_number(
+                "models.embedding", "query_timeout_seconds", embedding_config.get("query_timeout_seconds", 10)
+            ),
             model_service_hosts=model_service_hosts,
         )
         selected_embedding = GuardedEmbedding(
@@ -266,8 +297,11 @@ def build_container(
         LocalWorkbookReader(),
         source_policy=source_policy,
     )
+    search_settings = build_search_settings(selected)
+    embedding_settings = build_embedding_settings(selected)
     retrieval = RetrievalUseCases(
-        selected,
+        search_settings,
+        embedding_settings,
         selected_repository.retrieval,
         evidence,
         analyzer,
@@ -283,9 +317,9 @@ def build_container(
     )
     if ontology_root.is_dir() and has_pending_release(ontology_root):
         # Heal a release journal left behind by a process that crashed
-        # mid-materialization (see `kip.ontology_discovery_release`) before
+        # mid-materialization (see `kip.adapters.ontology.release`) before
         # the eager load below, so a half-applied two-file predicate release
-        # never bricks every subsequent `OntologyCatalog.load`. When the
+        # never bricks every subsequent catalog load. When the
         # root is read-only, a pending journal cannot be healed here (or by
         # `materialize_ontology_release` next time either); fail loudly
         # instead of silently loading a possibly-inconsistent tree. The
@@ -299,8 +333,10 @@ def build_container(
                 "release journal; run from a writable checkout to heal it "
                 "before loading"
             )
+    ontology_catalog = FilesystemOntologyCatalog()
+    ontology_release_writer = FilesystemOntologyReleaseWriter()
     ontology = (
-        OntologyCatalog.load(ontology_root, domain_profile=ontology_profile)
+        ontology_catalog.load(ontology_root, domain_profile=ontology_profile)
         if ontology_root.is_dir()
         else None
     )
@@ -451,6 +487,7 @@ def build_container(
     ontology_migrations = OntologyMigrationUseCases(
         selected_repository.knowledge,
         evidence,
+        ontology_catalog,
         domain_profile=ontology_profile,
         max_assertions=_bounded_integer(
             ontology_migration_config,
@@ -484,6 +521,21 @@ def build_container(
             maximum=86_400,
         ),
         ontology_root=ontology_root if ontology_root.is_dir() else None,
+        release_writer=ontology_release_writer,
+    )
+    operations = OperationsUseCases(
+        build_operations_settings(selected),
+        SemanticProjectionUseCases(
+            embedding_settings,
+            selected_repository.retrieval,
+            selected_embedding,
+        ),
+        selected_repository.operations,
+        selected_repository.jobs,
+        selected_repository.retrieval,
+        sources,
+        parsers,
+        selected_embedding,
     )
     application = Application(
         ingestion=IngestionUseCases(
@@ -515,18 +567,10 @@ def build_container(
         retrieval=retrieval,
         evidence=evidence,
         knowledge=knowledge,
-        operations=OperationsUseCases(
-            selected,
-            selected_repository.operations,
-            selected_repository.jobs,
-            selected_repository.retrieval,
-            sources,
-            parsers,
-            selected_embedding,
-        ),
+        operations=operations,
         egress=egress,
         answering=AnsweringUseCases(
-            selected,
+            build_generation_settings(selected),
             retrieval,
             evidence,
             egress,
@@ -539,6 +583,14 @@ def build_container(
         ontology_migrations=ontology_migrations,
         telemetry=telemetry,
         interactions=interactions,
+        diagnostics=DiagnosticsUseCases(
+            selected,
+            operations,
+            retrieval,
+            HttpModelRuntimeProbe(),
+            KordocOcrRuntimeProbe(),
+            ontology_release_writer,
+        ),
     )
     return Container(
         settings=selected,
@@ -764,11 +816,160 @@ def _build_egress_policy(
     )
 
 
+def build_generation_settings(settings: Settings) -> GenerationSettings:
+    raw = _table(settings, "models.generation")
+    fallback = raw.get("fallback_on_error", False)
+    if not isinstance(fallback, bool):
+        raise ConfigurationError("models.generation.fallback_on_error must be boolean")
+    max_claims = _configured_integer("models.generation", "max_claims", raw.get("max_claims", 16))
+    max_output_tokens = _configured_integer(
+        "models.generation", "max_output_tokens", raw.get("max_output_tokens", 4096)
+    )
+    if not 1 <= max_claims <= 64:
+        raise ConfigurationError("models.generation.max_claims must be between 1 and 64")
+    if not 64 <= max_output_tokens <= 32768:
+        raise ConfigurationError(
+            "models.generation.max_output_tokens must be between 64 and 32768"
+        )
+    # Operator-indexed extensions must fail closed like the built-in ones when
+    # a question names a file that is not among allowed evidence.
+    sources = settings.get("sources.filesystem", []) or []
+    return GenerationSettings(
+        enabled=bool(raw.get("enabled", False)),
+        fallback_on_error=fallback,
+        max_claims=max_claims,
+        max_output_tokens=max_output_tokens,
+        document_extensions=normalized_extensions(
+            extension
+            for source in sources if isinstance(source, dict)
+            for extension in (source.get("include_extensions") or [])
+            if isinstance(extension, str)
+        ),
+    )
+
+
+def build_search_settings(settings: Settings) -> SearchSettings:
+    raw = _table(settings, "search")
+
+    def configured(name: str) -> object:
+        return raw.get(name, SEARCH_DEFAULTS[name])
+
+    def integer(name: str) -> int:
+        return _configured_integer("search", name, configured(name))
+
+    semantic_enabled = bool(raw.get("semantic_enabled", False))
+    return SearchSettings(
+        semantic_enabled=semantic_enabled,
+        default_mode=str(configured("default_mode")),
+        context_item_max_chars=integer("context_item_max_chars"),
+        alias_expansion_enabled=bool(configured("alias_expansion_enabled")),
+        alias_expansion_max_terms=integer("alias_expansion_max_terms"),
+        max_hits_per_document=integer("max_hits_per_document"),
+        abstain_on_unknown_terms=bool(configured("abstain_on_unknown_terms")),
+        hybrid_candidate_limit=integer("hybrid_candidate_limit"),
+        rerank_candidate_limit=integer("rerank_candidate_limit"),
+        lexical_rerank_enabled=bool(configured("lexical_rerank_enabled")),
+        lexical_rerank_explicit=raw.get("lexical_rerank_enabled") is not None,
+        lexical_rerank_candidate_limit=integer("lexical_rerank_candidate_limit"),
+        rrf_rank_constant=integer("rrf_rank_constant"),
+    )
+
+
+def build_embedding_settings(settings: Settings) -> EmbeddingSettings:
+    raw = _table(settings, "models.embedding")
+    space_name = raw.get("space_name")
+    document_instruction = raw.get("document_instruction")
+    page_size = _configured_integer(
+        "models.embedding", "page_size", raw.get("page_size", 1000)
+    )
+    if page_size < 1:
+        raise ConfigurationError("embedding page_size must be positive")
+    # One request should not hold the shared model runtime for long:
+    # interactive query embeddings wait behind it (ADR-065).
+    max_batch_chars = _configured_integer(
+        "models.embedding",
+        "max_batch_chars",
+        raw.get("max_batch_chars", EMBEDDING_DEFAULTS["max_batch_chars"]),
+    )
+    if max_batch_chars < 1:
+        raise ConfigurationError("embedding max_batch_chars must be positive")
+    # The embedding space identity is built from this value, so a fallback
+    # that disagrees with the shipped default silently builds a space no
+    # release reviewed — hours of embedding that can never auto-activate.
+    max_document_chars = _configured_integer(
+        "models.embedding",
+        "max_document_chars",
+        raw.get("max_document_chars", EMBEDDING_DEFAULTS["max_document_chars"]),
+    )
+    if max_document_chars < 1:
+        raise ConfigurationError("embedding max_document_chars must be positive")
+    return EmbeddingSettings(
+        space_name=str(space_name) if space_name else None,
+        document_instruction=(
+            str(document_instruction) if document_instruction else None
+        ),
+        query_instruction=str(
+            raw.get("query_instruction", EMBEDDING_DEFAULTS["query_instruction"])
+        ),
+        batch_size=_configured_integer(
+            "models.embedding",
+            "batch_size",
+            raw.get("batch_size", EMBEDDING_DEFAULTS["batch_size"]),
+        ),
+        page_size=page_size,
+        max_batch_chars=max_batch_chars,
+        max_document_chars=max_document_chars,
+        semantic_enabled=bool(settings.get("search.semantic_enabled", False)),
+        semantic_auto_activate=bool(
+            settings.get("search.semantic_auto_activate", True)
+        ),
+    )
+
+
+def build_operations_settings(settings: Settings) -> OperationsSettings:
+    return OperationsSettings(
+        workspace=settings.workspace,
+        migrations_path=settings.project_root / "migrations",
+        is_memory=settings.is_memory,
+        semantic_enabled=bool(settings.get("search.semantic_enabled", False)),
+        unknown_config_keys=settings.unknown_config_keys,
+    )
+
+
 def _table(settings: Settings, section: str) -> dict[str, object]:
     raw = settings.get(section, {}) or {}
     if not isinstance(raw, dict):
         raise ConfigurationError(f"{section} must be a table")
     return raw
+
+
+def _configured_integer(section: str, name: str, value: object) -> int:
+    """An `int()` that names the key it failed on, like `_bounded_integer`.
+
+    These values carry no fixed bound to check, but a bare `ValueError` from
+    `int()` reaches the operator as `invalid literal for int()` with no hint
+    which configured key holds the bad value — and as a non-`KipError`, so
+    `kip doctor` reports a crash instead of a configuration problem.
+    """
+    try:
+        return int(str(value))
+    except ValueError as error:
+        raise ConfigurationError(f"{section}.{name} must be an integer") from error
+
+
+def _configured_number(section: str, name: str, value: object) -> float:
+    """A `float()` that names the key it failed on; see `_configured_integer`."""
+    try:
+        return float(str(value))
+    except ValueError as error:
+        raise ConfigurationError(f"{section}.{name} must be a number") from error
+
+
+def _required_string(section: str, name: str, table: Mapping[str, object]) -> str:
+    """A required key's string value; a missing key is a configuration error, not a KeyError."""
+    if name not in table or table[name] in (None, ""):
+        raise ConfigurationError(f"{section}.{name} is required")
+    return str(table[name])
 
 
 def _bounded_integer(

@@ -5,9 +5,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import perf_counter
 
-from kip.application.search_engine import SEARCH_DEFAULTS, RankedHits, SearchEngine
+from kip.application.search_engine import RankedHits, SearchEngine
 from kip.application.semantic import SemanticProjectionUseCases
 from kip.application.telemetry import TelemetryUseCases
+from kip.domain.configuration import EmbeddingSettings, SearchSettings
 from kip.domain.json_types import JsonObject
 from kip.domain.models import (
     ContextBundle,
@@ -40,7 +41,6 @@ from kip.ports.knowledge import KnowledgeStore
 from kip.ports.reranker import RerankerPort
 from kip.ports.retrieval import RetrievalStore
 from kip.ports.text_analyzer import TextAnalyzerPort
-from kip.settings import Settings
 
 _DEGRADED_FLAGS: tuple[str, ...] = (
     "semantic_degraded",
@@ -97,7 +97,8 @@ def _result_metadata(result: object) -> dict[str, object]:
 class RetrievalUseCases:
     def __init__(
         self,
-        settings: Settings,
+        search_settings: SearchSettings,
+        embedding_settings: EmbeddingSettings,
         store: RetrievalStore,
         evidence: EvidenceReaderPort,
         analyzer: TextAnalyzerPort,
@@ -108,16 +109,16 @@ class RetrievalUseCases:
         *,
         lexical_reranker: RerankerPort | None = None,
     ) -> None:
-        self._settings = settings
+        self._search_settings = search_settings
         self._store = store
         self._evidence = evidence
         self._semantic = SemanticProjectionUseCases(
-            settings,
+            embedding_settings,
             store,
             embedding,
         )
         self._search = SearchEngine(
-            settings,
+            search_settings,
             store,
             analyzer,
             embedding,
@@ -272,7 +273,7 @@ class RetrievalUseCases:
             for flag in _DEGRADED_FLAGS
             if flag in degraded or any(bool(metadata.get(flag)) for metadata in metadatas)
         ]
-        if not bool(self._settings.get("search.semantic_enabled", False)):
+        if not self._search_settings.semantic_enabled:
             # Lexical-only deployments still return hits; the warning stops a
             # paraphrase miss being read as absence.
             warnings.append(SEMANTIC_DISABLED_WARNING)
@@ -328,12 +329,7 @@ class RetrievalUseCases:
         # actually retrieve longer passages instead of silently hitting the
         # same per-item ceiling.
         item_cap = max(
-            int(
-                self._settings.get(
-                    "search.context_item_max_chars",
-                    SEARCH_DEFAULTS["context_item_max_chars"],
-                )
-            ),
+            self._search_settings.context_item_max_chars,
             request.max_chars // max(1, request.limit),
         )
         for hit in hits:

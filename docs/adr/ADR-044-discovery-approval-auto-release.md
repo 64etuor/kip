@@ -98,7 +98,7 @@ Constraints that shaped the design:
 
 ## References
 
-- `src/kip/ontology_discovery_release.py`
+- `src/kip/adapters/ontology/release.py`
 - `src/kip/application/interactions.py`
 - `src/kip/domain/interactions.py`
 - ADR-043 (collision-safe validation this release path relies on)

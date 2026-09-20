@@ -36,6 +36,7 @@ from kip.domain.models import (
     OntologyMiningSummary,
     RequestContext,
 )
+from kip.domain.ontology import OntologyCatalog
 from kip.domain.telemetry import (
     QueryFilterSummary,
     QueryTrace,
@@ -44,7 +45,6 @@ from kip.domain.telemetry import (
     safe_request_id,
 )
 from kip.errors import AuthorizationError, ConflictError, NotFoundError, ValidationError
-from kip.ontology import OntologyCatalog
 from kip.ports.jobs import JobStore
 from kip.ports.knowledge import KnowledgeStore
 from kip.ports.relation_miner import RelationMinerPort

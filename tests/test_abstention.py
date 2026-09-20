@@ -52,12 +52,13 @@ def test_one_grounded_term_is_enough_to_attempt(test_container):
     assert hits
 
 
-def test_abstention_can_be_disabled(test_container):
+def test_abstention_can_be_disabled(test_container, reconfigured):
     _seed(test_container)
     test_container.settings.raw["search"]["abstain_on_unknown_terms"] = False
-    context = test_container.application.operations.request_context()
+    ungated = reconfigured(test_container)
+    context = ungated.application.operations.request_context()
 
-    hits = test_container.application.retrieval.search(
+    hits = ungated.application.retrieval.search(
         context,
         SearchRequest(query="블라블라 뿅뿅 우주정거장", limit=5),
     )

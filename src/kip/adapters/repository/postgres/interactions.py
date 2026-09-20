@@ -49,35 +49,43 @@ class PostgresInteractionStore:
         context: RequestContext,
         question: ClarificationQuestion,
     ) -> ClarificationQuestion:
+        import psycopg
+
         if question.status != "open":
             raise ValidationError("new clarification must be open")
-        with self._database._connection(context) as connection:
-            self._database._ensure_workspace_and_principal(connection, context)
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO interaction.clarifications(
-                        id, workspace_id, principal_id, reason, prompt, choices,
-                        allow_freeform, allow_multiple, preference_key, status,
-                        created_at, expires_at
-                    ) VALUES (%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,%s,%s)
-                    """,
-                    (
-                        question.id,
-                        context.workspace,
-                        context.principal_id,
-                        question.reason,
-                        question.prompt,
-                        _json(question.choices),
-                        question.allow_freeform,
-                        question.allow_multiple,
-                        question.preference_key,
-                        question.status,
-                        question.created_at,
-                        question.expires_at,
-                    ),
-                )
-            connection.commit()
+        try:
+            with self._database._connection(context) as connection:
+                self._database._ensure_workspace_and_principal(connection, context)
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        INSERT INTO interaction.clarifications(
+                            id, workspace_id, principal_id, reason, prompt, choices,
+                            allow_freeform, allow_multiple, preference_key, status,
+                            created_at, expires_at
+                        ) VALUES (%s,%s,%s,%s,%s,%s::jsonb,%s,%s,%s,%s,%s,%s)
+                        """,
+                        (
+                            question.id,
+                            context.workspace,
+                            context.principal_id,
+                            question.reason,
+                            question.prompt,
+                            _json(question.choices),
+                            question.allow_freeform,
+                            question.allow_multiple,
+                            question.preference_key,
+                            question.status,
+                            question.created_at,
+                            question.expires_at,
+                        ),
+                    )
+                connection.commit()
+        except psycopg.errors.UniqueViolation as exc:
+            # A store speaks the port's error vocabulary, never psycopg's;
+            # `MemoryInteractionStore.create_clarification` refuses the same
+            # reuse with the same message.
+            raise ConflictError(f"clarification already exists: {question.id}") from exc
         return question
 
     def get_clarification(

@@ -38,7 +38,7 @@ Concurrency and crash safety, single-host deployment:
    file has landed. If the process crashes between the two replaces, the
    journal survives and `complete_pending_release` (called at the start of
    every materialization, and once at container start-up before the eager
-   `OntologyCatalog.load`) re-applies it idempotently, healing the tree
+   catalog load) re-applies it idempotently, healing the tree
    without operator intervention.
 3. `complete_pending_release` never trusts a journal blindly. A corrupt-JSON
    or structurally malformed journal (including a path-traversal attempt in
@@ -580,7 +580,7 @@ def _apply_via_shadow(
     # group-atomic across two `os.replace` calls: journal the full new
     # contents first (fsynced) so a crash between the replaces can be healed
     # by `complete_pending_release` instead of bricking every subsequent
-    # `OntologyCatalog.load` with a tree that violates the exact-match
+    # a catalog load with a tree that violates the exact-match
     # invariant `validate_ontology` enforces.
     _write_release_journal(ontology_root, edits, release_info)
     for real_path, new_text in edits.items():
@@ -799,3 +799,23 @@ def _check_idempotent_or_conflict(
         raise ConflictError(
             f"{kind_label} {symbol!r} already released with different content"
         )
+
+
+class FilesystemOntologyReleaseWriter:
+    """:class:`kip.ports.ontology.OntologyReleaseWriterPort` over this module.
+
+    The container also calls `complete_pending_release_locked` directly at
+    start-up, before the eager catalog load: healing a crashed release is a
+    composition-time concern, not something a use case may trigger.
+    """
+
+    def materialize(
+        self,
+        ontology_root: Path,
+        domain_profile: str,
+        candidate: OntologyDiscoveryCandidate,
+    ) -> OntologyDiscoveryRelease:
+        return materialize_ontology_release(ontology_root, domain_profile, candidate)
+
+    def pending_release_journal(self, ontology_root: Path) -> Path:
+        return ontology_root / RELEASE_JOURNAL_FILENAME

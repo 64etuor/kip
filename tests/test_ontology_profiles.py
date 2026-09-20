@@ -7,8 +7,8 @@ import pytest
 import yaml
 
 from kip.errors import ValidationError
-from kip.ontology import OntologyCatalog, validate_ontology
-from kip.ontology_release import OntologyRelease
+from kip.ontology import load_catalog, validate_ontology
+from kip.ontology_release import load_release
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -18,7 +18,7 @@ def test_catalog_loads_empty_domain_without_research_project_symbols() -> None:
     ontology_root = ROOT / "ontology"
 
     # When the catalog is loaded for a new deployment
-    catalog = OntologyCatalog.load(ontology_root, domain_profile="empty")
+    catalog = load_catalog(ontology_root, domain_profile="empty")
 
     # Then generic kernel symbols remain available but exemplar symbols do not
     catalog.validate_entity_type("Document")
@@ -33,7 +33,7 @@ def test_catalog_rejects_an_unknown_domain_profile() -> None:
 
     # When/Then profile resolution fails before catalog construction
     with pytest.raises(ValidationError, match="unknown ontology domain profile"):
-        OntologyCatalog.load(ontology_root, domain_profile="missing-profile")
+        load_catalog(ontology_root, domain_profile="missing-profile")
 
 
 def test_release_composition_uses_the_selected_domain_profile() -> None:
@@ -41,7 +41,7 @@ def test_release_composition_uses_the_selected_domain_profile() -> None:
     ontology_root = ROOT / "ontology"
 
     # When a release is composed for a new deployment
-    release = OntologyRelease.load(ontology_root, domain_profile="empty")
+    release = load_release(ontology_root, domain_profile="empty")
 
     # Then migration tooling sees only the core kernel and selected profile
     assert "Document" in release.entities
@@ -61,4 +61,4 @@ def test_release_load_rejects_a_domain_profile_that_shadows_a_core_entity_type(
 
     # When/Then release composition fails closed instead of silently overriding core meaning
     with pytest.raises(ValidationError, match="redefines core entity type"):
-        OntologyRelease.load(copied, domain_profile="research-project")
+        load_release(copied, domain_profile="research-project")

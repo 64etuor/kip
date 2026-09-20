@@ -37,8 +37,9 @@ def test_setup_skill_covers_bootstrap_prerequisite_and_post_apply_path() -> None
     assert "configuration-only" in text
     assert "runtime_readiness" in text
     assert "next_steps" in text
-    # Secret schemes match the runtime resolvers exactly.
-    assert "keychain" in text and "rejected" in text
+    # Accepted secret schemes match the runtime resolvers exactly; the parser's
+    # own error names the unresolvable ones.
+    assert "never credential values" in text
     assert "env:" in text
     assert "file:/absolute/path" in text
     # sync_schedule is declarative until an operator installs a scheduler.

@@ -16,7 +16,7 @@ from kip.domain.generation import (
 )
 from kip.domain.knowledge import KnowledgeEntity, RelationMiningRequest
 from kip.errors import DependencyUnavailableError, ValidationError
-from kip.ontology import OntologyCatalog
+from kip.ontology import load_catalog
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -89,7 +89,7 @@ def _request(
 def _miner(generator: RecordingStructuredGenerator) -> GeneratorRelationMiner:
     return GeneratorRelationMiner(
         generator,
-        OntologyCatalog.load(ROOT / "ontology"),
+        load_catalog(ROOT / "ontology"),
     )
 
 

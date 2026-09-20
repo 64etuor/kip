@@ -285,11 +285,14 @@ def test_auto_activation_never_replaces_an_explicitly_activated_custom_space(
     assert test_container.repository.retrieval.active_embedding_space(context).id == custom_space.id
 
 
-def test_rebuild_pages_through_every_pending_unit(test_container, tmp_path: Path) -> None:
-    container = _semantic_container(test_container, tmp_path, ReviewedEmbedding())
+def test_rebuild_pages_through_every_pending_unit(
+    test_container, tmp_path: Path, reconfigured
+) -> None:
+    built = _semantic_container(test_container, tmp_path, ReviewedEmbedding())
     for index in range(5):
         (tmp_path / "source" / f"추가{index}.txt").write_text(f"승인 근거 {index}", encoding="utf-8")
-    container.settings.raw["models"]["embedding"]["page_size"] = 2
+    built.settings.raw["models"]["embedding"]["page_size"] = 2
+    container = reconfigured(built)
     context = container.application.operations.request_context()
     container.application.ingestion.sync_filesystem(context, "fixture")
 
@@ -351,10 +354,11 @@ def test_a_probe_that_raises_something_else_does_not_wedge_the_circuit() -> None
 
 
 def test_a_semantic_config_without_default_mode_uses_the_shipped_hybrid_default(
-    test_container, tmp_path: Path
+    test_container, tmp_path: Path, reconfigured
 ) -> None:
-    container = _semantic_container(test_container, tmp_path, ReviewedEmbedding(), reranker=FailingReranker())
-    container.settings.raw["search"].pop("default_mode")
+    built = _semantic_container(test_container, tmp_path, ReviewedEmbedding(), reranker=FailingReranker())
+    built.settings.raw["search"].pop("default_mode")
+    container = reconfigured(built)
     context = container.application.operations.request_context()
     after_sync(
         container.application.retrieval,
@@ -369,7 +373,9 @@ def test_a_semantic_config_without_default_mode_uses_the_shipped_hybrid_default(
     assert container.application.retrieval.result_warnings(context, hits) == []
 
 
-def _cross_encoder_container(test_container, tmp_path: Path, monkeypatch, embedding, *, default_mode: str):
+def _cross_encoder_container(
+    test_container, tmp_path: Path, monkeypatch, reconfigured, embedding, *, default_mode: str
+):
     """`[models.reranker] backend = "http"` with the model runtime down."""
     from kip import container as container_module
 
@@ -381,18 +387,23 @@ def _cross_encoder_container(test_container, tmp_path: Path, monkeypatch, embedd
         "model": FailingReranker.model,
         "revision": FailingReranker.revision,
     }
-    container = _semantic_container(test_container, tmp_path, embedding)
-    container.settings.raw["search"]["default_mode"] = default_mode
-    return container
+    built = _semantic_container(test_container, tmp_path, embedding)
+    built.settings.raw["search"]["default_mode"] = default_mode
+    return reconfigured(built)
 
 
 def test_a_model_cross_encoder_leaves_lexical_mode_and_the_fallback_on_bm25(
-    test_container, tmp_path: Path, monkeypatch
+    test_container, tmp_path: Path, monkeypatch, reconfigured
 ) -> None:
     from kip.adapters.rerankers import Bm25RerankerAdapter
 
     degraded = _cross_encoder_container(
-        test_container, tmp_path, monkeypatch, ReviewedEmbedding(fail=True), default_mode="reranked"
+        test_container,
+        tmp_path,
+        monkeypatch,
+        reconfigured,
+        ReviewedEmbedding(fail=True),
+        default_mode="reranked",
     )
     assert isinstance(degraded.lexical_reranker, Bm25RerankerAdapter)
     assert degraded.reranker is not None and degraded.reranker.model == FailingReranker.model
@@ -419,10 +430,15 @@ def test_a_model_cross_encoder_leaves_lexical_mode_and_the_fallback_on_bm25(
 
 
 def test_a_model_cross_encoder_leaves_hybrid_alone_and_fails_explicit_reranked(
-    test_container, tmp_path: Path, monkeypatch
+    test_container, tmp_path: Path, monkeypatch, reconfigured
 ) -> None:
     container = _cross_encoder_container(
-        test_container, tmp_path, monkeypatch, ReviewedEmbedding(), default_mode="hybrid"
+        test_container,
+        tmp_path,
+        monkeypatch,
+        reconfigured,
+        ReviewedEmbedding(),
+        default_mode="hybrid",
     )
     context = container.application.operations.request_context()
     after_sync(
@@ -578,7 +594,7 @@ def test_a_runtime_serving_another_model_degrades_default_search_to_lexical(
 
 
 def test_degradation_is_reported_even_when_the_result_set_is_empty(
-    test_container, tmp_path: Path
+    test_container, tmp_path: Path, reconfigured
 ) -> None:
     container = _semantic_container(test_container, tmp_path, ReviewedEmbedding(fail=True))
     context = container.application.operations.request_context()
@@ -599,8 +615,9 @@ def test_degradation_is_reported_even_when_the_result_set_is_empty(
     # unit at all, and the ranking degraded on the way there. Both facts hold,
     # so the envelope must carry both.
     container.settings.raw["search"]["abstain_on_unknown_terms"] = False
+    answering = reconfigured(container).application.retrieval
     outsider = container.application.operations.request_context(acl_scopes=[])
-    hidden = retrieval.search_outcome(outsider, SearchRequest(query="승인"))
+    hidden = answering.search_outcome(outsider, SearchRequest(query="승인"))
 
     assert hidden.hits == []
     assert hidden.warnings == ["semantic_degraded", "no_visible_indexed_units"]

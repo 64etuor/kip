@@ -13,12 +13,12 @@ from kip.application.evidence import EvidenceUseCases
 from kip.application.ontology_context import OntologyContextUseCases
 from kip.application.search import RetrievalUseCases
 from kip.application.telemetry import TelemetryUseCases
+from kip.domain.configuration import GenerationSettings
 from kip.domain.egress import EgressDecision
 from kip.domain.file_references import (
     FilenameSearchRequest,
     file_references,
     filename_key,
-    normalized_extensions,
     unresolved_file_tokens,
     without_references,
 )
@@ -48,13 +48,12 @@ from kip.domain.telemetry import (
 )
 from kip.errors import ConfigurationError, DependencyUnavailableError, ValidationError
 from kip.ports.generation import GenerationPort
-from kip.settings import Settings
 
 
 class AnsweringUseCases:
     def __init__(
         self,
-        settings: Settings,
+        generation: GenerationSettings,
         retrieval: RetrievalUseCases,
         evidence: EvidenceUseCases,
         egress: EgressPolicyUseCases,
@@ -62,36 +61,11 @@ class AnsweringUseCases:
         ontology_context: OntologyContextUseCases,
         telemetry: TelemetryUseCases | None = None,
     ) -> None:
-        raw = settings.get("models.generation", {}) or {}
-        if not isinstance(raw, dict):
-            raise ConfigurationError("models.generation must be a table")
-        fallback = raw.get("fallback_on_error", False)
-        if not isinstance(fallback, bool):
-            raise ConfigurationError("models.generation.fallback_on_error must be boolean")
-        self._enabled = bool(raw.get("enabled", False))
-        self._fallback_on_error = fallback
-        # Operator-indexed extensions must fail closed like the built-in ones
-        # when a question names a file that is not among allowed evidence.
-        sources = settings.get("sources.filesystem", []) or []
-        self._document_extensions = normalized_extensions(
-            extension
-            for source in sources if isinstance(source, dict)
-            for extension in (source.get("include_extensions") or [])
-            if isinstance(extension, str)
-        )
-        try:
-            self._max_claims = int(str(raw.get("max_claims", 16)))
-            self._max_output_tokens = int(str(raw.get("max_output_tokens", 4096)))
-        except ValueError as error:
-            raise ConfigurationError(
-                "generation claim and token limits must be integers"
-            ) from error
-        if not 1 <= self._max_claims <= 64:
-            raise ConfigurationError("models.generation.max_claims must be between 1 and 64")
-        if not 64 <= self._max_output_tokens <= 32768:
-            raise ConfigurationError(
-                "models.generation.max_output_tokens must be between 64 and 32768"
-            )
+        self._enabled = generation.enabled
+        self._fallback_on_error = generation.fallback_on_error
+        self._max_claims = generation.max_claims
+        self._max_output_tokens = generation.max_output_tokens
+        self._document_extensions = generation.document_extensions
         self._retrieval = retrieval
         self._evidence = evidence
         self._egress = egress

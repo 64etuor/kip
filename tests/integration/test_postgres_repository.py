@@ -41,11 +41,11 @@ from kip.domain.models import (
     RequestContext,
     SearchRequest,
 )
+from kip.domain.ontology_migration import OntologyMigration
 from kip.domain.telemetry import QueryTrace
 from kip.errors import NotFoundError, ValidationError
 from kip.ids import new_id, stable_id
-from kip.ontology import OntologyCatalog
-from kip.ontology_migration import OntologyMigration
+from kip.ontology import load_catalog
 from kip.settings import Settings
 from tests.environment import TEST_DATABASE_SKIP_REASON, TEST_POSTGRES_URL
 
@@ -61,7 +61,7 @@ def test_postgres_interactions_enforce_owner_scope_and_review_lifecycle(
     real_root = Path(__file__).resolve().parents[2]
     # Approving an `entity_type`/`predicate` discovery candidate now
     # materializes it into the ontology tree the container was built from
-    # (see `kip.ontology_discovery_release`). This test approves one, so
+    # (see `kip.adapters.ontology.release`). This test approves one, so
     # `project_root` must never point at the real repo checkout or it would
     # mutate tracked ontology files on disk; copy just enough of the tree
     # (ontology contracts + migrations) into a throwaway directory instead.
@@ -253,7 +253,7 @@ def test_postgres_discovery_candidate_persists_predicate_spec_across_round_trip(
         assert reviewed.release is not None
         assert reviewed.release.kind == "predicate"
         assert reviewed.release.file == "core/predicates.yaml"
-        catalog = OntologyCatalog.load(project_root / "ontology", domain_profile="empty")
+        catalog = load_catalog(project_root / "ontology", domain_profile="empty")
         spec = catalog.predicate_specs["funds_test_spec"]
         assert spec.domain == ("Organization",)
         assert spec.range == ("Project",)

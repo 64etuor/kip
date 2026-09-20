@@ -12,17 +12,17 @@ from kip.domain.knowledge import (
     stable_candidate_id,
 )
 from kip.domain.models import ApprovedAssertion, AssertionCandidate, RequestContext
-from kip.errors import ValidationError
-from kip.ontology import OntologyCatalog
-from kip.ontology_migration import (
+from kip.domain.ontology import OntologyCatalog
+from kip.domain.ontology_migration import (
     OntologyMigration,
     OntologyMigrationMaterialization,
     SymbolKind,
-    diff_ontologies,
     ontology_migration_sha256,
     validate_migration_coverage,
 )
+from kip.errors import ValidationError
 from kip.ports.knowledge import KnowledgeStore
+from kip.ports.ontology import OntologyCatalogPort
 
 
 class OntologyMigrationUseCases:
@@ -30,12 +30,14 @@ class OntologyMigrationUseCases:
         self,
         store: KnowledgeStore,
         evidence: EvidenceUseCases,
+        catalog: OntologyCatalogPort,
         *,
         domain_profile: str = "research-project",
         max_assertions: int = 10_000,
     ) -> None:
         self._store = store
         self._evidence = evidence
+        self._catalog = catalog
         self._domain_profile = domain_profile
         self._max_assertions = max_assertions
 
@@ -46,11 +48,10 @@ class OntologyMigrationUseCases:
         after_root: Path,
         migration: OntologyMigration,
     ) -> OntologyMigrationMaterialization:
-        diff = diff_ontologies(
+        diff = self._catalog.diff(
             before_root,
             after_root,
-            before_domain_profile=self._domain_profile,
-            after_domain_profile=self._domain_profile,
+            domain_profile=self._domain_profile,
         )
         errors = validate_migration_coverage(diff, migration)
         if errors:
@@ -58,7 +59,7 @@ class OntologyMigrationUseCases:
                 "invalid ontology migration: " + "; ".join(errors)
             )
         self._validate_entity_operations(context, migration)
-        target = OntologyCatalog.load(
+        target = self._catalog.load(
             after_root,
             domain_profile=self._domain_profile,
         )

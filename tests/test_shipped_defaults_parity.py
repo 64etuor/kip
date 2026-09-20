@@ -18,6 +18,7 @@ from kip.application.semantic import (
     RELEASE_REVIEWED_EMBEDDING_IDENTITIES,
     SemanticProjectionUseCases,
 )
+from kip.container import build_embedding_settings
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -59,7 +60,11 @@ def test_a_config_without_embedding_keys_builds_the_release_reviewed_space(
 
     settings = test_container.settings
     settings.raw.pop("models", None)
-    semantic = SemanticProjectionUseCases(settings, test_container.repository, _ReviewedEmbedding())
+    semantic = SemanticProjectionUseCases(
+        build_embedding_settings(settings),
+        test_container.repository,
+        _ReviewedEmbedding(),
+    )
     context = test_container.application.operations.request_context()
 
     space = semantic.embedding_space(context)
@@ -72,7 +77,7 @@ def test_a_config_without_embedding_keys_builds_the_release_reviewed_space(
 
     settings.raw["models"] = {"embedding": dict(EMBEDDING_DEFAULTS)}
     shipped_space = SemanticProjectionUseCases(
-        settings,
+        build_embedding_settings(settings),
         test_container.repository,
         _ReviewedEmbedding(),
     ).embedding_space(context)
@@ -88,7 +93,7 @@ def test_a_config_without_embedding_keys_builds_the_release_reviewed_space(
 
 
 def test_lexical_reranking_defaults_on_without_failing_an_unconfigured_deployment(
-    test_container,
+    test_container, reconfigured
 ) -> None:
     from kip.domain.models import SearchRequest
     from kip.errors import DependencyUnavailableError
@@ -110,8 +115,9 @@ def test_lexical_reranking_defaults_on_without_failing_an_unconfigured_deploymen
 
     # Asking for it explicitly without an adapter stays a loud misconfiguration.
     settings.raw["search"]["lexical_rerank_enabled"] = True
+    explicit = reconfigured(test_container)
     try:
-        test_container.application.retrieval.search(
+        explicit.application.retrieval.search(
             context,
             SearchRequest(query="승인"),
             mode="lexical",

@@ -11,6 +11,12 @@ import pytest
 import yaml
 from pydantic import ValidationError as PydanticValidationError
 
+from kip.adapters.ontology.release import (
+    RELEASE_JOURNAL_FILENAME,
+    complete_pending_release,
+    has_pending_release,
+    materialize_ontology_release,
+)
 from kip.domain.interactions import (
     DiscoveryKind,
     OntologyDiscoveryCandidate,
@@ -18,13 +24,7 @@ from kip.domain.interactions import (
     RiskLevel,
 )
 from kip.errors import ConflictError, ValidationError
-from kip.ontology import OntologyCatalog
-from kip.ontology_discovery_release import (
-    RELEASE_JOURNAL_FILENAME,
-    complete_pending_release,
-    has_pending_release,
-    materialize_ontology_release,
-)
+from kip.ontology import load_catalog
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -129,7 +129,7 @@ def test_new_entity_type_into_an_empty_profile_becomes_a_root(tmp_path: Path) ->
         "description_ko": "업무상 체결하는 계약을 표현한다.",
     }
     # Loading the released tree must reflect the new symbol immediately.
-    catalog = OntologyCatalog.load(ontology_root, domain_profile="empty")
+    catalog = load_catalog(ontology_root, domain_profile="empty")
     catalog.validate_entity_type("contract")
     assert catalog.entity_parents["contract"] is None
 
@@ -160,7 +160,7 @@ def test_new_entity_type_with_an_explicit_parent_preserves_comments(tmp_path: Pa
     # The new entry must land inside `entity_types`, before the sibling
     # `controlled_values` section, not appended blindly at EOF.
     assert after.index("framework_agreement:") < after.index("controlled_values:")
-    catalog = OntologyCatalog.load(ontology_root, domain_profile="research-project")
+    catalog = load_catalog(ontology_root, domain_profile="research-project")
     assert catalog.is_a("framework_agreement", "Document")
 
 
@@ -197,7 +197,7 @@ def test_new_predicate_defaults_and_syncs_review_policy(tmp_path: Path) -> None:
     review_policy = yaml.safe_load(review_policy_path.read_text(encoding="utf-8"))
     assert "cites" in review_policy["human_review_required"]["predicates"]
 
-    catalog = OntologyCatalog.load(ontology_root, domain_profile="research-project")
+    catalog = load_catalog(ontology_root, domain_profile="research-project")
     assert "cites" in catalog.evidence_required_predicates()
 
 
@@ -357,7 +357,7 @@ def test_predicate_domain_thread_through_validates_against_the_real_domain_profi
     release = materialize_ontology_release(ontology_root, "research-project", candidate)
 
     assert release.symbol == "funds"
-    catalog = OntologyCatalog.load(ontology_root, domain_profile="research-project")
+    catalog = load_catalog(ontology_root, domain_profile="research-project")
     assert catalog.predicate_specs["funds"].range == ("ResearchProject",)
 
 
@@ -379,7 +379,7 @@ def test_predicate_materialization_against_the_empty_profile_still_validates(
     release = materialize_ontology_release(ontology_root, "empty", candidate)
 
     assert release.symbol == "cites"
-    catalog = OntologyCatalog.load(ontology_root, domain_profile="empty")
+    catalog = load_catalog(ontology_root, domain_profile="empty")
     assert "cites" in catalog.evidence_required_predicates()
 
 
@@ -581,15 +581,15 @@ def test_concurrent_materialization_is_serialized_by_the_release_lock(
     # fail without the release lock, then assert both symbols land and the
     # version is bumped exactly twice.
     ontology_root = _ontology_root(tmp_path)
-    from kip import ontology_discovery_release
+    from kip.adapters.ontology import release as release_module
 
-    original_atomic_write = ontology_discovery_release._atomic_write
+    original_atomic_write = release_module._atomic_write
 
     def slow_atomic_write(path: Path, text: str) -> None:
         time.sleep(0.05)
         original_atomic_write(path, text)
 
-    monkeypatch.setattr(ontology_discovery_release, "_atomic_write", slow_atomic_write)
+    monkeypatch.setattr(release_module, "_atomic_write", slow_atomic_write)
 
     candidate_a = _candidate(
         kind="entity_type", symbol="contract_a", label="계약 A", definition="첫 번째 계약."

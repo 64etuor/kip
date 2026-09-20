@@ -9,14 +9,14 @@ import httpx
 import pytest
 from typer.testing import CliRunner
 
+from kip.adapters.diagnostics import HttpModelRuntimeProbe, KordocOcrRuntimeProbe
 from kip.adapters.repository.memory import MemoryRepository
-from kip.cli import (
-    _kordoc_ocr_doctor_check,
+from kip.application import diagnostics as diagnostics_module
+from kip.application.diagnostics import (
     _mcp_registration_doctor_check,
-    _semantic_doctor_check,
     _skill_installs_doctor_check,
-    app,
 )
+from kip.cli import app
 from kip.container import build_container
 from kip.domain.models import Capabilities
 from kip.settings import Settings
@@ -31,6 +31,20 @@ from kip.skill_installs import (
     format_install_record,
 )
 from tests.setup_support import complete_setup_answers
+
+
+def _semantic_doctor_check(
+    settings: Settings, capabilities: Capabilities, verification: dict | None = None
+) -> dict:
+    """The check as the container wires it: with the real model runtime probe."""
+    return diagnostics_module._semantic_doctor_check(
+        HttpModelRuntimeProbe(), settings, capabilities, verification
+    )
+
+
+def _kordoc_ocr_doctor_check(settings: Settings) -> dict:
+    """The check as the container wires it: with the real Kordoc probe."""
+    return diagnostics_module._kordoc_ocr_doctor_check(KordocOcrRuntimeProbe(), settings)
 
 
 def _settings(tmp_path: Path, kordoc: dict[str, object] | None) -> Settings:
@@ -737,7 +751,7 @@ def test_skill_installs_check_does_not_warn_about_a_removed_location(tmp_path: P
 def test_semantic_doctor_check_calls_configured_off_the_intended_lexical_mode(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from kip.cli import _doctor_summary
+    from kip.application.diagnostics import _doctor_summary
 
     # The environment never decides it: only the configuration disables semantic search.
     monkeypatch.setenv("KIP_SEMANTIC", "on")
@@ -780,7 +794,7 @@ class _FakeOperations:
 
 
 def test_postgres_extensions_check_is_not_applicable_on_the_memory_repository(tmp_path: Path) -> None:
-    from kip.cli import _postgres_extensions_doctor_check
+    from kip.application.diagnostics import _postgres_extensions_doctor_check
 
     container = build_container(_settings(tmp_path, None), repository=MemoryRepository())
 
@@ -794,7 +808,7 @@ def test_postgres_extensions_check_is_not_applicable_on_the_memory_repository(tm
 
 
 def test_postgres_extensions_check_fails_an_outdated_vector_catalog_without_requiring_it() -> None:
-    from kip.cli import _postgres_extensions_doctor_check
+    from kip.application.diagnostics import _postgres_extensions_doctor_check
 
     operations = _FakeOperations(("0.8.2", "0.8.6"))
     check = _postgres_extensions_doctor_check(operations)
@@ -815,7 +829,7 @@ def test_postgres_extensions_check_fails_an_outdated_vector_catalog_without_requ
 
 
 def test_postgres_extensions_check_passes_a_current_catalog_and_reports_both_versions() -> None:
-    from kip.cli import _postgres_extensions_doctor_check
+    from kip.application.diagnostics import _postgres_extensions_doctor_check
 
     check = _postgres_extensions_doctor_check(_FakeOperations(("0.8.6", "0.8.6")))
     assert check["ok"] is True
@@ -828,7 +842,7 @@ def test_postgres_extensions_check_passes_a_current_catalog_and_reports_both_ver
 
 
 def test_postgres_extensions_check_reports_a_query_failure_as_not_checked() -> None:
-    from kip.cli import _postgres_extensions_doctor_check
+    from kip.application.diagnostics import _postgres_extensions_doctor_check
     from kip.errors import DependencyUnavailableError
 
     check = _postgres_extensions_doctor_check(_FakeOperations(error=DependencyUnavailableError("PostgreSQL is not reachable")))
@@ -869,7 +883,7 @@ def _port_environment(monkeypatch: pytest.MonkeyPatch, **values: str) -> None:
 def test_database_port_check_is_skipped_where_the_bash_guard_does_not_apply(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, values: dict[str, str], generated: bool, skipped: str
 ) -> None:
-    from kip.cli import _database_port_doctor_check
+    from kip.application.diagnostics import _database_port_doctor_check
 
     _port_environment(monkeypatch, **values)
     if generated:
@@ -894,7 +908,7 @@ def test_database_port_check_is_skipped_where_the_bash_guard_does_not_apply(
 def test_database_port_check_fails_a_loopback_url_on_another_port(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, url: str, port: int
 ) -> None:
-    from kip.cli import _database_port_doctor_check
+    from kip.application.diagnostics import _database_port_doctor_check
 
     values = {"KIP_POSTGRES_PORT": "15432", name: url}
     if name != "KIP_DATABASE_URL":
@@ -930,7 +944,7 @@ def test_database_port_check_fails_a_loopback_url_on_another_port(
 def test_database_port_check_passes_a_matching_or_non_loopback_url(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, values: dict[str, str]
 ) -> None:
-    from kip.cli import _database_port_doctor_check
+    from kip.application.diagnostics import _database_port_doctor_check
 
     _port_environment(monkeypatch, **values)
 
@@ -942,7 +956,7 @@ def test_database_port_check_passes_a_matching_or_non_loopback_url(
 def test_database_port_check_reads_a_file_when_the_env_url_is_empty(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from kip.cli import _database_port_doctor_check
+    from kip.application.diagnostics import _database_port_doctor_check
 
     secret = tmp_path / "database-url"
     secret.write_text("postgresql://kip:test-password@127.0.0.1:55432/kip\n", encoding="utf-8")
@@ -961,7 +975,7 @@ def test_database_port_check_reads_a_file_when_the_env_url_is_empty(
 def test_database_port_check_fails_a_published_port_that_is_not_a_number(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from kip.cli import _database_port_doctor_check
+    from kip.application.diagnostics import _database_port_doctor_check
 
     _port_environment(monkeypatch, KIP_POSTGRES_PORT="54a2",
                       KIP_DATABASE_URL="postgresql://kip:test-password@127.0.0.1:5432/kip")
@@ -973,7 +987,7 @@ def test_database_port_check_fails_a_published_port_that_is_not_a_number(
 
 
 def test_postgres_extensions_check_does_not_order_a_non_numeric_version() -> None:
-    from kip.cli import _postgres_extensions_doctor_check
+    from kip.application.diagnostics import _postgres_extensions_doctor_check
 
     check = _postgres_extensions_doctor_check(_FakeOperations(("0.8.7-dev", "0.8.6")))
 
@@ -986,7 +1000,7 @@ def test_postgres_extensions_check_does_not_order_a_non_numeric_version() -> Non
 
 
 def test_postgres_extensions_check_fails_an_installed_extension_the_server_cannot_load() -> None:
-    from kip.cli import _postgres_extensions_doctor_check
+    from kip.application.diagnostics import _postgres_extensions_doctor_check
 
     check = _postgres_extensions_doctor_check(_FakeOperations(("0.8.6", None)))
 
@@ -1012,7 +1026,7 @@ def test_postgres_extensions_check_fails_an_installed_extension_the_server_canno
 def test_database_port_check_fails_a_url_whose_port_is_not_a_port(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, url: str, raw: str
 ) -> None:
-    from kip.cli import _database_port_doctor_check
+    from kip.application.diagnostics import _database_port_doctor_check
 
     values = {"KIP_POSTGRES_PORT": "5432", name: url}
     if name != "KIP_DATABASE_URL":
@@ -1031,7 +1045,7 @@ def test_database_port_check_fails_a_url_whose_port_is_not_a_port(
 def test_database_port_check_reports_an_explicit_port_zero_instead_of_defaulting_it(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from kip.cli import _database_port_doctor_check
+    from kip.application.diagnostics import _database_port_doctor_check
 
     _port_environment(monkeypatch, KIP_POSTGRES_PORT="5432",
                       KIP_DATABASE_URL="postgresql://kip:test-password@127.0.0.1:0/kip")

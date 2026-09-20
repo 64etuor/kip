@@ -11,9 +11,9 @@ from kip.adapters.repository.memory import MemoryRepository
 from kip.container import build_container
 from kip.domain.knowledge import KnowledgeEntity, RelationDerivation, RelationProposal
 from kip.domain.models import GraphNeighborsRequest, RequestContext, SearchRequest
+from kip.domain.ontology_migration import OntologyMigration
 from kip.errors import ValidationError
 from kip.ids import new_id
-from kip.ontology_migration import OntologyMigration
 from kip.settings import Settings
 
 ROOT = Path(__file__).resolve().parents[1]

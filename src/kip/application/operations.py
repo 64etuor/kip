@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Literal
 
 from kip.application.semantic import SemanticProjectionUseCases
+from kip.domain.configuration import OperationsSettings
 from kip.domain.json_types import JsonObject
 from kip.domain.models import (
     Capabilities,
@@ -18,13 +19,13 @@ from kip.ports.ingestion import ParserRegistryPort, SourceCatalogPort
 from kip.ports.jobs import JobStore
 from kip.ports.operations import OperationsStore
 from kip.ports.retrieval import RetrievalStore
-from kip.settings import Settings
 
 
 class OperationsUseCases:
     def __init__(
         self,
-        settings: Settings,
+        settings: OperationsSettings,
+        semantic: SemanticProjectionUseCases,
         store: OperationsStore,
         jobs: JobStore,
         retrieval_store: RetrievalStore,
@@ -33,6 +34,7 @@ class OperationsUseCases:
         embedding: EmbeddingPort,
     ) -> None:
         self._settings = settings
+        self._semantic = semantic
         self._store = store
         self._jobs = jobs
         self._retrieval_store = retrieval_store
@@ -79,9 +81,7 @@ class OperationsUseCases:
                 "configuration keys are not recognised and have no effect: "
                 + ", ".join(self._settings.unknown_config_keys)
             )
-        semantic_configured = bool(
-            self._settings.get("search.semantic_enabled", False)
-        )
+        semantic_configured = self._settings.semantic_enabled
         selected_context = context or self.request_context()
         projection_status: Literal[
             "disabled",
@@ -97,11 +97,7 @@ class OperationsUseCases:
             # data call. Identity of the active space decides readiness; the
             # full completeness count lives in `kip doctor` and
             # `kip projection verify`, and sync maintenance keeps it current.
-            expected = SemanticProjectionUseCases(
-                self._settings,
-                self._retrieval_store,
-                self._embedding,
-            ).embedding_space(selected_context)
+            expected = self._semantic.embedding_space(selected_context)
             active = self._retrieval_store.active_embedding_space(selected_context)
             if active is not None and active.id == expected.id:
                 projection_status = "active"
@@ -135,7 +131,7 @@ class OperationsUseCases:
         )
 
     def migrate(self) -> MigrationReport:
-        return self._store.migrate(self._settings.project_root / "migrations")
+        return self._store.migrate(self._settings.migrations_path)
 
     def extension_versions(self, name: str) -> tuple[str | None, str | None] | None:
         return self._store.extension_versions(name)

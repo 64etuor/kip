@@ -1,3 +1,3 @@
 """KIP Knowledge Fabric."""
 
-__version__ = "3.15.8"
+__version__ = "3.16.0"

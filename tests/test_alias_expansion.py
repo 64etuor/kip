@@ -23,10 +23,11 @@ def _seed(test_container, *, entity_scopes: list[str] | None = None) -> None:
     )
 
 
-def _score(test_container, *, expansion: bool) -> float:
+def _score(test_container, reconfigured, *, expansion: bool) -> float:
     test_container.settings.raw["search"]["alias_expansion_enabled"] = expansion
-    context = test_container.application.operations.request_context()
-    hits = test_container.application.retrieval.search(
+    configured = reconfigured(test_container)
+    context = configured.application.operations.request_context()
+    hits = configured.application.retrieval.search(
         context,
         SearchRequest(query="공급업체 등록", limit=10),
     )
@@ -36,20 +37,22 @@ def _score(test_container, *, expansion: bool) -> float:
     return 0.0
 
 
-def test_approved_alias_expansion_boosts_the_canonical_document(test_container):
+def test_approved_alias_expansion_boosts_the_canonical_document(
+    test_container, reconfigured
+):
     _seed(test_container)
 
-    boosted = _score(test_container, expansion=True)
-    baseline = _score(test_container, expansion=False)
+    boosted = _score(test_container, reconfigured, expansion=True)
+    baseline = _score(test_container, reconfigured, expansion=False)
 
     assert boosted > baseline
 
 
-def test_expansion_respects_entity_acl_scopes(test_container):
+def test_expansion_respects_entity_acl_scopes(test_container, reconfigured):
     _seed(test_container, entity_scopes=["project:secret"])
 
-    with_flag = _score(test_container, expansion=True)
-    baseline = _score(test_container, expansion=False)
+    with_flag = _score(test_container, reconfigured, expansion=True)
+    baseline = _score(test_container, reconfigured, expansion=False)
 
     # The entity is outside the caller's scopes, so expansion adds nothing.
     assert with_flag == baseline

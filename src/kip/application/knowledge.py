@@ -14,8 +14,8 @@ from kip.domain.models import (
     GraphPathRequest,
     RequestContext,
 )
+from kip.domain.ontology import OntologyCatalog
 from kip.errors import AuthorizationError, NotFoundError, ValidationError
-from kip.ontology import OntologyCatalog
 from kip.ports.evidence import EvidenceReaderPort
 from kip.ports.knowledge import KnowledgeStore
 

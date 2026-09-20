@@ -9,14 +9,14 @@ import yaml
 from kip.adapters.repository.memory import MemoryRepository
 from kip.container import build_container
 from kip.domain.models import AssertionCandidate
-from kip.errors import ValidationError
-from kip.ids import new_id
-from kip.ontology import OntologyCatalog, validate_ontology
-from kip.ontology_migration import (
+from kip.domain.ontology_migration import (
     OntologyMigration,
-    diff_ontologies,
     validate_migration_coverage,
 )
+from kip.errors import ValidationError
+from kip.ids import new_id
+from kip.ontology import load_catalog, validate_ontology
+from kip.ontology_migration import diff_ontologies
 from kip.settings import Settings
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -78,7 +78,7 @@ def test_ontology_contract_reports_null_predicate_definition_without_crashing(
 
     assert "predicate some_predicate: definition must be a mapping" in errors
     with pytest.raises(ValidationError, match="invalid ontology contract"):
-        OntologyCatalog.load(copied)
+        load_catalog(copied)
 
 
 def test_ontology_contract_detects_domain_entity_type_shadowing_core(tmp_path: Path) -> None:
@@ -140,7 +140,7 @@ def test_ontology_contract_accepts_valid_domain_and_source_definitions(tmp_path:
 
 
 def test_ontology_catalog_exposes_korean_labels_through_mining_contract() -> None:
-    catalog = OntologyCatalog.load(ROOT / "ontology")
+    catalog = load_catalog(ROOT / "ontology")
 
     spec = catalog.predicate_specs["records_decision"]
     assert spec.label_ko == "의사결정 기록"
@@ -163,7 +163,7 @@ def test_ontology_catalog_exposes_korean_labels_through_mining_contract() -> Non
 
 
 def test_ontology_catalog_rejects_unknown_predicates_and_versions() -> None:
-    catalog = OntologyCatalog.load(ROOT / "ontology")
+    catalog = load_catalog(ROOT / "ontology")
 
     catalog.validate_candidate("amends", "core/1.0.0")
     with pytest.raises(ValidationError, match="unknown ontology predicate"):

@@ -7,7 +7,7 @@ from unittest.mock import Mock
 import pytest
 
 from kip.application.semantic import EMBEDDING_DEFAULTS, SemanticProjectionUseCases
-from kip.container import build_container
+from kip.container import build_container, build_embedding_settings
 from kip.domain.embedding import EmbeddingProjectionProgress
 from kip.domain.models import EmbeddableUnit
 from kip.errors import DependencyUnavailableError
@@ -84,7 +84,7 @@ def test_semantic_verification_uses_current_projection_units(
     test_container.application.ingestion.sync_filesystem(context, "fixture")
     embedding = CountingEmbedding()
     semantic = SemanticProjectionUseCases(
-        test_container.settings,
+        build_embedding_settings(test_container.settings),
         test_container.repository.retrieval,
         embedding,
     )
@@ -125,6 +125,7 @@ def test_embedding_space_identity_ignores_operational_batch_settings(
 def test_embedding_input_cap_is_bounded_and_versioned(
     test_container,
     tmp_path: Path,
+    reconfigured,
 ) -> None:
     source_root = tmp_path / "source"
     (source_root / "긴근거.txt").write_text(
@@ -151,8 +152,9 @@ def test_embedding_input_cap_is_bounded_and_versioned(
     assert all(len(text) <= 40 for text in embedding.document_batches[0])
     assert embedding.document_batches[0][0].endswith("TAIL")
     assert bounded_space.configuration["document_projection"] == "head_tail_v1"
+    # The cap is read once, at composition, so a changed cap is a new container.
     embedding_config["max_document_chars"] = 80
-    expanded_space = container.application.retrieval.embedding_space(context)
+    expanded_space = reconfigured(container).application.retrieval.embedding_space(context)
     assert expanded_space.id != bounded_space.id
     assert expanded_space.name != bounded_space.name
 
@@ -193,6 +195,7 @@ def test_embedding_input_cap_defaults_to_the_shipped_projection_bound(
 
 def test_embedding_space_identity_changes_with_truncation_config(
     test_container,
+    reconfigured,
 ) -> None:
     # Given a baseline embedding space built from the default cap.
     container = build_container(
@@ -208,7 +211,7 @@ def test_embedding_space_identity_changes_with_truncation_config(
         "embedding", {}
     )
     embedding_config["max_document_chars"] = 20000
-    widened = container.application.retrieval.embedding_space(context)
+    widened = reconfigured(container).application.retrieval.embedding_space(context)
 
     # Then a brand-new space identity is produced, so a cap change can never
     # silently mix old-truncation and new-truncation vectors in one space;
@@ -251,7 +254,7 @@ def test_semantic_rebuild_groups_units_by_bounded_input_length(
     )
     embedding = CountingEmbedding()
     semantic = SemanticProjectionUseCases(
-        test_container.settings,
+        build_embedding_settings(test_container.settings),
         store,
         embedding,
     )

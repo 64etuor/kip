@@ -7,6 +7,7 @@ from typing import Final
 
 from pydantic import TypeAdapter
 
+from kip.domain.configuration import EmbeddingSettings
 from kip.domain.json_types import JsonObject
 from kip.domain.models import (
     EmbeddableUnit,
@@ -19,7 +20,6 @@ from kip.errors import ConfigurationError, ConflictError, DependencyUnavailableE
 from kip.ids import stable_id
 from kip.ports.embedding import EmbeddingPort
 from kip.ports.retrieval import RetrievalStore
-from kip.settings import Settings
 
 _STR_MAP: Final = TypeAdapter(dict[str, str])
 _DOCUMENT_PROJECTION: Final = "head_tail_v1"
@@ -45,7 +45,8 @@ class ReviewedEmbeddingIdentity:
 
 
 # Shipped semantic defaults (ADR-065). Setup, the example and container
-# configs and the portable gate all read these so they cannot drift.
+# configs and the portable gate all read these so they cannot drift;
+# `kip.container.build_embedding_settings` applies them once, at composition.
 SEMANTIC_DEFAULT_MODE: Final = "hybrid"
 EMBEDDING_DEFAULTS: Final[dict[str, str | int]] = {
     "model": "kip-qwen3-embedding-0.6b",
@@ -131,7 +132,7 @@ def _embedding_input_length(unit: EmbeddableUnit, max_chars: int) -> int:
 class SemanticProjectionUseCases:
     def __init__(
         self,
-        settings: Settings,
+        settings: EmbeddingSettings,
         store: RetrievalStore,
         embedding: EmbeddingPort,
     ) -> None:
@@ -140,9 +141,8 @@ class SemanticProjectionUseCases:
         self._embedding = embedding
 
     def embedding_space(self, context: RequestContext) -> EmbeddingSpace:
-        configured = dict(self._settings.get("models.embedding", {}) or {})
-        base_space_name = str(
-            configured.get("space_name")
+        base_space_name = (
+            self._settings.space_name
             or f"{self._embedding.model}-{self._embedding.revision}-"
             f"{self._embedding.dimensions}"
         )
@@ -155,10 +155,8 @@ class SemanticProjectionUseCases:
             "max_document_chars": str(max_document_chars),
             "document_projection": _DOCUMENT_PROJECTION,
         }
-        if configured.get("document_instruction"):
-            configuration["document_instruction"] = str(
-                configured["document_instruction"]
-            )
+        if self._settings.document_instruction:
+            configuration["document_instruction"] = self._settings.document_instruction
         space_id = stable_id(
             "espace",
             context.workspace,
@@ -200,16 +198,9 @@ class SemanticProjectionUseCases:
             context,
             self.embedding_space(context),
         )
-        batch_size = int(
-            self._settings.get(
-                "models.embedding.batch_size",
-                EMBEDDING_DEFAULTS["batch_size"],
-            )
-        )
+        batch_size = self._settings.batch_size
         max_document_chars = self._max_document_chars()
-        page_size = int(self._settings.get("models.embedding.page_size", 1000))
-        if page_size < 1:
-            raise ConfigurationError("embedding page_size must be positive")
+        page_size = self._settings.page_size
         before = self._store.embedding_projection_progress(context, space.id)
         pending_total = max(before.content_units - before.indexed_units, 0)
         newly_indexed = 0
@@ -281,8 +272,7 @@ class SemanticProjectionUseCases:
         }
 
     def is_release_reviewed(self, space: EmbeddingSpace) -> bool:
-        configured = dict(self._settings.get("models.embedding", {}) or {})
-        if configured.get("document_instruction"):
+        if self._settings.document_instruction:
             return False
         return any(
             space.provider == identity.provider
@@ -293,10 +283,7 @@ class SemanticProjectionUseCases:
             == str(identity.max_document_chars)
             and space.configuration.get("document_projection")
             == identity.document_projection
-            and str(
-                configured.get("query_instruction", EMBEDDING_DEFAULTS["query_instruction"])
-            )
-            == identity.query_instruction
+            and self._settings.query_instruction == identity.query_instruction
             for identity in RELEASE_REVIEWED_EMBEDDING_IDENTITIES
         )
 
@@ -312,7 +299,7 @@ class SemanticProjectionUseCases:
         runtime being down is not a sync failure: search degrades to the
         lexical path and the next run resumes where this one stopped.
         """
-        if not bool(self._settings.get("search.semantic_enabled", False)):
+        if not self._settings.semantic_enabled:
             return SemanticProjectionUpdate(status="disabled")
         if self._embedding.name == "disabled":
             return SemanticProjectionUpdate(
@@ -383,9 +370,9 @@ class SemanticProjectionUseCases:
         return activated
 
     def _auto_activate(self, system: RequestContext, space: EmbeddingSpace) -> tuple[bool, str | None]:
-        if not bool(self._settings.get("search.semantic_enabled", False)):
+        if not self._settings.semantic_enabled:
             return False, None
-        if not bool(self._settings.get("search.semantic_auto_activate", True)):
+        if not self._settings.semantic_auto_activate:
             return False, "the space is complete; automatic activation is off, run `kip projection activate`"
         if not self.is_release_reviewed(space):
             return False, (
@@ -410,32 +397,15 @@ class SemanticProjectionUseCases:
     def _max_batch_chars(self) -> int:
         # One request should not hold the shared model runtime for long:
         # interactive query embeddings wait behind it (ADR-065).
-        configured = int(
-            self._settings.get(
-                "models.embedding.max_batch_chars",
-                EMBEDDING_DEFAULTS["max_batch_chars"],
-            )
-        )
-        if configured < 1:
-            raise ConfigurationError("embedding max_batch_chars must be positive")
-        return configured
+        return self._settings.max_batch_chars
 
     def _max_document_chars(self) -> int:
         # The space identity is built from this value, so a fallback that
         # disagrees with the shipped default silently builds a space no
         # release reviewed — hours of embedding that can never auto-activate.
-        # Every fallback for an embedding key comes from EMBEDDING_DEFAULTS.
-        configured = int(
-            self._settings.get(
-                "models.embedding.max_document_chars",
-                EMBEDDING_DEFAULTS["max_document_chars"],
-            )
-        )
-        if configured < 1:
-            raise ConfigurationError(
-                "embedding max_document_chars must be positive"
-            )
-        return configured
+        # Every fallback for an embedding key comes from EMBEDDING_DEFAULTS,
+        # applied once in `kip.container`.
+        return self._settings.max_document_chars
 
     def activate(
         self,

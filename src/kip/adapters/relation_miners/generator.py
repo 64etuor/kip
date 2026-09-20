@@ -12,8 +12,8 @@ from kip.domain.knowledge import (
     RelationMiningResult,
     normalize_entity_name,
 )
+from kip.domain.ontology import OntologyCatalog
 from kip.errors import ValidationError
-from kip.ontology import OntologyCatalog
 from kip.ports.generation import GenerationPort
 
 

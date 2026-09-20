@@ -44,21 +44,23 @@ def test_sync_search_context_and_stale_detection(test_container):
 
 def test_context_item_cap_keeps_one_big_unit_from_starving_the_bundle(
     test_container,
+    reconfigured,
 ):
     source = test_container.settings.project_root / "source"
     (source / "큰문서.txt").write_text("정산 기준 안내 " * 2000, encoding="utf-8")
     (source / "작은문서.txt").write_text("정산 기준은 별도 규정을 따른다.", encoding="utf-8")
     test_container.settings.raw["search"]["context_item_max_chars"] = 500
-    context = test_container.application.operations.request_context()
-    test_container.application.ingestion.sync_filesystem(context, "fixture")
+    capped = reconfigured(test_container)
+    context = capped.application.operations.request_context()
+    capped.application.ingestion.sync_filesystem(context, "fixture")
 
     # The configured value is a floor; each item may also claim its fair
     # share of the caller's budget (max_chars // limit).
-    tight = test_container.application.retrieval.context_bundle(
+    tight = capped.application.retrieval.context_bundle(
         context,
         ContextRequest(query="정산 기준", limit=5, max_chars=2000),
     )
-    generous = test_container.application.retrieval.context_bundle(
+    generous = capped.application.retrieval.context_bundle(
         context,
         ContextRequest(query="정산 기준", limit=5, max_chars=100000),
     )

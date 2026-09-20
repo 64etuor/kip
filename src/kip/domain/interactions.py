@@ -303,7 +303,7 @@ class OntologyDiscoveryProposal(InteractionModel):
     # applied leniently (silently dropped to root) when `parent` is absent.
     parent: str | None = Field(default=None, max_length=64)
     # `predicate` release spec. Absent fields fall back to safe defaults at
-    # materialization time (see `ontology_discovery_release.py`).
+    # materialization time (see `kip.adapters.ontology.release`).
     domain: list[str] | None = Field(default=None, min_length=1, max_length=8)
     range: list[str] | None = Field(default=None, min_length=1, max_length=8)
     inverse: str | None = Field(default=None, max_length=64)
@@ -399,7 +399,7 @@ class OntologyDiscoveryCandidate(InteractionModel):
     # trusting proposal-time validation. A candidate built directly (or
     # rehydrated from a row written before these checks existed, or by a
     # store adapter with a bug) must be rejected at construction, not deep
-    # inside `ontology_discovery_release.py`.
+    # inside `kip.adapters.ontology.release`.
     @field_validator("symbol", "inverse", "extraction")
     @classmethod
     def valid_symbol(cls, value: str | None) -> str | None:

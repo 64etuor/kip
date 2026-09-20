@@ -24,8 +24,8 @@ from kip.domain.interactions import (
 from kip.domain.models import RequestContext
 from kip.errors import AuthorizationError, ConflictError, ValidationError
 from kip.ids import stable_id
-from kip.ontology_discovery_release import materialize_ontology_release
 from kip.ports.interactions import InteractionStore
+from kip.ports.ontology import OntologyReleaseWriterPort
 
 _MATERIALIZED_KINDS = frozenset({"entity_type", "predicate"})
 
@@ -40,6 +40,7 @@ class InteractionUseCases:
         domain_profile: str,
         clarification_ttl_seconds: int,
         ontology_root: Path | None = None,
+        release_writer: OntologyReleaseWriterPort | None = None,
     ) -> None:
         self._store = store
         self._enabled = enabled
@@ -47,6 +48,7 @@ class InteractionUseCases:
         self._domain_profile = domain_profile
         self._clarification_ttl = timedelta(seconds=clarification_ttl_seconds)
         self._ontology_root = ontology_root
+        self._release_writer = release_writer
 
     @property
     def enabled(self) -> bool:
@@ -165,7 +167,7 @@ class InteractionUseCases:
         # compatibility: for `entity_type`, mirror the explicit `parent` hint
         # into it too so a parent-shaped hint is still visible to any
         # consumer that only reads `target_symbol`; see
-        # `ontology_discovery_release.py` for how the two are reconciled at
+        # `kip.adapters.ontology.release` for how the two are reconciled at
         # materialization time.
         effective_target_symbol = proposal.target_symbol
         if proposal.kind == "entity_type" and proposal.parent is not None:
@@ -237,14 +239,14 @@ class InteractionUseCases:
             if candidate.status != "proposed":
                 raise ConflictError("ontology discovery candidate has already been reviewed")
             if candidate.kind in _MATERIALIZED_KINDS:
-                if self._ontology_root is None:
+                if self._ontology_root is None or self._release_writer is None:
                     raise ValidationError(
                         "ontology discovery release requires an ontology contract"
                     )
                 # Materialize before persisting the status change: if this
                 # raises, the candidate must stay "proposed" and no file is
                 # touched (materializer is shadow-validated + atomic).
-                release = materialize_ontology_release(
+                release = self._release_writer.materialize(
                     self._ontology_root,
                     self._domain_profile,
                     candidate,

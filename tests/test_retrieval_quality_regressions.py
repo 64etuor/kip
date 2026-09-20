@@ -269,7 +269,9 @@ def test_truncate_context_body_keeps_head_and_tail_around_a_marker(
     assert _truncate_context_body("ABCDEFXYZ", allowed) == expected
 
 
-def test_search_context_and_read_expose_their_actual_verification(test_container):
+def test_search_context_and_read_expose_their_actual_verification(
+    test_container, reconfigured
+):
     source = test_container.settings.project_root / "source" / "verification.txt"
     source.write_text("현장조사 안내 " * 1000)
     context = test_container.application.operations.request_context()
@@ -279,7 +281,8 @@ def test_search_context_and_read_expose_their_actual_verification(test_container
     assert hit.evidence_role == "discovery"
     assert hit.source_verification == "not_checked"
     test_container.settings.raw["search"]["context_item_max_chars"] = 1000
-    pack = test_container.application.retrieval.context_bundle(
+    capped = reconfigured(test_container)
+    pack = capped.application.retrieval.context_bundle(
         context, ContextRequest(query="현장조사", max_chars=1000, limit=1)
     )
     item = pack.items[0]

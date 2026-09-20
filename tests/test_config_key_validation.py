@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from kip.errors import ConfigurationError, KipError
 from kip.settings import Settings, unknown_config_keys
 from kip.setup.config_payload import build_config_payload
 from kip.setup.planner import build_setup_plan
@@ -84,11 +85,12 @@ def test_a_valid_config_reports_no_unknown_keys(
 
 
 def test_unknown_keys_reach_the_operator_through_capability_warnings(
-    test_container,
+    test_container, reconfigured
 ) -> None:
     test_container.settings.unknown_config_keys = ("serach.default_mode",)
+    reported = reconfigured(test_container)
 
-    warnings = test_container.application.operations.capabilities().warnings
+    warnings = reported.application.operations.capabilities().warnings
 
     assert any("serach.default_mode" in warning for warning in warnings)
     assert sum("not recognised" in warning for warning in warnings) == 1
@@ -125,3 +127,44 @@ def test_an_empty_source_array_is_not_reported_as_unrecognised() -> None:
     assert "sources.filesystem[].nonsense" in unknown_config_keys(
         {"sources": {"filesystem": [{"nonsense": 1}]}}
     )
+
+
+def test_a_non_numeric_search_limit_names_the_key_instead_of_crashing(
+    test_container, reconfigured
+) -> None:
+    """A typed value is as wrong as a typed key, and must be as visible.
+
+    `int(str(...))` on a configured value raised a bare `ValueError`
+    ("invalid literal for int()") that names neither the section nor the key,
+    and is not a `KipError`, so `kip doctor` reported a crash rather than a
+    configuration problem.
+    """
+    test_container.settings.raw["search"]["hybrid_candidate_limit"] = "many"
+
+    with pytest.raises(ConfigurationError) as caught:
+        reconfigured(test_container)
+
+    assert isinstance(caught.value, KipError)
+    assert "search.hybrid_candidate_limit" in str(caught.value)
+
+
+def test_a_non_numeric_embedding_page_size_names_the_key(
+    test_container, reconfigured
+) -> None:
+    test_container.settings.raw["models"] = {"embedding": {"page_size": "big"}}
+
+    with pytest.raises(ConfigurationError) as caught:
+        reconfigured(test_container)
+
+    assert isinstance(caught.value, KipError)
+    assert "models.embedding.page_size" in str(caught.value)
+
+
+def test_the_same_construction_still_succeeds_on_a_valid_config(
+    test_container, reconfigured
+) -> None:
+    # The control for the two tests above: the doctor-style composition path
+    # they exercise builds a container when the values are numeric.
+    rebuilt = reconfigured(test_container)
+
+    assert rebuilt.application.operations.capabilities().repository == "memory"

@@ -184,3 +184,29 @@ def test_container(tmp_path: Path):
         admin_key="test-admin",
     )
     return build_container(settings, repository=MemoryRepository())
+
+
+@pytest.fixture()
+def reconfigured():
+    """Re-compose a container after its `settings.raw` changed.
+
+    Deployment configuration is read once, at composition (`kip.container`
+    builds the frozen `kip.domain.configuration` records), so a test that
+    edits `settings.raw` afterwards is describing a differently configured
+    deployment, not a live switch. This rebuilds that deployment over the
+    same repository and the same injected adapters, so the indexed corpus
+    and the model doubles survive the reconfiguration.
+    """
+
+    def rebuild(container):
+        return build_container(
+            container.settings,
+            repository=container.repository,
+            embedding=container.embedding,
+            reranker=container.reranker,
+            generator=container.generator,
+            relation_miner=container.relation_miner,
+            lexical_reranker=container.lexical_reranker,
+        )
+
+    return rebuild

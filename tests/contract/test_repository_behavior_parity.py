@@ -27,7 +27,7 @@ from kip.domain.models import (
     SourceObject,
     SourceRevision,
 )
-from kip.errors import NotFoundError
+from kip.errors import NotFoundError, ValidationError
 from kip.ids import new_id
 from kip.ports.repository import RepositoryPort
 
@@ -108,13 +108,6 @@ def _packet(
     acl_scopes: list[str],
     classification: DataClassification,
 ) -> tuple[DocumentPacket, Ingested]:
-    # `PostgresIngestionStore.ingest_packet` requires a non-None ACL
-    # snapshot whose scopes match the source object (ValidationError
-    # otherwise), while `MemoryIngestionStore.ingest_packet` tolerates a
-    # None snapshot and skips that check entirely -- a real divergence
-    # (reported alongside this file). Always supplying a matching,
-    # configuration-owned snapshot here stays inside the shared contract
-    # both backends accept.
     token = f"{suffix}_{workspace}"
     object_id = f"obj_{token}"
     revision_id = f"rev_{token}"
@@ -242,6 +235,55 @@ def test_ingest_lexical_search_and_read_unit_round_trip(harness: Harness) -> Non
     assert view.artifact.id == ingested.artifact_id
     assert view.source_object is not None
     assert view.source_object.id == ingested.object_id
+
+
+def test_ingest_refuses_a_packet_without_an_acl_snapshot(harness: Harness) -> None:
+    # The snapshot is what every later ACL decision is evaluated against, so a
+    # packet arriving without one is refused at admission by both backends
+    # rather than stored under scopes nothing can re-verify.
+    scope = f"workspace:{harness.workspace}"
+    packet, _ = _packet(
+        harness.workspace,
+        "no-snapshot",
+        body="packet without an acl snapshot",
+        acl_scopes=[scope],
+        classification=DataClassification.INTERNAL,
+    )
+    packet.source_object = packet.source_object.model_copy(
+        update={"acl_snapshot": None}
+    )
+
+    with pytest.raises(ValidationError, match="source ACL snapshot is required"):
+        harness.repository.ingestion.ingest_packet(
+            harness.context(acl_scopes=[scope]),
+            packet,
+        )
+
+
+def test_ingest_does_not_mutate_the_caller_s_packet(harness: Harness) -> None:
+    # The packet is the caller's value, not the store's working copy. The
+    # second ingest takes the unchanged-revision branch, which is where the
+    # store refreshes access control and could write through to the argument.
+    scope = f"workspace:{harness.workspace}"
+    packet, _ = _packet(
+        harness.workspace,
+        "caller-owned",
+        body="packet the caller still holds",
+        acl_scopes=[scope],
+        classification=DataClassification.INTERNAL,
+    )
+    context = harness.context(acl_scopes=[scope])
+    before = packet.model_dump(mode="json")
+
+    assert harness.repository.ingestion.ingest_packet(context, packet).status == (
+        "inserted"
+    )
+    assert packet.model_dump(mode="json") == before
+
+    assert harness.repository.ingestion.ingest_packet(context, packet).status == (
+        "unchanged"
+    )
+    assert packet.model_dump(mode="json") == before
 
 
 def test_acl_scope_denial_on_search_and_read(harness: Harness) -> None:

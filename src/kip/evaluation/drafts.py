@@ -125,7 +125,7 @@ class GoldenDraftReview(EvaluationModel):
 def _atomic_write(path: Path, text: str) -> None:
     """Write ``text`` to ``path`` via write-temp-then-``os.replace``.
 
-    Mirrors `kip.ontology_discovery_release._atomic_write`: a reader never
+    Mirrors `kip.adapters.ontology.release._atomic_write`: a reader never
     observes a partially written draft-review or dataset file, and a crash
     mid-write leaves the original file untouched.
     """

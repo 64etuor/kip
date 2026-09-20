@@ -4,4 +4,4 @@
 # scripts/audit-semantic.sh and docs/SECURITY.md.
 infinity-emb[server,torch]==0.0.77
 # typer<0.13 (infinity server CLI) needs click below 8.2.
-click==8.1.8
+click==8.5.0

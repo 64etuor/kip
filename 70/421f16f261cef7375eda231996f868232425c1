@@ -1,0 +1,258 @@
+src/kip/application/runtime.py
+  s_933aeb169886cb::t_6bbdeedcf56dff 6,34
+scripts/verify_project.py
+  s_933aeb169886cb::t_701ed3fde86dfc 166-168
+  s_933aeb169886cb::t_0dcd08c80a71ea 9-12,215-218
+tests/characterization/test_application_dependency_rules.py
+  s_933aeb169886cb::t_61b11fbe6afdde 121
+  s_933aeb169886cb::t_852ad0055bb5c0 6,9,11,17,22-26,28,32,37,39,43-45,47-48,50,54-87
+  s_933aeb169886cb::t_0c9d85c77125a2 134-136
+  s_933aeb169886cb::t_119e30b13ce4ec 7-8,10,88-120,122-132,138-195
+  s_933aeb169886cb::t_dfb1bbb9ed3a32 133,137
+tests/test_cli_doctor.py
+  s_933aeb169886cb::t_1aeb819413bff2 12,15,19,36-49,754,797,811,832,845,886,911,947,959,978,990,1003,1029,1048
+  s_933aeb169886cb::t_e54a6a58ea848d 14
+src/kip/application/interactions.py
+  s_933aeb169886cb::t_caae26a908fdbc 170
+  s_933aeb169886cb::t_e2ca9b814be0ee 28,43,51,242,249
+tests/test_ontology_review_governance.py
+  s_933aeb169886cb::t_5242415d58224a 32
+  s_933aeb169886cb::t_3c0d00d152c874 139
+contracts/openapi.json
+  s_933aeb169886cb::t_519ee0b0454d37 1065
+src/kip/application/diagnostics.py
+  s_933aeb169886cb::t_214c9d6692e53a 237
+  s_933aeb169886cb::t_f1ff7fc501a146 307
+  s_933aeb169886cb::t_f8dc4c6568ebaa 323-327,331,333
+  s_933aeb169886cb::t_3c9f2b8ec15890 98
+  s_933aeb169886cb::t_b3a58a4faa8536 1-21,24,26-32,36-43,45,50-53,58-77,79-97,100-141,143-200,202-236,238-303,305-306,308-322,328-330,332,334-339,341,343-419,421-487,489-529,531-534,536-541,543-574,576-581,587-624,626-654
+  s_933aeb169886cb::t_858148bed958a4 340,342
+  s_933aeb169886cb::t_8c5873f7b5d1bb 142
+  s_933aeb169886cb::t_9fe82cb5e620fb 535,542,625
+  s_933aeb169886cb::t_5623c54a3122c4 575,582-586
+  s_933aeb169886cb::t_065d392033e79b 33,35,44,46-49,54,56-57
+  s_933aeb169886cb::t_f7c8847f3b0bde 22
+  s_933aeb169886cb::t_e2ca9b814be0ee 23,25,34,55,99,304,420,488,530
+  s_933aeb169886cb::t_749cd28ec12326 78
+  s_933aeb169886cb::t_ec2d54271c9ae9 201
+src/kip/application/knowledge.py
+  s_933aeb169886cb::t_32eabaf1db5e20 17
+src/kip/application/operations.py
+  s_933aeb169886cb::t_1c4c94d51f2b38 7,27-28,37,84,100,134
+src/kip/evaluation/drafts.py
+  s_933aeb169886cb::t_caae26a908fdbc 128
+tests/test_adaptive_interactions.py
+  s_933aeb169886cb::t_5242415d58224a 12,30
+  s_933aeb169886cb::t_fe1a83c2e200c8 78
+  s_933aeb169886cb::t_586c42ce1eb7ea 315-326
+  s_933aeb169886cb::t_3c0d00d152c874 329,348,401,434,475
+src/kip/adapters/telemetry/memory.py
+  s_933aeb169886cb::t_15bf9c8120375e 9,28-42
+tests/conftest.py
+  s_933aeb169886cb::t_23e650133e6146 187-212
+tests/contract/test_repository_behavior_parity.py
+  s_933aeb169886cb::t_6970c7e953f6c2 263-288
+  s_933aeb169886cb::t_2cc4738200416c 30,240-260
+  s_933aeb169886cb::t_6f4f0dd7989d67 261-262
+tests/test_ontology_contract.py
+  s_933aeb169886cb::t_2575878df6e8a1 12,16-19
+  s_933aeb169886cb::t_3c0d00d152c874 81,143,166
+tests/test_ontology_discovery_release.py
+  s_933aeb169886cb::t_3c0d00d152c874 132,163,200,360,382
+  s_933aeb169886cb::t_5242415d58224a 14-19,27
+  s_933aeb169886cb::t_c12b55f4398b3e 584,586,592
+tests/test_search_diversity.py
+  s_933aeb169886cb::t_0646c916898fde 23,32,34,43,47,49,59,63,65,73,77,79
+tests/test_alias_expansion.py
+  s_933aeb169886cb::t_c783c87be9ccee 26,28-30,40-42,45-46,51,54-55
+tests/test_mcp_envelope_contract.py
+  s_933aeb169886cb::t_7c18d6a11ce0f0 652-667
+  s_933aeb169886cb::t_b82c092bb1e909 668
+tests/test_relation_miner_contract.py
+  s_933aeb169886cb::t_5242415d58224a 19
+  s_933aeb169886cb::t_3c0d00d152c874 92
+src/kip/adapters/repository/memory/interactions.py
+  s_933aeb169886cb::t_15bf9c8120375e 22
+src/kip/adapters/ontology/catalog.py
+  s_933aeb169886cb::t_e979195c4ca9ec 1-31
+src/kip/application/search_engine.py
+  s_933aeb169886cb::t_a8912eb1b3f024 37
+  s_933aeb169886cb::t_0c6f6f7b40e3b7 155,197,202,280,291-292,335-336,357-359,361-363,386,404-406,424,493
+  s_933aeb169886cb::t_1049a54ade46b7 10,389
+  s_933aeb169886cb::t_370bc02d34c4a6 125,135
+src/kip/domain/configuration.py
+  s_933aeb169886cb::t_1049a54ade46b7 48-53
+  s_933aeb169886cb::t_bfe1950d2573ba 1-16,18-47,54-82,84-89
+  s_933aeb169886cb::t_b115da2a23a30d 17,83
+src/kip/ports/configuration.py
+  s_933aeb169886cb::t_fd9aa8147d9ff7 1-43
+src/kip/adapters/ontology/__init__.py
+  s_933aeb169886cb::t_e979195c4ca9ec 1-6
+src/kip/adapters/repository/postgres/interactions.py
+  s_933aeb169886cb::t_887817532f8065 52-53,56-88
+src/kip/application/search.py
+  s_933aeb169886cb::t_e7be54049c9396 8,11
+  s_933aeb169886cb::t_37c067873db69f 100-101,112,116,121,276,332
+tests/contract/test_interaction_and_trace_parity.py
+  s_933aeb169886cb::t_fd96ec73f79ec0 1-272,274-276,279-406,408-411,413-456,472,477-482,484-492,494,496-639
+  s_933aeb169886cb::t_40763b738d6c35 273,277-278,407,412,457-471,473-476,483,493,495
+src/kip/adapters/ontology/release.py
+  s_933aeb169886cb::t_e979195c4ca9ec 1-40,42-582,584-821
+  s_933aeb169886cb::t_caae26a908fdbc 41,583
+tests/test_ontology_rag_domain.py
+  s_933aeb169886cb::t_5242415d58224a 20
+  s_933aeb169886cb::t_3c0d00d152c874 102
+docs/PRODUCTION_DESIGN_ALIGNMENT.md
+  s_933aeb169886cb::t_1dd9469bca65f0 4
+  s_933aeb169886cb::t_519ee0b0454d37 133
+src/kip/ports/diagnostics.py
+  s_933aeb169886cb::t_599107de215225 1-67
+docs/adr/ADR-044-discovery-approval-auto-release.md
+  s_933aeb169886cb::t_6a76f5c5284b7e 101
+src/kip/cli.py
+  s_933aeb169886cb::t_18b3a1d337e865 45,68-69,1717
+  s_933aeb169886cb::t_f6d4bb0b2b11af 19,723-728
+  s_933aeb169886cb::t_e54a6a58ea848d 7
+scripts/generate_contracts.py
+  s_933aeb169886cb::t_5242415d58224a 89-92
+skills/kip-setup/SKILL.md
+  s_933aeb169886cb::t_6f0db6fcacb5c9 20-24,27-29,44-50,88-90,105-108
+  s_933aeb169886cb::t_c698993abe70c7 98-100
+src/kip/container.py
+  s_933aeb169886cb::t_6bbdeedcf56dff 10,50,526,533-538,570,586-591,593
+  s_933aeb169886cb::t_db3746a6718db5 28-32,70,525,820-823,828-850,852-856,860-863,865,868,871-872,875-877,879-881,885-888,893-898,903-913,919-928,930-936
+  s_933aeb169886cb::t_61b11fbe6afdde 132-136,138-141,143-146,153-154,157-159,170-174,179-185,824-827,958-972
+  s_933aeb169886cb::t_baa5dd244efc62 300-301,527,573,819,851,878,929
+  s_933aeb169886cb::t_32eabaf1db5e20 79
+  s_933aeb169886cb::t_dda969b9635e86 857-859,864,866-867,869-870,873-874,882-884,889-892,899-902,914-918,946-957
+  s_933aeb169886cb::t_98ff690ff328ba 25-27,62-63,65-69,78,303-304,320,322,336-337,339,490,524,528-532,592,937-938,973-974
+src/kip/adapters/repository/memory/ingestion.py
+  s_933aeb169886cb::t_00adab006dd452 47-66,164-189,196-212
+.claude/skills/knowledge-fabric/SKILL.md
+  s_933aeb169886cb::t_13240300811c3f 50-53,64-67,101-110
+  s_933aeb169886cb::t_b82c092bb1e909 22-23
+  s_933aeb169886cb::t_065fb41e44c6b8 30-49,58-59,70-73
+src/kip/domain/ontology.py
+  s_933aeb169886cb::t_bfd29e1d2d05b6 1-25,57-174
+  s_933aeb169886cb::t_e334599902a086 26-56
+skills/knowledge-fabric/SKILL.md
+  s_933aeb169886cb::t_c698993abe70c7 50-53,64-67,101-110
+  s_933aeb169886cb::t_b82c092bb1e909 22-23
+  s_933aeb169886cb::t_37283f793c9c1d 30-49,58-59,70-73
+src/kip/application/ontology_migrations.py
+  s_933aeb169886cb::t_5654051032c2e9 15-16,23,25,33,40,51,54,62
+tests/test_dependency_boundaries.py
+  s_933aeb169886cb::t_61b11fbe6afdde 21
+  s_933aeb169886cb::t_852ad0055bb5c0 3-7,11-20,22-27
+tests/test_shipped_defaults_parity.py
+  s_933aeb169886cb::t_503e1ce76f905a 21,96,118,120
+  s_933aeb169886cb::t_18896d19dbe0ed 63-67,80
+src/kip/domain/interactions.py
+  s_933aeb169886cb::t_caae26a908fdbc 306,402
+tests/test_ontology_profiles.py
+  s_933aeb169886cb::t_fe1a83c2e200c8 10-11
+  s_933aeb169886cb::t_3c0d00d152c874 21,36,44,64
+tests/test_setup_skill.py
+  s_933aeb169886cb::t_4963a1d11ad63a 40-42
+tests/integration/test_postgres_repository.py
+  s_933aeb169886cb::t_5242415d58224a 44,48
+  s_933aeb169886cb::t_fe1a83c2e200c8 64
+  s_933aeb169886cb::t_3c0d00d152c874 256
+pyproject.toml
+  s_933aeb169886cb::t_1dd9469bca65f0 7
+src/kip/adapters/diagnostics.py
+  s_933aeb169886cb::t_a0e12a89ea047b 1-71
+tests/test_ontology_port_adapters.py
+  s_933aeb169886cb::t_e945a3e6cbdeef 1-109
+src/kip/ontology.py
+  s_933aeb169886cb::t_caae26a908fdbc 188
+  s_933aeb169886cb::t_9fa033408a5a67 216
+  s_933aeb169886cb::t_0e9613101a44fd 1-7,12,16,211-215,217-237,239-251,253-262,264-273
+src/kip/architecture_rules.py
+  s_933aeb169886cb::t_1f583215a99d16 1-24,28,31-96,98,112-115,117-120,160,162-165,174-182,185,187-192,195,202-213,217-224,227-236,243-256
+  s_933aeb169886cb::t_bf036083db5498 97,106-111,116,121-131,133-142,147-159,161,166-173,196-201,237-242
+  s_933aeb169886cb::t_61b11fbe6afdde 100-105,143-146
+  s_933aeb169886cb::t_57893529901427 99
+.claude/skills/kip-setup/SKILL.md
+  s_933aeb169886cb::t_065fb41e44c6b8 20-24,27-29,44-50,88-90,105-108
+  s_933aeb169886cb::t_13240300811c3f 98-100
+src/kip/__init__.py
+  s_933aeb169886cb::t_1dd9469bca65f0 3
+tests/test_config_key_validation.py
+  s_933aeb169886cb::t_c12b55f4398b3e 93
+  s_933aeb169886cb::t_503e1ce76f905a 88,91
+  s_933aeb169886cb::t_7bacc3a7723c70 170
+  s_933aeb169886cb::t_9dce7fa7b6085a 17,130-169
+contracts/openapi.yaml
+  s_933aeb169886cb::t_519ee0b0454d37 6
+tests/test_semantic_default.py
+  s_933aeb169886cb::t_f0c204f943a82e 288-291,294-295
+  s_933aeb169886cb::t_affc44abbde6a7 357,359-361,376-378,390-392,597,618,620
+  s_933aeb169886cb::t_5cab97fab090a2 396,401-406,433,436-441
+src/kip/ports/ontology.py
+  s_933aeb169886cb::t_a31db883c6421c 1-78
+src/kip/domain/ontology_migration.py
+  s_933aeb169886cb::t_af43bf33211a97 1-322
+src/kip/adapters/relation_miners/generator.py
+  s_933aeb169886cb::t_32eabaf1db5e20 15
+src/kip/application/ontology_rag.py
+  s_933aeb169886cb::t_00bcdf58e4d6ff 39
+src/kip/application/semantic.py
+  s_933aeb169886cb::t_4e9f07171eebaa 48-49
+  s_933aeb169886cb::t_e7be54049c9396 135,144-145,158-159,201,203,275,286,302,373,375,400,406-408
+  s_933aeb169886cb::t_8005b0b3568b3e 10
+src/kip/application/answering.py
+  s_933aeb169886cb::t_00bcdf58e4d6ff 16
+  s_933aeb169886cb::t_1ef4acf744cd02 56,64-68
+CHANGELOG.md
+  s_933aeb169886cb::t_519ee0b0454d37 65-68,83-90
+  s_933aeb169886cb::t_82a1758a73fc47 42,44-57,69-82
+  s_933aeb169886cb::t_b82c092bb1e909 36-40
+  s_933aeb169886cb::t_1dd9469bca65f0 3-31,41,43
+  s_933aeb169886cb::t_701ed3fde86dfc 32-35,58-64,91
+tests/test_filesystem_retrieval.py
+  s_933aeb169886cb::t_c783c87be9ccee 47,53-55,59,63
+docs/IMPLEMENTATION_STATUS.md
+  s_933aeb169886cb::t_1dd9469bca65f0 7-17,20
+  s_933aeb169886cb::t_701ed3fde86dfc 18-19
+VERSION
+  s_933aeb169886cb::t_1dd9469bca65f0 1
+tests/test_ontology_migration_materialization.py
+  s_933aeb169886cb::t_5242415d58224a 14
+tests/test_semantic_projection_resume.py
+  s_933aeb169886cb::t_fcc35b32fa3958 10,155
+  s_933aeb169886cb::t_503e1ce76f905a 128,157,198,214
+  s_933aeb169886cb::t_18896d19dbe0ed 87,257
+src/kip/ontology_migration.py
+  s_933aeb169886cb::t_af43bf33211a97 1-7,14-18,20,30-32
+src/kip/ontology_release.py
+  s_933aeb169886cb::t_e334599902a086 1-6,12-19,37-50,52-61
+src/kip/mcp_server.py
+  s_933aeb169886cb::t_335c44558faf8b 109-110
+  s_933aeb169886cb::t_7c9cfb92b91e7a 230
+  s_933aeb169886cb::t_b82c092bb1e909 111
+tests/contract/test_operations_extension_versions.py
+  s_933aeb169886cb::t_3c0401c59ba58e 23
+tests/test_abstention.py
+  s_933aeb169886cb::t_51e1acd51dbca1 55,58-59,61
+tests/test_retrieval_quality_regressions.py
+  s_933aeb169886cb::t_8c32a9fa47a98e 272-274,284-285
+uv.lock
+  s_933aeb169886cb::t_bd0ae7bc0426fc 764
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.19",
+  "base_commit_sha": "70421f16f261cef7375eda231996f868232425c1",
+  "prompts": {},
+  "sessions": {
+    "s_933aeb169886cb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ee81213d-ecb5-4436-abf7-b76c4b19f2b5",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "64etuor <130260521+64etuor@users.noreply.github.com>"
+    }
+  }
+}
